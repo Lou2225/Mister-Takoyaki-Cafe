@@ -1,0 +1,1474 @@
+<div
+    x-data="userManagementData(@js($panel), @js($mode), @js($view))"
+    x-on:switch-panel.window="
+        panel = $event.detail?.panel || $event.detail[0]?.panel || 'list'; 
+        mode = $event.detail?.mode || $event.detail[0]?.mode || 'list';
+        if (panel === 'form') {
+            initMap();
+        } else {
+            if (this.marker && mode === 'create') {
+                this.map.removeLayer(this.marker);
+                this.marker = null;
+            }
+        }
+    "
+    @send-email-bg.window="$wire.sendUserEmail($event.detail.userId, $event.detail.password)"
+    @trigger-edit.window="$wire.showEdit($event.detail.id, $event.detail.mode || 'edit')"
+    @trigger-set-formrole.window="$wire.setFormRoleId($event.detail)"
+    @trigger-set-formbranch.window="$wire.set('formBranchId', $event.detail)"
+    @trigger-set-position.window="$wire.set('position', $event.detail)"
+    class="relative">
+
+
+
+
+
+
+    <div class="relative min-h-[600px]">
+        {{-- ════════════════ PANEL 2 — FORM (CREATE/EDIT) ════════════════ --}}
+        <div x-show="panel === 'form'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="px-1">
+            <div class="mb-5 flex items-center justify-between">
+                <div>
+                    <h2 class="text-[17px] font-bold text-gray-900 tracking-tight" x-text="mode === 'create' ? 'Register New User' : (mode === 'edit' ? 'Update Profile' : 'View Profile')"></h2>
+                    <p class="text-[12px] text-gray-500 font-medium" x-text="mode === 'create' ? 'New team member entry' : (mode === 'edit' ? 'Employee reference configuration' : 'Read-only profile view')"></p>
+                </div>
+                <x-secondary-button @click="panel = 'list'; mode = 'list'; $wire.backToList()" class="h-10">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    Back to List
+                </x-secondary-button>
+            </div>
+
+            <div x-show="mode !== 'view'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {{-- Left: profile + work records --}}
+                <div class="lg:col-span-2 space-y-6">
+
+                    <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
+                        <h2 class="text-[13px] font-semibold text-gray-700 uppercase tracking-wider mb-4">Profile Details</h2>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <x-input-label for="f_first_name" value="First Name *" />
+                                <x-text-input id="f_first_name" name="first_name" wire:model.debounce.500ms="firstName"
+                                    type="text" class="mt-1 block w-full" placeholder="Juan"
+                                    autocomplete="given-name" inputFilter="nameStrict" maxlength="100"
+                                    @keydown="FormFilters.nameStrictKeydown($event)" @paste="FormFilters.nameStrictPaste($event)"
+                                    :hasError="$errors->has('firstName')" />
+                                <x-input-error :messages="$errors->get('firstName')" class="mt-1" />
+                            </div>
+                            <div>
+                                <x-input-label for="f_middle_name" value="Middle Name" />
+                                <x-text-input id="f_middle_name" name="middle_name" wire:model.debounce.500ms="middleName"
+                                    type="text" class="mt-1 block w-full" placeholder="Dela"
+                                    autocomplete="additional-name" inputFilter="nameStrict" maxlength="100"
+                                    @keydown="FormFilters.nameStrictKeydown($event)" @paste="FormFilters.nameStrictPaste($event)"
+                                    :hasError="$errors->has('middleName')" />
+                                <x-input-error :messages="$errors->get('middleName')" class="mt-1" />
+                            </div>
+                            <div>
+                                <x-input-label for="f_last_name" value="Last Name *" />
+                                <x-text-input id="f_last_name" name="last_name" wire:model.debounce.500ms="lastName" type="text"
+                                    class="mt-1 block w-full" placeholder="Cruz" autocomplete="family-name" 
+                                    inputFilter="nameStrict" maxlength="100"
+                                    @keydown="FormFilters.nameStrictKeydown($event)" @paste="FormFilters.nameStrictPaste($event)"
+                                    :hasError="$errors->has('lastName')" />
+                                <x-input-error :messages="$errors->get('lastName')" class="mt-1" />
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                            <div>
+                                <x-input-label for="f_email" value="Email Address *" />
+                                <x-text-input id="f_email" name="email" wire:model.debounce.500ms="email" type="email"
+                                    class="mt-1 block w-full" placeholder="juan.cruz@company.com"
+                                    autocomplete="email" inputFilter="email" maxlength="255"
+                                    @keydown="FormFilters.emailKeydown($event)" @paste="FormFilters.emailPaste($event)"
+                                    :hasError="$errors->has('email')" />
+                                <x-input-error :messages="$errors->get('email')" class="mt-1" />
+                            </div>
+                            <div>
+                                <x-input-label for="f_phone" value="Phone Number" />
+                                <div class="flex items-center mt-1">
+                                    <div class="flex-shrink-0 inline-flex items-center px-3 h-10 rounded-l-lg border border-r-0 border-gray-200 bg-gray-50 text-gray-500 text-[13px] font-bold">
+                                        +63
+                                    </div>
+                                    <x-text-input id="f_phone" name="phone" wire:model.debounce.500ms="phone" type="text"
+                                        class="block w-full rounded-l-none" placeholder="912 345 6789" autocomplete="tel"
+                                        inputFilter="number" maxlength="10"
+                                        @keydown="FormFilters.numberKeydown($event)" @paste="FormFilters.numberPaste($event)"
+                                        :hasError="$errors->has('phone')" />
+                                </div>
+                                <x-input-error :messages="$errors->get('phone')" class="mt-1" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
+                        <h2 class="text-[13px] font-semibold text-gray-700 uppercase tracking-wider mb-4">Work Records</h2>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div>
+                                <x-input-label for="f_employee_id" value="Employee ID" />
+                                <div class="relative mt-1">
+                                    <input type="text" id="f_employee_id" readonly 
+                                        value="{{ $editUserId ? $employeeId : 'Auto-generated' }}"
+                                        class="block w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-gray-400 text-[13px] shadow-sm cursor-not-allowed focus:ring-0 focus:border-gray-200 h-10 select-none pl-8">
+                                    <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                                        <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="{{ $formRoleId == 3 ? 'block' : 'hidden' }}">
+                                <x-input-label for="f_position">Staff Role <span class="text-red-500">*</span></x-input-label>
+                                <div wire:key="role-dropdown-container">
+                                    <x-dropdown align="left" width="full" containerClasses="block w-full">
+                                        <x-slot name="trigger">
+                                            <button id="f_position" type="button" 
+                                                class="mt-1 flex items-center justify-between w-full px-3 py-2 bg-white border rounded-lg text-[13px] text-gray-700 shadow-sm hover:border-gray-300 focus:outline-none transition-all h-10 {{ $errors->has('position') ? 'border-red-400 bg-red-50/30' : 'border-gray-200' }}">
+                                                <span>{{ $position ?: 'Select role...' }}</span>
+                                                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            </button>
+                                        </x-slot>
+                                        <x-slot name="content" class="max-h-60 overflow-y-auto">
+                                            @forelse($availablePositions as $pos)
+                                                <x-dropdown-link href="#" @click.prevent="$dispatch('trigger-set-position', '{{ $pos }}')">
+                                                    {{ $pos }}
+                                                </x-dropdown-link>
+                                            @empty
+                                                <div class="px-4 py-2 text-[12px] text-gray-400 italic font-medium">No roles configured...</div>
+                                            @endforelse
+                                        </x-slot>
+                                    </x-dropdown>
+                                    <x-input-error :messages="$errors->get('position')" class="mt-1" />
+                                </div>
+                            </div>
+                            <div>
+                                <x-input-label for="f_date_hired" value="Date Joined" />
+                                <x-text-input id="f_date_hired" name="date_hired" wire:model.lazy="dateHired"
+                                    type="date" class="mt-1 block w-full" inputFilter="date"
+                                    @keydown="FormFilters.dateKeydown($event)" @paste="FormFilters.datePaste($event)"
+                                    :hasError="$errors->has('dateHired')" />
+                                <x-input-error :messages="$errors->get('dateHired')" class="mt-1" />
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Section: Address --}}
+                    <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
+                        <div class="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <h3 class="text-[14px] font-bold text-gray-900 mb-1">Residential Address</h3>
+                                <p class="text-[12px] text-gray-500">Provide the geographic location of this team member.</p>
+                            </div>
+                            <button type="button" @click="$dispatch('open-modal', 'map-modal'); initMap();" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-[11px] font-bold hover:bg-indigo-100 transition-all shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                Open Map Picker
+                            </button>
+                        </div>
+
+                        <div class="flex flex-col gap-5">
+                            {{-- Row 1: Region + Province --}}
+                            <div class="flex flex-col sm:flex-row gap-5">
+                                <div class="flex-1 w-full">
+                                    <x-input-label value="Region" />
+                                    <div class="relative mt-1" @click.outside="loc.region.open = false">
+                                        <button type="button" @click="loc.region.open = !loc.region.open; loadRegions();" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm hover:border-indigo-300 focus:outline-none transition-all h-10">
+                                            <span class="truncate" :class="'{{ $addr_region }}' ? 'text-gray-900 font-medium' : 'text-gray-400'">{{ $addr_region ?: 'Select Region...' }}</span>
+                                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                        </button>
+                                        <div x-show="loc.region.open" class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden" x-cloak>
+                                            <div class="p-2 border-b border-gray-100 bg-gray-50/50">
+                                                <input x-model="loc.region.search" type="text" placeholder="Search..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                                            </div>
+                                            <div class="max-h-48 overflow-y-auto">
+                                                <template x-for="r in filtered('region')" :key="r.code">
+                                                    <button type="button" @click="selectRegion(r)" class="w-full text-left px-4 py-2 text-[12px] hover:bg-indigo-50 transition-colors" x-text="r.name"></button>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <x-input-error :messages="$errors->get('addr_region')" class="mt-1" />
+                                </div>
+
+                                <div class="flex-1 w-full">
+                                    <x-input-label value="Province" />
+                                    <div class="relative mt-1" @click.outside="loc.province.open = false">
+                                        <button type="button" @click="loc.province.open = !loc.province.open" :disabled="!'{{ $addr_region }}' || loc.noProvince" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 h-10">
+                                            <span class="truncate" :class="'{{ $addr_province }}' ? 'text-gray-900 font-medium' : 'text-gray-400'">
+                                                <template x-if="loc.noProvince"><span>N/A (Direct to City)</span></template>
+                                                <template x-if="!loc.noProvince"><span x-text="'{{ $addr_province }}' || 'Select Province...'"></span></template>
+                                            </span>
+                                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                        </button>
+                                        <div x-show="loc.province.open" class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden" x-cloak>
+                                            <div class="p-2 border-b border-gray-100 bg-gray-50/50">
+                                                <input x-model="loc.province.search" type="text" placeholder="Search..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                                            </div>
+                                            <div class="max-h-48 overflow-y-auto">
+                                                <template x-for="p in filtered('province')" :key="p.code">
+                                                    <button type="button" @click="selectProvince(p)" class="w-full text-left px-4 py-2 text-[12px] hover:bg-indigo-50 transition-colors" x-text="p.name"></button>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <x-input-error :messages="$errors->get('addr_province')" class="mt-1" />
+                                </div>
+                            </div>
+
+                            {{-- Row 2: City + Barangay --}}
+                            <div class="flex flex-col sm:flex-row gap-5">
+                                <div class="flex-1 w-full">
+                                    <x-input-label value="City / Municipality" />
+                                    <div class="relative mt-1" @click.outside="loc.city.open = false">
+                                        <button type="button" @click="loc.city.open = !loc.city.open" :disabled="!'{{ $addr_region }}'" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 h-10">
+                                            <span class="truncate" :class="'{{ $addr_city }}' ? 'text-gray-900 font-medium' : 'text-gray-400'">{{ $addr_city ?: 'Select City...' }}</span>
+                                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                        </button>
+                                        <div x-show="loc.city.open" class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden" x-cloak>
+                                            <div class="p-2 border-b border-gray-100 bg-gray-50/50">
+                                                <input x-model="loc.city.search" type="text" placeholder="Search..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                                            </div>
+                                            <div class="max-h-48 overflow-y-auto">
+                                                <template x-for="c in filtered('city')" :key="c.code">
+                                                    <button type="button" @click="selectCity(c)" class="w-full text-left px-4 py-2 text-[12px] hover:bg-indigo-50 transition-colors" x-text="c.name"></button>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <x-input-error :messages="$errors->get('addr_city')" class="mt-1" />
+                                </div>
+
+                                <div class="flex-1 w-full">
+                                    <x-input-label value="Barangay" />
+                                    <div class="relative mt-1" @click.outside="loc.barangay.open = false">
+                                        <button type="button" @click="loc.barangay.open = !loc.barangay.open" :disabled="!'{{ $addr_city }}'" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 h-10">
+                                            <span class="truncate" :class="'{{ $addr_barangay }}' ? 'text-gray-900 font-medium' : 'text-gray-400'">{{ $addr_barangay ?: 'Select Barangay...' }}</span>
+                                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                        </button>
+                                        <div x-show="loc.barangay.open" class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden" x-cloak>
+                                            <div class="p-2 border-b border-gray-100 bg-gray-50/50">
+                                                <input x-model="loc.barangay.search" type="text" placeholder="Search..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                                            </div>
+                                            <div class="max-h-48 overflow-y-auto">
+                                                <template x-for="b in filtered('barangay')" :key="b.code">
+                                                    <button type="button" @click="selectBarangay(b)" class="w-full text-left px-4 py-2 text-[12px] hover:bg-indigo-50 transition-colors" x-text="b.name"></button>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <x-input-error :messages="$errors->get('addr_barangay')" class="mt-1" />
+                                </div>
+                            </div>
+
+                            {{-- Row 3: Street --}}
+                            <div>
+                                <x-input-label value="House # / Street / Subdivision" />
+                                <x-text-input wire:model.debounce.400ms="addr_street" class="w-full mt-1 h-10" placeholder="e.g. Unit 123, Rosewood Ave, Phase 1" :hasError="$errors->has('addr_street')" />
+                                <x-input-error :messages="$errors->get('addr_street')" class="mt-1" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Right: access + status + actions --}}
+                <div class="space-y-6">
+                    <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
+                        <h2 class="text-[13px] font-semibold text-gray-700 uppercase tracking-wider mb-4">Access Rights</h2>
+                        @if(auth()->user()->role_id === 1)
+                            <div class="mb-4">
+                                <x-input-label for="f_role" value="Account Type *" />
+                                <x-dropdown align="left" width="full" containerClasses="block w-full">
+                                    <x-slot name="trigger">
+                                        <button id="f_role" type="button"
+                                            class="mt-1 flex items-center justify-between w-full px-3 py-2 bg-white border rounded-lg text-[13px] text-gray-700 shadow-sm hover:border-gray-300 focus:outline-none transition-all h-10 {{ $errors->has('formRoleId') ? 'border-red-400 bg-red-50/30' : 'border-gray-200' }}">
+                                            <span>{{ $formRoleId ? $roles->firstWhere('id', $formRoleId)?->name : 'Select account type...' }}</span>
+                                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </button>
+                                    </x-slot>
+                                    <x-slot name="content">
+                                        @forelse($roles as $r)
+                                            <x-dropdown-link href="#" @click.prevent="$dispatch('trigger-set-formrole', '{{ $r->id }}')">
+                                                {{ ucfirst($r->name) }}
+                                            </x-dropdown-link>
+                                        @empty
+                                            <div class="px-4 py-2 text-[12px] text-gray-400 italic font-medium">No roles available...</div>
+                                        @endforelse
+                                    </x-slot>
+                                </x-dropdown>
+                                <x-input-error :messages="$errors->get('formRoleId')" class="mt-1" />
+                            </div>
+                            <div>
+                                <x-input-label for="f_branch_id" value="Work Location *" />
+                                <x-dropdown align="left" width="full" containerClasses="block w-full">
+                                    <x-slot name="trigger">
+                                        <button id="f_branch_id" type="button"
+                                            class="mt-1 flex items-center justify-between w-full px-3 py-2 bg-white border rounded-lg text-[13px] text-gray-700 shadow-sm hover:border-gray-300 focus:outline-none transition-all h-10 {{ $errors->has('formBranchId') ? 'border-red-400 bg-red-50/30' : 'border-gray-200' }}">
+                                            <span>{{ $formBranchId ? $branches->firstWhere('id', $formBranchId)?->branch_name : 'Select work location...' }}</span>
+                                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor"
+                                                viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </button>
+                                    </x-slot>
+                                    <x-slot name="content" class="max-h-60 overflow-y-auto">
+                                        @forelse($branches as $branch)
+                                            <x-dropdown-link href="#" @click.prevent="$dispatch('trigger-set-formbranch', '{{ $branch->id }}')">
+                                                {{ $branch->branch_name }}
+                                            </x-dropdown-link>
+                                        @empty
+                                            <div class="px-4 py-2 text-[12px] text-gray-400 italic font-medium">No branches defined...</div>
+                                        @endforelse
+                                    </x-slot>
+                                </x-dropdown>
+                                <x-input-error :messages="$errors->get('formBranchId')" class="mt-1" />
+                            </div>
+                        @else
+                            <div class="space-y-3">
+                                <div class="flex items-center justify-between py-2 border-b border-gray-100">
+                                    <span class="text-[12px] text-gray-500 font-medium">Role</span>
+                                    <span
+                                        class="text-[12px] font-bold text-gray-800 bg-gray-100 px-2 py-0.5 rounded-full">Staff</span>
+                                </div>
+                                <div class="flex items-center justify-between py-2">
+                                    <span class="text-[12px] text-gray-500 font-medium">Branch</span>
+                                    <span
+                                        class="text-[12px] font-bold text-gray-800">{{ auth()->user()->branch?->branch_name ?? '—' }}</span>
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+
+                    <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
+                        <h2 class="text-[13px] font-semibold text-gray-700 uppercase tracking-wider mb-4">Account Status</h2>
+                        <label for="f_is_active" class="flex items-center gap-3 cursor-pointer select-none">
+                            <input type="checkbox" id="f_is_active" name="is_active" wire:model.lazy="formIsActive"
+                                class="rounded border-gray-300 text-gray-900 shadow-sm focus:ring-gray-900 h-4 w-4">
+                            <div>
+                                <span class="block text-[13px] font-semibold text-gray-800">Active Access</span>
+                                <span class="block text-[12px] text-gray-500">Allow user to sign in.</span>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div class="flex flex-col gap-2">
+                        <x-primary-button type="button" wire:click="validateBeforeSaveUser"
+                            class="w-full justify-center" x-text="mode === 'edit' ? 'Save Changes' : 'Register User'"></x-primary-button>
+                        <x-secondary-button @click="mode === 'edit' ? $wire.showEdit($wire.get('editUserId'), 'view') : (panel = 'list', mode = 'list', $wire.backToList())" class="w-full justify-center">
+                            <span>Cancel</span>
+                        </x-secondary-button>
+
+                        @if($editUserId)
+                            <div class="bg-red-50 border border-red-100 rounded-2xl p-6 shadow-sm mt-4" wire:key="danger-zone-{{ $editUserId }}">
+                                <h2 class="text-[13px] font-bold text-red-600 uppercase tracking-wider mb-2">Danger Zone</h2>
+                                <p class="text-[12px] text-gray-500 mb-4 leading-relaxed">Permanently deactivate this user account. This will restrict their access to the system immediately.</p>
+                                <x-danger-button 
+                                    wire:click="confirmDelete({{ $editUserId }}, '{{ addslashes($firstName . ' ' . $lastName) }}')"
+                                    class="w-full justify-center h-11">
+                                    Delete Account
+                                </x-danger-button>
+                            </div>
+                        @else
+                            <div wire:key="danger-zone-empty"></div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+            </div>
+
+            {{-- ════════════════ DASHBOARD (VIEW MODE) ════════════════ --}}
+            <div x-show="mode === 'view'" x-cloak x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    {{-- Profile Card (Left side) --}}
+                    <div class="col-span-1 space-y-6">
+                        <div class="bg-white rounded-3xl border border-slate-200/60 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.05)] p-8 text-center relative overflow-hidden group">
+                            {{-- Decorative background element --}}
+                            <div class="absolute -top-24 -right-24 w-48 h-48 bg-indigo-50 rounded-full blur-3xl opacity-50 group-hover:bg-indigo-100 transition-colors duration-500"></div>
+                            
+                            <div class="relative">
+                                <div class="w-24 h-24 bg-gradient-to-tr from-indigo-600 to-violet-500 text-white rounded-2xl flex items-center justify-center text-3xl font-black mx-auto mb-6 shadow-xl shadow-indigo-200 rotate-3 group-hover:rotate-0 transition-transform duration-500">
+                                    {{ strtoupper(substr($firstName, 0, 1) . substr($lastName, 0, 1)) }}
+                                </div>
+                                <h3 class="text-xl font-black text-slate-900 tracking-tight">{{ $firstName }} {{ $lastName }}</h3>
+                                <p class="text-[13px] text-slate-500 font-medium mt-1">{{ $email }}</p>
+                                
+                                <div class="mt-8 pt-8 border-t border-slate-100 text-left space-y-5">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Account ID</span>
+                                        <span class="text-[12px] font-black text-slate-700 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">#{{ $employeeId ?: 'PENDING' }}</span>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">System Role</span>
+                                        <span class="text-[12px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100">{{ $formRoleId ? $roles->firstWhere('id', $formRoleId)?->name : 'N/A' }}</span>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Work Location</span>
+                                        <span class="text-[12px] font-bold text-slate-700">{{ $formBranchId ? $branches->firstWhere('id', $formBranchId)?->branch_name : 'N/A' }}</span>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Status</span>
+                                        @if($formIsActive)
+                                            <span class="flex items-center gap-1.5 text-[10px] font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
+                                                <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+                                                ACTIVE
+                                            </span>
+                                        @else
+                                            <span class="text-[10px] font-black text-red-600 bg-red-50 px-2.5 py-1 rounded-full border border-red-100">INACTIVE</span>
+                                        @endif
+                                    </div>
+                                    <div class="flex items-center justify-between pt-2">
+                                        <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Hired Since</span>
+                                        <span class="text-[12px] font-bold text-slate-700">{{ $dateHired ? \Carbon\Carbon::parse($dateHired)->format('M d, Y') : 'N/A' }}</span>
+                                    </div>
+                                    
+                                    <div class="pt-5 border-t border-slate-50">
+                                        <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1.5">Residential Address</span>
+                                        <p class="text-[12px] font-bold text-slate-700 leading-relaxed">
+                                            @if($addr_street || $addr_barangay || $addr_city)
+                                                {{ $addr_street }}{{ $addr_barangay ? ', ' . $addr_barangay : '' }}<br>
+                                                {{ $addr_city }}{{ $addr_province ? ', ' . $addr_province : '' }}<br>
+                                                <span class="text-[11px] text-slate-500">{{ $addr_region }}</span>
+                                            @else
+                                                <span class="text-slate-400 font-medium italic">No address provided</span>
+                                            @endif
+                                        </p>
+                                    </div>
+                                    
+                                    {{-- Profile Actions --}}
+                                    <div class="pt-6 mt-6 border-t border-slate-100 flex flex-col gap-2">
+                                        <button wire:click.prevent="showEdit({{ $editUserId }})"
+                                            class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl transition-colors focus:outline-none">
+                                            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                            </svg>
+                                            Edit Profile
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    {{-- History Area (Right side) --}}
+                    <div class="col-span-1 lg:col-span-3">
+                        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm">
+
+                            {{-- Header: title + date filter --}}
+                            <div class="flex items-center justify-between px-6 pt-6 pb-0">
+                                <div>
+                                    <h4 class="text-[15px] font-bold text-gray-900 tracking-tight">Activity Overview</h4>
+                                    <p class="text-[12px] text-gray-400 font-medium mt-0.5">Historical performance data</p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <x-date-range-filter startModel="historyStartDate" endModel="historyEndDate" :startValue="$historyStartDate" />
+                                    <x-quick-date-filter :activeFilter="$activeFilter" class="h-10 border-gray-200 shadow-sm" />
+                                </div>
+                            </div>
+
+                            {{-- BI-style Tab Nav with sliding indicator --}}
+                            <x-sliding-tabs model="historyTab" class="mt-4 px-5" ref="historyTabList" wire:ignore>
+                                <x-sliding-tab model="historyTab" value="overview">
+                                    <x-slot name="icon">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                                    </x-slot>
+                                    Overview
+                                </x-sliding-tab>
+                                <x-sliding-tab model="historyTab" value="orders">
+                                    <x-slot name="icon">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                                    </x-slot>
+                                    Order History
+                                </x-sliding-tab>
+                            </x-sliding-tabs>
+
+                            {{-- Tab Contents --}}
+                            <div class="p-6">
+                            <div x-cloak x-show="historyTab === 'overview'" class="animate-fadeIn">
+                                @php
+                                    $stats = $this->historyStats;
+                                @endphp
+                                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    <div class="p-5 rounded-2xl bg-indigo-600 shadow-[0_12px_24px_-8px_rgba(79,70,229,0.3)] relative overflow-hidden group">
+                                        <div class="absolute -bottom-6 -right-6 w-20 h-20 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+                                        <div class="relative">
+                                            <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center mb-3 backdrop-blur-md">
+                                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                            </div>
+                                            <p class="text-[9px] text-indigo-100 uppercase font-black tracking-widest opacity-80">Total Revenue</p>
+                                            <p class="text-[19px] font-black text-white mt-0.5">₱{{ number_format($stats['total_sales'] ?? 0, 2) }}</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="p-5 rounded-2xl bg-white border border-slate-100 shadow-sm relative overflow-hidden group">
+                                        <div class="absolute -bottom-6 -right-6 w-20 h-20 bg-slate-50 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+                                        <div class="relative">
+                                            <div class="w-9 h-9 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center mb-3">
+                                                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+                                            </div>
+                                            <p class="text-[9px] text-slate-400 uppercase font-black tracking-widest">Total Orders</p>
+                                            <p class="text-[19px] font-black text-slate-900 mt-0.5">{{ number_format($stats['total_orders'] ?? 0) }}</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="p-5 rounded-2xl bg-white border border-slate-100 shadow-sm relative overflow-hidden group">
+                                        <div class="absolute -bottom-6 -right-6 w-20 h-20 bg-slate-50 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+                                        <div class="relative">
+                                            <div class="w-9 h-9 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center mb-3">
+                                                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                            </div>
+                                            <p class="text-[9px] text-slate-400 uppercase font-black tracking-widest">Avg. Order Value</p>
+                                            <p class="text-[19px] font-black text-slate-900 mt-0.5">₱{{ number_format($stats['avg_order_value'] ?? 0, 2) }}</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="p-5 rounded-2xl bg-white border border-slate-100 shadow-sm relative overflow-hidden group">
+                                        <div class="absolute -bottom-6 -right-6 w-20 h-20 bg-slate-50 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+                                        <div class="relative">
+                                            <div class="w-9 h-9 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center mb-3">
+                                                <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                            </div>
+                                            <p class="text-[9px] text-slate-400 uppercase font-black tracking-widest">Completion Rate</p>
+                                            <p class="text-[19px] font-black text-slate-900 mt-0.5">{{ number_format($stats['completion_rate'] ?? 0, 1) }}%</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mt-6 p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-8 h-8 rounded-lg bg-white border border-slate-100 flex items-center justify-center shadow-sm">
+                                            <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                        </div>
+                                        <div>
+                                            <p class="text-[11px] font-bold text-slate-700">Recent Activity Volume</p>
+                                            <p class="text-[10px] text-slate-500 font-medium tracking-wide italic">Last 7 days performance metrics</p>
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-[18px] font-black text-slate-900 leading-none">{{ $stats['recent_activity'] ?? 0 }}</p>
+                                        <p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Actions</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div x-cloak x-show="historyTab === 'orders'" class="animate-fadeIn">
+                                <x-data-table>
+                                    <x-slot name="header">
+                                        <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Date & Time</th>
+                                        <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Reference No.</th>
+                                        <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Status</th>
+                                        <th class="py-3 px-4 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest">Total Amount</th>
+                                    </x-slot>
+
+                                    @forelse($this->historyOrders as $order)
+                                        <tr class="hover:bg-slate-50/50 transition-colors cursor-pointer group" 
+                                            wire:click="viewOrder({{ $order->id }})"
+                                            title="Click to view details">
+                                            <td class="px-4 py-3 text-[13px] text-slate-600 font-medium">{{ $order->created_at->format('M d, Y h:i A') }}</td>
+                                            <td class="px-4 py-3">
+                                                <button type="button" 
+                                                    wire:click.stop="viewOrder({{ $order->id }})"
+                                                    class="text-[13px] font-bold text-indigo-600 hover:text-indigo-800 underline decoration-indigo-200 decoration-2 underline-offset-2 transition-colors">
+                                                    {{ $order->reference_no }}
+                                                </button>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider {{ $order->status === 'Completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-50 text-slate-600 border border-slate-100' }}">
+                                                    {{ $order->status }}
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-3 text-right text-[13px] font-black text-slate-900">₱{{ number_format($order->total_amount, 2) }}</td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="4" class="px-4 py-12 text-center text-slate-400">
+                                                <x-empty-state 
+                                                    compact
+                                                    title="No orders found" 
+                                                    description="No records match the selected date range."
+                                                />
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </x-data-table>
+                                <div class="mt-4">
+                                    <x-pagination :paginator="$this->historyOrders" />
+                                </div>
+                            </div>
+                            </div>{{-- end p-6 tab-content wrapper --}}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {{-- ════════════════ END DASHBOARD ════════════════ --}}
+        </div>{{-- end panel 2 --}}
+
+        {{-- ════════════════ PANEL 1 — LIST ════════════════ --}}
+        <div x-show="panel === 'list'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="px-1">
+
+            <div class="mb-5 flex items-center justify-between">
+                <div>
+                    <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">User Management</h2>
+                    <p class="text-[12px] text-gray-500 font-medium">System Overview: <span class="text-indigo-600 font-bold">{{ $totalUsers }} members</span></p>
+                </div>
+                <x-primary-button @click="panel = 'form'; mode = 'create'; $wire.showCreate()" class="h-10">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    Register New User
+                </x-primary-button>
+            </div>
+
+            {{-- System Metrics Grid (Customer Reviews Aesthetic) --}}
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                @php
+                    $sysStats = $this->systemStats;
+                    $primaryColor = auth()->user()->getRoleTheme()['primary'];
+                @endphp
+                
+                {{-- Total Users --}}
+                <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
+                    <div class="w-10 h-10 rounded-xl bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                    </div>
+                    <div>
+                        <span class="block text-[10px] font-black text-indigo-700/60 uppercase tracking-widest leading-none mb-1">Total Users</span>
+                        <span class="block text-[20px] font-black text-gray-900 leading-none">{{ number_format($sysStats['total']) }}</span>
+                    </div>
+                </div>
+
+                {{-- Active Status --}}
+                <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
+                    <div class="w-10 h-10 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    </div>
+                    <div>
+                        <span class="block text-[10px] font-black text-emerald-700/60 uppercase tracking-widest leading-none mb-1">Active Now</span>
+                        <span class="block text-[20px] font-black text-emerald-600 leading-none">{{ number_format($sysStats['active']) }}</span>
+                    </div>
+                </div>
+
+                {{-- Inactive Accounts --}}
+                <div class="bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
+                    <div class="w-10 h-10 rounded-xl bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                    </div>
+                    <div>
+                        <span class="block text-[10px] font-black text-rose-700/60 uppercase tracking-widest leading-none mb-1">Inactive</span>
+                        <span class="block text-[20px] font-black text-rose-600 leading-none">{{ number_format($sysStats['inactive']) }}</span>
+                    </div>
+                </div>
+
+                {{-- Workforce --}}
+                <div class="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
+                    <div class="w-10 h-10 rounded-xl bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                    </div>
+                    <div>
+                        <span class="block text-[10px] font-black text-amber-700/60 uppercase tracking-widest leading-none mb-1">Staff</span>
+                        <span class="block text-[20px] font-black text-gray-900 leading-none">{{ number_format($sysStats['staff']) }}</span>
+                    </div>
+                </div>
+            </div>
+
+            {{-- macOS Style Unified Toolbar --}}
+            <div class="relative z-20 flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
+                
+                {{-- Left: Search Bar --}}
+                <div class="flex flex-1 w-full lg:w-auto">
+                    <x-search-bar wireModel="search" placeholder="Find records..." width="w-full lg:w-72" />
+                </div>
+
+                {{-- Right: Filters & View Toggle --}}
+                <div class="flex flex-wrap items-center lg:justify-end gap-2">
+
+                    {{-- Role Filter (Super Admin only) --}}
+                    @if(auth()->user()->role_id === 1)
+                        <x-dropdown align="right" width="48" wire:key="filter-role">
+                            <x-slot name="trigger">
+                                <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
+                                    <svg class="w-3.5 h-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                        <circle cx="12" cy="7" r="4" stroke-width="1.5" />
+                                        <path d="M4 21v-2a4 4 0 014-4h8a4 4 0 014 4v2" stroke-width="1.5" />
+                                    </svg>
+                                    <span class="text-[12px] whitespace-nowrap">{{ $role_id ? ucfirst($roles->firstWhere('id', $role_id)?->name) : 'All Roles' }}</span>
+                                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </x-secondary-button>
+                            </x-slot>
+                            <x-slot name="content">
+                                <x-dropdown-link href="#" wire:click.prevent="$set('role_id', '')">All Roles</x-dropdown-link>
+                                @forelse($roles as $role)
+                                    <x-dropdown-link href="#" wire:click.prevent="$set('role_id', {{ $role->id }})">
+                                        {{ ucfirst($role->name) }}
+                                    </x-dropdown-link>
+                                @empty
+                                    <div class="px-4 py-2 text-[12px] text-gray-400 italic">No roles...</div>
+                                @endforelse
+                            </x-slot>
+                        </x-dropdown>
+                    @endif
+
+                    {{-- Branch Filter (Super Admin only) --}}
+                    @if(auth()->user()->role_id === 1)
+                        <x-dropdown align="right" width="48" wire:key="filter-branch">
+                            <x-slot name="trigger">
+                                <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
+                                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                    </svg>
+                                    <span class="text-[12px] whitespace-nowrap">{{ $branch_id ? $branches->firstWhere('id', $branch_id)?->branch_name : 'All Branches' }}</span>
+                                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </x-secondary-button>
+                            </x-slot>
+                            <x-slot name="content">
+                                <x-dropdown-link href="#" wire:click.prevent="$set('branch_id', '')">All Branches</x-dropdown-link>
+                                @forelse($branches as $branch)
+                                    <x-dropdown-link href="#" wire:click.prevent="$set('branch_id', {{ $branch->id }})">
+                                        {{ $branch->branch_name }}
+                                    </x-dropdown-link>
+                                @empty
+                                    <x-empty-state compact title="No branches" description="" />
+                                @endforelse
+                            </x-slot>
+                        </x-dropdown>
+                    @endif
+
+                    {{-- Status Filter --}}
+                    <x-dropdown align="right" width="48" wire:key="filter-status">
+                        <x-slot name="trigger">
+                            <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
+                                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                                <span class="text-[12px] whitespace-nowrap">{{ $is_active === '1' ? 'Active Only' : ($is_active === '0' ? 'Inactive Only' : 'All Status') }}</span>
+                                <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </x-secondary-button>
+                        </x-slot>
+                        <x-slot name="content">
+                            <x-dropdown-link href="#" wire:click.prevent="$set('is_active', '')">All Status</x-dropdown-link>
+                            <x-dropdown-link href="#" wire:click.prevent="$set('is_active', '1')">Active Only</x-dropdown-link>
+                            <x-dropdown-link href="#" wire:click.prevent="$set('is_active', '0')">Inactive Only</x-dropdown-link>
+                        </x-slot>
+                    </x-dropdown>
+
+                    {{-- macOS Divider --}}
+                    <div class="hidden lg:block w-px h-6 bg-slate-200 mx-2"></div>
+
+                    {{-- View Toggle (Seamless Single Icon) --}}
+                    <button type="button" @click="tableView = (tableView === 'table' ? 'board' : 'table')"
+                        class="w-9 h-9 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors focus:outline-none shrink-0"
+                        :title="tableView === 'table' ? 'Switch to Board View' : 'Switch to Table View'">
+                        
+                        {{-- Show Board Icon (since clicking it will switch to Board) --}}
+                        <svg x-cloak x-show="tableView === 'table'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                        </svg>
+                        
+                        {{-- Show Table Icon (since clicking it will switch to Table) --}}
+                        <svg x-cloak x-show="tableView === 'board'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            {{-- ── Table View ── --}}
+            <div x-show="tableView === 'table'" x-transition:enter="transition ease-out duration-400"
+                x-transition:enter-start="opacity-0 translate-y-4"
+                x-transition:enter-end="opacity-100 translate-y-0"
+                class="w-full">
+                <x-data-table>
+                    <x-slot name="header">
+                        <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Full name</th>
+                        <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Email</th>
+                        <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Role</th>
+                        <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Work Location</th>
+                        <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Status</th>
+                        <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Joined date</th>
+                        <th class="py-3 px-4 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest">Actions</th>
+                    </x-slot>
+
+                    @forelse($users as $user)
+                        @php
+                            $colors = ['from-purple-400 to-indigo-500', 'from-pink-400 to-rose-500', 'from-blue-400 to-sky-500', 'from-emerald-400 to-teal-500', 'from-amber-400 to-orange-500'];
+                            $grad = $colors[$user->id % count($colors)];
+                            $initials = strtoupper(substr($user->first_name ?? '', 0, 1) . substr($user->last_name ?? '', 0, 1));
+                        @endphp
+                        <tr wire:key="user-row-{{ $user->id }}-{{ $users->currentPage() }}"
+                            class="hover:bg-slate-50/50 transition-colors">
+                            <td class="py-3 px-4 whitespace-nowrap">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-[26px] h-[26px] rounded-full bg-gradient-to-br {{ $grad }} flex items-center justify-center text-white text-[11px] font-bold shadow-sm">
+                                        {{ $initials ?: '?' }}
+                                    </div>
+                                    <span class="font-medium text-[13px] text-slate-900">{{ $user->first_name }} {{ $user->last_name }}</span>
+                                </div>
+                            </td>
+                            <td class="py-3 px-4 whitespace-nowrap text-[13px] text-slate-500">{{ $user->email }}</td>
+                            <td class="py-3 px-4 whitespace-nowrap text-[13px] text-slate-600">{{ optional($user->role)->name ?? 'No Role' }}</td>
+                            <td class="py-3 px-4 whitespace-nowrap text-[13px] text-slate-600">{{ optional($user->branch)->branch_name ?? '—' }}</td>
+                            <td class="py-3 px-4 whitespace-nowrap">
+                                <button wire:click="toggleStatus({{ $user->id }})"
+                                    class="flex items-center gap-2 text-[12px] font-medium text-slate-600 hover:opacity-80 transition-opacity focus:outline-none">
+                                    <span class="w-1.5 h-1.5 rounded-full {{ $user->is_active ? 'bg-[#27C93F] shadow-[0_0_4px_rgba(39,201,63,0.5)]' : 'bg-[#FF5F56] shadow-[0_0_4px_rgba(255,95,86,0.5)]' }}"></span>
+                                    {{ $user->is_active ? 'Active' : 'Inactive' }}
+                                </button>
+                            </td>
+                            <td class="py-3 px-4 whitespace-nowrap text-[13px] text-slate-600">
+                                {{ $user->date_hired ? date('d M Y', strtotime($user->date_hired)) : date('d M Y', strtotime($user->created_at)) }}
+                            </td>
+                            <td class="py-3 px-4 whitespace-nowrap text-right">
+                                <x-secondary-button @click="panel = 'form'; mode = 'view'; $wire.showEdit({{ $user->id }}, 'view')" class="h-8 px-3 inline-flex items-center gap-1.5 text-xs shadow-none border-slate-200">
+                                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                    View Profile
+                                </x-secondary-button>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="7" class="py-0">
+                                <x-empty-state 
+                                    title="No users identified" 
+                                    description="No accounts match your current filter or search criteria. Try broadening your scope."
+                                />
+                            </td>
+                        </tr>
+                    @endforelse
+                </x-data-table>
+                <x-pagination :paginator="$users" />
+            </div>
+
+            {{-- ── Board View ── --}}
+            <div x-show="tableView === 'board'" x-transition:enter="transition ease-out duration-400"
+                x-transition:enter-start="opacity-0 translate-y-4"
+                x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="mt-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    @forelse($users as $user)
+                        @php
+                            $colors = ['from-purple-400 to-indigo-500', 'from-pink-400 to-rose-500', 'from-blue-400 to-sky-500', 'from-emerald-400 to-teal-500', 'from-amber-400 to-orange-500'];
+                            $grad = $colors[$user->id % count($colors)];
+                        @endphp
+                        <div class="bg-white rounded-2xl border border-slate-200/60 p-5 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_30px_-6px_rgba(0,0,0,0.1)] hover:-translate-y-0.5 transition-all duration-300">
+                            <div class="flex items-start justify-between mb-3">
+                                <div
+                                    class="w-10 h-10 rounded-full bg-gradient-to-br {{ $grad }} flex items-center justify-center text-white font-bold shadow-sm">
+                                    {{ strtoupper(substr($user->first_name, 0, 1)) }}
+                                </div>
+                                <span @class([
+                                    'px-2 py-0.5 rounded-xl text-[10px] font-bold uppercase border',
+                                    'bg-green-50 text-green-700 border-green-200' => $user->is_active,
+                                    'bg-red-50 text-red-700 border-red-200' => !$user->is_active,
+                                ])>
+
+                                    {{ $user->is_active ? 'Active' : 'Inactive' }}
+                                </span>
+                            </div>
+                            <h3 class="font-bold text-gray-900 text-sm mb-0.5">{{ $user->first_name }}
+                                {{ $user->last_name }}</h3>
+                            <p class="text-xs text-gray-500 mb-3">{{ $user->email }}</p>
+                            <div class="pt-3 border-t border-gray-100 flex items-center justify-between">
+                                <div class="flex flex-col">
+                                    <span
+                                        class="text-[11px] font-bold text-gray-600">{{ optional($user->role)->name ?? 'No Role' }}</span>
+                                    <span
+                                        class="text-[10px] text-gray-400 font-medium">{{ optional($user->branch)->branch_name ?? 'Unassigned' }}</span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <button @click="panel = 'form'; mode = 'view'; $wire.showEdit({{ $user->id }}, 'view')"
+                                        title="View Details"
+                                        class="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all focus:outline-none">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                        </svg>
+                                    </button>
+                                    <button wire:click.prevent="showEdit({{ $user->id }})"
+                                        title="Edit Profile"
+                                        class="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all focus:outline-none">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path
+                                                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    @empty
+                        <div class="col-span-full">
+                            <x-empty-state 
+                                title="No employee profiles" 
+                                description="Your search yielded no results. Consider checking the spelling or removing filters."
+                            />
+                        </div>
+                    @endforelse
+                </div>
+            </div>
+
+        </div>{{-- end panel 1 --}}
+
+
+    </div>{{-- end relative wrapper --}}
+
+    {{-- ── List-page delete confirmation modal ── --}}
+    <x-modal name="delete-user" maxWidth="sm" focusable>
+        <div class="h-1 w-full bg-gradient-to-r from-red-400 to-rose-500 rounded-t-lg"></div>
+        <div class="p-6">
+            <div class="flex items-start gap-4 mb-4">
+                <div
+                    class="flex-shrink-0 w-10 h-10 rounded-full bg-red-50 border border-red-100 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75"
+                            d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-[15px] font-bold text-gray-900 leading-tight">Delete User</h3>
+                    <p class="mt-1 text-[13px] text-gray-500 leading-relaxed">The user account and permissions will be
+                        removed. This cannot be undone.</p>
+                </div>
+            </div>
+            <div class="px-3 py-2 bg-white border border-gray-100 rounded-lg text-[13px] text-gray-600 mb-5">
+                <span class="font-semibold text-gray-800">{{ $deleteTargetName }}</span>
+            </div>
+            <div class="flex items-center justify-end gap-2">
+                <x-secondary-button @click="$dispatch('close-modal', 'delete-user')">Cancel</x-secondary-button>
+                <x-danger-button wire:click="deleteUser" @click="$dispatch('close-modal', 'delete-user')">Delete</x-danger-button>
+            </div>
+        </div>
+    </x-modal>
+
+    {{-- ── Manager Conflict Warning Modal ── --}}
+    <x-modal name="confirm-manager-replace" maxWidth="sm" focusable>
+            <div class="h-1 w-full bg-gradient-to-r from-amber-400 to-orange-500 rounded-t-lg"></div>
+            <div class="p-6">
+                <div class="flex items-start gap-4 mb-4">
+                    <div
+                        class="flex-shrink-0 w-10 h-10 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75"
+                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-[15px] font-bold text-gray-900 leading-tight">Replace Branch Manager?</h3>
+                        <p class="mt-1 text-[13px] text-gray-500 leading-relaxed">
+                            The selected branch already has a manager: <br>
+                            <span class="font-bold text-gray-800">{{ $conflictingManagerName }}</span>
+                        </p>
+                        <p class="mt-2 text-[12px] text-gray-400 leading-relaxed italic">
+                            Confirming will reassign this user as the new branch manager and clear the previous assignment.
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center justify-end gap-2">
+                    <x-secondary-button @click="$dispatch('close-modal', 'confirm-manager-replace')">Cancel</x-secondary-button>
+                    <x-primary-button @click="$wire.replaceManager(); $dispatch('close-modal', 'confirm-manager-replace')"
+                        class="bg-amber-600 hover:bg-amber-700">
+                        Replace & Save
+                    </x-primary-button>
+                </div>
+            </div>
+        </x-modal>
+
+    {{-- ── Save Confirmation Modal ── --}}
+    <x-modal name="confirm-save-user" maxWidth="sm" focusable>
+        <div class="h-1 w-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-t-lg"></div>
+        <div class="p-6">
+            <div class="flex items-start gap-4 mb-4">
+                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M5 13l4 4L19 7" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-[15px] font-bold text-gray-900 leading-tight" x-text="mode === 'edit' ? 'Update User' : 'Register User'"></h3>
+                    <p class="mt-1 text-[13px] text-gray-500 leading-relaxed" x-text="mode === 'edit' ? 'Apply changes to this profile?' : 'Register this new user into the system?'"></p>
+                </div>
+            </div>
+            
+            <div class="flex items-center justify-end gap-2 mt-6">
+                <x-secondary-button @click="$dispatch('close-modal', 'confirm-save-user')" class="h-10">Cancel</x-secondary-button>
+                <x-primary-button 
+                    @click="$dispatch('close-modal', 'confirm-save-user')"
+                    wire:click="{{ $editUserId ? 'updateUser' : 'saveUser' }}" 
+                    class="h-10">
+                    Confirm & Save
+                </x-primary-button>
+            </div>
+        </div>
+    </x-modal>
+
+    {{-- ── Order Detail Side Panel ── --}}
+    <x-side-panel name="view-order-detail" width="max-w-md">
+        @if($viewingOrder)
+            <div class="flex flex-col h-full bg-white">
+                {{-- Premium Header --}}
+                <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/40">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white shadow-lg shadow-slate-200">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-[15px] font-black text-slate-900 tracking-tight leading-none">Order Details</h3>
+                            <span class="text-[11px] text-indigo-600 font-bold uppercase tracking-wider mt-1 block">Ref: #{{ $viewingOrder->reference_no }}</span>
+                        </div>
+                    </div>
+                    <button @click="$dispatch('close-modal', 'view-order-detail')" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-white hover:text-slate-600 hover:shadow-sm transition-all border border-transparent hover:border-slate-200">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+
+                {{-- Content Area --}}
+                <div class="flex-1 overflow-y-auto custom-scrollbar">
+                    {{-- Transaction Context Section --}}
+                    <div class="p-6 bg-gradient-to-b from-slate-50/80 to-white border-b border-slate-50">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Branch Context</span>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 shadow-sm">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                                    </div>
+                                    <span class="text-[12px] font-bold text-slate-700">{{ $viewingOrder->branch->branch_name ?? 'N/A' }}</span>
+                                </div>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Status</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider {{ $viewingOrder->status === 'Completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-50 text-slate-500 border border-slate-100' }}">
+                                    {{ $viewingOrder->status }}
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 gap-4">
+                            <div>
+                                <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Cashier</span>
+                                <span class="text-[12px] font-bold text-slate-700">{{ $viewingOrder->user->first_name ?? 'System' }} {{ $viewingOrder->user->last_name ?? '' }}</span>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Timestamp</span>
+                                <span class="text-[12px] font-bold text-slate-700">{{ $viewingOrder->created_at->format('M d, h:i A') }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Itemized Breakdown Section --}}
+                    <div class="p-6">
+                        <div class="flex items-center justify-between mb-6">
+                            <h5 class="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                <span class="w-1.5 h-1.5 rounded-full bg-slate-900"></span>
+                                Order Summary
+                            </h5>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase">{{ $viewingOrder->items->count() }} Items</span>
+                        </div>
+
+                        <div class="space-y-6 relative">
+                            {{-- Vertical line --}}
+                            <div class="absolute left-[7px] top-2 bottom-2 w-[2px] bg-slate-50 rounded-full"></div>
+
+                            @foreach($viewingOrder->items as $item)
+                                <div class="relative pl-7 group">
+                                    {{-- Dot --}}
+                                    <div class="absolute left-0 top-[6px] w-[16px] h-[16px] rounded-full border-4 border-white bg-slate-100 group-hover:bg-slate-900 transition-colors z-10"></div>
+                                    
+                                    <div class="flex justify-between items-start">
+                                        <div class="flex-1">
+                                            <p class="text-[13px] font-bold text-slate-900 leading-tight">{{ $item->product->name ?? 'Unknown Item' }}</p>
+                                            @if($item->options->isNotEmpty())
+                                                <div class="flex flex-wrap gap-x-2 gap-y-0.5 mt-1">
+                                                    @foreach($item->options as $opt)
+                                                        <span class="text-[11px] text-slate-400 italic">{{ $opt->option->name ?? 'N/A' }}</span>
+                                                    @endforeach
+                                                </div>
+                                            @endif
+                                            <p class="text-[11px] font-bold text-slate-400 mt-1">₱{{ number_format($item->price, 2) }} × {{ $item->quantity }}</p>
+                                        </div>
+                                        <div class="text-right">
+                                            <span class="text-[13px] font-black text-slate-900">₱{{ number_format($item->subtotal, 2) }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    {{-- Financial Totals Section --}}
+                    <div class="p-6 bg-slate-50 border-t border-slate-100">
+                        <div class="space-y-2.5">
+                            <div class="flex justify-between text-[12px] font-medium text-slate-500">
+                                <span>Subtotal</span>
+                                <span class="font-bold text-slate-700">₱{{ number_format($viewingOrder->total_amount + $viewingOrder->discount_amount - $viewingOrder->tax_amount, 2) }}</span>
+                            </div>
+                            @if($viewingOrder->tax_amount > 0)
+                                <div class="flex justify-between text-[12px] font-medium text-slate-500">
+                                    <span>Tax (Included)</span>
+                                    <span class="font-bold text-slate-700">₱{{ number_format($viewingOrder->tax_amount, 2) }}</span>
+                                </div>
+                            @endif
+                            @if($viewingOrder->discount_amount > 0)
+                                <div class="flex justify-between text-[12px] font-bold text-rose-500">
+                                    <span>Applied Discount</span>
+                                    <span>-₱{{ number_format($viewingOrder->discount_amount, 2) }}</span>
+                                </div>
+                            @endif
+                            <div class="pt-3 mt-3 border-t border-slate-200 flex justify-between items-baseline">
+                                <span class="text-[13px] font-black text-slate-900 uppercase tracking-tight">Grand Total</span>
+                                <span class="text-[24px] font-black text-slate-900 tracking-tighter">₱{{ number_format($viewingOrder->total_amount, 2) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Action Footer --}}
+                <div class="p-5 border-t border-slate-100 bg-white">
+                    <button @click="$dispatch('close-modal', 'view-order-detail')" class="w-full h-10 flex items-center justify-center gap-2 bg-slate-900 text-white text-[13px] font-bold rounded-xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-200">
+                        <span>Done Reviewing</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    </button>
+                </div>
+            </div>
+        @endif
+    </x-side-panel>
+
+    {{-- ── Map Selection Modal ── --}}
+    <x-modal name="map-modal" maxWidth="2xl" focusable>
+        <div class="h-1 w-full bg-gradient-to-r from-indigo-500 to-purple-600 rounded-t-lg"></div>
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="text-[15px] font-bold text-gray-900 leading-tight">Geographic Locator</h3>
+                    <p class="text-[11px] text-gray-500 mt-0.5 uppercase tracking-wider font-bold">Laguna Province Boundary</p>
+                </div>
+                <button @click="$dispatch('close-modal', 'map-modal')" class="text-gray-400 hover:text-gray-500 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l18 18" /></svg>
+                </button>
+            </div>
+            
+            <div id="userMap" class="w-full h-[400px] rounded-xl border border-gray-200 shadow-inner z-10" wire:ignore></div>
+            
+            <div class="mt-5 p-4 bg-indigo-50 border border-indigo-100 rounded-xl flex items-start gap-3">
+                <div class="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-indigo-600 shrink-0 shadow-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <div>
+                    <h4 class="text-[12px] font-bold text-indigo-900">How to use</h4>
+                    <p class="text-[11px] text-indigo-700/80 leading-relaxed">Click anywhere on the map to drop a pin. The system will automatically resolve the address components (Region, City, Street) using reverse-geocoding.</p>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 mt-6">
+                <x-primary-button @click="$dispatch('close-modal', 'map-modal')" class="h-10 px-8">Confirm Pin Location</x-primary-button>
+            </div>
+        </div>
+    </x-modal>
+</div>
+
+@push('scripts')
+@once
+<script>
+(function() {
+    const registerUserData = () => {
+        if (Alpine.data('userManagementData')) return;
+        Alpine.data('userManagementData', (initialPanel, initialMode, initialView) => ({
+            ...slidingTabs(@js($historyTab), 'historyTab', 'historyTabList'),
+            panel: initialPanel || 'list',
+            mode: initialMode || 'list',
+            tableView: initialView || 'table',
+            deleteTargetId: null,
+            deleteTargetName: '',
+
+            // ── Location state ───────────────────────────────────────
+            loc: {
+                region:   { items: [], open: false, search: '', loading: false },
+                province: { items: [], open: false, search: '', loading: false },
+                city:     { items: [], open: false, search: '', loading: false },
+                barangay: { items: [], open: false, search: '', loading: false }
+            },
+
+            filtered(type) {
+                const s = this.loc[type];
+                const q = s.search.toLowerCase();
+                return q ? s.items.filter(i => i.name.toLowerCase().includes(q)) : s.items;
+            },
+
+            // ── PSGC loaders ─────────────────────────────────────────
+            async loadRegions() {
+                if (this.loc.region.items.length > 0) return;
+                this.loc.region.loading = true;
+                try {
+                    const res = await fetch('https://psgc.cloud/api/regions');
+                    if (!res.ok) throw new Error();
+                    this.loc.region.items = (await res.json()).sort((a, b) => a.name.localeCompare(b.name));
+                } catch (e) { console.error('Regions fetch failed', e); }
+                finally { this.loc.region.loading = false; }
+            },
+
+            async loadProvinces(regionCode) {
+                this.loc.province.items = []; this.loc.city.items = []; this.loc.barangay.items = [];
+                if (!regionCode) return;
+                this.loc.province.loading = true;
+                try {
+                    const res = await fetch(`https://psgc.cloud/api/regions/${regionCode}/provinces`);
+                    if (!res.ok) throw new Error();
+                    const data = await res.json();
+                    this.loc.province.items = data.sort((a, b) => a.name.localeCompare(b.name));
+                    
+                    // Handle regions that are also cities (e.g. NCR)
+                    if (this.loc.province.items.length === 0) {
+                        this.loc.province.loading = false;
+                        this.loc.city.loading = true;
+                        const res2 = await fetch(`https://psgc.cloud/api/regions/${regionCode}/cities-municipalities`);
+                        this.loc.city.items = (await res2.json()).sort((a, b) => a.name.localeCompare(b.name));
+                        this.loc.city.loading = false;
+                    }
+                } catch (e) { console.error(e); }
+                finally { this.loc.province.loading = false; }
+            },
+
+            async loadCities(provinceCode) {
+                this.loc.city.items = []; this.loc.barangay.items = [];
+                if (!provinceCode) return;
+                this.loc.city.loading = true;
+                try {
+                    const res = await fetch(`https://psgc.cloud/api/provinces/${provinceCode}/cities-municipalities`);
+                    if (!res.ok) throw new Error();
+                    this.loc.city.items = (await res.json()).sort((a, b) => a.name.localeCompare(b.name));
+                } catch (e) { console.error(e); }
+                finally { this.loc.city.loading = false; }
+            },
+
+            async loadBarangays(cityCode) {
+                this.loc.barangay.items = [];
+                if (!cityCode) return;
+                this.loc.barangay.loading = true;
+                try {
+                    const res = await fetch(`https://psgc.cloud/api/cities-municipalities/${cityCode}/barangays`);
+                    if (!res.ok) throw new Error();
+                    this.loc.barangay.items = (await res.json()).sort((a, b) => a.name.localeCompare(b.name));
+                } catch (e) { console.error(e); }
+                finally { this.loc.barangay.loading = false; }
+            },
+
+            // ── Cascade handlers ─────────────────────────────────────
+            async selectRegion(region) {
+                const lw = window.livewire.find('{{ $_instance->id }}');
+                lw.set('addr_region', region.name);
+                lw.set('addr_province', ''); lw.set('addr_city', ''); lw.set('addr_barangay', '');
+                this.loc.region.search = ''; this.loc.region.open = false;
+                this.loc.province.search = ''; this.loc.city.search = ''; this.loc.barangay.search = '';
+                await this.loadProvinces(region.code);
+            },
+            async selectProvince(province) {
+                const lw = window.livewire.find('{{ $_instance->id }}');
+                lw.set('addr_province', province.name);
+                lw.set('addr_city', ''); lw.set('addr_barangay', '');
+                this.loc.province.search = ''; this.loc.province.open = false;
+                this.loc.city.search = ''; this.loc.barangay.search = '';
+                await this.loadCities(province.code);
+            },
+            async selectCity(city) {
+                const lw = window.livewire.find('{{ $_instance->id }}');
+                lw.set('addr_city', city.name);
+                lw.set('addr_barangay', '');
+                this.loc.city.search = ''; this.loc.city.open = false;
+                this.loc.barangay.search = '';
+                await this.loadBarangays(city.code);
+            },
+            selectBarangay(brgy) {
+                window.livewire.find('{{ $_instance->id }}').set('addr_barangay', brgy.name);
+                this.loc.barangay.search = ''; this.loc.barangay.open = false;
+            },
+
+            async autoMatchLocation(addr) {
+                const clean = (str) => {
+                    if (!str) return '';
+                    return str.toLowerCase()
+                        .replace(/city of|province of|region|district|barangay|brgy\.?|municipality of/g, '')
+                        .replace(/[^a-z0-9]/g, '')
+                        .trim();
+                };
+
+                let rName = addr.region || '';
+                let pName = addr.state || addr.province || addr.county || '';
+                let cName = addr.city || addr.town || addr.municipality || '';
+                let bName = addr.quarter || addr.village || addr.suburb || addr.neighbourhood || '';
+
+                if (this.loc.region.items.length === 0) await this.loadRegions();
+
+                let crName = clean(rName);
+                let cpName = clean(pName);
+                let matchedR = this.loc.region.items.find(r => {
+                    const target = clean(r.name);
+                    return target === crName || 
+                           (crName.includes('manila') && target.includes('ncr')) ||
+                           (cpName.includes('manila') && target.includes('ncr'));
+                });
+
+                if (!matchedR && crName) {
+                    matchedR = this.loc.region.items.find(r => clean(r.name).includes(crName) || crName.includes(clean(r.name)));
+                }
+
+                if (!matchedR) return;
+                await this.selectRegion(matchedR);
+
+                if (pName && this.loc.province.items.length > 0) {
+                    let cppName = clean(pName);
+                    let matchedP = this.loc.province.items.find(p => clean(p.name) === cppName);
+                    if (!matchedP) {
+                        matchedP = this.loc.province.items.find(p => {
+                            const target = clean(p.name).replace('province', '');
+                            const search = cppName.replace('province', '');
+                            return target && search && (target === search || target.includes(search) || search.includes(target));
+                        });
+                    }
+                    if (matchedP) await this.selectProvince(matchedP);
+                }
+
+                if (cName && this.loc.city.items.length > 0) {
+                    let ccName = clean(cName);
+                    let matchedC = this.loc.city.items.find(c => clean(c.name) === ccName);
+                    if (!matchedC) {
+                        matchedC = this.loc.city.items.find(c => {
+                            const target = clean(c.name).replace('city', '').replace('municipality', '').replace('city of', '');
+                            const search = ccName.replace('city', '').replace('municipality', '').replace('city of', '');
+                            return target && search && (target === search || target.includes(search) || search.includes(target));
+                        });
+                    }
+                    if (matchedC) await this.selectCity(matchedC);
+                }
+
+                if (bName && this.loc.barangay.items.length > 0) {
+                    let cbName = clean(bName);
+                    let matchedB = this.loc.barangay.items.find(b => clean(b.name) === cbName);
+                    if (!matchedB) {
+                        matchedB = this.loc.barangay.items.find(b => {
+                            const target = clean(b.name).replace('barangay', '').replace('brgy', '').replace('poblacion', '').replace('pob', '');
+                            const search = cbName.replace('barangay', '').replace('brgy', '').replace('poblacion', '').replace('pob', '');
+                            return target && search && (target === search || target.includes(search) || search.includes(target));
+                        });
+                    }
+                    if (matchedB) this.selectBarangay(matchedB);
+                }
+            },
+
+            map: null,
+            marker: null,
+            initMap() {
+                if (this.map) {
+                    setTimeout(async () => {
+                        const container = document.getElementById('userMap');
+                        if (!container) return;
+                        this.map.invalidateSize(); 
+                        let lat = await window.livewire.find('{{ $_instance->id }}').get('addr_lat');
+                        let lng = await window.livewire.find('{{ $_instance->id }}').get('addr_lng');
+                        if (lat && lng) {
+                            this.map.setView([lat, lng], 16);
+                            if (this.marker) this.marker.setLatLng([lat, lng]);
+                        }
+                    }, 250);
+                    return;
+                }
+                setTimeout(async () => {
+                    const container = document.getElementById('userMap');
+                    if (!container) return;
+
+                    let lat = await window.livewire.find('{{ $_instance->id }}').get('addr_lat');
+                    let lng = await window.livewire.find('{{ $_instance->id }}').get('addr_lng');
+                    let startLat = lat || 14.2189;
+                    let startLng = lng || 121.1672;
+                    let startZoom = lat ? 15 : 11;
+                    
+                    const lagunaBounds = L.latLngBounds([13.9, 120.9], [14.5, 121.6]);
+                    this.map = L.map('userMap', {
+                        maxBounds: lagunaBounds,
+                        maxBoundsViscosity: 1.0
+                    }).setView([startLat, startLng], startZoom);
+
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        maxZoom: 19,
+                        minZoom: 10,
+                        attribution: '© OpenStreetMap'
+                    }).addTo(this.map);
+                    
+                    if (lat && lng) {
+                        this.marker = L.marker([lat, lng]).addTo(this.map);
+                    }
+
+                    this.map.on('click', async (e) => {
+                        const lat = e.latlng.lat;
+                        const lng = e.latlng.lng;
+                        if (this.marker) this.marker.setLatLng(e.latlng);
+                        else this.marker = L.marker(e.latlng).addTo(this.map);
+                        
+                        window.livewire.find('{{ $_instance->id }}').set('addr_lat', lat);
+                        window.livewire.find('{{ $_instance->id }}').set('addr_lng', lng);
+                        
+                        try {
+                            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&countrycodes=ph`);
+                            const data = await response.json();
+                            if (data && data.address) {
+                                let st = data.address.road || data.address.pedestrian || '';
+                                let num = data.address.house_number || '';
+                                let fst = (num + ' ' + st).trim();
+                                if(fst) window.livewire.find('{{ $_instance->id }}').set('addr_street', fst);
+                                
+                                await this.autoMatchLocation(data.address);
+                            }
+                        } catch (error) { console.error(error); }
+                    });
+                }, 350);
+            },
+
+            init() {
+                this.loadRegions();
+                this.$watch('panel', (val) => {
+                    if (this.$wire && this.$wire.get('panel') !== val) {
+                        this.$wire.set('panel', val);
+                    }
+                    if (val === 'form') {
+                        this.$nextTick(() => {
+                            if (typeof this.recalculateHistoryTab === 'function') {
+                                this.recalculateHistoryTab();
+                            }
+                        });
+                    }
+                });
+
+                this.$watch('mode', (val) => {
+                    if (this.$wire && this.$wire.get('mode') !== val) {
+                        this.$wire.set('mode', val);
+                    }
+                });
+
+                this.$watch('tableView', (val) => {
+                    if (this.$wire && this.$wire.get('view') !== val) {
+                        this.$wire.set('view', val);
+                    }
+                });
+            }
+        }));
+    };
+    if (window.Alpine) registerUserData();
+    else document.addEventListener('alpine:init', registerUserData);
+})();
+</script>
+@endonce
+@endpush

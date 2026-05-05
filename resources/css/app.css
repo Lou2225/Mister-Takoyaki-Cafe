@@ -1,0 +1,79 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+[x-cloak] { display: none !important; }
+
+/* Cinematic Sliding Pagination Animations */
+@keyframes slideInRight {
+    0% { opacity: 0; transform: translateX(40px); filter: blur(8px); }
+    100% { opacity: 1; transform: translateX(0); filter: blur(0); }
+}
+
+@keyframes slideInLeft {
+    0% { opacity: 0; transform: translateX(-40px); filter: blur(8px); }
+    100% { opacity: 1; transform: translateX(0); filter: blur(0); }
+}
+
+.animate-slide-right { animation: slideInRight 0.7s cubic-bezier(0.23, 1, 0.32, 1) both; }
+.animate-slide-left { animation: slideInLeft 0.7s cubic-bezier(0.23, 1, 0.32, 1) both; }
+
+.animate-fadeIn { animation: fadeIn 0.4s ease-out; }
+.animate-fadeInSlideUp { animation: fadeInSlideUp 0.5s cubic-bezier(0.23, 1, 0.32, 1) both; }
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInSnappy {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.animate-fadeInSnappy { animation: fadeInSnappy 0.15s ease-out forwards; }
+
+@keyframes fadeInSlideUp {
+    0% { opacity: 0; transform: translateY(15px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   GLOBAL SEAMLESS RESET
+   Definitively kill all focus rings, glows, and shadows globally to achieve
+   a cinematic, seamless UI. Targeted at overriding @tailwindcss/forms plugin.
+   ───────────────────────────────────────────────────────────────────────────── */
+input:focus, 
+textarea:focus, 
+select:focus, 
+button:focus,
+.form-control:focus,
+.form-select:focus {
+    outline: none !important;
+    box-shadow: none !important;
+    border-color: inherit !important;
+    --tw-ring-offset-width: 0px !important;
+    --tw-ring-width: 0px !important;
+    --tw-ring-color: transparent !important;
+}
+
+/* Specific override for gray borders on focus if we want them to remain subtle */
+input:focus, 
+textarea:focus {
+    border-color: #E5E7EB !important; /* gray-200 */
+}
+
+/* ── Disable Number Input Arrows (manual entry only) ── */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+input[type=number] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+/* ── Hide scrollbar while keeping scroll functionality ── */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
