@@ -98,17 +98,17 @@
 
                 {{-- Right: Filters --}}
                 <div class="flex flex-wrap items-center lg:justify-end gap-2">
-                    {{-- Type Filter --}}
+                    {{-- Category Focus Filter --}}
                     <x-dropdown align="right" width="48">
                         <x-slot name="trigger">
                             <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
                                 <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-                                <span class="text-[12px] whitespace-nowrap">{{ $filterType === 'all' ? 'All Types' : ucfirst($filterType) . ' Only' }}</span>
+                                <span class="text-[12px] whitespace-nowrap">{{ $filterType === 'all' ? 'All Categories' : ucfirst($filterType) . ' Only' }}</span>
                                 <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                             </x-secondary-button>
                         </x-slot>
                         <x-slot name="content">
-                            <x-dropdown-link href="#" wire:click.prevent="$set('filterType', 'all')">All Category Types</x-dropdown-link>
+                            <x-dropdown-link href="#" wire:click.prevent="$set('filterType', 'all')">All Categories</x-dropdown-link>
                             <x-dropdown-link href="#" wire:click.prevent="$set('filterType', 'product')">Product Focus</x-dropdown-link>
                             <x-dropdown-link href="#" wire:click.prevent="$set('filterType', 'ingredient')">Ingredient Focus</x-dropdown-link>
                         </x-slot>
@@ -123,7 +123,7 @@
                         <x-slot name="header">
                             <th class="py-3 px-6 text-[11px] font-black text-slate-500 uppercase tracking-widest">Category Information</th>
                             <th class="py-3 px-6 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center">Type</th>
-                            <th class="py-3 px-6 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center">Utilization</th>
+                            <th class="py-3 px-6 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center">Count</th>
                             <th class="py-3 px-6 text-right text-[11px] font-black text-slate-500 uppercase tracking-widest">Actions</th>
                         </x-slot>
                         
@@ -143,23 +143,20 @@
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
                                                 </svg>
                                             </div>
-                                            <div>
-                                                <div class="font-black text-[14px] text-slate-900 group-hover/row:text-{{ $catColor }}-600 leading-tight">{{ $category->name }}</div>
-                                                <div class="text-[11px] text-slate-500 font-medium mt-0.5 line-clamp-1 max-w-[200px]">{{ $category->description ?: 'No operational description...' }}</div>
+                                            <div class="min-w-0">
+                                                <div class="font-black text-[14px] text-slate-900 group-hover/row:text-{{ $catColor }}-600 leading-tight truncate">{{ $category->name }}</div>
+                                                <div class="text-[11px] text-slate-500 font-medium mt-1 line-clamp-1">{{ $category->description ?: 'No operational description...' }}</div>
                                             </div>
                                         </div>
                                     </td>
                                     <td class="py-4 px-6 border-r border-slate-100/50 text-center whitespace-nowrap">
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider {{ $category->cat_type === 'product' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-rose-50 text-rose-700 border border-rose-100' }}">
-                                            {{ $category->cat_type }}
+                                            {{ ucfirst($category->cat_type) }}
                                         </span>
                                     </td>
-
                                     <td class="py-4 px-6 border-r border-slate-100/50 text-center whitespace-nowrap">
-                                        <div class="flex flex-col items-center">
-                                            <span class="text-[13px] font-black text-slate-900">{{ $category->associated_count }}</span>
-                                            <span class="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{{ $category->cat_type === 'product' ? 'Products' : 'Ingredients' }}</span>
-                                        </div>
+                                        <div class="text-[13px] font-black text-slate-900">{{ $category->associated_count ?? 0 }}</div>
+                                        <div class="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{{ $category->cat_type === 'product' ? 'Products' : 'Ingredients' }}</div>
                                     </td>
                                     <td class="py-4 px-6 text-right whitespace-nowrap">
                                         <x-secondary-button wire:click="selectCategory({{ $category->id }}, '{{ $category->cat_type }}')" class="h-8 px-3 inline-flex items-center gap-1.5 text-xs shadow-none border-slate-200">

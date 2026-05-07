@@ -70,7 +70,7 @@
 
             <!-- Left Side: Marketing Cover -->
             <div class="hidden md:flex md:w-1/2 relative overflow-hidden flex-col justify-between p-10 group bg-indigo-600">
-                <img src="{{ asset('images/login-left-panel.png') }}" alt="Mister Takoyaki" class="absolute inset-0 w-full h-full object-cover" />
+                <img src="{{ asset('images/mtc-logo-only.png') }}" alt="Mister Takoyaki" class="absolute inset-0 w-full h-full object-cover" />
                 <!-- Overlay for readability -->
                 <div class="absolute inset-0 bg-black/45"></div>
                 <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-orange-100/20 via-transparent to-transparent"></div>

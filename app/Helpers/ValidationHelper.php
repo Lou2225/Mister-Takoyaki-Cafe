@@ -24,6 +24,12 @@ class ValidationHelper
     const REGEX_NAME_BASIC = '/^[\pL\pN\s\-\.]+$/u';
 
     /**
+     * Product Name Pattern: Allows letters, numbers, spaces, hyphens, dots, apostrophes, slashes, parentheses, ampersands, hash.
+     * Examples: "Classic Takoyaki (8pcs)", "Spicy Taco #1", "Item v2.0", "Fish & Chips"
+     */
+    const REGEX_PRODUCT_NAME = '/^[\pL\pN\s\-\.()/#&\']+$/u';
+
+    /**
      * Strict Phone Pattern: Optional leading +, then 7–20 digits.
      * Allows: +639123456789, 09123456789, 123456789
      */
@@ -88,6 +94,23 @@ class ValidationHelper
     public static function rulesOptionalName(int $min = 2, int $max = 100): array
     {
         return self::rulesName($min, $max, false);
+    }
+
+    /**
+     * Product name rules (allows numbers and special characters).
+     * Supports product names like "Classic Takoyaki (8pcs)", "Spicy Taco #1", "Item v2.0".
+     */
+    public static function rulesProductName(int $min = 2, int $max = 255, bool $required = true): array
+    {
+        $rules = [
+            $required ? 'required' : 'nullable', 
+            'string', 
+            "min:{$min}", 
+            "max:{$max}", 
+            'regex:' . self::REGEX_PRODUCT_NAME,
+            'not_regex:/\s{2,}/'        // Prevents consecutive spaces
+        ];
+        return $rules;
     }
 
     /**

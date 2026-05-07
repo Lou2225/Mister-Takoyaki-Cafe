@@ -162,7 +162,7 @@ class MenuManagement extends Component
     public function updatedName()
     {
         $this->validateFieldLive('name', array_merge(
-            ValidationHelper::rulesName(2, 255),
+            ValidationHelper::rulesProductName(2, 255),
             [Rule::unique('products', 'name')->ignore($this->editProductId)]
         ), ValidationHelper::commonMessages());
     }
@@ -464,7 +464,7 @@ class MenuManagement extends Component
     private function getProductValidationRules(): array
     {
         $rules = [
-            'name'         => ['required', 'string', 'max:255', 'regex:' . ValidationHelper::REGEX_NAME, Rule::unique('products', 'name')->ignore($this->editProductId)],
+            'name'         => ['required', 'string', 'max:255', 'regex:' . ValidationHelper::REGEX_PRODUCT_NAME, Rule::unique('products', 'name')->ignore($this->editProductId)],
             'categoryId'   => ['nullable', 'exists:product_categories,id'],
             'price'        => ValidationHelper::RULES_PRICE,
             'description'  => ['nullable', 'string', 'max:500'],

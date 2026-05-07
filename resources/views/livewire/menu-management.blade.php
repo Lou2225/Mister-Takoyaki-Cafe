@@ -66,7 +66,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
                             <div>
                                 <x-input-label value="Product Name *" />
-                                <x-text-input wire:model.debounce.400ms="name" class="w-full mt-1.5 h-11 font-medium" placeholder="e.g. Classic Takoyaki (8pcs)" inputFilter="name" :hasError="$errors->has('name')" />
+                                <x-text-input wire:model.debounce.400ms="name" class="w-full mt-1.5 h-11 font-medium" placeholder="e.g. Classic Takoyaki (8pcs)" inputFilter="productName" :hasError="$errors->has('name')" />
                                 <x-input-error :messages="$errors->get('name')" class="mt-1" />
                             </div>
                             <div>
@@ -194,7 +194,7 @@
                                             @foreach($group['options'] as $oIdx => $option)
                                                 <div class="flex items-center gap-4">
                                                     <div class="flex-1">
-                                                        <x-text-input wire:model="optionGroups.{{ $idx }}.options.{{ $oIdx }}.name" class="w-full h-10 text-[13px] font-bold" placeholder="Option name..." inputFilter="name" />
+                                                        <x-text-input wire:model="optionGroups.{{ $idx }}.options.{{ $oIdx }}.name" class="w-full h-10 text-[13px] font-bold" placeholder="Option name..." inputFilter="productName" />
                                                     </div>
                                                     <div class="w-28 relative">
                                                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -382,8 +382,8 @@
                     </div>
 
                     {{-- Tab: Profitability Analysis --}}
-                    <div x-show="activeTab === 'analysis'" x-cloak class="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                            <div class="flex items-center gap-4 mb-8">
+                    <div x-show="activeTab === 'analysis'" x-cloak class="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-8">
+                            <div class="flex items-center gap-4">
                                 <div class="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm border border-indigo-100">
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
                                 </div>
@@ -393,19 +393,19 @@
                                 </div>
                             </div>
 
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-                                <div class="p-5 bg-slate-50/50 rounded-2xl border border-slate-100 transition-all hover:bg-white hover:shadow-md group">
-                                    <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 group-hover:text-slate-500 transition-colors">Base Recipe Cost</span>
-                                    <span class="text-[20px] font-black text-slate-900 italic font-mono">₱{{ number_format($recipeCost, 2) }}</span>
+                            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                                <div class="p-5 bg-slate-50/50 rounded-2xl border border-slate-100 transition-all hover:bg-white hover:shadow-md group space-y-2">
+                                    <span class="text-[11px] font-black text-slate-400 uppercase tracking-widest block group-hover:text-slate-500 transition-colors">Base Recipe Cost</span>
+                                    <span class="text-[22px] font-black text-slate-900 italic font-mono block leading-none">₱{{ number_format($recipeCost, 2) }}</span>
                                 </div>
-                                <div class="p-5 bg-slate-50/50 rounded-2xl border border-slate-100 transition-all hover:bg-white hover:shadow-md group">
-                                    <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2 group-hover:text-slate-500 transition-colors">Listing Price</span>
-                                    <span class="text-[20px] font-black text-slate-900 italic font-mono">₱{{ number_format($salePrice, 2) }}</span>
+                                <div class="p-5 bg-slate-50/50 rounded-2xl border border-slate-100 transition-all hover:bg-white hover:shadow-md group space-y-2">
+                                    <span class="text-[11px] font-black text-slate-400 uppercase tracking-widest block group-hover:text-slate-500 transition-colors">Listing Price</span>
+                                    <span class="text-[22px] font-black text-slate-900 italic font-mono block leading-none">₱{{ number_format($salePrice, 2) }}</span>
                                 </div>
-                                <div class="p-5 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-100 flex flex-col justify-center transition-all hover:scale-[1.02]">
-                                    <span class="text-[10px] font-black text-indigo-100 uppercase tracking-widest block mb-2">Net Profit</span>
+                                <div class="p-5 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-100 flex flex-col justify-center transition-all hover:scale-[1.02] space-y-2">
+                                    <span class="text-[11px] font-black text-indigo-100 uppercase tracking-widest block">Net Profit</span>
                                     <div class="flex items-baseline gap-2">
-                                        <span class="text-[24px] font-black text-white italic font-mono">₱{{ number_format($netProfit, 2) }}</span>
+                                        <span class="text-[24px] font-black text-white italic font-mono leading-none">₱{{ number_format($netProfit, 2) }}</span>
                                         <span class="text-[11px] font-black text-indigo-200 tracking-widest">{{ $profitMargin }}% MARGIN</span>
                                     </div>
                                 </div>
@@ -414,15 +414,17 @@
                             {{-- Cost Impact Breakdown --}}
                             @php $breakdown = $this->getCostBreakdown(); @endphp
                             @if(!empty($breakdown))
-                                <div class="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
-                                    <div class="flex items-center justify-between mb-6">
-                                        <h3 class="text-[14px] font-black text-slate-900 uppercase tracking-widest">Cost Impact Breakdown</h3>
-                                        <span class="text-[11px] font-bold text-slate-400 italic">Sorted by impact (highest to lowest)</span>
+                                <div class="pt-2">
+                                    <div class="flex items-center justify-between border-b border-slate-50 pb-4 mb-6">
+                                        <div>
+                                            <h3 class="text-[14px] font-black text-slate-900 uppercase tracking-widest">Cost Impact Breakdown</h3>
+                                            <p class="text-[11px] text-slate-400 font-medium mt-1">Sorted by impact (highest to lowest)</p>
+                                        </div>
                                     </div>
-                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-6">
+                                    <div class="grid grid-cols-1 gap-y-5">
                                         @foreach($breakdown as $item)
-                                            <div class="space-y-2">
-                                                <div class="flex items-center justify-between text-[12px] font-bold">
+                                            <div class="space-y-2.5">
+                                                <div class="flex items-center justify-between text-[13px] font-bold">
                                                     <span class="text-slate-700 truncate mr-2">{{ $item['name'] }}</span>
                                                     <span class="text-slate-900 font-mono italic">₱{{ number_format($item['cost'], 2) }}</span>
                                                 </div>
@@ -430,8 +432,8 @@
                                                     <div class="h-full bg-indigo-500/80 rounded-full transition-all duration-700" style="width: {{ $item['percentage'] }}%"></div>
                                                 </div>
                                                 <div class="flex justify-between items-center">
-                                                    <span class="text-[10px] font-black text-indigo-500 uppercase tracking-tighter">{{ round($item['percentage'], 1) }}% <span class="text-slate-300 ml-1">of total cost</span></span>
-                                                    <span class="text-[10px] font-black text-slate-400 italic">{{ number_format($item['qty'] ?? 0, 2) }} {{ strtoupper($item['unit'] ?? '') }}</span>
+                                                    <span class="text-[11px] font-black text-indigo-500 uppercase tracking-tighter">{{ round($item['percentage'], 1) }}% <span class="text-slate-300 ml-1">of total</span></span>
+                                                    <span class="text-[11px] font-black text-slate-400 italic">{{ number_format($item['qty'] ?? 0, 2) }} {{ strtoupper($item['unit'] ?? '') }}</span>
                                                 </div>
                                             </div>
                                         @endforeach
@@ -878,7 +880,7 @@
             <div class="mt-6 space-y-6">
                 <div>
                     <x-input-label value="Group Name" />
-                    <x-text-input wire:model="newGroupName" class="w-full mt-2 h-11" placeholder="e.g. Extras, Sizes, Flavors" inputFilter="name" />
+                    <x-text-input wire:model="newGroupName" class="w-full mt-2 h-11" placeholder="e.g. Extras, Sizes, Flavors" inputFilter="productName" />
                     <x-input-error :messages="$errors->get('newGroupName')" class="mt-1" />
                 </div>
                 <div>

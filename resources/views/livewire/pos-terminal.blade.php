@@ -54,12 +54,12 @@
 
                 @foreach($categories as $cat)
                     @if($selectedCategoryId == $cat->id)
-                        <x-primary-button type="button" wire:key="pos-tab-{{ $cat->id }}" wire:click.prevent="$set('selectedCategoryId', {{ $cat->id }})" wire:loading.attr="disabled" wire:target="$set('selectedCategoryId', {{ $cat->id }})" id="pos_tab_cat_{{ $cat->id }}" class="pos-category-tab inline-flex gap-1.5 whitespace-nowrap shrink-0" data-id="{{ $cat->id }}">
+                        <x-primary-button type="button" wire:key="pos-tab-{{ $cat->id }}" wire:click.prevent="$set('selectedCategoryId', {{ $cat->id }})" wire:loading.attr="disabled" wire:target="$set('selectedCategoryId', {{ $cat->id }})" id="pos_tab_cat_{{ $cat->id }}" class="pos-category-tab inline-flex gap-1.5 whitespace-nowrap shrink-0 transition-all {{ $isEditMode ? 'border border-dashed border-gray-300 cursor-move' : '' }}" data-id="{{ $cat->id }}">
                             {{ $cat->name }}
                             <span class="text-[10px] font-bold text-gray-100">{{ $cat->products_count }}</span>
                         </x-primary-button>
                     @else
-                        <x-secondary-button type="button" wire:key="pos-tab-{{ $cat->id }}" wire:click.prevent="$set('selectedCategoryId', {{ $cat->id }})" wire:loading.attr="disabled" wire:target="$set('selectedCategoryId', {{ $cat->id }})" id="pos_tab_cat_{{ $cat->id }}" class="pos-category-tab inline-flex gap-1.5 whitespace-nowrap shrink-0" data-id="{{ $cat->id }}">
+                        <x-secondary-button type="button" wire:key="pos-tab-{{ $cat->id }}" wire:click.prevent="$set('selectedCategoryId', {{ $cat->id }})" wire:loading.attr="disabled" wire:target="$set('selectedCategoryId', {{ $cat->id }})" id="pos_tab_cat_{{ $cat->id }}" class="pos-category-tab inline-flex gap-1.5 whitespace-nowrap shrink-0 transition-all {{ $isEditMode ? 'border border-dashed border-gray-300 cursor-move' : '' }}" data-id="{{ $cat->id }}">
                             {{ $cat->name }}
                             <span class="text-[10px] font-bold text-gray-400">{{ $cat->products_count }}</span>
                         </x-secondary-button>
@@ -76,7 +76,7 @@
                         </svg>
                     </div>
                     <label for="pos_search" class="sr-only">Search Menu</label>
-                    <input id="pos_search" wire:model.debounce.300ms="search" type="text" placeholder="Search Menu"
+                    <input id="pos_search" wire:model="search" type="text" placeholder="Search Menu"
                         class="pl-8 pr-3 py-1.5 w-36 text-[12px] font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:border-gray-300 placeholder-gray-400 transition-all focus:w-44">
                 </div>
 
@@ -95,7 +95,7 @@
                         <span class="text-[11px] font-black uppercase tracking-wider">Done</span>
                     @else
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
-                        <span class="text-[11px] font-black uppercase tracking-wider">Sort Menu</span>
+                        <span class="text-[11px] font-black uppercase tracking-wider">Sort</span>
                     @endif
                 </button>
                 @endif

@@ -53,13 +53,13 @@
         {{-- Notifications --}}
         <div class="relative" x-data="{ notificationsOpen: false }" @close-notifications.window="notificationsOpen = false" wire:poll.30s>
             <button @click="notificationsOpen = !notificationsOpen" @click.outside="notificationsOpen = false" 
-                class="p-2 text-gray-400 hover:text-gray-500 rounded-full hover:bg-gray-100 transition-colors focus:outline-none relative group">
+                class="p-3 text-gray-400 hover:text-gray-500 rounded-full hover:bg-gray-100 transition-colors focus:outline-none relative group">
                 <span class="sr-only">View notifications</span>
-                <svg class="h-5 w-5 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <svg class="h-6 w-6 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
                 </svg>
                 @if($unreadCount > 0)
-                    <div class="absolute top-1.5 right-1.5 min-w-[16px] h-4 px-1 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center ring-2 ring-white shadow-sm">
+                    <div class="absolute top-2 right-2 min-w-[18px] h-5 px-1 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center ring-2 ring-white shadow-sm">
                         {{ $unreadCount > 9 ? '9+' : $unreadCount }}
                     </div>
                 @endif

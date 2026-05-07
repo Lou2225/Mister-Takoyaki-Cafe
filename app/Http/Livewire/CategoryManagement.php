@@ -256,15 +256,15 @@ class CategoryManagement extends Component
         
         if ($this->filterType === 'product') {
             $categories = ProductCategory::query()
-                ->withCount('products as associated_count')
                 ->select('id', 'name', 'description', 'icon', 'created_at', DB::raw("'product' as cat_type"))
+                ->withCount('products as associated_count')
                 ->where('name', 'like', "%{$this->search}%")
                 ->orderBy('name', 'asc')
                 ->paginate($this->perPage);
         } elseif ($this->filterType === 'ingredient') {
             $categories = IngredientCategory::query()
-                ->withCount('ingredients as associated_count')
                 ->select('id', 'name', 'description', 'icon', 'created_at', DB::raw("'ingredient' as cat_type"))
+                ->withCount('ingredients as associated_count')
                 ->where('name', 'like', "%{$this->search}%")
                 ->orderBy('name', 'asc')
                 ->paginate($this->perPage);

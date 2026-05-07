@@ -25,7 +25,7 @@
 
                 <!-- Email Address -->
                 <div>
-                    <x-input-label for="email" :value="__('Email Address')" class="text-[12px] font-semibold text-indigo-700 uppercase tracking-[0.24em] mb-2" />
+                    <x-input-label for="email" :value="__('Email Address')" class="text-[12px] font-semibold text-slate-900 uppercase tracking-[0.24em] mb-2" />
                     <x-text-input id="email" class="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:border-indigo-500 focus:ring-indigo-100 transition-all duration-200" 
                         type="email" name="email" :value="old('email')" required autofocus autocomplete="username" placeholder="name@domain.com" />
                     <x-input-error :messages="$errors->get('email')" class="mt-2" />
@@ -34,7 +34,7 @@
                 <!-- Password -->
                 <div x-data="{ show: false }">
                     <div class="flex items-center justify-between mb-2">
-                        <x-input-label for="password" :value="__('Password')" class="text-[12px] font-semibold text-indigo-700 uppercase tracking-[0.24em]" />
+                        <x-input-label for="password" :value="__('Password')" class="text-[12px] font-semibold text-slate-900 uppercase tracking-[0.24em]" />
                         @if (Route::has('password.request'))
                             <button type="button" @click.prevent="view = 'forgot'" class="text-[12px] font-semibold text-indigo-600 hover:text-indigo-700 transition-colors">
                             </button>
@@ -67,7 +67,7 @@
                 </div>
 
                 <div class="pt-2">
-                    <x-primary-button class="w-full justify-center py-4 shadow-lg shadow-indigo-200 uppercase tracking-widest">
+                    <x-primary-button class="w-full justify-center py-4 bg-black text-white shadow-lg shadow-slate-900/10 uppercase tracking-widest hover:bg-slate-900">
                         {{ __('Log In') }}
                     </x-primary-button>
                 </div>
