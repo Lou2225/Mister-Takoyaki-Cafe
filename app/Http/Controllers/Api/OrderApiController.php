@@ -17,6 +17,7 @@ use App\Services\StockDeductionService;
 use App\Events\OrderStatusUpdated;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class OrderApiController extends Controller
@@ -46,7 +47,7 @@ class OrderApiController extends Controller
             $query->where('customer_id', $user->id);
         }
 
-        $orders = $query->orderBy('created_at', 'desc')->get();
+        $orders = $query->orderBy('created_at', 'desc')->get()->map(fn($order) => $this->formatOrder($order));
 
         return response()->json([
             'success' => true,
@@ -225,11 +226,11 @@ class OrderApiController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Order placed successfully. Waiting for branch approval.',
-                'data' => $order->load($this->orderRelations)
+                'data' => $this->formatOrder($order->load($this->orderRelations))
             ], 201);
 
         } catch (\Exception $e) {
-            \Log::error("Failed to place order: " . $e->getMessage(), [
+            Log::error("Failed to place order: " . $e->getMessage(), [
                 'request' => $request->all(),
                 'trace' => $e->getTraceAsString()
             ]);
@@ -244,7 +245,7 @@ class OrderApiController extends Controller
     /**
      * Get order details
      */
-    public function show($id, Request $request)
+    public function show(int $id, Request $request)
     {
         $user = $request->user();
         $query = Order::with($this->orderRelations);
@@ -275,14 +276,14 @@ class OrderApiController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $order
+            'data' => $this->formatOrder($order)
         ]);
     }
 
     /**
      * Update order status (Staff/Admin usage via Dashboard)
      */
-    public function updateStatus(Request $request, $id)
+    public function updateStatus(Request $request, int $id)
     {
         $user = $request->user();
         if (!$user->isStaff() && !$user->isAdmin() && !$user->isSuperAdmin()) {
@@ -303,11 +304,11 @@ class OrderApiController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => "Order status updated to {$request->status}",
-                'data' => $order->fresh($this->orderRelations)
+                'data' => $this->formatOrder($order->fresh($this->orderRelations))
             ]);
 
         } catch (\Exception $e) {
-            \Log::error("Failed to update order status: " . $e->getMessage(), [
+            Log::error("Failed to update order status: " . $e->getMessage(), [
                 'order_id' => $id,
                 'status' => $request->status,
                 'trace' => $e->getTraceAsString()
@@ -318,5 +319,15 @@ class OrderApiController extends Controller
                 'message' => 'Failed to update status: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Format order API response and remove tax fields for the App.
+     */
+    private function formatOrder(Order $order): array
+    {
+        $orderData = $order->toArray();
+        unset($orderData['tax_amount']);
+        return $orderData;
     }
 }

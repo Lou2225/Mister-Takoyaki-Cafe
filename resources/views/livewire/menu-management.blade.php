@@ -351,7 +351,7 @@
                                         <p class="text-[12px] text-slate-400 font-medium">No ingredients added yet.</p>
                                     </div>
                                 @else
-                                    <div class="space-y-3">
+                                    <div class="space-y-3 max-h-96 overflow-y-auto pr-2">
                                         @foreach($recipeIngredients as $idx => $ri)
                                             <div class="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl shadow-sm group">
                                                 <div class="flex items-center gap-4">

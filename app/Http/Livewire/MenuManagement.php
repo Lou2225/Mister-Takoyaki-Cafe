@@ -5,6 +5,7 @@ namespace App\Http\Livewire;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Livewire\WithFileUploads;
+use Livewire\TemporaryUploadedFile;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\Ingredient;
@@ -26,7 +27,7 @@ class MenuManagement extends Component
 {
     use WithPagination, WithFileUploads, HandlesValidations;
 
-    public function importOptionTemplate($templateId)
+    public function importOptionTemplate(int $templateId)
     {
         $template = OptionTemplate::with('items')->find($templateId);
         if (!$template) return;
@@ -61,7 +62,7 @@ class MenuManagement extends Component
         $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => "Imported '{$template->name}' template."]);
     }
 
-    public function saveGroupToLibrary($index)
+    public function saveGroupToLibrary(int $index)
     {
         $groupData = $this->optionGroups[$index] ?? null;
         if (!$groupData) return;
@@ -101,21 +102,22 @@ class MenuManagement extends Component
     public $mode = 'list';
 
     // ── Deletion State ────────────────────────────────────────────
-    public $deleteTargetId = null;
-    public $deleteTargetName = '';
+    public ?int $deleteTargetId = null;
+    public string $deleteTargetName = '';
 
     // ── Form: Product (Create/Edit) ───────────────────────────────
-    public $editProductId = null;
-    public $name = '';
-    public $categoryId = '';
-    public $description = '';
-    public $price = '';
-    public $isActive = true;
-    public $image;
-    public $existingImage;
-    public $sortOrder = 0;
-    public $recipeIngredients = [];
-    public $newCategoryName = '';
+    public ?int $editProductId = null;
+    public string $name = '';
+    public int|string|null $categoryId = null;
+    public string $description = '';
+    public string $price = '';
+    public bool $isActive = true;
+    /** @var TemporaryUploadedFile|null */
+    public $image = null;
+    public ?string $existingImage = null;
+    public int $sortOrder = 0;
+    public array $recipeIngredients = [];
+    public string $newCategoryName = '';
 
     // ── Option Groups ─────────────────────────────────────────────
     public $optionGroups = [];
@@ -180,7 +182,7 @@ class MenuManagement extends Component
         $this->validateFieldLive('newGroupName', ['required', 'string', 'max:100'], ValidationHelper::commonMessages());
     }
 
-    public function updatedNewIngredientId($id)
+    public function updatedNewIngredientId(int|string|null $id)
     {
         if ($id) {
             $ing = Ingredient::find($id);
@@ -244,7 +246,7 @@ class MenuManagement extends Component
         $this->dispatchBrowserEvent('switch-panel', ['panel' => 'form']);
     }
 
-    public function showEdit($id)
+    public function showEdit(int $id)
     {
         $product = Product::with(['category', 'recipes.ingredient', 'branches', 'optionGroups.options'])->findOrFail($id);
 
@@ -300,7 +302,7 @@ class MenuManagement extends Component
         $this->dispatchBrowserEvent('switch-panel', ['panel' => 'list']);
     }
 
-    public function toggleStatus($id)
+    public function toggleStatus(int $id)
     {
         if (!$this->isSuperAdmin() && !$this->isAdmin()) return;
         $product = Product::findOrFail($id);
@@ -363,7 +365,7 @@ class MenuManagement extends Component
         $this->dispatchBrowserEvent('close-modal', ['name' => 'add-option-group']);
     }
 
-    public function removeOptionGroup($index)
+    public function removeOptionGroup(int $index)
     {
         unset($this->optionGroups[$index]);
         $this->optionGroups = array_values($this->optionGroups);
@@ -372,20 +374,20 @@ class MenuManagement extends Component
         }
     }
 
-    public function addOptionToGroup($groupIndex)
+    public function addOptionToGroup(int $groupIndex)
     {
         $this->optionGroups[$groupIndex]['options'][] = [
             'id' => null, 'name' => '', 'price' => 0, 'is_default' => false,
         ];
     }
 
-    public function removeOptionFromGroup($groupIndex, $optionIndex)
+    public function removeOptionFromGroup(int $groupIndex, int $optionIndex)
     {
         unset($this->optionGroups[$groupIndex]['options'][$optionIndex]);
         $this->optionGroups[$groupIndex]['options'] = array_values($this->optionGroups[$groupIndex]['options']);
     }
 
-    public function setOptionAsDefault($groupIndex, $optionIndex)
+    public function setOptionAsDefault(int $groupIndex, int $optionIndex)
     {
         foreach ($this->optionGroups[$groupIndex]['options'] as $idx => $opt) {
             $this->optionGroups[$groupIndex]['options'][$idx]['is_default'] = ($idx == $optionIndex);
@@ -421,7 +423,7 @@ class MenuManagement extends Component
         $this->newIngredientQty = '';
     }
 
-    public function removeRecipeIngredient($index)
+    public function removeRecipeIngredient(int $index)
     {
         unset($this->recipeIngredients[$index]);
         $this->recipeIngredients = array_values($this->recipeIngredients);
@@ -452,7 +454,7 @@ class MenuManagement extends Component
         $this->dispatchBrowserEvent('close-modal', ['name' => 'quick-add-category']);
     }
 
-    public function setCategoryAndValidate($categoryId)
+    public function setCategoryAndValidate(int|string|null $categoryId)
     {
         $this->categoryId = $categoryId;
         $this->validateOnly('categoryId', ['categoryId' => ['nullable', 'exists:product_categories,id']]);
@@ -466,7 +468,7 @@ class MenuManagement extends Component
             'categoryId'   => ['nullable', 'exists:product_categories,id'],
             'price'        => ValidationHelper::RULES_PRICE,
             'description'  => ['nullable', 'string', 'max:500'],
-            'image'        => ['nullable', 'image', 'max:2048'],
+            'image'        => ['nullable', 'image', 'max:4096'],
             'sortOrder'    => ['integer', 'min:0'],
             'optionGroups.*.name'              => 'required|string|max:100',
             'optionGroups.*.price_mode'        => 'required|in:fixed,additive',
@@ -591,7 +593,7 @@ class MenuManagement extends Component
     }
 
     // ── Delete Product ────────────────────────────────────────────
-    public function confirmDeleteProduct($id)
+    public function confirmDeleteProduct(int $id)
     {
         if (!$this->isSuperAdmin() && !$this->isAdmin()) return;
         $product = Product::findOrFail($id);

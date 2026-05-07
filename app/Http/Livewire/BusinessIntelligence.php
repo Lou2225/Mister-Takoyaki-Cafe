@@ -21,14 +21,14 @@ class BusinessIntelligence extends Component
 {
     use WithPagination, HandlesExports;
 
-    public $activeTab = 'performance'; // performance, forecasting, products, operations, sales
-    public $startDate;
-    public $endDate;
-    public $selectedBranchId = 'all';
-    public $search = '';
-    public $perPage = 5;
-    public $seasonalityMode = 'weekly'; // weekly | monthly
-    public $activeFilter = 'All Time';
+    public string $activeTab = 'performance'; // performance, forecasting, products, operations, sales
+    public string $startDate = '';
+    public string $endDate = '';
+    public string $selectedBranchId = 'all';
+    public string $search = '';
+    public int $perPage = 5;
+    public string $seasonalityMode = 'weekly'; // weekly | monthly
+    public string $activeFilter = 'All Time';
 
     protected $queryString = [
         'activeTab' => ['except' => 'performance'],
@@ -66,7 +66,7 @@ class BusinessIntelligence extends Component
         $this->updateHeader();
     }
 
-    public function applyQuickDateFilter($filter)
+    public function applyQuickDateFilter(string $filter)
     {
         switch ($filter) {
             case 'today':
@@ -93,7 +93,12 @@ class BusinessIntelligence extends Component
         $this->resetPage();
     }
 
-    public function updated($propertyName)
+    public function redirectToOrdering(int $ingredientId)
+    {
+        return redirect()->route('stock.orders', ['ingredient' => $ingredientId]);
+    }
+
+    public function updated(string $propertyName)
     {
         if (in_array($propertyName, ['startDate', 'endDate', 'selectedBranchId', 'search', 'perPage'])) {
             if (in_array($propertyName, ['startDate', 'endDate'])) {
@@ -109,6 +114,8 @@ class BusinessIntelligence extends Component
     public function render()
     {
         $salesData = $this->getSalesData();
+        $mainBranchId = Branch::where('is_main', true)->first()?->id;
+        $canOrder = $this->selectedBranchId !== 'all' && $this->selectedBranchId != $mainBranchId;
         
         return view('livewire.business-intelligence', [
             'branches'       => Branch::all(),
@@ -118,10 +125,11 @@ class BusinessIntelligence extends Component
             'operations'     => $this->getOperationalData(),
             'recentOrders'   => $this->getRecentOrders(),
             'salesData'      => $salesData,
+            'canOrder'       => $canOrder,
         ])->layout('layouts.app');
     }
 
-    private function getPerformanceMetrics($analytics)
+    private function getPerformanceMetrics(array $analytics)
     {
         $cogsData = $this->getCogsAndProfit();
 
@@ -230,7 +238,7 @@ class BusinessIntelligence extends Component
         ];
     }
 
-    private function calculateRegression($type, $historyCount, $predictCount)
+    private function calculateRegression(string $type, int $historyCount, int $predictCount)
     {
         $query = Order::where('status', 'Completed')
             ->when($this->selectedBranchId !== 'all', fn($q) => $q->where('branch_id', $this->selectedBranchId));
@@ -295,7 +303,7 @@ class BusinessIntelligence extends Component
 
     private function getIngredientDemandForecast()
     {
-        // 1. Get Top 5 products for the branch to predict restocking
+        // 1. Get all products with sales in the period for the branch to predict restocking
         $topProducts = OrderItem::whereHas('order', function($q) {
                 $q->where('status', 'Completed')
                   ->when($this->selectedBranchId !== 'all', fn($q) => $q->where('branch_id', $this->selectedBranchId))
@@ -304,7 +312,6 @@ class BusinessIntelligence extends Component
             ->select('product_id', DB::raw('SUM(quantity) / 30 as daily_avg'))
             ->groupBy('product_id')
             ->orderBy('daily_avg', 'desc')
-            ->take(5)
             ->with('product.recipes.ingredient')
             ->get();
 
@@ -313,9 +320,9 @@ class BusinessIntelligence extends Component
         foreach ($topProducts as $tp) {
             if (!$tp->product || !$tp->product->recipes) continue;
 
-            // Simple 7-day projection: daily_avg * 7 * (1 + current growth momentum)
-            // For now, we'll use a 1.1x safety buffer
-            $projectedUnits = $tp->daily_avg * 7 * 1.1;
+            // Simple 14-day projection: daily_avg * 14 * (1 + current growth momentum)
+            // Use a 1.2x safety buffer
+            $projectedUnits = $tp->daily_avg * 14 * 1.2;
 
             foreach ($tp->product->recipes as $recipe) {
                 if (!$recipe->ingredient) continue;
@@ -323,6 +330,7 @@ class BusinessIntelligence extends Component
                 $id = $recipe->ingredient_id;
                 if (!isset($ingredientDemand[$id])) {
                     $ingredientDemand[$id] = [
+                        'id' => $id,
                         'name' => $recipe->ingredient->name,
                         'unit' => $recipe->ingredient->unit,
                         'amount' => 0,
@@ -333,15 +341,15 @@ class BusinessIntelligence extends Component
             }
         }
 
-        // Sort by amount descending and take top 5 "Must Stock" ingredients
+        // Sort by amount descending and take top 15 "Must Stock" ingredients
         return collect($ingredientDemand)
             ->sortByDesc('amount')
-            ->take(5)
+            ->take(15)
             ->map(function($item) {
                 // Round to whole number
                 $item['amount'] = ceil($item['amount']);
                 // Heuristic: If amount is significant, mark as High priority
-                if ($item['amount'] > 100) $item['priority'] = 'High';
+                if ($item['amount'] > 25) $item['priority'] = 'High';
                 return $item;
             })
             ->values()

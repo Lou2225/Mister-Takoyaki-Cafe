@@ -7,6 +7,7 @@ use Livewire\WithPagination;
 use App\Models\ProductCategory;
 use App\Models\IngredientCategory;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
 use App\Traits\HandlesValidations;
 use App\Helpers\ValidationHelper;
 
@@ -14,21 +15,21 @@ class CategoryManagement extends Component
 {
     use WithPagination, HandlesValidations;
 
-    public $panel = 'list'; // 'list' | 'detail'
-    public $filterType = 'all'; // 'all' | 'product' | 'ingredient'
-    public $search = '';
-    public $perPage = 5;
+    public string $panel = 'list'; // 'list' | 'detail'
+    public string $filterType = 'all'; // 'all' | 'product' | 'ingredient'
+    public string $search = '';
+    public int $perPage = 5;
     
     // Form fields
-    public $editCategoryId = null;
-    public $editCategoryType = null; // 'product' | 'ingredient'
-    public $name = '';
-    public $description = '';
-    public $icon = 'tag';
+    public ?int $editCategoryId = null;
+    public ?string $editCategoryType = null; // 'product' | 'ingredient'
+    public string $name = '';
+    public string $description = '';
+    public string $icon = 'tag';
 
     // Deletion targets
-    public $deleteTargetId = null;
-    public $deleteTargetName = '';
+    public ?int $deleteTargetId = null;
+    public string $deleteTargetName = '';
 
     protected $queryString = [
         'filterType' => ['except' => 'all', 'as' => 'type'],
@@ -110,7 +111,7 @@ class CategoryManagement extends Component
         ];
     }
 
-    public function showCreate($type = 'product')
+    public function showCreate(string $type = 'product')
     {
         $this->resetForm();
         $this->editCategoryType = $type;
@@ -118,7 +119,7 @@ class CategoryManagement extends Component
         $this->dispatchBrowserEvent('switch-panel', ['panel' => 'detail']);
     }
 
-    public function selectCategory($id, $type)
+    public function selectCategory(int $id, string $type)
     {
         $this->resetForm();
         $this->editCategoryId = $id;
@@ -128,7 +129,7 @@ class CategoryManagement extends Component
         $category = $model::findOrFail($id);
         
         $this->name = $category->name;
-        $this->description = $category->description;
+        $this->description = $category->description ?? '';
         $this->icon = $category->icon ?? 'tag';
         
         $this->panel = 'detail';
@@ -195,7 +196,7 @@ class CategoryManagement extends Component
         $this->resetForm();
     }
 
-    public function confirmDelete($id, $type)
+    public function confirmDelete(int $id, string $type)
     {
         $this->deleteTargetId = $id;
         $this->editCategoryType = $type;
@@ -256,32 +257,46 @@ class CategoryManagement extends Component
         if ($this->filterType === 'product') {
             $categories = ProductCategory::query()
                 ->withCount('products as associated_count')
-                ->select('id', 'name', 'description', 'icon', 'created_at', \DB::raw("'product' as cat_type"))
+                ->select('id', 'name', 'description', 'icon', 'created_at', DB::raw("'product' as cat_type"))
                 ->where('name', 'like', "%{$this->search}%")
                 ->orderBy('name', 'asc')
                 ->paginate($this->perPage);
         } elseif ($this->filterType === 'ingredient') {
             $categories = IngredientCategory::query()
                 ->withCount('ingredients as associated_count')
-                ->select('id', 'name', 'description', 'icon', 'created_at', \DB::raw("'ingredient' as cat_type"))
+                ->select('id', 'name', 'description', 'icon', 'created_at', DB::raw("'ingredient' as cat_type"))
                 ->where('name', 'like', "%{$this->search}%")
                 ->orderBy('name', 'asc')
                 ->paginate($this->perPage);
         } else {
             // Merge both for 'all' with counts
             $productQuery = ProductCategory::query()
-                ->withCount('products as associated_count')
-                ->select('id', 'name', 'description', 'icon', 'created_at', \DB::raw("'product' as cat_type"), 'associated_count')
+                ->select([
+                    'id',
+                    'name',
+                    'description',
+                    'icon',
+                    'created_at',
+                    DB::raw("'product' as cat_type"),
+                    DB::raw('(select count(*) from products where products.category_id = product_categories.id) as associated_count')
+                ])
                 ->where('name', 'like', "%{$this->search}%");
 
             $ingredientQuery = IngredientCategory::query()
-                ->withCount('ingredients as associated_count')
-                ->select('id', 'name', 'description', 'icon', 'created_at', \DB::raw("'ingredient' as cat_type"), 'associated_count')
+                ->select([
+                    'id',
+                    'name',
+                    'description',
+                    'icon',
+                    'created_at',
+                    DB::raw("'ingredient' as cat_type"),
+                    DB::raw('(select count(*) from ingredients where ingredients.category_id = ingredient_categories.id) as associated_count')
+                ])
                 ->where('name', 'like', "%{$this->search}%");
 
             $unifiedQuery = $productQuery->union($ingredientQuery);
             
-            $categories = \DB::table(\DB::raw("({$unifiedQuery->toSql()}) as unified"))
+            $categories = DB::table(DB::raw("({$unifiedQuery->toSql()}) as unified"))
                 ->mergeBindings($unifiedQuery->getQuery())
                 ->orderBy('name', 'asc')
                 ->paginate($this->perPage);

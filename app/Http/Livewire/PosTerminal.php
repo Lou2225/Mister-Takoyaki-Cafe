@@ -18,6 +18,7 @@ use App\Models\FinancialLedger;
 use App\Models\BranchCategorySort;
 use App\Services\StockDeductionService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use App\Traits\HandlesValidations;
@@ -27,7 +28,7 @@ class PosTerminal extends Component
 {
     use HandlesValidations;
     // ─── Filters ───────────────────────────────────────────────────────────
-    public $selectedCategoryId = null;
+    public ?int $selectedCategoryId = null;
     public $search = '';
 
     // ─── Cart ──────────────────────────────────────────────────────────────
@@ -42,7 +43,7 @@ class PosTerminal extends Component
     public float $amountTendered = 0;
 
     // ─── Branch / Settings ─────────────────────────────────────────────────
-    public $branchId = null;
+    public ?int $branchId = null;
     public float $taxRate = 0;          // decimal (e.g. 0.12)
     public float $serviceChargeRate = 0; // decimal (e.g. 0.05)
     public float $discountPercent = 0;  // decimal (e.g. 0.10)
@@ -55,7 +56,7 @@ class PosTerminal extends Component
     public array $paymentMethods = [];
 
     // ─── UI State ──────────────────────────────────────────────────────────
-    public $editCartItemId = null;
+    public ?string $editCartItemId = null;
     public $editCartItemQty = 1;
     public string $editCartItemNotes = '';
     public bool $applyRegularDiscount = false;
@@ -69,10 +70,10 @@ class PosTerminal extends Component
     public string $primaryColor = 'indigo';
 
     // ─── Options Modal ─────────────────────────────────────
-    public $showingOptionsId = null;
-    public array $selectedOptions = []; // [groupId => optionId]
+    public ?int $showingOptionsId = null;
+    public array $selectedOptions = []; // [groupId => [optionId, optionId, ...]] for additive; [groupId => [optionId]] for fixed
     public array $selectedModifierIds = [];
-    public $currentProduct = null;
+    public ?Product $currentProduct = null;
     public array $optionAvailability = [];
     public array $modifierAvailability = []; // [modifierId => quantity_available]
     public bool $isVerifyingGCash = false;
@@ -199,7 +200,7 @@ class PosTerminal extends Component
     }
 
     // ─── Computed: Products ────────────────────────────────────────────────
-    protected $productsCache = null;
+    protected ?Collection $productsCache = null;
     public function getProductsProperty()
     {
         if ($this->productsCache !== null) return $this->productsCache;
@@ -279,7 +280,7 @@ class PosTerminal extends Component
     }
 
     // ─── Computed: Categories ──────────────────────────────────────────────
-    protected $categoriesCache = null;
+    protected ?Collection $categoriesCache = null;
     public function getCategoriesProperty()
     {
         if ($this->categoriesCache !== null) return $this->categoriesCache;
@@ -472,14 +473,29 @@ class PosTerminal extends Component
         $group = $this->currentProduct->optionGroups->where('id', $groupId)->first();
         if (!$group) return;
 
-        if (isset($this->selectedOptions[$groupId]) && $this->selectedOptions[$groupId] == $optionId) {
-            // If already selected and NOT required, we can unselect it
-            if (!$group->is_required) {
-                $this->selectedOptions[$groupId] = null;
+        // Initialize as array if not exists
+        if (!isset($this->selectedOptions[$groupId])) {
+            $this->selectedOptions[$groupId] = [];
+        } else if (!is_array($this->selectedOptions[$groupId])) {
+            $this->selectedOptions[$groupId] = [$this->selectedOptions[$groupId]];
+        }
+
+        if ($group->price_mode === 'additive') {
+            // Additive: allow multiple selections (toggle)
+            $key = array_search($optionId, $this->selectedOptions[$groupId]);
+            if ($key !== false) {
+                unset($this->selectedOptions[$groupId][$key]);
+                $this->selectedOptions[$groupId] = array_values($this->selectedOptions[$groupId]);
+            } else {
+                $this->selectedOptions[$groupId][] = $optionId;
             }
         } else {
-            // Select it
-            $this->selectedOptions[$groupId] = $optionId;
+            // Fixed: single selection (replace)
+            if (in_array($optionId, $this->selectedOptions[$groupId]) && !$group->is_required) {
+                $this->selectedOptions[$groupId] = [];
+            } else {
+                $this->selectedOptions[$groupId] = [$optionId];
+            }
         }
     }
 
@@ -534,10 +550,17 @@ class PosTerminal extends Component
         }
 
 
-        // Filter out null options before adding to cart
-        $filteredOptions = array_filter($this->selectedOptions);
+        // Flatten selected options: convert arrays of IDs to flat array of IDs
+        $flattenedOptions = [];
+        foreach ($this->selectedOptions as $groupId => $options) {
+            if (is_array($options)) {
+                $flattenedOptions = array_merge($flattenedOptions, $options);
+            } elseif ($options) {
+                $flattenedOptions[] = $options;
+            }
+        }
         
-        $this->confirmAdd($this->showingOptionsId, $filteredOptions, $this->selectedModifierIds);
+        $this->confirmAdd($this->showingOptionsId, $flattenedOptions, $this->selectedModifierIds);
         $this->closeOptionsModal();
     }
 

@@ -16,8 +16,8 @@
             <x-auth-session-status class="mb-6" :status="session('status')" />
 
             <div class="mb-8">
-                <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight mb-2">LOGIN</h1>
-                <p class="text-[14px] text-gray-500 font-medium">Enter your credentials to access your administrative workspace.</p>
+                <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight mb-2">LOGIN</h1>
+                <p class="text-[14px] text-slate-500 font-medium">Enter your credentials to access your administrative workspace.</p>
             </div>
 
             <form method="POST" action="{{ route('login') }}" class="space-y-6">
@@ -25,8 +25,8 @@
 
                 <!-- Email Address -->
                 <div>
-                    <x-input-label for="email" :value="__('Email Address')" class="text-[12px] font-bold text-gray-700 uppercase tracking-wider mb-2" />
-                    <x-text-input id="email" class="block w-full px-4 py-3 bg-gray-50 border-gray-100 rounded-xl focus:bg-white focus:border-indigo-600 transition-all duration-200" 
+                    <x-input-label for="email" :value="__('Email Address')" class="text-[12px] font-semibold text-indigo-700 uppercase tracking-[0.24em] mb-2" />
+                    <x-text-input id="email" class="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:border-indigo-500 focus:ring-indigo-100 transition-all duration-200" 
                         type="email" name="email" :value="old('email')" required autofocus autocomplete="username" placeholder="name@domain.com" />
                     <x-input-error :messages="$errors->get('email')" class="mt-2" />
                 </div>
@@ -34,10 +34,9 @@
                 <!-- Password -->
                 <div x-data="{ show: false }">
                     <div class="flex items-center justify-between mb-2">
-                        <x-input-label for="password" :value="__('Password')" class="text-[12px] font-bold text-gray-700 uppercase tracking-wider" />
+                        <x-input-label for="password" :value="__('Password')" class="text-[12px] font-semibold text-indigo-700 uppercase tracking-[0.24em]" />
                         @if (Route::has('password.request'))
-                            <button type="button" @click.prevent="view = 'forgot'" class="text-[12px] font-bold text-indigo-600 hover:text-indigo-700 transition-colors">
-                                {{ __('Forgot Password?') }}
+                            <button type="button" @click.prevent="view = 'forgot'" class="text-[12px] font-semibold text-indigo-600 hover:text-indigo-700 transition-colors">
                             </button>
                         @endif
                     </div>

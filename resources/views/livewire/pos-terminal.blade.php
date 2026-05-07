@@ -461,6 +461,9 @@
                                     @if($group->is_required)
                                         <span class="text-[11px] font-semibold text-red-600 mt-0.5">Required selection</span>
                                     @endif
+                                    @if($group->price_mode === 'additive')
+                                        <span class="text-[11px] font-semibold text-blue-600 mt-0.5">Multiple allowed</span>
+                                    @endif
                                 </div>
                             </div>
                             <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -468,10 +471,11 @@
                                     @php
                                         $optAvailable = $optionAvailability[$opt->id] ?? 0;
                                         $isOutOfStock = $optAvailable <= 0;
+                                        $isSelected = is_array($selectedOptions[$group->id] ?? null) && in_array($opt->id, $selectedOptions[$group->id]);
                                     @endphp
                                     <div wire:click="toggleOption({{ $group->id }}, {{ $opt->id }})" 
                                         class="relative flex flex-col p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 hover:shadow-md
-                                        {{ $isOutOfStock ? 'opacity-50 cursor-not-allowed border-gray-200 bg-gray-50' : (($selectedOptions[$group->id] ?? null) == $opt->id ? 'border-indigo-500 bg-indigo-50 shadow-md' : 'border-gray-200 bg-white hover:border-gray-300') }}">
+                                        {{ $isOutOfStock ? 'opacity-50 cursor-not-allowed border-gray-200 bg-gray-50' : ($isSelected ? 'border-indigo-500 bg-indigo-50 shadow-md' : 'border-gray-200 bg-white hover:border-gray-300') }}">
 
                                         <span class="text-[13px] font-bold text-gray-900">{{ $opt->name }}</span>
                                         @if($group->price_mode === 'fixed')
@@ -491,11 +495,17 @@
                                             @endif
                                         </div>
                                         
-                                        @if(($selectedOptions[$group->id] ?? null) == $opt->id)
+                                        @if($isSelected)
                                             <div class="absolute top-2 right-2">
-                                                <div class="w-5 h-5 bg-indigo-500 rounded-full flex items-center justify-center shadow-md">
-                                                    <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
-                                                </div>
+                                                @if($group->price_mode === 'additive')
+                                                    <div class="w-5 h-5 bg-indigo-500 rounded flex items-center justify-center shadow-md">
+                                                        <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                                                    </div>
+                                                @else
+                                                    <div class="w-5 h-5 bg-indigo-500 rounded-full flex items-center justify-center shadow-md">
+                                                        <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                                                    </div>
+                                                @endif
                                             </div>
                                         @endif
                                     </div>

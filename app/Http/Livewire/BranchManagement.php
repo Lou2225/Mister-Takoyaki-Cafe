@@ -38,27 +38,27 @@ class BranchManagement extends Component
     public $dateError = '';
     
     // Form fields
-    public $branch_id;
-    public $branch_name;
-    public $branch_code;
-    public $phone;
-    public $email;
-    public $address; // Full JSON address blob
-    public $user_id; // Manager
-    public $status = 1;
-    public $is_main = 0;
-    public $confirmMainDesignation = false;
-    public $deleteTargetId = null;
-    public $deleteTargetName = '';
+    public ?int $branch_id;
+    public string $branch_name;
+    public string $branch_code;
+    public string $phone;
+    public string $email;
+    public string $address; // Full JSON address blob
+    public ?int $user_id; // Manager
+    public bool $status = true;
+    public bool $is_main = false;
+    public bool $confirmMainDesignation = false;
+    public ?int $deleteTargetId = null;
+    public string $deleteTargetName = '';
 
     // PSGC address sub-fields (bound by Alpine PSGC dropdowns + map picker)
-    public $addr_region   = '';
-    public $addr_province = '';
-    public $addr_city     = '';
-    public $addr_barangay = '';
-    public $addr_street   = '';
-    public $addr_lat      = null;
-    public $addr_lng      = null;
+    public string $addr_region   = '';
+    public string $addr_province = '';
+    public string $addr_city     = '';
+    public string $addr_barangay = '';
+    public string $addr_street   = '';
+    public ?float $addr_lat      = null;
+    public ?float $addr_lng      = null;
 
     protected $queryString = [
         'search'    => ['except' => '', 'as' => 'b_search'],
@@ -79,7 +79,7 @@ class BranchManagement extends Component
         $this->updateGlobalHeader('list');
     }
 
-    public function toggleBranch($id)
+    public function toggleBranch(int $id)
     {
         if (in_array($id, $this->selectedBranchIds)) {
             $this->selectedBranchIds = array_filter($this->selectedBranchIds, fn($bid) => $bid != $id);
@@ -88,7 +88,7 @@ class BranchManagement extends Component
         }
     }
 
-    public function updatedBranchName($value)
+    public function updatedBranchName(string $value)
     {
         $rules = [
             'required', 'string', 'min:3', 'max:150',
@@ -207,7 +207,7 @@ class BranchManagement extends Component
         $this->dispatchBrowserEvent('switch-panel', ['panel' => 'form', 'mode' => 'create']);
     }
 
-    public function showEdit($id)
+    public function showEdit(int $id)
     {
         $this->mode = 'edit';
         $branch = Branch::findOrFail($id);
@@ -247,7 +247,7 @@ class BranchManagement extends Component
     }
 
     // ── Deletion Workflow ──────────────────────────────────────────
-    public function confirmDeleteBranch($id)
+    public function confirmDeleteBranch(int $id)
     {
         if (!$this->isSuperAdmin()) return;
 
@@ -277,7 +277,7 @@ class BranchManagement extends Component
         $this->dispatchBrowserEvent('open-modal', 'delete-branch');
     }
 
-    public function deleteBranch($id)
+    public function deleteBranch(int $id)
     {
         if (!$this->isSuperAdmin()) return;
 
@@ -489,7 +489,7 @@ class BranchManagement extends Component
         $this->dispatchBrowserEvent('switch-panel', ['panel' => 'list', 'mode' => 'list']);
     }
 
-    public function toggleStatus($id)
+    public function toggleStatus(int $id)
     {
         if (!$this->isSuperAdmin()) return;
         $branch = Branch::findOrFail($id);
@@ -509,7 +509,7 @@ class BranchManagement extends Component
         $this->dispatchBrowserEvent('open-modal', 'confirm-set-main');
     }
 
-    public function setMainBranch($id)
+    public function setMainBranch(int $id)
     {
         if (!$this->isSuperAdmin()) return;
 
@@ -540,14 +540,14 @@ class BranchManagement extends Component
         $this->emit('refresh');
     }
 
-    public function setView($view)
+    public function setView(string $view)
     {
         if (in_array($view, ['table', 'board'])) {
             $this->view = $view;
         }
     }
 
-    public function applyQuickDateFilter($range)
+    public function applyQuickDateFilter(string $range)
     {
         switch ($range) {
             case 'today':
@@ -747,7 +747,7 @@ class BranchManagement extends Component
         return ['start' => $start, 'end' => $end];
     }
 
-    private function calculateHealthScore($orders, $sales)
+    private function calculateHealthScore(int $orders, float $sales)
     {
         if ($orders == 0) return 0;
         // Simplified benchmark: 500 PHP per order as "ideal" base for this calculation
@@ -825,7 +825,7 @@ class BranchManagement extends Component
         return $this->exportCsv();
     }
 
-    private function calculateDistance($lat1, $lon1, $lat2, $lon2)
+    private function calculateDistance(float $lat1, float $lon1, float $lat2, float $lon2)
     {
         if (!$lat1 || !$lon1 || !$lat2 || !$lon2) return 0;
         $earthRadius = 6371; // KM

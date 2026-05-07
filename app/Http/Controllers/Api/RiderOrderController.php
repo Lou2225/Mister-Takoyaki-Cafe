@@ -23,16 +23,25 @@ class RiderOrderController extends Controller
             ], 403);
         }
 
-        // Get the requested status (Handed to Rider, Out for Delivery, delivered, etc.)
-        // Default to 'Handed to Rider' — the initial state when staff gives the order to the rider
-        $status = $request->query('status', Order::STATUS_HANDED_TO_RIDER);
+        // Get the requested status or default to rider-assigned delivery stages.
+        // This covers both OrderManagement handoff and KDS delivery assignment flows.
+        $statusParam = $request->query('status');
+        $statuses = $statusParam
+            ? array_map('trim', explode(',', $statusParam))
+            : [Order::STATUS_HANDED_TO_RIDER, Order::STATUS_OUT_FOR_DELIVERY];
 
-        // Query orders assigned to THIS rider
-        $orders = Order::with('items.product')
+        // Query delivery orders assigned to THIS rider
+        $orders = Order::with(['items.product', 'branch', 'customer'])
             ->where('rider_id', $user->id)
-            ->where('status', $status)
+            ->where('order_type', Order::TYPE_DELIVERY)
+            ->whereIn('status', $statuses)
             ->orderBy('created_at', 'desc')
-            ->get();
+            ->get()
+            ->map(function ($order) {
+                $orderData = $order->toArray();
+                unset($orderData['tax_amount']);
+                return $orderData;
+            });
 
         return response()->json([
             'success' => true,

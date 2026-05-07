@@ -25,36 +25,36 @@ class BranchStockOrdering extends Component
     public $panel = 'requests';
 
     // ── Branch Context ────────────────────────────────────────────
-    public $selectedBranchId = '';
-    public $mainBranchId     = '';
+    public string $selectedBranchId = '';
+    public string $mainBranchId     = '';
 
     // ── Detail Side Panel ─────────────────────────────────────────
-    public $selectedOrderId   = null;
-    public $selectedOrder     = null;
+    public ?int $selectedOrderId   = null;
+    public ?StockOrder $selectedOrder     = null;
 
     // ── Cart (new request form) ───────────────────────────────────
-    public $cartItems        = [];
-    public $cartIngredientId = '';
-    public $cartQty          = '';
-    public $cartUnit         = '';  // The unit the user picks: base ('g') or packaging ('box', 'bottle')
-    public $cartPrice        = 0;
-    public $cartNotes        = '';
-    public $orderPriority    = 'normal';
-    public $orderNotes       = '';
-    public $deliveryFee      = 0;
-    public $globalRate       = 50; // default PHP per KM
-    public $branchDistance   = 0;
+    public array $cartItems        = [];
+    public string $cartIngredientId = '';
+    public string $cartQty          = '';
+    public string $cartUnit         = '';  // The unit the user picks: base ('g') or packaging ('box', 'bottle')
+    public float $cartPrice        = 0;
+    public string $cartNotes        = '';
+    public string $orderPriority    = 'normal';
+    public string $orderNotes       = '';
+    public float $deliveryFee      = 0;
+    public int $globalRate       = 50; // default PHP per KM
+    public float $branchDistance   = 0;
 
     // ── Filters ───────────────────────────────────────────────────
-    public $search       = '';
-    public $statusFilter = 'all';
-    public $perPage      = 10;
+    public string $search       = '';
+    public string $statusFilter = 'all';
+    public int $perPage      = 10;
 
     // ── Modal state ───────────────────────────────────────────────
-    public $cancelTargetId   = null;
-    public $cancelTargetRef  = '';
-    public $deliverTargetId  = null;
-    public $deliverTargetRef = '';
+    public ?int $cancelTargetId   = null;
+    public string $cancelTargetRef  = '';
+    public ?int $deliverTargetId  = null;
+    public string $deliverTargetRef = '';
 
     protected $queryString = [
         'panel'        => ['except' => 'requests'],
@@ -79,12 +79,17 @@ class BranchStockOrdering extends Component
         if ($this->isSuperAdmin()) {
             $this->selectedBranchId = BranchContext::getActiveBranchId();
             
-            // Safety: Ensure we aren't ordering FROM the main branch TO the main branch
+            // Main branch cannot request stock orders
             if (!$this->selectedBranchId || $this->selectedBranchId == $this->mainBranchId) {
-                $this->selectedBranchId = Branch::where('is_main', false)->first()?->id;
+                abort(403, 'Main branch cannot request stock orders. Please use supplier ordering module.');
             }
         } else {
             $this->selectedBranchId = $user->branch_id;
+        }
+
+        // Main branch cannot request stock orders (they supply, not request)
+        if ($this->selectedBranchId == $this->mainBranchId) {
+            abort(403, 'Main branch cannot request stock orders. Please use supplier ordering module.');
         }
 
         if (!$this->selectedBranchId) {
@@ -94,6 +99,12 @@ class BranchStockOrdering extends Component
 
         $this->calculateEstimatedFee();
         $this->updateHeader();
+
+        // Check for ingredient query parameter from BI insights
+        if (request()->has('ingredient')) {
+            $this->cartIngredientId = request()->query('ingredient');
+            $this->panel = 'new'; // Switch to new request panel
+        }
     }
 
     // ── Role Helpers ──────────────────────────────────────────────
@@ -115,7 +126,7 @@ class BranchStockOrdering extends Component
 
     // ── Cart Management ───────────────────────────────────────────
 
-    public function updatedCartIngredientId($value): void
+    public function updatedCartIngredientId(string $value): void
     {
         if ($value) {
             $ing = Ingredient::find($value);

@@ -342,7 +342,9 @@
 
                 <div class="space-y-4">
                     @forelse($forecasting['restock_insights'] as $ri)
-                    <div class="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                    <div class="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/10 {{ $canOrder ? 'hover:bg-white/10 hover:border-emerald-500/30 cursor-pointer' : 'cursor-not-allowed opacity-60' }} transition-all"
+                         @if($canOrder) wire:click="redirectToOrdering({{ $ri['id'] }})" @endif
+                         @if(!$canOrder) title="Stock ordering not available for main branch" @endif>
                         <div class="flex items-center gap-3">
                             <div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-500">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>

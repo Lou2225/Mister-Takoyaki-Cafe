@@ -69,10 +69,11 @@
             <div class="container-glow bg-white/20"></div>
 
             <!-- Left Side: Marketing Cover -->
-            <div class="hidden md:flex md:w-1/2 relative bg-indigo-600 overflow-hidden flex-col justify-between p-10 group">
-                <!-- Clean Gradient Background -->
-                <div class="absolute inset-0 bg-gradient-to-tr from-indigo-900 via-indigo-600 to-indigo-500"></div>
-                <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-500/30 via-transparent to-transparent"></div>
+            <div class="hidden md:flex md:w-1/2 relative overflow-hidden flex-col justify-between p-10 group bg-indigo-600">
+                <img src="{{ asset('images/login-left-panel.png') }}" alt="Mister Takoyaki" class="absolute inset-0 w-full h-full object-cover" />
+                <!-- Overlay for readability -->
+                <div class="absolute inset-0 bg-black/45"></div>
+                <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-orange-100/20 via-transparent to-transparent"></div>
                 
                 <div class="relative z-10 flex items-center gap-2">
                      <x-application-logo class="w-8 h-8 fill-current text-white" />
@@ -80,8 +81,8 @@
                 </div>
 
                 <div class="relative z-10 mt-auto">
-                    <h2 class="text-3xl font-extrabold text-white leading-tight mb-3">Effortlessly manage your operations.</h2>
-                    <p class="text-indigo-100 text-[13px] opacity-90 leading-relaxed max-w-sm">Manage your branch monitoring, sales data, and staff execution all in one centralized command center.</p>
+                    <h2 class="text-4xl sm:text-5xl font-extrabold text-white leading-tight mb-3 drop-shadow-[0_16px_24px_rgba(0,0,0,0.35)]">Effortlessly manage your operations.</h2>
+                    <p class="text-slate-200 text-sm opacity-95 leading-relaxed max-w-sm">Manage your branch monitoring, sales data, and staff execution all in one centralized command center.</p>
                 </div>
             </div>
 
