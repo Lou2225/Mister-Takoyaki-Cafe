@@ -38,6 +38,7 @@ class DashboardOverview extends Component
     public $selectedMetric = 'Revenue';
     public $selectedChartMetric = 'Sales'; // Sales, Volume, Profit
     public $breakdownData = [];
+    public $stockTab = 'deficiency';
 
     public function setChartMetric($metric)
     {
@@ -53,6 +54,8 @@ class DashboardOverview extends Component
             'Revenue' => $this->getRevenueBreakdown(),
             'COGS'    => $this->getCogsBreakdown(),
             'AOV'     => $this->getAovBreakdown(),
+            'Profit'  => $this->getProfitBreakdown(),
+            'Margin'  => $this->getMarginBreakdown(),
             default   => [],
         };
         $this->showBreakdown = true;
@@ -67,22 +70,38 @@ class DashboardOverview extends Component
     private function getRevenueBreakdown(): array
     {
         $branchId = $this->selectedBranchId;
-        $start = $this->startDate ? $this->startDate . ' 00:00:00' : null;
-        $end = $this->endDate ? $this->endDate . ' 23:59:59' : null;
+        $orders = $this->fetchFinancialOrders($branchId);
+        
+        $categories = [];
+        $untrackedRevenue = 0;
+        
+        $taxes = $orders->sum('tax_amount');
+        $service = $orders->sum('service_charge');
+        $delivery = $orders->sum('delivery_fee');
+        $discounts = $orders->sum('discount_amount');
 
-        return OrderItem::join('orders', 'order_items.order_id', '=', 'orders.id')
-            ->join('products', 'order_items.product_id', '=', 'products.id')
-            ->leftJoin('product_categories', 'products.category_id', '=', 'product_categories.id')
-            ->where('orders.status', Order::STATUS_COMPLETED)
-            ->when($start, fn($q) => $q->where('orders.created_at', '>=', $start))
-            ->when($end, fn($q) => $q->where('orders.created_at', '<=', $end))
-            ->when(!$this->isSuperAdmin, fn($q) => $q->where('orders.branch_id', auth()->user()->branch_id))
-            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('orders.branch_id', $branchId))
-            ->select('product_categories.name as category', DB::raw('SUM(order_items.subtotal) as total'))
-            ->groupBy('product_categories.name')
-            ->orderByDesc('total')
-            ->get()
-            ->toArray();
+        foreach ($orders as $order) {
+            if ($order->items->count() > 0) {
+                foreach ($order->items as $item) {
+                    $categoryName = $item->product->category->name ?? 'Uncategorized';
+                    $categories[$categoryName] = ($categories[$categoryName] ?? 0) + $item->subtotal;
+                }
+            } else {
+                // If order has no items but has a total, track it as untracked
+                $untrackedRevenue += $order->total_amount;
+            }
+        }
+
+        $breakdown = collect($categories)->map(fn($val, $key) => ['category' => $key, 'total' => (float)$val])->values()->toArray();
+        
+        if ($taxes > 0) $breakdown[] = ['category' => 'Government Taxes', 'total' => (float)$taxes];
+        if ($service > 0) $breakdown[] = ['category' => 'Service Charges', 'total' => (float)$service];
+        if ($delivery > 0) $breakdown[] = ['category' => 'Delivery Fees', 'total' => (float)$delivery];
+        if ($discounts > 0) $breakdown[] = ['category' => 'Discounts Applied', 'total' => (float)-$discounts];
+        if ($untrackedRevenue > 0) $breakdown[] = ['category' => 'Untracked Sales', 'total' => (float)$untrackedRevenue];
+
+        usort($breakdown, fn($a, $b) => abs($b['total']) <=> abs($a['total']));
+        return $breakdown;
     }
 
     private function getCogsBreakdown(): array
@@ -96,17 +115,22 @@ class DashboardOverview extends Component
 
         $ingredients = Ingredient::pluck('name', 'id');
         $usage = [];
-        $productCostMap = [];
-        $optionCostMap = [];
-        $modifierCostMap = [];
+        $categoryCogs = [];
 
         foreach ($orderItems as $item) {
-            $this->calculateItemCogs($item, $branchCostMap, $globalCostMap, $productCostMap, $optionCostMap, $modifierCostMap);
+            $productCostMap = []; $optionCostMap = []; $modifierCostMap = [];
+            $itemCost = $this->calculateItemCogs($item, $branchCostMap, $globalCostMap, $productCostMap, $optionCostMap, $modifierCostMap);
+            $totalItemCogs = $itemCost * $item->quantity;
+
+            // Group by category for visual consistency
+            $categoryName = $item->product->category->name ?? 'Uncategorized';
+            $categoryCogs[$categoryName] = ($categoryCogs[$categoryName] ?? 0) + $totalItemCogs;
+
             $this->trackIngredientUsage($item, $branchCostMap, $globalCostMap, $ingredients, $usage);
         }
 
-        arsort($usage);
-        return collect($usage)->map(fn($val, $key) => ['name' => $key, 'total' => $val])->values()->take(10)->toArray();
+        arsort($categoryCogs);
+        return collect($categoryCogs)->map(fn($val, $key) => ['category' => $key, 'total' => $val])->values()->toArray();
     }
 
     private function fetchBreakdownOrderItems($branchId)
@@ -137,14 +161,96 @@ class DashboardOverview extends Component
             ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
             ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
             ->select(DB::raw('CASE 
-                WHEN total_amount < 100 THEN "Under ₱100"
-                WHEN total_amount BETWEEN 100 AND 300 THEN "₱100 - ₱300"
-                WHEN total_amount BETWEEN 301 AND 600 THEN "₱301 - ₱600"
-                ELSE "Above ₱600"
-            END as bucket'), DB::raw('COUNT(*) as count'))
+                WHEN total_amount < 200 THEN "Light Snack (Under ₱200)"
+                WHEN total_amount BETWEEN 200 AND 500 THEN "Standard Meal (₱200 - ₱500)"
+                WHEN total_amount BETWEEN 501 AND 1000 THEN "Family Pack (₱501 - ₱1000)"
+                ELSE "Party/Bulk (Above ₱1000)"
+            END as bucket'), DB::raw('COUNT(*) as count'), DB::raw('SUM(total_amount) as total'))
             ->groupBy('bucket')
+            ->orderByDesc('count')
             ->get()
             ->toArray();
+    }
+
+    private function getProfitBreakdown(): array
+    {
+        $branchId = $this->selectedBranchId;
+        $orders = $this->fetchFinancialOrders($branchId);
+        
+        $standardCosts = $this->fetchChartStandardCosts($branchId);
+        $branchCostMap = $standardCosts->pluck('cost_per_base_unit', 'ingredient_id')->union($standardCosts->pluck('unit_cost', 'ingredient_id'));
+        $globalCostMap = Ingredient::pluck('cost', 'id');
+
+        $categoryProfit = [];
+        $untrackedProfit = 0;
+
+        foreach ($orders as $order) {
+            if ($order->items->count() > 0) {
+                foreach ($order->items as $item) {
+                    $productCostMap = []; $optionCostMap = []; $modifierCostMap = [];
+                    $itemCost = $this->calculateItemCogs($item, $branchCostMap, $globalCostMap, $productCostMap, $optionCostMap, $modifierCostMap);
+                    $itemProfit = ($item->price - $itemCost) * $item->quantity;
+
+                    $categoryName = $item->product->category->name ?? 'Uncategorized';
+                    $categoryProfit[$categoryName] = ($categoryProfit[$categoryName] ?? 0) + $itemProfit;
+                }
+            } else {
+                $untrackedProfit += $order->total_amount;
+            }
+        }
+
+        // Adjust profit for discounts (Discounts reduce profit directly)
+        $discounts = $orders->sum('discount_amount');
+        if ($discounts > 0) {
+            $categoryProfit['Discounts Impact'] = ($categoryProfit['Discounts Impact'] ?? 0) - $discounts;
+        }
+
+        $breakdown = collect($categoryProfit)->map(fn($val, $key) => ['category' => $key, 'total' => (float)$val])->values()->toArray();
+        if ($untrackedProfit > 0) $breakdown[] = ['category' => 'Untracked Profit', 'total' => (float)$untrackedProfit];
+
+        usort($breakdown, fn($a, $b) => abs($b['total']) <=> abs($a['total']));
+        return $breakdown;
+    }
+
+    private function getMarginBreakdown(): array
+    {
+        $branchId = $this->selectedBranchId;
+        $orders = $this->fetchFinancialOrders($branchId);
+        
+        $standardCosts = $this->fetchChartStandardCosts($branchId);
+        $branchCostMap = $standardCosts->pluck('cost_per_base_unit', 'ingredient_id')->union($standardCosts->pluck('unit_cost', 'ingredient_id'));
+        $globalCostMap = Ingredient::pluck('cost', 'id');
+
+        $categoryRevenue = [];
+        $categoryProfit = [];
+        $totalRevenue = $orders->sum('total_amount');
+
+        foreach ($orders as $order) {
+            foreach ($order->items as $item) {
+                $productCostMap = []; $optionCostMap = []; $modifierCostMap = [];
+                $itemCost = $this->calculateItemCogs($item, $branchCostMap, $globalCostMap, $productCostMap, $optionCostMap, $modifierCostMap);
+                $itemProfit = ($item->price - $itemCost) * $item->quantity;
+
+                $categoryName = $item->product->category->name ?? 'Uncategorized';
+                $categoryRevenue[$categoryName] = ($categoryRevenue[$categoryName] ?? 0) + ($item->price * $item->quantity);
+                $categoryProfit[$categoryName] = ($categoryProfit[$categoryName] ?? 0) + $itemProfit;
+            }
+        }
+
+        $margins = [];
+        foreach ($categoryRevenue as $name => $rev) {
+            $profit = $categoryProfit[$name] ?? 0;
+            $margins[] = [
+                'category' => $name,
+                'total'    => $rev > 0 ? ($profit / $rev) * 100 : 0,
+                'is_percentage' => true,
+                'revenue' => $rev,
+                'profit' => $profit
+            ];
+        }
+
+        usort($margins, fn($a, $b) => $b['total'] <=> $a['total']);
+        return $margins;
     }
 
     public function mount()

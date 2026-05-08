@@ -100,10 +100,16 @@ class OptionLibraryManagement extends Component
         $this->templateItems = array_values($this->templateItems);
     }
 
-    public function setItemAsDefault($index)
+    public function toggleItemDefault($index)
     {
+        $currentValue = $this->templateItems[$index]['is_default'] ?? false;
+        
         foreach ($this->templateItems as $i => $item) {
-            $this->templateItems[$i]['is_default'] = ($i == $index);
+            $this->templateItems[$i]['is_default'] = false;
+        }
+
+        if (!$currentValue) {
+            $this->templateItems[$index]['is_default'] = true;
         }
     }
 

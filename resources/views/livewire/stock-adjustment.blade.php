@@ -132,12 +132,12 @@
             <div class="w-full">
                 <x-data-table>
                     <x-slot name="header">
-                        <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Audit Timestamp</th>
-                        <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Item & Branch</th>
-                        <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-center">Type</th>
-                        <th class="py-3 px-4 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest">Adjustment Qty</th>
-                        <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Reference / Notes</th>
+                        <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Date & Reference</th>
+                        <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-center">Adjustment Type</th>
+                        <th class="py-3 px-4 text-center text-[11px] font-bold text-slate-500 uppercase tracking-widest">Items</th>
+                        <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-right">Branch</th>
                         <th class="py-3 px-4 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest">Attendant</th>
+                        <th class="py-3 px-4 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest">Actions</th>
                     </x-slot>
 
                     @forelse($movements as $mov)
@@ -154,17 +154,11 @@
                             ];
                             $colorClass = $typeColors[$mov->type] ?? 'bg-gray-50 text-gray-600 border-gray-100';
                         @endphp
-                        <tr wire:key="mov-{{ $mov->id }}-{{ $movements->currentPage() }}" class="hover:bg-slate-50/50 transition-colors border-b border-slate-50">
+                        <tr wire:key="adj-{{ $mov->reference_id }}-{{ $movements->currentPage() }}" class="hover:bg-slate-50/50 transition-colors border-b border-slate-50 group">
                             <td class="py-3 px-4 whitespace-nowrap">
                                 <div class="flex flex-col">
                                     <span class="text-[13px] font-bold text-slate-900">{{ $mov->created_at->format('M d, Y') }}</span>
-                                    <span class="text-[11px] text-slate-400 font-medium">{{ $mov->created_at->format('h:i A') }}</span>
-                                </div>
-                            </td>
-                            <td class="py-3 px-4">
-                                <div class="flex flex-col">
-                                    <span class="text-[13px] font-bold text-slate-900">{{ $mov->ingredient->name ?? 'Deleted Item' }}</span>
-                                    <span class="text-[11px] text-slate-400 font-medium tracking-tight uppercase">{{ $mov->branch->branch_name ?? 'Global' }}</span>
+                                    <span class="text-[11px] text-indigo-500 font-black tracking-tighter uppercase">{{ $mov->reference_id ?: 'NO REF' }}</span>
                                 </div>
                             </td>
                             <td class="py-3 px-4 text-center">
@@ -172,27 +166,14 @@
                                     {{ str_replace('_', ' ', $mov->type) }}
                                 </span>
                             </td>
-                            <td class="py-3 px-4 text-right">
-                                <div class="flex flex-col items-end">
-                                    <span @class([
-                                        'text-[14px] font-black tracking-tight',
-                                        'text-emerald-600' => in_array($mov->type, ['in', 'customer_return', 'transfer_in']),
-                                        'text-rose-600' => in_array($mov->type, ['out', 'waste', 'waste_expired', 'transfer_out']),
-                                        'text-indigo-600' => $mov->type === 'adjust',
-                                    ])>
-                                        {{ in_array($mov->type, ['in', 'customer_return', 'transfer_in']) ? '+' : (in_array($mov->type, ['out', 'waste', 'waste_expired', 'transfer_out']) ? '-' : '') }}
-                                        {{ \App\Helpers\StockHelper::formatForDisplay($mov->quantity, $mov->ingredient?->unit ?? 'g') }}
-                                    </span>
-                                    @if($mov->unit_cost)
-                                        <span class="text-[10px] text-slate-400 font-bold">₱{{ number_format($mov->unit_cost, 2) }}</span>
-                                    @endif
+                            <td class="py-3 px-4 text-center">
+                                <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50 border border-slate-100 text-[11px] font-bold text-slate-600">
+                                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                                    {{ $mov->item_count }} {{ \Illuminate\Support\Str::plural('Item', $mov->item_count) }}
                                 </div>
                             </td>
-                            <td class="py-3 px-4">
-                                <div class="flex flex-col max-w-[200px]">
-                                    <span class="text-[12px] font-bold text-slate-700 truncate" title="{{ $mov->reference_id }}">{{ $mov->reference_id ?: '—' }}</span>
-                                    <span class="text-[11px] text-slate-400 font-medium truncate" title="{{ $mov->remarks }}">{{ $mov->remarks ?: 'No additional notes' }}</span>
-                                </div>
+                            <td class="py-3 px-4 text-right">
+                                <span class="text-[11px] text-slate-400 font-bold tracking-tight uppercase">{{ $mov->branch->branch_name ?? 'Global' }}</span>
                             </td>
                             <td class="py-3 px-4 text-right">
                                 <div class="flex items-center justify-end gap-2">
@@ -204,6 +185,12 @@
                                         {{ strtoupper(substr($mov->user->first_name, 0, 1) . substr($mov->user->last_name, 0, 1)) }}
                                     </div>
                                 </div>
+                            </td>
+                            <td class="py-3 px-4 text-right">
+                                <button wire:click="viewAdjustment('{{ $mov->reference_id }}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-[11px] font-bold hover:bg-slate-50 transition-all shadow-sm group-hover:border-indigo-200 group-hover:text-indigo-600">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                    View Details
+                                </button>
                             </td>
                         </tr>
                     @empty
@@ -309,11 +296,13 @@
                                                         <span class="w-1 h-1 rounded-full bg-slate-200"></span>
                                                         <span class="text-[10px] font-bold text-slate-400 uppercase">Cost: <span class="text-rose-500">₱{{ number_format($row['cost'], 2) }}</span></span>
                                                     @endif
-                                                    @if($row['price'])
+                                                    
+                                                    @if(isset($row['price']) && $row['price'])
                                                         <span class="w-1 h-1 rounded-full bg-slate-200"></span>
                                                         <span class="text-[10px] font-bold text-slate-400 uppercase">Price: <span class="text-emerald-500">₱{{ number_format($row['price'], 2) }}</span></span>
                                                     @endif
-                                                    @if($row['cost'] && $row['price'])
+
+                                                    @if(isset($row['cost'], $row['price']) && $row['cost'] && $row['price'])
                                                         <span class="w-1 h-1 rounded-full bg-slate-200"></span>
                                                         <span class="text-[9px] font-black bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded uppercase tracking-widest">
                                                             {{ number_format((($row['price'] - $row['cost']) / ($row['cost'] ?: 1)) * 100, 0) }}% Margin
@@ -464,7 +453,7 @@
                                 @endif
                                 <div class="mt-3">
                                     <x-input-label value="Expiry Date" />
-                                    <x-text-input type="date" wire:model="newItemExpiry" class="mt-1.5 h-11 text-[13px] font-medium w-full" />
+                                    <x-text-input type="date" wire:model="newItemExpiry" min="{{ now()->format('Y-m-d') }}" class="mt-1.5 h-11 text-[13px] font-medium w-full" />
                                 </div>
                             </div>
                         @endif
@@ -658,20 +647,28 @@
         </div>{{-- end panel 3 --}}
     </div>
 
-    {{-- ── Confirmation Modals ── --}}
+    {{-- ── Confirmation Modals (Matching User Management Layout) ── --}}
     <x-modal name="confirm-save-adjustment" maxWidth="sm" focusable>
-        <div class="h-1 w-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-t-lg"></div>
-        <div class="p-6 text-center">
-            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100 mb-4 border border-indigo-200 shadow-sm">
-                <svg class="h-6 w-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        <div class="h-1 w-full bg-gradient-to-r from-indigo-500 to-purple-600 rounded-t-lg"></div>
+        <div class="p-6">
+            <div class="flex items-start gap-4 mb-4">
+                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center shadow-sm">
+                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-[15px] font-bold text-slate-900 leading-tight">Save Adjustment Queue?</h3>
+                    <p class="mt-1 text-[13px] text-slate-500 leading-relaxed">
+                        You are about to commit <span class="font-bold text-indigo-600">{{ count($rows) }} items</span> to the inventory ledger. This will update batch stock levels and create an immutable audit log.
+                    </p>
+                </div>
             </div>
-            <h3 class="text-[16px] font-bold text-slate-900 tracking-tight">Save Adjustment Queue?</h3>
-            <p class="mt-2 text-[13px] text-slate-500 font-medium">You are about to commit {{ count($rows) }} items to the inventory ledger. This will update batch stock levels and create an audit log.</p>
             
-            <div class="flex items-center justify-center gap-3 mt-6">
-                <x-secondary-button @click="$dispatch('close-modal', 'confirm-save-adjustment')">Go Back</x-secondary-button>
-                <x-primary-button wire:click="commitAdjustment" @click="$dispatch('close-modal', 'confirm-save-adjustment')" class="bg-indigo-600 hover:bg-indigo-700">
-                    Yes, Save All
+            <div class="flex items-center justify-end gap-2 mt-6">
+                <x-secondary-button @click="$dispatch('close-modal', 'confirm-save-adjustment')" class="h-10">Discard Draft</x-secondary-button>
+                <x-primary-button wire:click="commitAdjustment" @click="$dispatch('close-modal', 'confirm-save-adjustment')" class="h-10 bg-indigo-600 hover:bg-indigo-700">
+                    Confirm & Save All
                 </x-primary-button>
             </div>
         </div>
@@ -679,20 +676,141 @@
 
     <x-modal name="confirm-bulk-save" maxWidth="sm" focusable>
         <div class="h-1 w-full bg-gradient-to-r from-rose-500 to-amber-500 rounded-t-lg"></div>
-        <div class="p-6 text-center">
-            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-rose-100 mb-4 border border-rose-200 shadow-sm">
-                <svg class="h-6 w-6 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        <div class="p-6">
+            <div class="flex items-start gap-4 mb-4">
+                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center shadow-sm">
+                    <svg class="w-5 h-5 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-[15px] font-bold text-slate-900 leading-tight">Apply Stock Corrections?</h3>
+                    <p class="mt-1 text-[13px] text-slate-500 leading-relaxed">
+                        This will permanently update the system stock levels to match your physical audit counts. 
+                        <span class="font-bold text-rose-600">This action cannot be undone.</span>
+                    </p>
+                </div>
             </div>
-            <h3 class="text-[16px] font-bold text-slate-900 tracking-tight">Apply Stock Corrections?</h3>
-            <p class="mt-2 text-[13px] text-slate-500 font-medium">This will permanently update the system stock levels to match your physical audit counts. This action cannot be undone.</p>
             
-            <div class="flex items-center justify-center gap-3 mt-6">
-                <x-secondary-button @click="$dispatch('close-modal', 'confirm-bulk-save')">Go Back</x-secondary-button>
-                <x-primary-button wire:click="commitReconcile" @click="$dispatch('close-modal', 'confirm-bulk-save')" class="bg-rose-600 hover:bg-rose-700">
-                    Yes, Apply All
+            <div class="flex items-center justify-end gap-2 mt-6">
+                <x-secondary-button @click="$dispatch('close-modal', 'confirm-bulk-save')" class="h-10">Cancel Audit</x-secondary-button>
+                <x-primary-button wire:click="commitReconcile" @click="$dispatch('close-modal', 'confirm-bulk-save')" class="h-10 bg-rose-600 hover:bg-rose-700">
+                    Apply Corrections
                 </x-primary-button>
             </div>
         </div>
     </x-modal>
+
+    {{-- ── Adjustment Details Side Panel ── --}}
+    <x-side-panel name="view-adjustment-details" width="max-w-md">
+        @if($viewingReferenceId)
+            @php
+                $totalValue = $viewingMovements->sum(fn($m) => $m->quantity * $m->unit_cost);
+                $firstMov = $viewingMovements->first();
+            @endphp
+            <div class="flex flex-col h-full bg-white max-h-screen overflow-hidden">
+                {{-- Fixed Header --}}
+                <div class="shrink-0 p-6 border-b border-slate-100 bg-slate-50/50">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-[18px] font-black text-slate-900 tracking-tight">Adjustment Record</h3>
+                        <button @click="$dispatch('close-modal', 'view-adjustment-details')" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors">
+                            <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 text-[10px] font-black uppercase tracking-widest">{{ $viewingReferenceId }}</span>
+                        <span class="text-[11px] text-slate-400 font-bold">•</span>
+                        <span class="text-[11px] text-slate-400 font-bold uppercase tracking-tight">{{ $firstMov?->created_at->format('M d, Y h:i A') }}</span>
+                    </div>
+                </div>
+
+                {{-- Fixed Summary Section --}}
+                <div class="shrink-0 p-6 pb-2 space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
+                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Items</p>
+                            <p class="text-[20px] font-black text-slate-900">{{ count($viewingMovements) }}</p>
+                        </div>
+                        <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
+                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Transaction Value</p>
+                            <p class="text-[20px] font-black text-indigo-600">₱{{ number_format($totalValue, 2) }}</p>
+                        </div>
+                    </div>
+
+                    <div class="p-4 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-100">
+                        <p class="text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1">Adjustment Logic</p>
+                        <p class="text-[15px] font-bold text-white uppercase tracking-tight">{{ str_replace('_', ' ', $firstMov?->type) }}</p>
+                        <p class="text-[11px] text-indigo-100/80 mt-1 font-medium italic">Recorded by {{ $firstMov?->user->first_name }} {{ $firstMov?->user->last_name }}</p>
+                    </div>
+
+                    <h4 class="text-[11px] font-black text-slate-900 uppercase tracking-widest mt-6 mb-2 flex items-center gap-2">
+                        <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                        Detailed Breakdown
+                    </h4>
+                </div>
+
+                {{-- Scrollable Item List --}}
+                <div class="flex-1 overflow-y-auto px-6 py-2">
+                    <div class="space-y-4">
+                        @foreach($viewingMovements as $vm)
+                            <div class="p-4 bg-white border border-slate-100 rounded-2xl hover:border-indigo-100 transition-all shadow-sm group">
+                                <div class="flex justify-between items-start mb-3">
+                                    <div class="flex flex-col">
+                                        <span class="text-[14px] font-black text-slate-900 group-hover:text-indigo-600 transition-colors">{{ $vm->ingredient->name ?? 'Deleted' }}</span>
+                                        <span class="text-[11px] text-slate-400 font-bold uppercase tracking-tight">{{ $vm->ingredient->sku ?? 'NO-SKU' }}</span>
+                                    </div>
+                                    <div @class([
+                                        'px-3 py-1 rounded-lg text-[13px] font-black tracking-tighter',
+                                        'bg-emerald-50 text-emerald-600' => in_array($vm->type, ['in', 'customer_return']),
+                                        'bg-rose-50 text-rose-600' => in_array($vm->type, ['out', 'waste', 'waste_expired']),
+                                        'bg-indigo-50 text-indigo-600' => $vm->type === 'adjust',
+                                    ])>
+                                        {{ in_array($vm->type, ['in', 'customer_return']) ? '+' : '-' }}
+                                        {{ \App\Helpers\StockHelper::formatForDisplay($vm->quantity, $vm->ingredient?->unit ?? 'g') }}
+                                    </div>
+                                </div>
+                                
+                                <div class="grid grid-cols-2 gap-3 pt-3 border-t border-slate-50">
+                                    <div>
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Unit Cost</p>
+                                        <p class="text-[12px] font-bold text-slate-700">₱{{ number_format($vm->unit_cost, 2) }}</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Extended</p>
+                                        <p class="text-[12px] font-black text-slate-900">₱{{ number_format($vm->quantity * $vm->unit_cost, 2) }}</p>
+                                    </div>
+                                </div>
+
+                                @if($vm->expiry_date)
+                                    <div class="mt-3 flex items-center gap-2 px-3 py-2 bg-amber-50 rounded-xl border border-amber-100">
+                                        <svg class="w-3.5 h-3.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                        <span class="text-[11px] font-bold text-amber-700 uppercase">Expires: {{ $vm->expiry_date->format('M d, Y') }}</span>
+                                    </div>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+
+                {{-- Fixed Footer & Remarks --}}
+                <div class="shrink-0 p-6 border-t border-slate-100 bg-white">
+                    @if($firstMov?->remarks)
+                        <div class="mb-4 p-4 bg-indigo-50/50 border border-indigo-100 rounded-2xl relative overflow-hidden">
+                            <h4 class="text-[10px] font-black text-indigo-900 uppercase tracking-widest mb-1 flex items-center gap-2">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
+                                Remarks
+                            </h4>
+                            <p class="text-[12px] text-indigo-700 font-medium italic">"{{ $firstMov->remarks }}"</p>
+                        </div>
+                    @endif
+
+                    <button @click="$dispatch('close-modal', 'view-adjustment-details')" class="w-full h-12 flex items-center justify-center gap-2 bg-slate-900 text-white text-[13px] font-black rounded-xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-200">
+                        <span>Done Reviewing</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    </button>
+                </div>
+            </div>
+        @endif
+    </x-side-panel>
 
 </div>

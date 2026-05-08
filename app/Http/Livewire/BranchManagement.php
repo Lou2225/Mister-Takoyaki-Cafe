@@ -129,7 +129,7 @@ class BranchManagement extends Component
 
     public function updatedPhone()
     {
-        $this->validateFieldLive('phone', ['nullable', 'string', 'regex:/^[0-9]{10}$/'], ['phone.regex' => 'Enter 10-digit mobile number.']);
+        $this->validateFieldLive('phone', ['nullable', 'string', 'regex:~^[0-9]{10}$~'], ['phone.regex' => 'Enter 10-digit mobile number.']);
     }
 
     public function updatedEmail()
@@ -310,7 +310,7 @@ class BranchManagement extends Component
                 'required', 'string', 'max:50',
                 Rule::unique('branches', 'branch_code')->ignore($this->branch_id),
             ],
-            'phone' => ['nullable', 'string', 'regex:/^[0-9]{10}$/'],
+            'phone' => ['nullable', 'string', 'regex:~^[0-9]{10}$~'],
             'email' => array_merge(ValidationHelper::rulesEmail(false), [
                 $this->branch_id ? Rule::unique('branches', 'email')->ignore($this->branch_id) : 'unique:branches,email'
             ]),
@@ -341,7 +341,7 @@ class BranchManagement extends Component
                 'required', 'string', 'max:50',
                 Rule::unique('branches', 'branch_code'),
             ],
-            'phone' => ['nullable', 'string', 'regex:/^[0-9]{10}$/'],
+            'phone' => ['nullable', 'string', 'regex:~^[0-9]{10}$~'],
             'email' => array_merge(ValidationHelper::rulesEmail(false), ['unique:branches,email']),
             'user_id' => ['nullable', Rule::exists('users', 'id')->where('role_id', 2)->where('is_active', 1)],
             'status'  => ['boolean'],
@@ -413,7 +413,7 @@ class BranchManagement extends Component
                 'required', 'string', 'max:50',
                 Rule::unique('branches', 'branch_code')->ignore($this->branch_id),
             ],
-            'phone' => ['nullable', 'string', 'regex:/^[0-9]{10}$/'],
+            'phone' => ['nullable', 'string', 'regex:~^[0-9]{10}$~'],
             'email' => array_merge(ValidationHelper::rulesEmail(false), [
                 Rule::unique('branches', 'email')->ignore($this->branch_id)
             ]),

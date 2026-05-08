@@ -172,14 +172,8 @@
 
                             {{-- Product Image --}}
                             <div class="relative h-[120px] overflow-hidden bg-gray-100">
-                                @if($product->image)
-                                    <img src="{{ asset('storage/' . $product->image) }}" alt="{{ $product->name }}"
-                                        class="w-full h-full object-cover {{ !$isAvailable ? 'grayscale' : '' }}">
-                                @else
-                                    <div class="w-full h-full bg-gradient-to-br {{ $gradients[$pid % count($gradients)] }} flex items-center justify-center text-white/40 font-black text-5xl">
-                                        {{ strtoupper(substr($product->name, 0, 1)) }}
-                                    </div>
-                                @endif
+                                <img src="{{ $product->image_url }}" alt="{{ $product->name }}"
+                                    class="w-full h-full object-cover {{ !$isAvailable ? 'grayscale' : '' }}">
 
                                 @if($isEditMode)
                                     <div class="drag-handle absolute top-2 left-2 z-20 bg-white/90 backdrop-blur-md p-2 rounded-lg shadow-lg border border-gray-200 cursor-move hover:scale-110 transition-transform flex items-center justify-center">
@@ -270,13 +264,7 @@
                         <div wire:key="cart-item-{{ $key }}" class="flex items-start gap-2.5 py-3">
                             {{-- Thumbnail --}}
                             <div class="w-11 h-11 rounded-lg overflow-hidden bg-gray-100 shrink-0 border border-gray-100">
-                                @if($item['image'])
-                                    <img src="{{ asset('storage/' . $item['image']) }}" class="w-full h-full object-cover" alt="{{ $item['name'] }}">
-                                @else
-                                    <div class="w-full h-full flex items-center justify-center font-black text-lg {{ $thumbColors[$loop->index % count($thumbColors)] }}">
-                                        {{ strtoupper(substr($item['name'], 0, 1)) }}
-                                    </div>
-                                @endif
+                                <img src="{{ $item['image'] ? asset('storage/' . $item['image']) : asset('images/placeholder-product.png') }}" class="w-full h-full object-cover" alt="{{ $item['name'] }}">
                             </div>
 
                             {{-- Details --}}
@@ -443,10 +431,8 @@
                         <h2 class="text-[22px] font-black text-gray-900">{{ $currentProduct->name }}</h2>
                         <p class="text-[13px] text-gray-500 mt-1">Customize your order</p>
                     </div>
-                    @if($currentProduct->image)
-                        <img src="{{ asset('storage/' . $currentProduct->image) }}" alt="{{ $currentProduct->name }}" 
-                            class="w-20 h-20 rounded-lg object-cover border border-gray-100 shadow-sm">
-                    @endif
+                    <img src="{{ $currentProduct->image_url }}" alt="{{ $currentProduct->name }}" 
+                        class="w-20 h-20 rounded-lg object-cover border border-gray-100 shadow-sm">
                 </div>
             </div>
 

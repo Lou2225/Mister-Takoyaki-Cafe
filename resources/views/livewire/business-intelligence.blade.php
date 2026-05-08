@@ -650,8 +650,8 @@
 
         {{-- Branch Comparison (Admin Only) --}}
         @if(auth()->user()->role_id === 1)
-        <div class="bg-white border border-gray-200 rounded-2xl shadow-sm mx-1 overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/30">
+        <div class="mx-1">
+            <div class="flex items-center justify-between mb-3 px-1">
                 <div class="flex items-center gap-2">
                     <h4 class="text-[14px] font-bold text-gray-900 tracking-tight">Network Performance</h4>
                     <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-emerald-50 text-[9px] font-black text-emerald-600 uppercase tracking-widest border border-emerald-100 italic">
@@ -661,7 +661,7 @@
                 </div>
                 <span class="text-[10px] font-black uppercase text-gray-400 tracking-widest leading-none">By Branch Matrix</span>
             </div>
-            
+
             <x-data-table>
                 <x-slot name="header">
                     <th class="py-3 px-6 border-r border-gray-100 text-[12px] font-medium text-gray-500 tracking-wide uppercase">Branch Entity</th>
@@ -698,12 +698,12 @@
                 @endforelse
             </x-data-table>
 
-            {{-- Pagination --}}
             <div class="mt-4">
                 <x-pagination :paginator="$operations['branch_performance']" keyPrefix="bi-branches" />
             </div>
         </div>
         @endif
+
     </div>
 
 

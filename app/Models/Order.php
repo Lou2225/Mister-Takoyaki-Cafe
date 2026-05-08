@@ -196,7 +196,9 @@ class Order extends Model
 
     public function canBeRefunded(): bool
     {
-        return in_array($this->status, [self::STATUS_COMPLETED]) && $this->refundable_amount > 0;
+        return in_array($this->status, [self::STATUS_COMPLETED]) 
+            && $this->refundable_amount > 0 
+            && $this->created_at->diffInHours(now()) <= 24;
     }
 
     public function isPending(): bool
@@ -221,10 +223,29 @@ class Order extends Model
 
     public function canBeVoided(): bool
     {
-        return in_array($this->status, [self::STATUS_COMPLETED]) && !$this->isVoid() && !$this->isRefunded();
+        return in_array($this->status, [self::STATUS_COMPLETED]) 
+            && !$this->isVoid() 
+            && !$this->isRefunded()
+            && $this->created_at->diffInHours(now()) <= 24;
     }
 
     // ─── Actions ───
+
+    public function reject(string $reason)
+    {
+        if ($this->status !== self::STATUS_PENDING) {
+            return $this;
+        }
+
+        $this->update([
+            'status' => self::STATUS_CANCELLED,
+            'notes' => ($this->notes ? $this->notes . "\n" : "") . trim($reason)
+        ]);
+
+        event(new OrderStatusUpdated($this));
+
+        return $this;
+    }
 
     public function void(string $reason = null, int $userId = null)
     {

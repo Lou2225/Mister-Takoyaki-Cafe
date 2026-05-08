@@ -33,12 +33,8 @@
 
                 <!-- Password -->
                 <div x-data="{ show: false }">
-                    <div class="flex items-center justify-between mb-2">
+                    <div class="mb-2">
                         <x-input-label for="password" :value="__('Password')" class="text-[12px] font-semibold text-slate-900 uppercase tracking-[0.24em]" />
-                        @if (Route::has('password.request'))
-                            <button type="button" @click.prevent="view = 'forgot'" class="text-[12px] font-semibold text-indigo-600 hover:text-indigo-700 transition-colors">
-                            </button>
-                        @endif
                     </div>
 
                     <div class="relative">
@@ -47,7 +43,7 @@
                                         name="password"
                                         required autocomplete="current-password" placeholder="••••••••" />
                         
-                        <button type="button" @click="show = !show" class="absolute inset-y-0 right-0 pr-4 flex items-center justify-center text-gray-400 hover:text-indigo-600 transition-colors">
+                        <button type="button" @click="show = !show" class="absolute inset-y-0 right-0 pr-4 flex items-center justify-center text-gray-400 hover:text-black transition-colors">
                             {{-- Eye Icon --}}
                             <svg x-show="!show" class="w-5 h-5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                             {{-- Eye Slash Icon --}}
@@ -55,21 +51,20 @@
                         </button>
                     </div>
 
-                    <x-input-error :messages="$errors->get('password')" class="mt-2" />
-                </div>
-
-                <!-- Remember Me -->
-                <div class="flex items-center">
-                    <label for="remember_me" class="inline-flex items-center group cursor-pointer">
-                        <input id="remember_me" type="checkbox" class="w-4 h-4 rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500 cursor-pointer" name="remember">
-                        <span class="ml-2 text-sm text-gray-500 group-hover:text-gray-700 transition-colors font-medium">{{ __('Keep me logged in') }}</span>
-                    </label>
+                    <div class="flex items-center justify-between mt-2">
+                        <x-input-error :messages="$errors->get('password')" />
+                        @if (Route::has('password.request'))
+                            <button type="button" @click.prevent="view = 'forgot'" class="text-[12px] font-semibold text-indigo-600 hover:text-indigo-700 transition-colors ml-auto">
+                                {{ __('Forgot your password?') }}
+                            </button>
+                        @endif
+                    </div>
                 </div>
 
                 <div class="pt-2">
-                    <x-primary-button class="w-full justify-center py-4 bg-black text-white shadow-lg shadow-slate-900/10 uppercase tracking-widest hover:bg-slate-900">
+                    <button type="submit" class="w-full inline-flex justify-center items-center px-4 py-4 bg-black hover:bg-slate-900 text-white rounded-xl font-black text-[12px] shadow-lg shadow-slate-900/10 uppercase tracking-widest transition-all duration-200 transform active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900">
                         {{ __('Log In') }}
-                    </x-primary-button>
+                    </button>
                 </div>
             </form>
         </div>

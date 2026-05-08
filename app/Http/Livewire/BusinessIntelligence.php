@@ -7,8 +7,6 @@ use Livewire\WithPagination;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Branch;
-use App\Models\ProductCategory;
-use App\Models\FinancialLedger;
 use App\Models\IngredientCost;
 use App\Models\Ingredient;
 use App\Models\StockMovement;
@@ -16,6 +14,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 use App\Traits\HandlesExports;
+
 
 class BusinessIntelligence extends Component
 {
@@ -113,121 +112,206 @@ class BusinessIntelligence extends Component
 
     public function render()
     {
-        $salesData = $this->getSalesData();
+        $analytics = $this->getAnalytics();
         $mainBranchId = Branch::where('is_main', true)->first()?->id;
         $canOrder = $this->selectedBranchId !== 'all' && $this->selectedBranchId != $mainBranchId;
         
         return view('livewire.business-intelligence', [
             'branches'       => Branch::all(),
-            'performance'    => $this->getPerformanceMetrics($salesData),
+            'performance'    => $analytics['performance'],
             'forecasting'    => $this->getForecastingData(),
-            'productInsights'=> $this->getProductInsights(),
-            'operations'     => $this->getOperationalData(),
+            'productInsights'=> $this->getProductInsights($analytics),
+            'operations'     => $this->getOperationalData($analytics),
             'recentOrders'   => $this->getRecentOrders(),
-            'salesData'      => $salesData,
+            'salesData'      => $analytics,
             'canOrder'       => $canOrder,
         ])->layout('layouts.app');
     }
 
-    private function getPerformanceMetrics(array $analytics)
+    private function getAnalytics(): array
     {
-        $cogsData = $this->getCogsAndProfit();
-
-        return [
-            'gross_sales' => $analytics['gross_sales'],
-            'order_count' => $analytics['order_count'],
-            'avg_order_value' => $analytics['avg_order_value'],
-            'total_discounts' => $analytics['total_discounts'],
-            'delivery_fees' => $analytics['delivery_fees'],
-            'tax_collected' => $analytics['tax_collected'],
-            'refunds' => $analytics['refunds'],
-            'net_sales' => $analytics['net_sales'],
-            'gross_profit' => $analytics['gross_profit'],
-        ];
-    }
-
-    private function getCogsAndProfit(): array
-    {
+        $start    = Carbon::parse($this->startDate)->startOfDay();
+        $end      = Carbon::parse($this->endDate)->endOfDay();
         $branchId = $this->selectedBranchId === 'all' ? null : $this->selectedBranchId;
-        $start = Carbon::parse($this->startDate)->startOfDay();
-        $end = Carbon::parse($this->endDate)->endOfDay();
 
-        // 1. Get all completed items in period with full recipe hierarchy
-        $orderItems = OrderItem::whereHas('order', function($q) use ($branchId, $start, $end) {
-                $q->where('status', Order::STATUS_COMPLETED)
-                  ->whereBetween('created_at', [$start, $end])
-                  ->when($branchId, fn($query) => $query->where('branch_id', $branchId));
-            })
+        // 1. Single eager-loaded query for all orders in range
+        $orders = Order::whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
+            ->whereBetween('created_at', [$start, $end])
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->with([
-                'order',
-                'product.recipes',
-                'options.option.recipes',
-                'modifiers.modifier.recipes'
+                'items.product.recipes.ingredient',
+                'items.options.option.recipes.ingredient',
+                'items.modifiers.modifier.recipes.ingredient',
+                'branch',
             ])
             ->get();
 
-        // 2. Fetch standard ingredient costs (grouped by branch)
+        $completedOrders = $orders->where('status', Order::STATUS_COMPLETED);
+
+        // 2. Sales Metrics
+        $totalCollected = $completedOrders->sum('total_amount');
+        $totalDiscounts = $completedOrders->sum('discount_amount');
+        $deliveryFees   = $completedOrders->sum('delivery_fee');
+        $taxCollected   = $completedOrders->sum('tax_amount');
+        $netSales       = $totalCollected - $deliveryFees - $taxCollected;
+        $grossSales     = $netSales + $totalDiscounts;
+        $orderCount     = $completedOrders->count();
+        $avgOrderValue  = $orderCount > 0 ? $totalCollected / $orderCount : 0;
+        $refunds        = $orders->sum('refunded_amount');
+
+        // 3. Delegate heavy sub-calculations to focused helpers
+        $totalCogs   = $this->computeCogs($completedOrders, $branchId);
+        $grossProfit = $netSales - $totalCogs;
+        $trendData   = $this->buildTrendData($completedOrders, $start, $end);
+        $breakdown   = $this->buildSalesBreakdown($completedOrders);
+
+        return [
+            'gross_sales'     => $grossSales,
+            'net_sales'       => $netSales,
+            'total_discounts' => $totalDiscounts,
+            'delivery_fees'   => $deliveryFees,
+            'tax_collected'   => $taxCollected,
+            'total_collected' => $totalCollected,
+            'order_count'     => $orderCount,
+            'avg_order_value' => $avgOrderValue,
+            'refunds'         => $refunds,
+            'total_cogs'      => $totalCogs,
+            'gross_profit'    => $grossProfit,
+            'trend'           => $trendData,
+            'performance' => [
+                'gross_sales'     => $grossSales,
+                'net_sales'       => $netSales,
+                'order_count'     => $orderCount,
+                'avg_order_value' => $avgOrderValue,
+                'total_discounts' => $totalDiscounts,
+                'delivery_fees'   => $deliveryFees,
+                'tax_collected'   => $taxCollected,
+                'refunds'         => $refunds,
+                'gross_profit'    => $grossProfit,
+            ],
+            'payment_methods'  => $breakdown['payment_methods'],
+            'order_sources'    => $breakdown['order_sources'],
+            'top_items'        => $breakdown['top_items'],
+            'orders'           => $orders,
+            'completed_orders' => $completedOrders,
+        ];
+    }
+
+    /**
+     * Calculate total Cost of Goods Sold for a set of completed orders.
+     * Uses a tiered pricing strategy: Branch Standard Cost → Latest Purchase Price → Global Ingredient Cost.
+     */
+    private function computeCogs($completedOrders, ?string $branchId): float
+    {
         $standardCosts = IngredientCost::when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->get()
             ->groupBy('branch_id')
-            ->map(fn($group) => $group->pluck('unit_cost', 'ingredient_id'));
+            ->map(fn($g) => $g->pluck('unit_cost', 'ingredient_id'));
 
-        // 3. Fetch latest purchase prices (grouped by branch)
-        $latestPurchasePrices = StockMovement::where('type', 'in')
+        $purchasePrices = StockMovement::where('type', 'in')
             ->whereNotNull('unit_cost')
             ->where('unit_cost', '>', 0)
             ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->orderBy('created_at', 'desc')
             ->get()
             ->groupBy('branch_id')
-            ->map(fn($group) => $group->unique('ingredient_id')->pluck('unit_cost', 'ingredient_id'));
+            ->map(fn($g) => $g->unique('ingredient_id')->pluck('unit_cost', 'ingredient_id'));
 
-        // 4. Fetch fallback costs from ingredients table
-        $fallbackCosts = Ingredient::pluck('cost', 'id');
+        $fallback = Ingredient::pluck('cost', 'id');
 
-        $totalCogs = 0;
-        foreach ($orderItems as $item) {
-            $itemCost = 0;
-            $itemBranchId = $item->order->branch_id;
+        $total = 0.0;
+        foreach ($completedOrders as $order) {
+            $bid = $order->branch_id;
+            $resolve = fn($ingId) =>
+                $standardCosts[$bid][$ingId] ?? $purchasePrices[$bid][$ingId] ?? $fallback[$ingId] ?? 0;
 
-            $getUnitPrice = function($ingId) use ($itemBranchId, $standardCosts, $latestPurchasePrices, $fallbackCosts) {
-                // Priority: Standard Branch Cost -> Latest Branch Purchase -> Global Ingredient Cost -> 0
-                return $standardCosts[$itemBranchId][$ingId] 
-                    ?? $latestPurchasePrices[$itemBranchId][$ingId] 
-                    ?? $fallbackCosts[$ingId] 
-                    ?? 0;
-            };
-
-            // Base Product Recipe Cost
-            if ($item->product && $item->product->recipes) {
-                foreach ($item->product->recipes as $recipe) {
-                    $itemCost += ($recipe->quantity * $getUnitPrice($recipe->ingredient_id));
-                }
-            }
-
-            // Options Recipe Cost
-            foreach ($item->options as $itemOpt) {
-                if ($itemOpt->option && $itemOpt->option->recipes) {
-                    foreach ($itemOpt->option->recipes as $recipe) {
-                        $itemCost += ($recipe->quantity * $getUnitPrice($recipe->ingredient_id));
+            foreach ($order->items as $item) {
+                $cost = 0.0;
+                if ($item->product) {
+                    foreach ($item->product->recipes as $r) {
+                        $cost += $r->quantity * $resolve($r->ingredient_id);
                     }
                 }
-            }
-
-            // Modifiers Recipe Cost
-            foreach ($item->modifiers as $itemMod) {
-                if ($itemMod->modifier && $itemMod->modifier->recipes) {
-                    foreach ($itemMod->modifier->recipes as $recipe) {
-                        $itemCost += ($recipe->quantity * $getUnitPrice($recipe->ingredient_id));
+                foreach ($item->options as $opt) {
+                    if ($opt->option) {
+                        foreach ($opt->option->recipes as $r) {
+                            $cost += $r->quantity * $resolve($r->ingredient_id);
+                        }
                     }
                 }
+                foreach ($item->modifiers as $mod) {
+                    if ($mod->modifier) {
+                        foreach ($mod->modifier->recipes as $r) {
+                            $cost += $r->quantity * $resolve($r->ingredient_id);
+                        }
+                    }
+                }
+                $total += $cost * $item->quantity;
             }
-
-            $totalCogs += ($itemCost * $item->quantity);
         }
 
-        return ['total_cogs' => $totalCogs];
+        return $total;
     }
+
+    /**
+     * Build a day-by-day trend array for the given date range, filling gaps with 0.
+     */
+    private function buildTrendData($completedOrders, Carbon $start, Carbon $end): array
+    {
+        $daily = $completedOrders
+            ->groupBy(fn($o) => $o->created_at->format('Y-m-d'))
+            ->map(fn($g) => $g->sum('total_amount'));
+
+        $trend = [];
+        $cursor = $start->copy();
+        while ($cursor->lte($end)) {
+            $key     = $cursor->format('Y-m-d');
+            $trend[] = ['label' => $cursor->format('M d'), 'value' => (float)($daily[$key] ?? 0)];
+            $cursor->addDay();
+        }
+
+        return $trend;
+    }
+
+    /**
+     * Build payment method breakdown, order source breakdown, and top-selling items
+     * from an already-fetched collection of completed orders.
+     */
+    private function buildSalesBreakdown($completedOrders): array
+    {
+        $paymentMethods = $completedOrders->groupBy('payment_method')
+            ->map(fn($g, $method) => (object)[
+                'payment_method' => $method ?: 'Unknown',
+                'count'          => $g->count(),
+                'total'          => $g->sum('total_amount'),
+            ])->values();
+
+        $orderSources = $completedOrders->groupBy('order_type')
+            ->map(fn($g, $source) => (object)[
+                'source' => $source ?: 'Unknown',
+                'count'  => $g->count(),
+                'total'  => $g->sum('total_amount'),
+            ])->values();
+
+        $topItems = collect();
+        if ($completedOrders->isNotEmpty()) {
+            $topItems = OrderItem::with('product')
+                ->whereIn('order_id', $completedOrders->pluck('id'))
+                ->select('product_id', DB::raw('sum(quantity) as total_quantity'), DB::raw('sum(subtotal) as total_sales'))
+                ->groupBy('product_id')
+                ->orderByDesc('total_quantity')
+                ->take(5)
+                ->get();
+        }
+
+        return [
+            'payment_methods' => $paymentMethods,
+            'order_sources'   => $orderSources,
+            'top_items'       => $topItems,
+        ];
+
+    }
+
 
     private function getForecastingData()
     {
@@ -356,35 +440,38 @@ class BusinessIntelligence extends Component
             ->toArray();
     }
 
-    private function getProductInsights()
+    private function getProductInsights(array $analytics): array
     {
-        $query = OrderItem::whereHas('order', function($q) {
-            $q->where('payment_status', 'Paid')
-              ->when($this->selectedBranchId !== 'all', fn($q) => $q->where('branch_id', $this->selectedBranchId))
-              ->whereBetween('created_at', [Carbon::parse($this->startDate)->startOfDay(), Carbon::parse($this->endDate)->endOfDay()]);
-        });
+        $orderIds = $analytics['completed_orders']->pluck('id');
 
-        $topProducts = (clone $query)
-            ->with('product')
-            ->select('product_id', DB::raw('SUM(quantity) as units_sold'), DB::raw('SUM(subtotal) as revenue'))
-            ->groupBy('product_id')
-            ->orderBy('units_sold', 'desc')
-            ->take(5)
-            ->get();
+        $topProducts = collect();
+        $categorySales = collect();
 
-        $categorySales = (clone $query)
-            ->join('products', 'order_items.product_id', '=', 'products.id')
-            ->join('product_categories', 'products.category_id', '=', 'product_categories.id')
-            ->select('product_categories.name', DB::raw('SUM(order_items.subtotal) as revenue'))
-            ->groupBy('product_categories.name')
-            ->get();
+        if ($orderIds->isNotEmpty()) {
+            $topProducts = OrderItem::with('product')
+                ->whereIn('order_id', $orderIds)
+                ->select('product_id', DB::raw('SUM(quantity) as units_sold'), DB::raw('SUM(subtotal) as revenue'))
+                ->groupBy('product_id')
+                ->orderBy('units_sold', 'desc')
+                ->take(5)
+                ->get();
+
+            $categorySales = OrderItem::whereIn('order_id', $orderIds)
+                ->join('products', 'order_items.product_id', '=', 'products.id')
+                ->join('product_categories', 'products.category_id', '=', 'product_categories.id')
+                ->select('product_categories.name', DB::raw('SUM(order_items.subtotal) as revenue'))
+                ->groupBy('product_categories.name')
+                ->get();
+        }
 
         return [
-            'top_products' => $topProducts,
-            'category_sales' => $categorySales,
-            'seasonality' => $this->getProductSeasonality(),
+            'top_products'  => $topProducts,
+            'category_sales'=> $categorySales,
+            'seasonality'   => $this->getProductSeasonality(),
         ];
     }
+
+
 
     private function getProductSeasonality()
     {
@@ -497,26 +584,26 @@ class BusinessIntelligence extends Component
         return $seasonalityData;
     }
 
-    private function getOperationalData()
+    private function getOperationalData(array $analytics)
     {
-        $hourlySales = Order::where('payment_status', 'Paid')
-            ->when($this->selectedBranchId !== 'all', fn($q) => $q->where('branch_id', $this->selectedBranchId))
-            ->whereBetween('created_at', [Carbon::parse($this->startDate)->startOfDay(), Carbon::parse($this->endDate)->endOfDay()])
-            ->selectRaw('HOUR(created_at) as hour, COUNT(*) as count, SUM(total_amount) as revenue')
-            ->groupBy('hour')
-            ->orderBy('hour', 'asc')
-            ->get();
+        $completedOrders = $analytics['completed_orders'];
+        
+        $hourlySales = $completedOrders->groupBy(fn($o) => $o->created_at->format('H'))
+            ->map(fn($group, $hour) => (object)[
+                'hour'    => (int)$hour,
+                'count'   => $group->count(),
+                'revenue' => $group->sum('total_amount'),
+            ])->values();
+
 
         $branchPerformance = [];
         $globalNetworkTotal = 0;
 
         if (auth()->user()->role_id === 1) {
-            $baseQuery = Order::where('payment_status', 'Paid')
-                ->whereBetween('created_at', [Carbon::parse($this->startDate)->startOfDay(), Carbon::parse($this->endDate)->endOfDay()]);
-
-            $globalNetworkTotal = (clone $baseQuery)->sum('total_amount');
-
-            $branchPerformance = $baseQuery->selectRaw('branch_id, SUM(total_amount) as revenue, COUNT(*) as count')
+            $globalNetworkTotal = $completedOrders->sum('total_amount');
+            
+            $branchPerformance = Order::whereIn('id', $completedOrders->pluck('id'))
+                ->selectRaw('branch_id, SUM(total_amount) as revenue, COUNT(*) as count')
                 ->groupBy('branch_id')
                 ->with('branch')
                 ->paginate($this->perPage, ['*'], 'branchPage');
@@ -528,6 +615,7 @@ class BusinessIntelligence extends Component
             'global_network_total' => $globalNetworkTotal ?: 1,
         ];
     }
+
 
     private function getRecentOrders()
     {
@@ -551,99 +639,7 @@ class BusinessIntelligence extends Component
         ]);
     }
 
-    private function getSalesData(): array
-    {
-        $start = Carbon::parse($this->startDate)->startOfDay();
-        $end   = Carbon::parse($this->endDate)->endOfDay();
 
-        $query = Order::whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
-            ->whereBetween('created_at', [$start, $end])
-            ->when($this->selectedBranchId !== 'all', fn($q) => $q->where('branch_id', $this->selectedBranchId));
-
-        $orders = (clone $query)->get();
-
-        $totalCollected  = $orders->where('status', Order::STATUS_COMPLETED)->sum('total_amount');
-        $totalDiscounts  = $orders->where('status', Order::STATUS_COMPLETED)->sum('discount_amount');
-        $deliveryFees    = $orders->where('status', Order::STATUS_COMPLETED)->sum('delivery_fee');
-        $taxCollected    = $orders->where('status', Order::STATUS_COMPLETED)->sum('tax_amount');
-        
-        // Accurate Peddlr-inspired logic:
-        // Net Sales is what we actually earned from products after discounts
-        // Gross Sales is what we would have earned without discounts
-        $netSales        = $totalCollected - $deliveryFees - $taxCollected;
-        $grossSales      = $netSales + $totalDiscounts;
-        
-        $orderCount      = $orders->where('status', Order::STATUS_COMPLETED)->count();
-        $avgOrderValue   = $orderCount > 0 ? $totalCollected / $orderCount : 0;
-
-        // Refunds (from all orders in period including partially/fully refunded)
-        $refunds = $orders->sum('refunded_amount');
-
-        // Gross Profit (using COGS)
-        $cogsData = $this->getCogsAndProfit();
-
-        // Payment method breakdown (completed only)
-        $paymentMethods = (clone $query)->where('status', Order::STATUS_COMPLETED)
-            ->select('payment_method', DB::raw('count(*) as count'), DB::raw('sum(total_amount) as total'))
-            ->groupBy('payment_method')
-            ->get();
-
-        // Order source breakdown (completed only)
-        $orderSources = (clone $query)->where('status', Order::STATUS_COMPLETED)
-            ->select('order_type as source', DB::raw('count(*) as count'), DB::raw('sum(total_amount) as total'))
-            ->groupBy('order_type')
-            ->get();
-
-        // Top Selling Items (completed only)
-        $orderIds = $orders->where('status', Order::STATUS_COMPLETED)->pluck('id');
-        $topItems = [];
-        if ($orderIds->isNotEmpty()) {
-            $topItems = OrderItem::with('product')
-                ->whereIn('order_id', $orderIds)
-                ->select('product_id', DB::raw('sum(quantity) as total_quantity'), DB::raw('sum(subtotal) as total_sales'))
-                ->groupBy('product_id')
-                ->orderByDesc('total_quantity')
-                ->take(5)
-                ->get();
-        }
-
-        // Daily Sales Trend (completed only)
-        $dailySales = (clone $query)->where('status', Order::STATUS_COMPLETED)
-            ->selectRaw('DATE(created_at) as date, SUM(total_amount) as total')
-            ->groupBy('date')
-            ->orderBy('date', 'asc')
-            ->get()
-            ->mapWithKeys(fn($item) => [$item->date => $item->total]);
-
-        // Fill gaps in dates
-        $trendData = [];
-        $tempDate = $start->copy();
-        while ($tempDate->lte($end)) {
-            $dStr = $tempDate->format('Y-m-d');
-            $trendData[] = [
-                'label' => $tempDate->format('M d'),
-                'value' => (float)($dailySales[$dStr] ?? 0)
-            ];
-            $tempDate->addDay();
-        }
-
-        return [
-            'gross_sales'      => $grossSales,
-            'net_sales'        => $netSales,
-            'total_discounts'  => $totalDiscounts,
-            'delivery_fees'    => $deliveryFees,
-            'tax_collected'    => $taxCollected,
-            'total_collected'  => $totalCollected,
-            'order_count'      => $orderCount,
-            'avg_order_value'  => $avgOrderValue,
-            'refunds'          => $refunds,
-            'gross_profit'     => $netSales - $cogsData['total_cogs'],
-            'payment_methods'  => $paymentMethods,
-            'order_sources'    => $orderSources,
-            'top_items'        => $topItems,
-            'trend'            => $trendData,
-        ];
-    }
     // ── Reports ───────────────────────────────────────────────────
     public function exportPdf()
     {
@@ -653,19 +649,20 @@ class BusinessIntelligence extends Component
 
     public function exportCsv()
     {
-        $sales = $this->getSalesData();
+        $analytics = $this->getAnalytics();
         $data = [
-            ['Metric' => 'Gross Sales', 'Value' => number_format($sales['gross_sales'], 2)],
-            ['Metric' => 'Net Sales', 'Value' => number_format($sales['net_sales'], 2)],
-            ['Metric' => 'Order Count', 'Value' => $sales['order_count']],
-            ['Metric' => 'Avg Order Value', 'Value' => number_format($sales['avg_order_value'], 2)],
-            ['Metric' => 'Total Discounts', 'Value' => number_format($sales['total_discounts'], 2)],
-            ['Metric' => 'Refunds', 'Value' => number_format($sales['refunds'], 2)],
-            ['Metric' => 'Gross Profit', 'Value' => number_format($sales['gross_profit'], 2)],
+            ['Metric' => 'Gross Sales', 'Value' => number_format($analytics['gross_sales'], 2)],
+            ['Metric' => 'Net Sales', 'Value' => number_format($analytics['net_sales'], 2)],
+            ['Metric' => 'Order Count', 'Value' => $analytics['order_count']],
+            ['Metric' => 'Avg Order Value', 'Value' => number_format($analytics['avg_order_value'], 2)],
+            ['Metric' => 'Total Discounts', 'Value' => number_format($analytics['total_discounts'], 2)],
+            ['Metric' => 'Refunds', 'Value' => number_format($analytics['refunds'], 2)],
+            ['Metric' => 'Gross Profit', 'Value' => number_format($analytics['gross_profit'], 2)],
         ];
 
         return $this->generateCsvReport('BI_Report_' . now()->format('Y-m-d') . '.csv', $data);
     }
+
 
     public function exportExcel()
     {
@@ -674,31 +671,34 @@ class BusinessIntelligence extends Component
 
     private function getExportDataForReport(): array
     {
-        $sales  = $this->getSalesData();
+        $analytics = $this->getAnalytics();
         $branch = $this->selectedBranchId === 'all' ? 'Global Network' : Branch::find($this->selectedBranchId)?->branch_name;
 
-        $trendRows = collect($sales['trend'])->map(fn($d) => [
+        $trendRows = collect($analytics['trend'])->map(fn($d) => [
             $d['label'],
             'PHP ' . number_format($d['value'], 2),
         ])->toArray();
 
-        $paymentRows = $sales['payment_methods']->map(fn($p) => [
-            $p->payment_method ?: 'N/A',
-            number_format($p->count),
-            'PHP ' . number_format($p->total, 2),
-        ])->toArray();
+        $paymentRows = $analytics['completed_orders']->groupBy('payment_method')
+            ->map(fn($group, $method) => [
+                $method ?: 'N/A',
+                number_format($group->count()),
+                'PHP ' . number_format($group->sum('total_amount'), 2),
+            ])->values()->toArray();
 
-        $sourceRows = $sales['order_sources']->map(fn($s) => [
-            ucfirst($s->source ?: 'Unknown'),
-            number_format($s->count),
-            'PHP ' . number_format($s->total, 2),
-        ])->toArray();
+        $sourceRows = $analytics['completed_orders']->groupBy('order_type')
+            ->map(fn($group, $source) => [
+                ucfirst($source ?: 'Unknown'),
+                number_format($group->count()),
+                'PHP ' . number_format($group->sum('total_amount'), 2),
+            ])->values()->toArray();
 
-        $topItemRows = $sales['top_items']->map(fn($i) => [
+        $topItemRows = $analytics['top_items']->map(fn($i) => [
             optional($i->product)->name ?? 'Unknown',
             number_format($i->total_quantity),
             'PHP ' . number_format($i->total_sales, 2),
         ])->toArray();
+
 
         return [
             'reportType'  => 'business_intelligence',
@@ -708,16 +708,16 @@ class BusinessIntelligence extends Component
             'branch'      => $branch,
             'generatedAt' => now()->format('F d, Y h:i A'),
             'kpis' => [
-                'Gross Sales'      => 'PHP ' . number_format($sales['gross_sales'], 2),
-                'Net Sales'        => 'PHP ' . number_format($sales['net_sales'], 2),
-                'Total Collected'  => 'PHP ' . number_format($sales['total_collected'], 2),
-                'Gross Profit'     => 'PHP ' . number_format($sales['gross_profit'], 2),
-                'Avg. Order Value' => 'PHP ' . number_format($sales['avg_order_value'], 2),
-                'Order Count'      => number_format($sales['order_count']),
-                'Total Discounts'  => 'PHP ' . number_format($sales['total_discounts'], 2),
-                'Delivery Fees'    => 'PHP ' . number_format($sales['delivery_fees'], 2),
-                'Tax Collected'    => 'PHP ' . number_format($sales['tax_collected'], 2),
-                'Total Refunds'    => 'PHP ' . number_format($sales['refunds'], 2),
+                'Gross Sales'      => 'PHP ' . number_format($analytics['gross_sales'], 2),
+                'Net Sales'        => 'PHP ' . number_format($analytics['net_sales'], 2),
+                'Total Collected'  => 'PHP ' . number_format($analytics['total_collected'], 2),
+                'Gross Profit'     => 'PHP ' . number_format($analytics['gross_profit'], 2),
+                'Avg. Order Value' => 'PHP ' . number_format($analytics['avg_order_value'], 2),
+                'Order Count'      => number_format($analytics['order_count']),
+                'Total Discounts'  => 'PHP ' . number_format($analytics['total_discounts'], 2),
+                'Delivery Fees'    => 'PHP ' . number_format($analytics['delivery_fees'], 2),
+                'Tax Collected'    => 'PHP ' . number_format($analytics['tax_collected'], 2),
+                'Total Refunds'    => 'PHP ' . number_format($analytics['refunds'], 2),
             ],
             'sections' => [
                 [
@@ -747,4 +747,5 @@ class BusinessIntelligence extends Component
             ],
         ];
     }
+
 }

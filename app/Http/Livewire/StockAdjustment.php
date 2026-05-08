@@ -41,6 +41,8 @@ class StockAdjustment extends Component
     public $bulkAdjustments = []; 
     public $globalReference = '';
     public $globalRemarks = '';
+    public $viewingReferenceId;
+    public $viewingMovements = [];
 
     /**
      * Standard rules property to prevent "Missing rules" exception
@@ -110,6 +112,22 @@ class StockAdjustment extends Component
         if ($this->panel === 'bulk') {
             $this->startBulkAdjustment();
         }
+    }
+
+    public function viewAdjustment($refId)
+    {
+        $this->viewingReferenceId = $refId;
+        $this->viewingMovements = StockMovement::with(['ingredient', 'user'])
+            ->where('reference_id', $refId)
+            ->get();
+        
+        $this->dispatchBrowserEvent('open-modal', 'view-adjustment-details');
+    }
+
+    public function closeView()
+    {
+        $this->viewingReferenceId = null;
+        $this->viewingMovements = [];
     }
 
     // ── Lifecycle & Sync ──────────────────────────────────────────
@@ -200,10 +218,11 @@ class StockAdjustment extends Component
     public function addToQueue()
     {
         $this->validate([
-            'newItemId'   => 'required|exists:ingredients,id',
-            'newItemQty'  => 'required|numeric|min:0.01',
-            'newItemType' => 'required|in:in,out,waste,adjust',
-            'newItemCost' => 'nullable|numeric|min:0',
+            'newItemId'     => 'required|exists:ingredients,id',
+            'newItemQty'    => 'required|numeric|min:0.01',
+            'newItemType'   => 'required|in:in,out,waste,adjust,return_to_supplier',
+            'newItemExpiry' => 'nullable|date|after_or_equal:today',    
+            'newItemCost'   => 'nullable|numeric|min:0',
         ], [
             'newItemId.required'  => 'Select an ingredient.',
             'newItemQty.required' => 'Quantity is required.',
@@ -231,7 +250,8 @@ class StockAdjustment extends Component
             'display_unit'    => $selectedUnit,       // e.g. 'box', 'bottle', 'g'
             'unit'            => $ing->unit,          // base unit (g/ml/pcs)
             'cost'            => $costToStore,
-            'expiry'          => $this->newItemExpiry,
+            'price'           => null, // Ingredients track cost, but we add key to prevent undefined error
+            'expiry'          => $this->newItemExpiry ?: null,
             'remarks'         => null,
         ];
 
@@ -445,7 +465,7 @@ class StockAdjustment extends Component
                 'branch_id' => $branchId,
                 'batch_number' => $ref,
                 'current_quantity' => $baseQty,
-                'expiry_date' => $expiry,
+                'expiry_date' => empty($expiry) ? null : $expiry,
             ]);
         } elseif (in_array($type, ['out', 'waste', 'waste_expired', 'return_to_supplier'])) {
             $result = \App\Services\StockDeductionService::deductByFEFO(
@@ -558,7 +578,10 @@ class StockAdjustment extends Component
 
     public function render()
     {
-        $movements = StockMovement::with(['ingredient', 'branch', 'user'])
+        // Get grouped adjustments (by reference_id)
+        $movements = StockMovement::with(['user', 'branch'])
+            ->select('reference_id', 'created_at', 'user_id', 'branch_id', 'type', 'remarks')
+            ->selectRaw('COUNT(*) as item_count')
             ->where('branch_id', $this->selectedBranchId)
             ->when($this->search, function($q) {
                 $q->where(function($sub) {
@@ -567,7 +590,8 @@ class StockAdjustment extends Component
                         ->orWhere('remarks', 'like', '%' . $this->search . '%');
                 });
             })
-            ->latest()
+            ->groupBy('reference_id', 'created_at', 'user_id', 'branch_id', 'type', 'remarks')
+            ->latest('created_at')
             ->paginate($this->perPage);
 
         $stats = [

@@ -77,11 +77,10 @@
                 
                 <div class="relative z-10 flex items-center gap-2">
                      <x-application-logo class="w-8 h-8 fill-current text-white" />
-                     <span class="text-[16px] font-extrabold tracking-tight text-white uppercase">Mister Takoyaki</span>
+                     <span class="text-[16px] font-extrabold tracking-tight text-white uppercase">Mister Takoyaki Cafe</span>
                 </div>
 
                 <div class="relative z-10 mt-auto">
-                    <h2 class="text-4xl sm:text-5xl font-extrabold text-white leading-tight mb-3 drop-shadow-[0_16px_24px_rgba(0,0,0,0.35)]">Effortlessly manage your operations.</h2>
                     <p class="text-slate-200 text-sm opacity-95 leading-relaxed max-w-sm">Manage your branch monitoring, sales data, and staff execution all in one centralized command center.</p>
                 </div>
             </div>
@@ -92,7 +91,7 @@
                     <!-- Mobile only logo -->
                     <div class="flex items-center gap-2 mb-8 md:hidden justify-center hover:opacity-80 transition-opacity">
                          <x-application-logo class="w-8 h-8 fill-current text-indigo-600" />
-                         <span class="text-xl font-extrabold tracking-tight text-gray-900 uppercase">Mister Takoyaki</span>
+                         <span class="text-xl font-extrabold tracking-tight text-gray-900 uppercase">Mister Takoyaki Cafe</span>
                     </div>
                     
                     {{ $slot }}

@@ -160,48 +160,55 @@
                         <span class="text-[11px] font-black text-white/60 uppercase tracking-[0.2em]">Avg. Order Value</span>
                     </div>
                     <h3 class="text-3xl font-black text-white tracking-tight">₱ {{ number_format($kpi['aov'], 2) }}</h3>
-                    <div class="flex items-center gap-2 mt-2">
-                        <span class="flex h-2 w-2 rounded-full bg-indigo-300 animate-pulse"></span>
-                        <p class="text-[12px] font-bold text-white/80">Unit Transaction Value</p>
-                    </div>
-                </div>
-            </div>
-
-            {{-- COGS --}}
-            <div wire:click="openBreakdown('COGS')" class="p-6 bg-gradient-to-br from-slate-600 to-slate-800 rounded-3xl shadow-lg shadow-slate-200/40 group hover:shadow-xl hover:shadow-slate-300/40 hover:-translate-y-1 transition-all duration-500 relative overflow-hidden cursor-pointer border border-white/10">
-                <div class="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-bl-[80px] -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
-                <div class="relative z-10 text-white">
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-white backdrop-blur-md transition-all duration-500 shadow-sm border border-white/20">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                        </div>
-                        <span class="text-[11px] font-black text-white/60 uppercase tracking-[0.2em]">Resource Costs</span>
-                    </div>
-                    <h3 class="text-3xl font-black text-white tracking-tight">₱ {{ number_format($kpi['total_cogs'], 2) }}</h3>
-                    <div class="flex items-center gap-2 mt-2">
-                        <span class="flex h-2 w-2 rounded-full bg-slate-300 animate-pulse"></span>
-                        <p class="text-[12px] font-bold text-white/80">Inventory Consumption</p>
-                    </div>
-                </div>
-            </div>
-
-            {{-- Profit Insight --}}
-            <div wire:click="openBreakdown('Profit')" class="p-6 bg-gradient-to-br from-amber-500 to-orange-700 rounded-3xl shadow-lg shadow-amber-200/40 group hover:shadow-xl hover:shadow-amber-300/40 hover:-translate-y-1 transition-all duration-500 relative overflow-hidden cursor-pointer border border-white/10">
-                <div class="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-bl-[80px] -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
-                <div class="relative z-10 text-white">
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-white backdrop-blur-md transition-all duration-500 shadow-sm border border-white/20">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
-                        </div>
-                        <span class="text-[11px] font-black text-white/60 uppercase tracking-[0.2em]">Net Profit</span>
-                    </div>
-                    <h3 class="text-3xl font-black text-white tracking-tight">₱ {{ number_format($kpi['gross_profit'], 2) }}</h3>
-                    <div class="flex items-center gap-2 mt-2">
-                        <span class="flex h-2 w-2 rounded-full bg-amber-300 animate-pulse"></span>
-                        <p class="text-[12px] font-bold text-white/80">{{ $kpi['profit_margin_pct'] }}% Profit Margin</p>
-                    </div>
-                </div>
-            </div>
+                                        <div class="flex items-center gap-2 mt-2">
+                                            <span class="flex h-2 w-2 rounded-full bg-indigo-300 animate-pulse"></span>
+                                            <p class="text-[12px] font-bold text-white/80">Profit/Sales Intensity</p>
+                                        </div>
+                                    </div>
+                                </div>
+                
+                                {{-- COGS --}}
+                                <div wire:click="openBreakdown('COGS')" class="p-6 bg-gradient-to-br from-slate-600 to-slate-800 rounded-3xl shadow-lg shadow-slate-200/40 group hover:shadow-xl hover:shadow-slate-300/40 hover:-translate-y-1 transition-all duration-500 relative overflow-hidden cursor-pointer border border-white/10">
+                                    <div class="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-bl-[80px] -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+                                    <div class="relative z-10 text-white">
+                                        <div class="flex items-center justify-between mb-4">
+                                            <div class="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-white backdrop-blur-md transition-all duration-500 shadow-sm border border-white/20">
+                                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                            </div>
+                                            <span class="text-[11px] font-black text-white/60 uppercase tracking-[0.2em]">Resource Costs</span>
+                                        </div>
+                                        <h3 class="text-3xl font-black text-white tracking-tight">₱ {{ number_format($kpi['total_cogs'], 2) }}</h3>
+                                        <div class="flex items-center gap-2 mt-2">
+                                            <span class="flex h-2 w-2 rounded-full bg-slate-300 animate-pulse"></span>
+                                            <p class="text-[12px] font-bold text-white/80">Inventory Consumption</p>
+                                        </div>
+                                    </div>
+                                </div>
+                
+                                {{-- Profit Insight --}}
+                                <div class="relative group h-full">
+                                    <div wire:click="openBreakdown('Profit')" class="p-6 bg-gradient-to-br from-amber-500 to-orange-700 rounded-3xl shadow-lg shadow-amber-200/40 group-hover:shadow-xl hover:shadow-amber-300/40 hover:-translate-y-1 transition-all duration-500 relative overflow-hidden cursor-pointer border border-white/10">
+                                        <div class="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-bl-[80px] -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+                                        <div class="relative z-10 text-white">
+                                            <div class="flex items-center justify-between mb-4">
+                                                <div class="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-white backdrop-blur-md transition-all duration-500 shadow-sm border border-white/20">
+                                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                                                </div>
+                                                <span class="text-[11px] font-black text-white/60 uppercase tracking-[0.2em]">Net Profit</span>
+                                            </div>
+                                            <h3 class="text-3xl font-black text-white tracking-tight">₱ {{ number_format($kpi['gross_profit'], 2) }}</h3>
+                                            <div class="flex items-center gap-2 mt-2">
+                                                <span class="flex h-2 w-2 rounded-full bg-amber-300 animate-pulse"></span>
+                                                <p class="text-[12px] font-bold text-white/80">{{ $kpi['profit_margin_pct'] }}% Profit Margin</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                
+                                    {{-- Mini Margin Trigger --}}
+                                    <button wire:click="openBreakdown('Margin')" class="absolute bottom-4 right-4 z-20 w-8 h-8 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-all shadow-sm" title="View Margin Breakdown">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </button>
+                                </div>
         </div>
 
         {{-- ─── Breakdown Side Panel ────────────────────────────────────────── --}}
@@ -238,13 +245,15 @@
                                         <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Formula:</span>
                                         <code class="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
                                             @if($selectedMetric === 'Revenue')
-                                                Σ (Price × Qty) + Add-ons
+                                                Σ (Sales Price × Qty)
                                             @elseif($selectedMetric === 'COGS')
-                                                Σ (Usage × Unit Cost)
+                                                Σ (Inventory Used × Unit Cost)
                                             @elseif($selectedMetric === 'AOV')
-                                                Total Revenue / Order Count
+                                                Total Revenue ÷ Order Count
                                             @elseif($selectedMetric === 'Profit')
-                                                Revenue - COGS
+                                                Revenue - Total Costs (COGS)
+                                            @elseif($selectedMetric === 'Margin')
+                                                (Net Profit ÷ Revenue) × 100
                                             @endif
                                         </code>
                                     </div>
@@ -321,9 +330,17 @@
                                         </div>
                                         <div class="text-right">
                                             <p class="text-[14px] font-black text-slate-900">
-                                                {{ isset($item['total']) ? '₱ ' . number_format($item['total'], 2) : ($item['count'] ?? '') }}
+                                                @if(isset($item['is_percentage']) && $item['is_percentage'])
+                                                    {{ number_format($item['total'], 2) }}%
+                                                @elseif(isset($item['total']))
+                                                    ₱ {{ number_format($item['total'], 2) }}
+                                                @else
+                                                    {{ $item['count'] ?? '' }}
+                                                @endif
                                             </p>
-                                            <p class="text-[9px] font-black text-slate-300 uppercase mt-0.5 tracking-tighter">Contribution</p>
+                                            <p class="text-[9px] font-black text-slate-400 uppercase mt-0.5 tracking-tighter">
+                                                @if($selectedMetric === 'Margin') Efficiency @elseif($selectedMetric === 'AOV') Volume Share @else Contribution @endif
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
@@ -504,12 +521,12 @@
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-            <div class="lg:col-span-5 rounded-xl bg-white border border-gray-200 shadow-sm overflow-hidden flex flex-col">
-                <div class="px-6 py-5 border-b border-gray-200 flex items-center justify-between">
+            <div class="lg:col-span-5 rounded-xl bg-white border border-gray-200 shadow-sm overflow-hidden flex flex-col h-[400px]">
+                <div class="px-6 py-5 border-b border-gray-200 flex items-center justify-between shrink-0">
                     <h2 class="text-[14px] font-black text-gray-900 uppercase tracking-widest">Top Products</h2>
                     <span class="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Volume Ranking</span>
                 </div>
-                <div class="flex-1">
+                <div class="flex-1 overflow-y-auto custom-scrollbar">
                     <table class="w-full text-left border-collapse">
                         <tbody class="divide-y divide-gray-50">
                             @forelse($bestSellers as $item)
@@ -555,16 +572,16 @@
             </div>
 
             {{-- Enhanced Stock Intelligence (col-span-4) --}}
-            <div class="lg:col-span-4 rounded-xl bg-white border border-gray-200 shadow-sm overflow-hidden flex flex-col" x-data="{ tab: 'deficiency', ...slidingTabs('deficiency', 'tab') }">
-                <div class="px-6 py-5 flex items-center justify-between bg-white sticky top-0 z-20">
+            <div class="lg:col-span-4 rounded-xl bg-white border border-gray-200 shadow-sm overflow-hidden flex flex-col h-[400px]" x-data="{ stockTab: 'deficiency', ...slidingTabs('deficiency', 'stockTab') }">
+                <div class="px-6 py-5 flex items-center justify-between bg-white sticky top-0 z-20 shrink-0">
                     <h2 class="text-[14px] font-black text-gray-900 uppercase tracking-widest">Stock Intelligence</h2>
                 </div>
-                <div class="px-2">
-                    <x-sliding-tabs model="tab" class="mb-4">
-                        <x-sliding-tab model="tab" value="deficiency">
+                <div class="px-2 shrink-0">
+                    <x-sliding-tabs model="stockTab" class="mb-4">
+                        <x-sliding-tab model="stockTab" value="deficiency">
                             Shortage
                         </x-sliding-tab>
-                        <x-sliding-tab model="tab" value="expiration">
+                        <x-sliding-tab model="stockTab" value="expiration">
                             <span class="flex items-center gap-1.5">
                                 Expiry
                                 @if(count($expirationAlerts) > 0)
@@ -575,9 +592,9 @@
                     </x-sliding-tabs>
                 </div>
 
-                <div class="flex-1 p-5 pt-0 space-y-3">
+                <div class="flex-1 p-5 pt-0 space-y-3 overflow-y-auto custom-scrollbar">
                     {{-- Deficiency Tab --}}
-                    <div x-show="tab === 'deficiency'" class="space-y-2">
+                    <div x-show="stockTab === 'deficiency'" class="space-y-2">
                         @forelse($lowStockAlerts as $alert)
                             <div class="p-3 rounded-2xl bg-red-50/30 border border-red-50 flex items-center justify-between group hover:border-red-200 transition-all">
                                 <div>
@@ -602,7 +619,7 @@
                     </div>
 
                     {{-- Expiration Tab --}}
-                    <div x-show="tab === 'expiration'" class="space-y-2" x-cloak>
+                    <div x-show="stockTab === 'expiration'" class="space-y-2" x-cloak>
                         @forelse($expirationAlerts as $exp)
                             <div class="p-3 rounded-2xl bg-amber-50/30 border border-amber-50 flex items-center justify-between group hover:border-amber-200 transition-all">
                                 <div>
@@ -638,15 +655,15 @@
             </div>
 
             {{-- Live Terminal Feed (col-span-3) --}}
-            <div class="lg:col-span-3 rounded-xl bg-gray-900 border border-gray-800 shadow-xl overflow-hidden flex flex-col relative text-white">
-                <div class="px-5 py-4 border-b border-gray-800 flex items-center justify-between bg-gray-900 sticky top-0 z-20">
+            <div class="lg:col-span-3 rounded-xl bg-gray-900 border border-gray-800 shadow-xl overflow-hidden flex flex-col relative text-white h-[400px]">
+                <div class="px-5 py-4 border-b border-gray-800 flex items-center justify-between bg-gray-900 sticky top-0 z-20 shrink-0">
                     <h2 class="text-[11px] font-black text-gray-200 uppercase tracking-widest flex items-center gap-2">
                         <div class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.8)] animate-pulse"></div>
                         Remote POS
                     </h2>
                 </div>
                 
-                <div class="flex-1 p-5 space-y-4">
+                <div class="flex-1 p-5 space-y-4 overflow-y-auto custom-scrollbar">
                     @forelse($liveOrders as $order)
                         <div class="relative pl-5 border-l-2 {{ $order['status'] === 'Preparing' ? 'border-amber-500' : ($order['status'] === 'Completed' ? 'border-gray-700' : 'border-emerald-500') }} group transition-all">
                             <div class="flex justify-between items-start mb-1 text-left">

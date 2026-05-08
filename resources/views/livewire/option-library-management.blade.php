@@ -226,7 +226,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {{-- Main Content: Variation Items --}}
             <div class="lg:col-span-2 space-y-6">
-                <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] min-h-[400px] max-h-[520px] lg:max-h-[560px] overflow-hidden flex flex-col">
+                <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] h-[560px] flex flex-col">
                     <div class="flex items-center justify-between mb-6 pb-4 border-b border-slate-50">
                         <div>
                             <h3 class="text-[13px] font-semibold text-gray-700 uppercase tracking-wider">Variation Options</h3>
@@ -238,7 +238,7 @@
                         </button>
                     </div>
 
-                    <div class="space-y-4 overflow-y-auto flex-1 min-h-0">
+                    <div class="space-y-4 overflow-y-auto flex-1 min-h-0 max-h-[400px] pr-2 custom-scrollbar">
                         @foreach($templateItems as $idx => $item)
                             <div class="flex items-center gap-4 p-4 rounded-xl bg-slate-50/50 border border-slate-100 hover:bg-white hover:border-indigo-100 hover:shadow-sm transition-all group animate-fadeIn">
                                 <div class="flex-1">
@@ -259,9 +259,9 @@
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-2 pt-5">
-                                    <button wire:click="setItemAsDefault({{ $idx }})" 
+                                    <button wire:click="toggleItemDefault({{ $idx }})" 
                                         class="w-9 h-9 flex items-center justify-center rounded-lg border-2 transition-all {{ $item['is_default'] ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-white border-slate-100 text-slate-300 hover:text-emerald-500 hover:border-emerald-100' }}" 
-                                        title="Set as system default">
+                                        title="Toggle system default">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
                                     </button>
                                     <button wire:click="removeItem({{ $idx }})" 
@@ -325,11 +325,9 @@
                 </div>
 
                 <div class="flex flex-col gap-2">
-                    <x-primary-button type="button" @click="$dispatch('open-modal', 'confirm-save-template')" class="w-full justify-center h-11 text-[12px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">
-                        {{ $mode === 'create' ? 'Register Template' : 'Save Changes' }}
-                    </x-primary-button>
-                    <x-secondary-button wire:click="backToList" class="w-full justify-center h-11 text-[12px] font-black uppercase tracking-widest">
-                        Cancel
+                    <x-primary-button type="button" @click="$dispatch('open-modal', 'confirm-save-template')" class="w-full justify-center" x-text="mode === 'create' ? 'Register Template' : 'Save Changes'"></x-primary-button>
+                    <x-secondary-button wire:click="backToList" class="w-full justify-center">
+                        <span>Cancel</span>
                     </x-secondary-button>
                 </div>
 
@@ -348,36 +346,56 @@
 
     {{-- ── Delete Template Modal ── --}}
     <x-modal name="delete-template" maxWidth="sm" focusable>
-        <div class="h-1.5 w-full bg-gradient-to-r from-rose-400 to-pink-500 rounded-t-lg"></div>
-        <div class="p-8 text-center">
-            <div class="w-20 h-20 bg-rose-50 rounded-[28px] flex items-center justify-center text-rose-500 mx-auto mb-6 border border-rose-100 shadow-xl shadow-rose-100/50 animate-bounce-slow">
-                <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        <div class="h-1 w-full bg-gradient-to-r from-red-400 to-rose-500 rounded-t-lg"></div>
+        <div class="p-6">
+            <div class="flex items-start gap-4 mb-4">
+                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-red-50 border border-red-100 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-[15px] font-bold text-gray-900 leading-tight">Delete Template</h3>
+                    <p class="mt-1 text-[13px] text-gray-500 leading-relaxed">
+                        You are about to remove this template from the library. This cannot be undone.
+                    </p>
+                </div>
             </div>
-            <h3 class="text-[22px] font-black text-slate-900 tracking-tight mb-2">Delete Template?</h3>
-            <p class="text-[14px] text-slate-500 font-medium leading-relaxed mb-8 px-4">
-                You are about to remove <span class="font-black text-slate-900 underline decoration-rose-200">"{{ $deleteTargetName }}"</span> from the library.
-            </p>
             
-            <div class="flex items-center gap-3">
-                <x-secondary-button @click="$dispatch('close-modal', 'delete-template')" class="flex-1 h-12 text-[12px] font-black uppercase tracking-widest border-slate-200">Keep It</x-secondary-button>
-                <button wire:click="deleteTemplate" class="flex-1 h-12 bg-rose-500 text-white text-[12px] font-black uppercase tracking-widest rounded-xl hover:bg-rose-600 transition-all shadow-xl shadow-rose-200/40">Confirm Delete</button>
+            <div class="px-3 py-2 bg-white border border-gray-100 rounded-lg text-[13px] text-gray-600 mb-5">
+                <span class="font-semibold text-gray-800">{{ $deleteTargetName }}</span>
+            </div>
+
+            <div class="flex items-center justify-end gap-2">
+                <x-secondary-button @click="$dispatch('close-modal', 'delete-template')">Cancel</x-secondary-button>
+                <x-danger-button wire:click="deleteTemplate" @click="$dispatch('close-modal', 'delete-template')">Delete</x-danger-button>
             </div>
         </div>
     </x-modal>
 
     <x-modal name="confirm-save-template" maxWidth="sm" focusable>
-        <div class="h-1.5 w-full bg-gradient-to-r from-indigo-400 to-sky-500 rounded-t-lg"></div>
-        <div class="p-8 text-center">
-            <div class="w-20 h-20 bg-indigo-50 rounded-[28px] flex items-center justify-center text-indigo-600 mx-auto mb-6 border border-indigo-100 shadow-xl shadow-indigo-100/50 animate-bounce-slow">
-                <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        <div class="h-1 w-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-t-lg"></div>
+        <div class="p-6">
+            <div class="flex items-start gap-4 mb-4">
+                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M5 13l4 4L19 7" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-[15px] font-bold text-gray-900 leading-tight" x-text="mode === 'create' ? 'Create Template' : 'Save Changes'"></h3>
+                    <p class="mt-1 text-[13px] text-gray-500 leading-relaxed" x-text="mode === 'create' ? 'This will add a new template to the options library.' : 'This will persist the current template updates.'"></p>
+                </div>
             </div>
-            <h3 class="text-[22px] font-black text-slate-900 tracking-tight mb-2">{{ $mode === 'create' ? 'Create Template?' : 'Save Changes?' }}</h3>
-            <p class="text-[14px] text-slate-500 font-medium leading-relaxed mb-8 px-4">
-                {{ $mode === 'create' ? 'This will add a new template to the options library.' : 'This will persist the current template updates.' }}
-            </p>
-            <div class="flex items-center gap-3">
-                <x-secondary-button @click="$dispatch('close-modal', 'confirm-save-template')" class="flex-1 h-12 text-[12px] font-black uppercase tracking-widest border-slate-200">Go Back</x-secondary-button>
-                <button wire:click="saveTemplate" @click="$dispatch('close-modal', 'confirm-save-template')" class="flex-1 h-12 bg-indigo-600 text-white text-[12px] font-black uppercase tracking-widest rounded-xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200/40">Confirm {{ $mode === 'create' ? 'Create' : 'Save' }}</button>
+            
+            <div class="flex items-center justify-end gap-2 mt-6">
+                <x-secondary-button @click="$dispatch('close-modal', 'confirm-save-template')" class="h-10">Cancel</x-secondary-button>
+                <x-primary-button 
+                    wire:click="saveTemplate" 
+                    @click="$dispatch('close-modal', 'confirm-save-template')" 
+                    class="h-10">
+                    Confirm & Save
+                </x-primary-button>
             </div>
         </div>
     </x-modal>

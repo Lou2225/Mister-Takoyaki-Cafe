@@ -28,6 +28,7 @@ class OrderManagement extends Component
     public $selectedOrder = null;
     public $refundAmount = 0;
     public $refundReason = '';
+    public $rejectReason = '';
     
     // Rider Assignment
     public $riders = [];
@@ -103,14 +104,28 @@ class OrderManagement extends Component
         
         $validStatuses = [];
         if ($value === 'POS') {
-            $validStatuses = ['Pending', 'Completed', 'Drafted', 'Void', 'Refunded', 'Partially Refunded'];
+            $validStatuses = [Order::STATUS_PENDING, Order::STATUS_DRAFTED];
         } elseif ($value === 'App') {
-            $validStatuses = ['Pending', 'Preparing', 'Out for Delivery', 'Delivered', 'Cancelled', 'Refunded'];
+            $validStatuses = [Order::STATUS_PENDING, Order::STATUS_PREPARING, Order::STATUS_READY, Order::STATUS_HANDED_TO_RIDER, Order::STATUS_OUT_FOR_DELIVERY];
+        } elseif ($value === 'History') {
+            $validStatuses = [Order::STATUS_COMPLETED, Order::STATUS_CANCELLED, Order::STATUS_VOID, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED];
         }
 
         if ($value !== '' && !in_array($this->statusFilter, $validStatuses)) {
             $this->statusFilter = ''; 
         }
+    }
+
+    public function updatedStartDate()
+    {
+        $this->activeFilter = 'Custom Range';
+        $this->resetPage();
+    }
+
+    public function updatedEndDate()
+    {
+        $this->activeFilter = 'Custom Range';
+        $this->resetPage();
     }
 
     public function applyQuickDateFilter($range)
@@ -145,8 +160,26 @@ class OrderManagement extends Component
         $query = Order::with(['branch', 'user', 'items.product', 'customer']);
 
         // Filter by source
-        if (!empty($this->sourceFilter)) {
-            $query->where('source', $this->sourceFilter);
+        if ($this->sourceFilter === 'History') {
+            $query->whereIn('status', [
+                Order::STATUS_COMPLETED,
+                Order::STATUS_CANCELLED,
+                Order::STATUS_VOID,
+                Order::STATUS_REFUNDED,
+                Order::STATUS_PARTIALLY_REFUNDED
+            ]);
+        } else {
+            if (!empty($this->sourceFilter)) {
+                $query->where('source', $this->sourceFilter);
+            }
+            // Exclude history statuses from active tabs
+            $query->whereNotIn('status', [
+                Order::STATUS_COMPLETED,
+                Order::STATUS_CANCELLED,
+                Order::STATUS_VOID,
+                Order::STATUS_REFUNDED,
+                Order::STATUS_PARTIALLY_REFUNDED
+            ]);
         }
 
         // Search by reference number or customer
@@ -201,6 +234,15 @@ class OrderManagement extends Component
         $this->dispatchBrowserEvent('close-modal', 'refund-modal');
         $this->dispatchBrowserEvent('close-modal', 'confirm-void-order');
         $this->dispatchBrowserEvent('close-modal', 'receipt-modal');
+        $this->dispatchBrowserEvent('close-modal', 'reject-modal');
+    }
+
+    public function openRejectModal(Order $order)
+    {
+        if ($order->status !== Order::STATUS_PENDING) return;
+        $this->selectedOrder = $order;
+        $this->rejectReason = '';
+        $this->dispatchBrowserEvent('open-modal', 'reject-modal');
     }
 
     public function openRefundModal(Order $order)
@@ -412,24 +454,22 @@ class OrderManagement extends Component
         $this->dispatchBrowserEvent('notify', ['type' => 'info', 'message' => "Order #{$order->reference_no} cancelled."]);
     }
 
-    public function rejectOrder(Order $order)
+    public function rejectOrder()
     {
-        if ($order->status !== Order::STATUS_PENDING) return;
+        if (!$this->selectedOrder || $this->selectedOrder->status !== Order::STATUS_PENDING) return;
         
-        $order->update([
-            'status' => Order::STATUS_CANCELLED,
-            'notes' => ($order->notes ? $order->notes . "\n" : "") . "Rejected by branch staff."
-        ]);
+        $order = $this->selectedOrder;
+        $reason = trim($this->rejectReason) ?: "Rejected by branch staff.";
+
+        $order->reject($reason);
 
         // Refresh selected order if it's currently being viewed
         if ($this->selectedOrderId === $order->id) {
-            $this->selectedOrder = Order::with(['branch', 'user', 'items.product', 'customer', 'refundedBy', 'rider'])
-                ->find($order->id);
+            $this->selectedOrder = $order->fresh(['branch', 'user', 'items.product', 'customer', 'refundedBy', 'rider']);
         }
 
-        event(new OrderStatusUpdated($order));
-
         $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => "Order #{$order->reference_no} rejected."]);
+        $this->dispatchBrowserEvent('close-modal', 'reject-modal');
         $this->backToList();
     }
 
@@ -498,20 +538,39 @@ class OrderManagement extends Component
 
     public function render()
     {
+        $allStatuses = [
+            Order::STATUS_COMPLETED => 'Completed',
+            Order::STATUS_PENDING => 'Pending',
+            Order::STATUS_PREPARING => 'Preparing',
+            Order::STATUS_READY => 'Ready',
+            Order::STATUS_HANDED_TO_RIDER => 'Handed to Rider',
+            Order::STATUS_OUT_FOR_DELIVERY => 'Out for Delivery',
+            Order::STATUS_CANCELLED => 'Cancelled',
+            Order::STATUS_DRAFTED => 'Draft',
+            Order::STATUS_VOID => 'Voided',
+            Order::STATUS_REFUNDED => 'Refunded',
+            Order::STATUS_PARTIALLY_REFUNDED => 'Partially Refunded',
+        ];
+
+        $validStatuses = [];
+        if ($this->sourceFilter === 'POS') {
+            $validStatuses = [Order::STATUS_PENDING, Order::STATUS_DRAFTED];
+        } elseif ($this->sourceFilter === 'App') {
+            $validStatuses = [Order::STATUS_PENDING, Order::STATUS_PREPARING, Order::STATUS_READY, Order::STATUS_HANDED_TO_RIDER, Order::STATUS_OUT_FOR_DELIVERY];
+        } elseif ($this->sourceFilter === 'History') {
+            $validStatuses = [Order::STATUS_COMPLETED, Order::STATUS_CANCELLED, Order::STATUS_VOID, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED];
+        }
+
+        $filteredStatuses = [];
+        foreach ($validStatuses as $status) {
+            if (isset($allStatuses[$status])) {
+                $filteredStatuses[$status] = $allStatuses[$status];
+            }
+        }
+
         return view('livewire.order-management', [
             'orders' => $this->orders,
-            'statuses' => [
-                Order::STATUS_COMPLETED => 'Completed',
-                Order::STATUS_PENDING => 'Pending Approval',
-                Order::STATUS_PREPARING => 'Preparing',
-                Order::STATUS_HANDED_TO_RIDER => 'Handed to Rider',
-                Order::STATUS_OUT_FOR_DELIVERY => 'Out for Delivery',
-                Order::STATUS_CANCELLED => 'Cancelled',
-                Order::STATUS_DRAFTED => 'Draft',
-                Order::STATUS_VOID => 'Voided',
-                Order::STATUS_REFUNDED => 'Refunded',
-                Order::STATUS_PARTIALLY_REFUNDED => 'Partially Refunded',
-            ],
+            'statuses' => $filteredStatuses,
         ])->layout('layouts.app');
     }
 }

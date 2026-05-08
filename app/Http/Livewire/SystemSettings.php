@@ -213,7 +213,7 @@ class SystemSettings extends Component
 
     public function updatedBusinessPhone()
     {
-        $this->validateFieldLive('businessPhone', ['nullable', 'string', 'regex:/^[0-9]{10}$/'], ['businessPhone.regex' => 'Enter 10-digit mobile number.']);
+        $this->validateFieldLive('businessPhone', ['nullable', 'string', 'regex:~^[0-9]{10}$~'], ['businessPhone.regex' => 'Enter 10-digit mobile number.']);
     }
 
     public function updatedAddrStreet() { $this->validateFieldLive('addr_street', ['nullable', 'string', 'max:255'], ValidationHelper::commonMessages()); }
@@ -360,8 +360,8 @@ class SystemSettings extends Component
             'general' => [
                 'businessName'    => ['required', 'string', 'min:3', 'max:255', 'regex:' . ValidationHelper::REGEX_NAME_BASIC],
                 'businessEmail'   => ValidationHelper::rulesEmail(),
-                'businessPhone'   => ['nullable', 'string', 'regex:/^[0-9]{10}$/'],
-                'businessTin'     => ['nullable', 'regex:/^\d{3}-\d{3}-\d{3}-\d{3}$/'],
+                'businessPhone'   => ['nullable', 'string', 'regex:~^[0-9]{10}$~'],
+                'businessTin'     => ['nullable', 'regex:~^\d{3}-\d{3}-\d{3}-\d{3}$~'],
                 'addr_region'     => ['nullable', 'string'],
                 'addr_province'   => ['nullable', 'string'],
                 'addr_city'       => ['nullable', 'string'],

@@ -29,6 +29,7 @@ class StockMovement extends Model
 
     protected $casts = [
         'batch_data' => 'array',
+        'expiry_date' => 'date',
     ];
 
     public function branch()

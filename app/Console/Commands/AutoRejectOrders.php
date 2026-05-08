@@ -39,12 +39,7 @@ class AutoRejectOrders extends Command
         $count = $orders->count();
 
         foreach ($orders as $order) {
-            $order->update([
-                'status' => Order::STATUS_CANCELLED,
-                'notes' => ($order->notes ? $order->notes . "\n" : "") . "Automatically rejected: Not accepted within 1 hour."
-            ]);
-
-            event(new OrderStatusUpdated($order));
+            $order->reject("Automatically rejected: Not accepted within 1 hour.");
         }
 
         if ($count > 0) {

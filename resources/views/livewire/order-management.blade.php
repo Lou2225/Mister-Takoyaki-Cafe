@@ -30,6 +30,7 @@
                 @foreach([
                     'App' => ['Delivery Orders', 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9-4v4m4-4v4', 'text-blue-600'],
                     'POS' => ['POS Orders', 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z', 'text-amber-600'],
+                    'History' => ['Order History', 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', 'text-emerald-600'],
                 ] as $val => $info)
                     <x-sliding-tab model="sourceFilter" value="{{ $val }}" @click="$wire.set('statusFilter', '')">
                         <x-slot name="icon">
@@ -142,6 +143,10 @@
                     {{-- Quick Date Dropdown --}}
                     <x-quick-date-filter :activeFilter="$activeFilter" class="shadow-none border-slate-200" />
 
+                    @if($sourceFilter === 'History')
+                        <x-date-range-filter startModel="startDate" endModel="endDate" :startValue="$startDate" :endValue="$endDate" class="h-9 border-slate-200 shadow-none bg-slate-50/50" />
+                    @endif
+
                     {{-- macOS Divider --}}
                     <div class="hidden lg:block w-px h-6 bg-slate-200 mx-1"></div>
 
@@ -175,7 +180,7 @@
         {{-- ── Order Detail Side Panel ── --}}
         <x-side-panel name="view-order-detail" width="max-w-md">
             @if($selectedOrder)
-                <div class="flex flex-col h-full bg-white">
+                <div class="flex flex-col h-full bg-white" x-data="{ currentTab: 'summary' }" @update-active-tab.window="currentTab = $event.detail.activeTab">
                     {{-- Premium Header --}}
                     <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/40">
                         <div class="flex items-center gap-3">
@@ -192,9 +197,22 @@
                         </button>
                     </div>
 
+                    {{-- Tabs Navigation --}}
+                    <div class="px-6 border-b border-slate-100 bg-white">
+                        <div class="flex gap-6">
+                            <button @click="currentTab = 'summary'" class="py-3 text-[13px] font-bold border-b-2 transition-colors" :class="currentTab === 'summary' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'">
+                                Summary
+                            </button>
+                            <button @click="currentTab = 'activity'" class="py-3 text-[13px] font-bold border-b-2 transition-colors" :class="currentTab === 'activity' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'">
+                                Order History
+                            </button>
+                        </div>
+                    </div>
+
                     {{-- Content Area --}}
-                    <div class="flex-1 overflow-y-auto custom-scrollbar">
-                        {{-- Transaction Context Section --}}
+                    <div class="flex-1 overflow-y-auto custom-scrollbar relative">
+                        <div x-show="currentTab === 'summary'">
+                            {{-- Transaction Context Section --}}
                         <div class="p-6 bg-gradient-to-b from-slate-50/80 to-white border-b border-slate-50">
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
@@ -331,19 +349,86 @@
                                 @endif
                             </div>
                         </div>
+                        </div>
+
+                        <div x-show="currentTab === 'activity'" style="display: none;">
+                            <div class="p-6">
+                                <h5 class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-6">Activity Timeline</h5>
+                                <div class="space-y-6 relative">
+                                    {{-- Vertical line --}}
+                                    <div class="absolute left-[15px] top-2 bottom-2 w-[2px] bg-slate-100 rounded-full"></div>
+
+                                    @php
+                                        $timeline = collect([
+                                            ['label' => 'Order Placed', 'time' => $selectedOrder->created_at, 'icon' => 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'slate'],
+                                        ]);
+
+                                        if ($selectedOrder->accepted_at) {
+                                            $timeline->push(['label' => 'Order Accepted', 'time' => $selectedOrder->accepted_at, 'icon' => 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'blue']);
+                                        }
+
+                                        if ($selectedOrder->prepared_at) {
+                                            $timeline->push(['label' => 'Order Prepared', 'time' => $selectedOrder->prepared_at, 'icon' => 'M5 13l4 4L19 7', 'color' => 'indigo']);
+                                        }
+
+                                        if ($selectedOrder->dispatched_at) {
+                                            $timeline->push(['label' => 'Dispatched to Rider', 'time' => $selectedOrder->dispatched_at, 'icon' => 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'amber']);
+                                        }
+
+                                        if ($selectedOrder->delivered_at) {
+                                            $timeline->push(['label' => 'Order Delivered/Completed', 'time' => $selectedOrder->delivered_at, 'icon' => 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'emerald']);
+                                        } elseif ($selectedOrder->status === 'Completed') {
+                                            $timeline->push(['label' => 'Order Completed', 'time' => $selectedOrder->updated_at, 'icon' => 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'emerald']);
+                                        }
+
+                                        if ($selectedOrder->refunded_at) {
+                                            $timeline->push(['label' => 'Order Refunded/Voided', 'time' => $selectedOrder->refunded_at, 'icon' => 'M6 18L18 6M6 6l12 12', 'color' => 'red', 'desc' => $selectedOrder->refund_reason]);
+                                        } else if (in_array($selectedOrder->status, ['Cancelled', 'Void'])) {
+                                            $timeline->push(['label' => 'Order ' . $selectedOrder->status, 'time' => $selectedOrder->updated_at, 'icon' => 'M6 18L18 6M6 6l12 12', 'color' => 'red', 'desc' => $selectedOrder->notes]);
+                                        }
+
+                                        $timeline = $timeline->sortByDesc('time')->values();
+                                    @endphp
+
+                                    @foreach($timeline as $index => $event)
+                                        <div class="relative pl-10 group">
+                                            {{-- Icon Dot --}}
+                                            <div class="absolute left-0 top-[2px] w-8 h-8 rounded-full bg-{{ $event['color'] }}-50 flex items-center justify-center border-4 border-white z-10 shadow-sm">
+                                                <svg class="w-3.5 h-3.5 text-{{ $event['color'] }}-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="{{ $event['icon'] }}"/></svg>
+                                            </div>
+                                            
+                                            <div class="flex justify-between items-start pt-1">
+                                                <div>
+                                                    <p class="text-[13px] font-bold text-slate-900 leading-tight">{{ $event['label'] }}</p>
+                                                    @if(isset($event['desc']) && $event['desc'])
+                                                        <p class="text-[11px] text-slate-500 mt-0.5 max-w-[200px]">{{ $event['desc'] }}</p>
+                                                    @endif
+                                                </div>
+                                                <div class="text-right">
+                                                    <span class="block text-[11px] font-bold text-slate-700">{{ $event['time']->format('M d, Y') }}</span>
+                                                    <span class="block text-[10px] text-slate-400">{{ $event['time']->format('h:i A') }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     {{-- Action Footer --}}
-                    <div class="p-5 border-t border-slate-100 bg-white grid grid-cols-2 gap-2">
+                    <div class="p-5 border-t border-slate-100 bg-white grid grid-cols-2 gap-2" x-show="currentTab === 'summary'">
                         @if($selectedOrder->source === 'App')
                             @if($selectedOrder->status === 'Pending')
                                 <x-primary-button wire:click="acceptOrder({{ $selectedOrder->id }})" class="col-span-2 h-10 justify-center">
                                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                     Accept Order
                                 </x-primary-button>
-                                <x-secondary-button wire:click="rejectOrder({{ $selectedOrder->id }})" class="col-span-2 h-10 justify-center text-red-600 border-red-200">
-                                    Reject Order
-                                </x-secondary-button>
+                                @if($selectedOrder->created_at->diffInHours(now()) <= 24)
+                                    <x-secondary-button wire:click="openRejectModal({{ $selectedOrder->id }})" class="col-span-2 h-10 justify-center text-red-600 border-red-200">
+                                        Reject Order
+                                    </x-secondary-button>
+                                @endif
                             @elseif($selectedOrder->status === 'Preparing')
                                 <x-primary-button wire:click="openHandToRiderModal({{ $selectedOrder->id }})" class="col-span-2 h-10 justify-center bg-indigo-600 hover:bg-indigo-700">
                                     Hand to Rider
@@ -352,10 +437,22 @@
                                     Out for Delivery
                                 </x-secondary-button>
                             @elseif(in_array($selectedOrder->status, ['Handed to Rider', 'Out for Delivery']))
-                                <x-primary-button wire:click="markAsDelivered({{ $selectedOrder->id }})" class="col-span-2 h-10 justify-center">
-                                    Mark as Completed
+                                <x-primary-button wire:click="markAsDelivered({{ $selectedOrder->id }})" class="col-span-2 h-10 justify-center bg-emerald-600 hover:bg-emerald-700">
+                                    Mark as Delivered
                                 </x-primary-button>
                             @endif
+                        @endif
+
+                        {{-- Universal Actions --}}
+                        @if($selectedOrder->canBeRefunded())
+                            <x-danger-button wire:click="openRefundModal({{ $selectedOrder->id }})" class="col-span-1 h-10 justify-center text-red-600 bg-red-50 hover:bg-red-100 border-red-200">
+                                Refund
+                            </x-danger-button>
+                        @endif
+                        @if($selectedOrder->canBeVoided())
+                            <x-danger-button wire:click="openVoidModal({{ $selectedOrder->id }})" class="col-span-1 h-10 justify-center text-red-600 bg-red-50 hover:bg-red-100 border-red-200">
+                                Void Order
+                            </x-danger-button>
                         @endif
 
                         @if($selectedOrder->source === 'POS')
@@ -440,6 +537,47 @@
     </div>
 </x-modal>
 
+{{-- Reject Modal --}}
+<x-modal name="reject-modal" maxWidth="sm" focusable>
+    <div class="h-1 w-full bg-gradient-to-r from-red-400 to-rose-500 rounded-t-lg"></div>
+    <div class="p-6">
+        <div class="flex items-start gap-4 mb-4">
+            <div class="flex-shrink-0 w-10 h-10 rounded-full bg-red-50 border border-red-100 flex items-center justify-center text-red-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div>
+                <h3 class="text-[15px] font-bold text-gray-900">Reject Order</h3>
+                <p class="mt-1 text-[12px] text-gray-500">Provide a reason for rejection</p>
+            </div>
+        </div>
+
+        @if($selectedOrder)
+            <div class="space-y-4">
+                <div class="bg-red-50 border border-red-100 rounded-xl p-3">
+                    <p class="text-[12px] text-red-900 font-medium">
+                        Are you sure you want to reject <strong>Order #{{ $selectedOrder->reference_no }}</strong>? The customer will be notified.
+                    </p>
+                </div>
+
+                <div>
+                    <x-input-label for="reject_reason" value="Reason for Rejection (Optional)" />
+                    <textarea id="reject_reason" wire:model.defer="rejectReason" rows="2" placeholder="e.g., Out of stock, branch closing..."
+                        class="mt-1.5 block w-full border border-gray-200 rounded-xl px-3 py-2 text-[13px] focus:border-red-300 focus:ring-0 resize-none transition-all"></textarea>
+                </div>
+            </div>
+        @endif
+
+        <div class="flex items-center justify-end gap-2 px-6 py-4 bg-gray-50 text-right -mx-6 -mb-6 mt-6 rounded-b-lg border-t border-gray-100">
+            <x-secondary-button @click="$dispatch('close-modal', 'reject-modal')" wire:click="$set('rejectReason', '')" class="h-11">
+                Cancel
+            </x-secondary-button>
+            <x-danger-button wire:click="rejectOrder" class="h-11">
+                Reject Order
+            </x-danger-button>
+        </div>
+    </div>
+</x-modal>
+
 {{-- Void Modal --}}
 <x-modal name="confirm-void-order" maxWidth="sm" focusable>
     <div class="h-1 w-full bg-gradient-to-r from-rose-400 to-red-500 rounded-t-lg"></div>
@@ -491,53 +629,110 @@
         </div>
 
         @if($selectedOrder)
-            <div class="bg-gray-50 rounded-xl p-4 space-y-3 mb-4 text-[12px] border border-gray-100">
-                <div class="text-center border-b border-gray-200 pb-3">
-                    <h3 class="text-[13px] font-black text-gray-900 uppercase tracking-widest">MISTER TAKOYAKI CAFE</h3>
-                    <p class="text-[10px] text-gray-500 mt-1 font-bold">{{ $selectedOrder->branch->branch_name ?? 'Branch' }}</p>
-                </div>
+            <div class="flex justify-center bg-gray-50 rounded-xl p-6 border border-gray-100 shadow-inner overflow-hidden mb-4">
+                <div class="w-full max-w-[260px] bg-white shadow-md p-4 pt-6 pb-8 font-mono text-[10px] text-gray-800 relative receipt-paper border border-gray-100">
+                    @php
+                        $logoUrl = \App\Models\SystemSetting::get('business_logo') ? Storage::url(\App\Models\SystemSetting::get('business_logo')) : null;
+                        $businessName = \App\Models\SystemSetting::get('business_name', 'Mister Takoyaki Cafe');
+                        $footer = \App\Models\SystemSetting::get('receipt_footer_message', 'Thank you for your visit!');
+                        $logoEnabled = \App\Models\SystemSetting::get('receipt_logo_enabled', true);
+                    @endphp
 
-                <div class="space-y-1.5 text-[11px]">
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Receipt #:</span>
-                        <span class="font-bold">#{{ $selectedOrder->reference_no }}</span>
+                    <div class="text-center mb-4">
+                        @if($logoEnabled)
+                            <div class="mb-2 flex justify-center">
+                                @if($logoUrl)
+                                    <img src="{{ $logoUrl }}" class="w-10 h-10 object-contain">
+                                @else
+                                    <div class="w-8 h-8 bg-black rounded flex items-center justify-center text-white font-bold text-sm">
+                                        <span>MTC</span>
+                                    </div>
+                                @endif
+                            </div>
+                        @endif
+                        <p class="font-bold text-[11px]">{{ $businessName }}</p>
                     </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-600">Date:</span>
-                        <span class="font-bold">{{ $selectedOrder->created_at->format('M d, Y H:i') }}</span>
-                    </div>
-                </div>
 
-                <div class="border-t border-b border-gray-200 py-2">
-                    @forelse($selectedOrder->items as $item)
-                        <div class="flex justify-between text-[10px] py-1">
-                            <span class="font-medium">{{ substr($item->product->name ?? 'Item', 0, 25) }} x{{ $item->quantity }}</span>
-                            <span class="font-bold text-gray-900">₱{{ number_format($item->quantity * $item->unit_price, 2) }}</span>
+                    <div class="border-y border-dashed border-gray-200 py-1.5 mb-3 space-y-0.5 text-[9px]">
+                        <div class="flex justify-between"><span>#{{ $selectedOrder->reference_no }}</span><span>{{ $selectedOrder->created_at->format('d/m/y H:i') }}</span></div>
+                        <div class="flex justify-between font-bold" style="font-size:9px; margin-top:4px;">
+                            <span style="text-transform:uppercase; letter-spacing:0.05em;">⬛ {{ strtoupper($selectedOrder->order_type ?? 'DINE-IN') }}</span>
                         </div>
-                    @empty
-                        <p class="text-[10px] text-gray-500 py-1 italic text-center">No items</p>
-                    @endforelse
-                </div>
+                        
+                        @if($selectedOrder->source === 'App' || ($selectedOrder->order_type ?? '') === 'Delivery')
+                            <div class="mt-2 pt-2 border-t border-gray-100 flex flex-col gap-0.5">
+                                <span class="font-bold">Customer: {{ $selectedOrder->customer_name ?? 'N/A' }}</span>
+                                <span>Phone: {{ $selectedOrder->customer_phone ?? 'N/A' }}</span>
+                                <span class="whitespace-normal leading-tight">Address: {{ $selectedOrder->delivery_address ?? 'N/A' }}</span>
+                            </div>
+                        @endif
+                    </div>
 
-                <div class="space-y-1 text-[11px]">
-                    @if($selectedOrder->discount_amount > 0)
+                    <div class="space-y-1 mb-3">
+                        @forelse($selectedOrder->items as $item)
+                            <div class="flex justify-between items-start">
+                                <span class="flex-1 pr-2 leading-tight">{{ $item->quantity }}x {{ $item->product->name ?? 'Item' }}</span>
+                                <span class="whitespace-nowrap">₱{{ number_format($item->quantity * $item->unit_price, 2) }}</span>
+                            </div>
+                            @if($item->options && $item->options->isNotEmpty())
+                                @foreach($item->options as $opt)
+                                    <div class="flex justify-between text-[8px] text-gray-500 pl-3 leading-tight">
+                                        <span>+ {{ $opt->option->name ?? 'N/A' }}</span>
+                                    </div>
+                                @endforeach
+                            @endif
+                        @empty
+                            <div class="text-center italic">No items</div>
+                        @endforelse
+                    </div>
+
+                    <div class="border-t border-dashed border-gray-200 pt-1.5 mb-3 space-y-0.5">
                         <div class="flex justify-between">
-                            <span class="text-gray-600">Discount:</span>
-                            <span class="text-emerald-600 font-bold">-₱{{ number_format($selectedOrder->discount_amount, 2) }}</span>
+                            <span>Subtotal</span>
+                            <span>₱{{ number_format($selectedOrder->total_amount - $selectedOrder->delivery_fee + $selectedOrder->discount_amount, 2) }}</span>
+                        </div>
+
+                        @if($selectedOrder->discount_amount > 0)
+                            <div class="flex justify-between text-[9px] text-gray-500">
+                                <span>Discount</span>
+                                <span>-₱{{ number_format($selectedOrder->discount_amount, 2) }}</span>
+                            </div>
+                        @endif
+
+                        @if($selectedOrder->delivery_fee > 0)
+                            <div class="flex justify-between text-[9px] text-gray-500">
+                                <span>Delivery Fee</span>
+                                <span>₱{{ number_format($selectedOrder->delivery_fee, 2) }}</span>
+                            </div>
+                        @endif
+
+                        <div class="flex justify-between font-bold text-[10px] pt-1 mt-1 border-t border-gray-100">
+                            <span>TOTAL</span>
+                            <span>₱{{ number_format($selectedOrder->total_amount, 2) }}</span>
+                        </div>
+                    </div>
+
+                    @if($selectedOrder->refunded_amount > 0)
+                        <div class="text-center font-bold text-[9px] mb-3 mt-1 py-1 border-y border-dashed border-gray-200 uppercase text-gray-900">
+                            Refunded: ₱{{ number_format($selectedOrder->refunded_amount, 2) }}
                         </div>
                     @endif
 
-                    <div class="flex justify-between font-black border-t border-gray-300 pt-2 text-[13px] text-gray-900">
-                        <span>TOTAL:</span>
-                        <span>₱{{ number_format($selectedOrder->total_amount, 2) }}</span>
+                    <div class="text-center mt-4">
+                        <p class="font-bold italic text-gray-700 text-[8px] mb-2">{{ $footer }}</p>
+                        @php
+                            $qrCodeSvg = \App\Helpers\QrCodeHelper::generateReviewQrCode($selectedOrder->id);
+                        @endphp
+                        @if($qrCodeSvg)
+                            <div class="mt-2 pt-2 border-t border-gray-200">
+                                <p class="text-[7px] text-gray-600 mb-1">Scan to Review:</p>
+                                <div class="bg-white p-1 inline-block border border-gray-300 mx-auto">
+                                    <img src="{{ $qrCodeSvg }}" alt="Review QR Code" class="w-16 h-16 block">
+                                </div>
+                            </div>
+                        @endif
                     </div>
                 </div>
-
-                @if($selectedOrder->refunded_amount > 0)
-                    <div class="bg-red-50 border border-red-100 rounded-lg p-2 text-center text-[10px] text-red-700 font-black uppercase tracking-wider">
-                        ⚠ Refunded: ₱{{ number_format($selectedOrder->refunded_amount, 2) }}
-                    </div>
-                @endif
             </div>
         @endif
 
