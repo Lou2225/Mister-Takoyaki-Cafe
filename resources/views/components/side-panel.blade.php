@@ -6,8 +6,8 @@
 
 <div
     x-data="{ 
-        @if($attributes->has('wire:model'))
-            show: @entangle($attributes->wire('model')),
+        @if($attributes->has('wire:model.live'))
+            show: @entangle($attributes->wire('model')).live,
         @else
             show: @js($show),
         @endif

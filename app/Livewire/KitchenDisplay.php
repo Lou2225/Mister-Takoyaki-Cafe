@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Livewire;
 
 use Livewire\Component;
 use App\Models\Order;
@@ -51,14 +51,14 @@ class KitchenDisplay extends Component
 
     public function updateHeader()
     {
-        $this->emit('setHeader', [
-            'icon' => 'M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4',
-            'title' => 'Kitchen Display',
-            'breadcrumbs' => [
+        $this->dispatch('setHeader', 
+            icon: 'M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4',
+            title: 'Kitchen Display',
+            breadcrumbs: [
                 ['label' => 'Operations', 'url' => '#'],
                 ['label' => 'KDS', 'url' => route('kds.index')],
             ]
-        ]);
+        );
     }
 
     public function getKdsStatsProperty()
@@ -113,9 +113,9 @@ class KitchenDisplay extends Component
         try {
             $order = Order::findOrFail($orderId);
             $order->updateStatus(Order::STATUS_PREPARING);
-            $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => "Order #{$order->reference_no} accepted."]);
+            $this->dispatch('notify', type: 'success', message: "Order #{$order->reference_no} accepted.");
         } catch (\Exception $e) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => "Failed to accept order: " . $e->getMessage()]);
+            $this->dispatch('notify', type: 'error', message: "Failed to accept order: " . $e->getMessage());
         }
     }
 
@@ -124,9 +124,9 @@ class KitchenDisplay extends Component
         try {
             $order = Order::findOrFail($orderId);
             $order->updateStatus(Order::STATUS_READY);
-            $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => "Order #{$order->reference_no} is ready!"]);
+            $this->dispatch('notify', type: 'success', message: "Order #{$order->reference_no} is ready!");
         } catch (\Exception $e) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => "Error: " . $e->getMessage()]);
+            $this->dispatch('notify', type: 'error', message: "Error: " . $e->getMessage());
         }
     }
 
@@ -141,14 +141,14 @@ class KitchenDisplay extends Component
                 $this->selectedOrderForDelivery = $order->id;
                 $this->availableRiders = $this->getAvailableRidersForBranch();
                 $this->showRiderModal = true;
-                $this->dispatchBrowserEvent('open-modal', 'assign-rider-modal');
+                $this->dispatch('open-modal', 'assign-rider-modal');
             } else {
                 $order->updateStatus(Order::STATUS_COMPLETED);
                 $msg = "Order #{$order->reference_no} served.";
-                $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => $msg]);
+                $this->dispatch('notify', type: 'success', message: $msg);
             }
         } catch (\Exception $e) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => "Error: " . $e->getMessage()]);
+            $this->dispatch('notify', type: 'error', message: "Error: " . $e->getMessage());
         }
     }
 
@@ -206,7 +206,7 @@ class KitchenDisplay extends Component
                 'message' => "Order #{$order->reference_no} assigned to {$riderName} and ready for delivery."
             ]);
         } catch (\Exception $e) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => "Error: " . $e->getMessage()]);
+            $this->dispatch('notify', type: 'error', message: "Error: " . $e->getMessage());
         }
     }
 
@@ -219,7 +219,7 @@ class KitchenDisplay extends Component
         $this->selectedOrderForDelivery = null;
         $this->availableRiders = [];
         $this->selectedRiderId = null;
-        $this->dispatchBrowserEvent('close-modal', 'assign-rider-modal');
+        $this->dispatch('close-modal', 'assign-rider-modal');
     }
 
     public function render()

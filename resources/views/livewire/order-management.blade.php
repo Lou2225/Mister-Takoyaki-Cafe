@@ -8,7 +8,7 @@
 
 <div 
     x-data="{ 
-        sourceFilter: @entangle('sourceFilter'),
+        sourceFilter: @entangle('sourceFilter').live,
         ...slidingTabs(@js($sourceFilter ?: 'App'), 'sourceFilter') 
     }"
     class="relative overflow-hidden">
@@ -180,7 +180,7 @@
         {{-- ── Order Detail Side Panel ── --}}
         <x-side-panel name="view-order-detail" width="max-w-md">
             @if($selectedOrder)
-                <div class="flex flex-col h-full bg-white" x-data="{ currentTab: 'summary' }" @update-active-tab.window="currentTab = $event.detail.activeTab">
+                <div class="flex flex-col h-full bg-white" x-data="slidingTabs('summary', 'currentTab')" @update-active-tab.window="currentTab = $event.detail.activeTab">
                     {{-- Premium Header --}}
                     <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/40">
                         <div class="flex items-center gap-3">
@@ -198,15 +198,11 @@
                     </div>
 
                     {{-- Tabs Navigation --}}
-                    <div class="px-6 border-b border-slate-100 bg-white">
-                        <div class="flex gap-6">
-                            <button @click="currentTab = 'summary'" class="py-3 text-[13px] font-bold border-b-2 transition-colors" :class="currentTab === 'summary' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'">
-                                Summary
-                            </button>
-                            <button @click="currentTab = 'activity'" class="py-3 text-[13px] font-bold border-b-2 transition-colors" :class="currentTab === 'activity' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'">
-                                Order History
-                            </button>
-                        </div>
+                    <div class="px-6 bg-white">
+                        <x-sliding-tabs model="currentTab">
+                            <x-sliding-tab value="summary" model="currentTab">Summary</x-sliding-tab>
+                            <x-sliding-tab value="activity" model="currentTab">Order History</x-sliding-tab>
+                        </x-sliding-tabs>
                     </div>
 
                     {{-- Content Area --}}
@@ -561,7 +557,7 @@
 
                 <div>
                     <x-input-label for="reject_reason" value="Reason for Rejection (Optional)" />
-                    <textarea id="reject_reason" wire:model.defer="rejectReason" rows="2" placeholder="e.g., Out of stock, branch closing..."
+                    <textarea id="reject_reason" wire:model="rejectReason" rows="2" placeholder="e.g., Out of stock, branch closing..."
                         class="mt-1.5 block w-full border border-gray-200 rounded-xl px-3 py-2 text-[13px] focus:border-red-300 focus:ring-0 resize-none transition-all"></textarea>
                 </div>
             </div>

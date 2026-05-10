@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Livewire;
 
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -24,6 +24,10 @@ class UserManagement extends Component
     public $is_active = '';
     public $view = 'table';
     public $perPage = 5;
+
+    protected $listeners = [
+        'refreshTopbar' => '$refresh',
+    ];
 
     // ── Panel state is managed in Alpine via browser events ─────
     // Livewire fires 'switch-panel' after data is ready.
@@ -60,6 +64,7 @@ class UserManagement extends Component
     public $skipValidation = false;
     public $deleteTargetId = null;
     public $deleteTargetName = '';
+    public ?array $editUserAvatar = null;
 
     // ── User History Dashboard State ──────────────────────────────
     public $historyTab = 'overview';
@@ -154,7 +159,7 @@ class UserManagement extends Component
         $this->mode = 'create';
         $this->resetForm();
         $this->updateGlobalHeader('create');
-        $this->dispatchBrowserEvent('switch-panel', ['panel' => 'form', 'mode' => 'create']);
+        $this->dispatch('switch-panel', panel: 'form', mode: 'create');
     }
 
     // ── Show edit form ────────────────────────────────────────────
@@ -184,6 +189,13 @@ class UserManagement extends Component
         $this->password = '';
         $this->passwordConfirm = '';
 
+        // Load avatar display data
+        $this->editUserAvatar = null;
+        if ($user->avatar) {
+            $all = collect(\App\Livewire\ProfileSettings::avatarCollection())->flatten(1);
+            $this->editUserAvatar = $all->firstWhere('id', $user->avatar);
+        }
+
         // Decode stored JSON address if exists
         $addr = json_decode($user->address, true);
         if (is_array($addr)) {
@@ -203,7 +215,7 @@ class UserManagement extends Component
         $this->resetValidation();
 
         $this->updateGlobalHeader($mode);
-        $this->dispatchBrowserEvent('switch-panel', ['panel' => 'form', 'mode' => $mode]);
+        $this->dispatch('switch-panel', panel: 'form', mode: $mode);
     }
 
     // ── History Computed Properties ───────────────────────────────
@@ -290,7 +302,7 @@ class UserManagement extends Component
     public function viewOrder($orderId)
     {
         $this->viewingOrder = Order::with(['items.product', 'items.options.option', 'branch', 'rider', 'user'])->findOrFail($orderId);
-        $this->dispatchBrowserEvent('open-modal', ['name' => 'view-order-detail']);
+        $this->dispatch('open-modal', name: 'view-order-detail');
     }
 
     public function closeOrder()
@@ -351,7 +363,7 @@ class UserManagement extends Component
         $this->mode = 'list';
         $this->resetForm();
         $this->updateGlobalHeader('list');
-        $this->dispatchBrowserEvent('switch-panel', ['panel' => 'list', 'mode' => 'list']);
+        $this->dispatch('switch-panel', panel: 'list', mode: 'list');
     }
 
     public function validateBeforeSaveUser()
@@ -437,7 +449,7 @@ class UserManagement extends Component
             if ($branch && $branch->user_id) {
                 $this->conflictingManagerName = $branch->manager->first_name . ' ' . $branch->manager->last_name;
                 // Standardize: always dispatch as object for robust event handling
-                $this->dispatchBrowserEvent('open-modal', ['name' => 'confirm-manager-replace']);
+                $this->dispatch('open-modal', name: 'confirm-manager-replace');
                 return;
             }
         }
@@ -505,8 +517,8 @@ class UserManagement extends Component
         }
 
         $message = 'User created successfully.';
-        $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => $message]);
-        $this->dispatchBrowserEvent('send-email-bg', ['userId' => $user->id, 'password' => $plainPassword]);
+        $this->dispatch('notify', type: 'success', message: $message);
+        $this->dispatch('send-email-bg', userId: $user->id, password: $plainPassword);
         
         // Modal will be closed by toast component after displaying the notification
         $this->backToList();
@@ -520,10 +532,10 @@ class UserManagement extends Component
         try {
             \Illuminate\Support\Facades\Mail::to($user->email)
                 ->send(new \App\Mail\UserCredentialsMail($user, $password));
-            $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => 'Credentials emailed to ' . $user->email]);
+            $this->dispatch('notify', type: 'success', message: 'Credentials emailed to ' . $user->email);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Failed to send credential email: ' . $e->getMessage());
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => 'Failed to send credentials. Please check logs.']);
+            $this->dispatch('notify', type: 'error', message: 'Failed to send credentials. Please check logs.');
         }
     }
 
@@ -571,7 +583,7 @@ class UserManagement extends Component
             $branch = Branch::with('manager')->find($this->formBranchId);
             if ($branch && $branch->user_id && $branch->user_id != $user->id) {
                 $this->conflictingManagerName = $branch->manager->first_name . ' ' . $branch->manager->last_name;
-                $this->dispatchBrowserEvent('open-modal', ['name' => 'confirm-manager-replace']);
+                $this->dispatch('open-modal', name: 'confirm-manager-replace');
                 return;
             }
         }
@@ -650,7 +662,7 @@ class UserManagement extends Component
             }
         }
 
-        $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => 'User updated successfully.']);
+        $this->dispatch('notify', type: 'success', message: 'User updated successfully.');
         // Modal will be closed by toast component after displaying the notification
         // Return to list after successful update
         $this->backToList();
@@ -675,7 +687,7 @@ class UserManagement extends Component
         $user->is_active = !$user->is_active;
         $user->save();
 
-        $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => 'Status for ' . $user->first_name . ' updated successfully.']);
+        $this->dispatch('notify', type: 'success', message: 'Status for ' . $user->first_name . ' updated successfully.');
     }
 
     // ── Delete ────────────────────────────────────────────────────
@@ -688,7 +700,7 @@ class UserManagement extends Component
         $this->deleteTargetId = null;
         $this->deleteTargetName = '';
         
-        $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => 'User deleted successfully.']);
+        $this->dispatch('notify', type: 'success', message: 'User deleted successfully.');
         $this->backToList();
     }
 
@@ -696,7 +708,7 @@ class UserManagement extends Component
     {
         $this->deleteTargetId = $id;
         $this->deleteTargetName = $name;
-        $this->dispatchBrowserEvent('open-modal', ['name' => 'delete-user']);
+        $this->dispatch('open-modal', name: 'delete-user');
     }
 
     // ── Reset form fields ─────────────────────────────────────────
@@ -719,11 +731,11 @@ class UserManagement extends Component
             $title = 'View Customer Profile';
         }
 
-        $this->emit('setHeader', [
-            'icon' => 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
-            'title' => $title,
-            'breadcrumbs' => $breadcrumbs
-        ]);
+        $this->dispatch('setHeader', 
+            icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
+            title: $title,
+            breadcrumbs: $breadcrumbs
+        );
     }
 
     public function resetForm()

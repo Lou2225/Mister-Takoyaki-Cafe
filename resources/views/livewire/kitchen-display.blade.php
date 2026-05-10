@@ -318,7 +318,7 @@
     <script>
     document.addEventListener('alpine:init', () => {
         Alpine.data('kdsDisplay', (tab) => {
-            const tabs = window.createTabComponent({ activeTab: tab }, 'activeTab');
+            const tabs = window.slidingTabs({ activeTab: tab }, 'activeTab');
             return {
                 ...tabs,
                 _int: null,

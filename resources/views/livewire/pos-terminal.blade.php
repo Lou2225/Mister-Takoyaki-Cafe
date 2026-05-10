@@ -12,7 +12,7 @@
                 id="category-sortable-tabs"
                 class="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-1 min-w-0"
                 x-data="{ 
-                    isEditMode: @entangle('isEditMode'),
+                    isEditMode: @entangle('isEditMode').live,
                     sortable: null,
                     setup() {
                         if (!this.isEditMode) {
@@ -76,7 +76,7 @@
                         </svg>
                     </div>
                     <label for="pos_search" class="sr-only">Search Menu</label>
-                    <input id="pos_search" wire:model="search" type="text" placeholder="Search Menu"
+                    <input id="pos_search" wire:model.live="search" type="text" placeholder="Search Menu"
                         class="pl-8 pr-3 py-1.5 w-36 text-[12px] font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:border-gray-300 placeholder-gray-400 transition-all focus:w-44">
                 </div>
 
@@ -127,7 +127,7 @@
                     id="product-sortable-grid"
                     wire:key="pos-grid-{{ $selectedCategoryId ?? 'all' }}-{{ $search }}-{{ $isEditMode ? 'edit' : 'view' }}"
                     x-data="{ 
-                        isEditMode: @entangle('isEditMode'),
+                        isEditMode: @entangle('isEditMode').live,
                         sortable: null,
                         setup() {
                             if (!this.isEditMode) {
@@ -391,7 +391,7 @@
                         {{-- Table input — dynamic, not hardcoded --}}
                         <div class="flex items-center justify-between">
                             <span class="text-[12px] text-gray-500">Table / Ref</span>
-                            <input type="text" wire:model.debounce.400ms="tableNumber" placeholder="Table #"
+                            <input type="text" wire:model.live.debounce.400ms="tableNumber" placeholder="Table #"
                                 inputFilter="name_basic"
                                 class="text-[12px] font-bold text-gray-800 bg-transparent border-0 p-0 focus:ring-0 text-right w-24 placeholder-gray-300 {{ $errors->has('tableNumber') ? 'text-red-500 placeholder-red-300' : '' }}">
                         </div>
@@ -514,7 +514,7 @@
                             @endphp
                             <label class="flex items-center justify-between p-4 rounded-lg border border-gray-200 cursor-pointer transition-all hover:bg-gray-50 hover:border-gray-300 {{ $isModOutOfStock ? 'opacity-50 cursor-not-allowed bg-gray-50' : '' }}">
                                 <div class="flex items-center gap-3">
-                                    <input type="checkbox" wire:model="selectedModifierIds" value="{{ $m->id }}" {{ $isModOutOfStock ? 'disabled' : '' }}
+                                    <input type="checkbox" wire:model.live="selectedModifierIds" value="{{ $m->id }}" {{ $isModOutOfStock ? 'disabled' : '' }}
                                         class="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
                                     <div>
                                         <span class="text-[13px] font-semibold text-gray-800">{{ $m->name }}</span>
@@ -651,7 +651,7 @@
                         <div class="space-y-4">
                             <div>
                                 <x-input-label for="pos_amount_tendered" class="text-[11px] font-semibold text-gray-600 uppercase tracking-wide mb-2 block">Amount Tendered</x-input-label>
-                                <x-text-input id="pos_amount_tendered" wire:model.lazy="amountTendered" type="number" min="0" step="0.01"
+                                <x-text-input id="pos_amount_tendered" wire:model.blur="amountTendered" type="number" min="0" step="0.01"
                                     class="block w-full text-[14px] py-2.5 px-3 font-mono font-bold" placeholder="0.00"/>
                             </div>
                             
@@ -718,7 +718,7 @@
 
                                 <div>
                                     <x-input-label for="pos_gcash_reference" class="text-[11px] font-bold text-gray-600 uppercase tracking-wide mb-2 block">Reference Number</x-input-label>
-                                    <x-text-input id="pos_gcash_reference" wire:model.debounce.400ms="paymentReference" type="text"
+                                    <x-text-input id="pos_gcash_reference" wire:model.live.debounce.400ms="paymentReference" type="text"
                                         inputFilter="name_basic"
                                         class="block w-full text-[13px] py-2.5 px-3 font-mono font-bold border-gray-200 bg-gray-50 focus:bg-white" placeholder="Enter manually if needed"/>
                                 </div>
@@ -803,7 +803,7 @@
 
         <div class="space-y-4 mb-8">
             <label for="pos_edit_item_notes" class="sr-only">Instructions</label>
-            <textarea id="pos_edit_item_notes" wire:model.debounce.400ms="editCartItemNotes" rows="4" 
+            <textarea id="pos_edit_item_notes" wire:model.live.debounce.400ms="editCartItemNotes" rows="4" 
                 placeholder="e.g., No spicy sauce, extra napkins, separate bag..."
                 inputFilter="name_basic"
                 class="w-full px-4 py-3 text-[13px] font-medium text-gray-700 bg-white border border-gray-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all placeholder-gray-400 resize-none {{ $errors->has('editCartItemNotes') ? 'border-red-500 focus:ring-red-500/10 focus:border-red-500' : '' }}"
@@ -833,7 +833,7 @@
                         
                         <div class="flex items-center">
                             <label class="inline-flex relative items-center cursor-pointer scale-90">
-                                <input type="checkbox" wire:model="applyRegularDiscount" class="sr-only peer">
+                                <input type="checkbox" wire:model.live="applyRegularDiscount" class="sr-only peer">
                                 <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
                             </label>
                         </div>
@@ -858,7 +858,7 @@
                         
                         <div class="flex items-center">
                             <label class="inline-flex relative items-center cursor-pointer scale-90">
-                                <input type="checkbox" wire:model="applySeniorDiscount" class="sr-only peer">
+                                <input type="checkbox" wire:model.live="applySeniorDiscount" class="sr-only peer">
                                 <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
                             </label>
                         </div>

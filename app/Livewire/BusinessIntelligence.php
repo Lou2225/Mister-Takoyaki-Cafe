@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Livewire;
 
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -101,7 +101,7 @@ class BusinessIntelligence extends Component
     {
         if (in_array($propertyName, ['startDate', 'endDate', 'selectedBranchId', 'search', 'perPage'])) {
             if (in_array($propertyName, ['startDate', 'endDate'])) {
-                $this->activeFilter = 'Custom Range';
+                $this->activeFilter = 'All Time';
             }
             $this->resetPage();
             if ($propertyName === 'perPage') {
@@ -629,14 +629,14 @@ class BusinessIntelligence extends Component
 
     private function updateHeader()
     {
-        $this->emit('setHeader', [
-            'icon' => 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
-            'title' => 'Business Intelligence',
-            'breadcrumbs' => [
+        $this->dispatch('setHeader', 
+            icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+            title: 'Business Intelligence',
+            breadcrumbs: [
                 ['label' => 'Auditing', 'url' => '#'],
                 ['label' => 'Consolidated Ledger', 'url' => route('reports.index')],
             ]
-        ]);
+        );
     }
 
 

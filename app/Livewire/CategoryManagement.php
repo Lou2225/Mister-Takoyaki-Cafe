@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Livewire;
 
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -17,6 +17,7 @@ class CategoryManagement extends Component
 
     public string $panel = 'list'; // 'list' | 'detail'
     public string $filterType = 'all'; // 'all' | 'product' | 'ingredient'
+    public string $view = 'table'; // 'table' | 'board'
     public string $search = '';
     public int $perPage = 5;
     
@@ -26,6 +27,7 @@ class CategoryManagement extends Component
     public string $name = '';
     public string $description = '';
     public string $icon = 'tag';
+    public string $production_station = 'kitchen'; // 'kitchen' | 'barista'
 
     // Deletion targets
     public ?int $deleteTargetId = null;
@@ -34,6 +36,7 @@ class CategoryManagement extends Component
     protected $queryString = [
         'filterType' => ['except' => 'all', 'as' => 'type'],
         'search' => ['except' => ''],
+        'view' => ['except' => 'table'],
     ];
 
     public function mount()
@@ -77,6 +80,7 @@ class CategoryManagement extends Component
         $this->name = '';
         $this->description = '';
         $this->icon = 'tag';
+        $this->production_station = 'kitchen';
         $this->resetValidation();
     }
 
@@ -116,7 +120,7 @@ class CategoryManagement extends Component
         $this->resetForm();
         $this->editCategoryType = $type;
         $this->panel = 'detail';
-        $this->dispatchBrowserEvent('switch-panel', ['panel' => 'detail']);
+        $this->dispatch('switch-panel', panel: 'detail');
     }
 
     public function selectCategory(int $id, string $type)
@@ -131,9 +135,10 @@ class CategoryManagement extends Component
         $this->name = $category->name;
         $this->description = $category->description ?? '';
         $this->icon = $category->icon ?? 'tag';
+        $this->production_station = $category->production_station ?? 'kitchen';
         
         $this->panel = 'detail';
-        $this->dispatchBrowserEvent('switch-panel', ['panel' => 'detail']);
+        $this->dispatch('switch-panel', panel: 'detail');
     }
 
     public function backToList()
@@ -153,6 +158,7 @@ class CategoryManagement extends Component
             'name' => ['required', 'string', 'max:255', 'regex:' . ValidationHelper::REGEX_NAME, Rule::unique($table, 'name')->ignore($this->editCategoryId)],
             'description' => ['nullable', 'string', 'max:500'],
             'icon' => ['nullable', 'string', 'max:50'],
+            'production_station' => [$this->editCategoryType === 'product' ? 'required' : 'nullable', 'string', 'in:kitchen,barista'],
         ];
 
         $this->validateBeforeModal($rules, ValidationHelper::commonMessages(), 'confirm-save-category');
@@ -177,6 +183,7 @@ class CategoryManagement extends Component
                 'name' => $this->name,
                 'description' => $this->description,
                 'icon' => $this->icon,
+                'production_station' => $this->editCategoryType === 'product' ? $this->production_station : null,
             ]);
             $msg = 'Category updated successfully.';
         } else {
@@ -184,14 +191,15 @@ class CategoryManagement extends Component
                 'name' => $this->name,
                 'description' => $this->description,
                 'icon' => $this->icon,
+                'production_station' => $this->editCategoryType === 'product' ? $this->production_station : null,
             ]);
             $msg = 'Category created successfully.';
         }
 
-        $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => $msg]);
-        $this->dispatchBrowserEvent('close-modal', 'confirm-save-category');
+        $this->dispatch('notify', type: 'success', message: $msg);
+        $this->dispatch('close-modal', 'confirm-save-category');
         $this->panel = 'list';
-        $this->dispatchBrowserEvent('switch-panel', ['panel' => 'list']);
+        $this->dispatch('switch-panel', panel: 'list');
         $this->resetPage();
         $this->resetForm();
     }
@@ -204,7 +212,7 @@ class CategoryManagement extends Component
         $category = $model::findOrFail($id);
         $this->deleteTargetName = $category->name;
 
-        $this->dispatchBrowserEvent('open-modal', ['name' => 'confirm-delete-category']);
+        $this->dispatch('open-modal', name: 'confirm-delete-category');
     }
 
     public function deleteCategory()
@@ -222,15 +230,15 @@ class CategoryManagement extends Component
                 'type' => 'error', 
                 'message' => "Cannot delete category. It still has $count assigned " . ($this->editCategoryType === 'product' ? 'products' : 'ingredients') . "."
             ]);
-            $this->dispatchBrowserEvent('close-modal', 'confirm-delete-category');
+            $this->dispatch('close-modal', 'confirm-delete-category');
             return;
         }
 
         $category->delete();
-        $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => 'Category removed.']);
-        $this->dispatchBrowserEvent('close-modal', 'confirm-delete-category');
+        $this->dispatch('notify', type: 'success', message: 'Category removed.');
+        $this->dispatch('close-modal', 'confirm-delete-category');
         $this->panel = 'list';
-        $this->dispatchBrowserEvent('switch-panel', ['panel' => 'list']);
+        $this->dispatch('switch-panel', panel: 'list');
         $this->resetPage();
         $this->resetForm();
         $this->deleteTargetId = null;
@@ -239,15 +247,15 @@ class CategoryManagement extends Component
 
     private function updateHeader()
     {
-        $this->emit('setHeader', [
-            'icon' => 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z',
-            'title' => 'Category Management Hub',
-            'subtitle' => 'Global Category Catalog - Sorting affects all branches',
-            'breadcrumbs' => [
+        $this->dispatch('setHeader', 
+            icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z',
+            title: 'Category Management Hub',
+            subtitle: 'Global Category Catalog - Sorting affects all branches',
+            breadcrumbs: [
                 ['label' => 'Management', 'url' => '#'],
                 ['label' => 'Categories', 'url' => route('categories.index')],
             ]
-        ]);
+        );
     }
 
     public function render()
@@ -256,14 +264,14 @@ class CategoryManagement extends Component
         
         if ($this->filterType === 'product') {
             $categories = ProductCategory::query()
-                ->select('id', 'name', 'description', 'icon', 'created_at', DB::raw("'product' as cat_type"))
+                ->select('id', 'name', 'description', 'icon', 'production_station', 'created_at', DB::raw("'product' as cat_type"))
                 ->withCount('products as associated_count')
                 ->where('name', 'like', "%{$this->search}%")
                 ->orderBy('name', 'asc')
                 ->paginate($this->perPage);
         } elseif ($this->filterType === 'ingredient') {
             $categories = IngredientCategory::query()
-                ->select('id', 'name', 'description', 'icon', 'created_at', DB::raw("'ingredient' as cat_type"))
+                ->select('id', 'name', 'description', 'icon', DB::raw("NULL as production_station"), 'created_at', DB::raw("'ingredient' as cat_type"))
                 ->withCount('ingredients as associated_count')
                 ->where('name', 'like', "%{$this->search}%")
                 ->orderBy('name', 'asc')
@@ -276,6 +284,7 @@ class CategoryManagement extends Component
                     'name',
                     'description',
                     'icon',
+                    'production_station',
                     'created_at',
                     DB::raw("'product' as cat_type"),
                     DB::raw('(select count(*) from products where products.category_id = product_categories.id) as associated_count')
@@ -288,6 +297,7 @@ class CategoryManagement extends Component
                     'name',
                     'description',
                     'icon',
+                    DB::raw("NULL as production_station"),
                     'created_at',
                     DB::raw("'ingredient' as cat_type"),
                     DB::raw('(select count(*) from ingredients where ingredients.category_id = ingredient_categories.id) as associated_count')

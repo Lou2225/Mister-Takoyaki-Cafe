@@ -50,7 +50,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div>
                                 <x-input-label for="f_first_name" value="First Name *" />
-                                <x-text-input id="f_first_name" name="first_name" wire:model.debounce.500ms="firstName"
+                                <x-text-input id="f_first_name" name="first_name" wire:model.live.debounce.500ms="firstName"
                                     type="text" class="mt-1 block w-full" placeholder="Juan"
                                     autocomplete="given-name" inputFilter="nameStrict" maxlength="100"
                                     @keydown="FormFilters.nameStrictKeydown($event)" @paste="FormFilters.nameStrictPaste($event)"
@@ -59,7 +59,7 @@
                             </div>
                             <div>
                                 <x-input-label for="f_middle_name" value="Middle Name" />
-                                <x-text-input id="f_middle_name" name="middle_name" wire:model.debounce.500ms="middleName"
+                                <x-text-input id="f_middle_name" name="middle_name" wire:model.live.debounce.500ms="middleName"
                                     type="text" class="mt-1 block w-full" placeholder="Dela"
                                     autocomplete="additional-name" inputFilter="nameStrict" maxlength="100"
                                     @keydown="FormFilters.nameStrictKeydown($event)" @paste="FormFilters.nameStrictPaste($event)"
@@ -68,7 +68,7 @@
                             </div>
                             <div>
                                 <x-input-label for="f_last_name" value="Last Name *" />
-                                <x-text-input id="f_last_name" name="last_name" wire:model.debounce.500ms="lastName" type="text"
+                                <x-text-input id="f_last_name" name="last_name" wire:model.live.debounce.500ms="lastName" type="text"
                                     class="mt-1 block w-full" placeholder="Cruz" autocomplete="family-name" 
                                     inputFilter="nameStrict" maxlength="100"
                                     @keydown="FormFilters.nameStrictKeydown($event)" @paste="FormFilters.nameStrictPaste($event)"
@@ -79,7 +79,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                             <div>
                                 <x-input-label for="f_email" value="Email Address *" />
-                                <x-text-input id="f_email" name="email" wire:model.debounce.500ms="email" type="email"
+                                <x-text-input id="f_email" name="email" wire:model.live.debounce.500ms="email" type="email"
                                     class="mt-1 block w-full" placeholder="juan.cruz@company.com"
                                     autocomplete="email" inputFilter="email" maxlength="255"
                                     @keydown="FormFilters.emailKeydown($event)" @paste="FormFilters.emailPaste($event)"
@@ -92,7 +92,7 @@
                                     <div class="flex-shrink-0 inline-flex items-center px-3 h-10 rounded-l-lg border border-r-0 border-gray-200 bg-gray-50 text-gray-500 text-[13px] font-bold">
                                         +63
                                     </div>
-                                    <x-text-input id="f_phone" name="phone" wire:model.debounce.500ms="phone" type="text"
+                                    <x-text-input id="f_phone" name="phone" wire:model.live.debounce.500ms="phone" type="text"
                                         class="block w-full rounded-l-none" placeholder="912 345 6789" autocomplete="tel"
                                         inputFilter="number" maxlength="10"
                                         @keydown="FormFilters.numberKeydown($event)" @paste="FormFilters.numberPaste($event)"
@@ -148,7 +148,7 @@
                             </div>
                             <div>
                                 <x-input-label for="f_date_hired" value="Date Joined" />
-                                <x-text-input id="f_date_hired" name="date_hired" wire:model.lazy="dateHired"
+                                <x-text-input id="f_date_hired" name="date_hired" wire:model.blur="dateHired"
                                     type="date" class="mt-1 block w-full" inputFilter="date"
                                     @keydown="FormFilters.dateKeydown($event)" @paste="FormFilters.datePaste($event)"
                                     :hasError="$errors->has('dateHired')" />
@@ -267,7 +267,7 @@
                             {{-- Row 3: Street --}}
                             <div>
                                 <x-input-label value="House # / Street / Subdivision" />
-                                <x-text-input wire:model.debounce.400ms="addr_street" class="w-full mt-1 h-10" placeholder="e.g. Unit 123, Rosewood Ave, Phase 1" :hasError="$errors->has('addr_street')" />
+                                <x-text-input wire:model.live.debounce.400ms="addr_street" class="w-full mt-1 h-10" placeholder="e.g. Unit 123, Rosewood Ave, Phase 1" :hasError="$errors->has('addr_street')" />
                                 <x-input-error :messages="$errors->get('addr_street')" class="mt-1" />
                             </div>
                         </div>
@@ -350,7 +350,7 @@
                     <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
                         <h2 class="text-[13px] font-semibold text-gray-700 uppercase tracking-wider mb-4">Account Status</h2>
                         <label for="f_is_active" class="flex items-center gap-3 cursor-pointer select-none">
-                            <input type="checkbox" id="f_is_active" name="is_active" wire:model.lazy="formIsActive"
+                            <input type="checkbox" id="f_is_active" name="is_active" wire:model.blur="formIsActive"
                                 class="rounded border-gray-300 text-gray-900 shadow-sm focus:ring-gray-900 h-4 w-4">
                             <div>
                                 <span class="block text-[13px] font-semibold text-gray-800">Active Access</span>
@@ -394,9 +394,15 @@
                             <div class="absolute -top-24 -right-24 w-48 h-48 bg-indigo-50 rounded-full blur-3xl opacity-50 group-hover:bg-indigo-100 transition-colors duration-500"></div>
                             
                             <div class="relative">
-                                <div class="w-24 h-24 bg-gradient-to-tr from-indigo-600 to-violet-500 text-white rounded-2xl flex items-center justify-center text-3xl font-black mx-auto mb-6 shadow-xl shadow-indigo-200 rotate-3 group-hover:rotate-0 transition-transform duration-500">
-                                    {{ strtoupper(substr($firstName, 0, 1) . substr($lastName, 0, 1)) }}
-                                </div>
+                                @if($editUserAvatar)
+                                    <div class="w-24 h-24 rounded-2xl flex items-center justify-center text-5xl mx-auto mb-6 shadow-xl rotate-3 group-hover:rotate-0 transition-transform duration-500" style="{{ $editUserAvatar['style'] }}">
+                                        {{ $editUserAvatar['emoji'] }}
+                                    </div>
+                                @else
+                                    <div class="w-24 h-24 bg-gradient-to-tr from-indigo-600 to-violet-500 text-white rounded-2xl flex items-center justify-center text-3xl font-black mx-auto mb-6 shadow-xl shadow-indigo-200 rotate-3 group-hover:rotate-0 transition-transform duration-500">
+                                        {{ strtoupper(substr($firstName, 0, 1) . substr($lastName, 0, 1)) }}
+                                    </div>
+                                @endif
                                 <h3 class="text-xl font-black text-slate-900 tracking-tight">{{ $firstName }} {{ $lastName }}</h3>
                                 <p class="text-[13px] text-slate-500 font-medium mt-1">{{ $email }}</p>
                                 
@@ -802,19 +808,34 @@
                         <th class="py-3 px-4 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest">Actions</th>
                     </x-slot>
 
+                    @php
+                        $avatarCollection = collect(\App\Livewire\ProfileSettings::avatarCollection())->flatten(1);
+                    @endphp
+
                     @forelse($users as $user)
                         @php
                             $colors = ['from-purple-400 to-indigo-500', 'from-pink-400 to-rose-500', 'from-blue-400 to-sky-500', 'from-emerald-400 to-teal-500', 'from-amber-400 to-orange-500'];
                             $grad = $colors[$user->id % count($colors)];
                             $initials = strtoupper(substr($user->first_name ?? '', 0, 1) . substr($user->last_name ?? '', 0, 1));
+                            
+                            $userAvatar = null;
+                            if ($user->avatar) {
+                                $userAvatar = $avatarCollection->firstWhere('id', $user->avatar);
+                            }
                         @endphp
                         <tr wire:key="user-row-{{ $user->id }}-{{ $users->currentPage() }}"
                             class="hover:bg-slate-50/50 transition-colors">
                             <td class="py-3 px-4 whitespace-nowrap">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-[26px] h-[26px] rounded-full bg-gradient-to-br {{ $grad }} flex items-center justify-center text-white text-[11px] font-bold shadow-sm">
-                                        {{ $initials ?: '?' }}
-                                    </div>
+                                    @if($userAvatar)
+                                        <div class="w-[26px] h-[26px] rounded-full flex items-center justify-center text-[14px] shadow-sm" style="{{ $userAvatar['style'] }}">
+                                            {{ $userAvatar['emoji'] }}
+                                        </div>
+                                    @else
+                                        <div class="w-[26px] h-[26px] rounded-full bg-gradient-to-br {{ $grad }} flex items-center justify-center text-white text-[11px] font-bold shadow-sm">
+                                            {{ $initials ?: '?' }}
+                                        </div>
+                                    @endif
                                     <span class="font-medium text-[13px] text-slate-900">{{ $user->first_name }} {{ $user->last_name }}</span>
                                 </div>
                             </td>
@@ -864,13 +885,23 @@
                         @php
                             $colors = ['from-purple-400 to-indigo-500', 'from-pink-400 to-rose-500', 'from-blue-400 to-sky-500', 'from-emerald-400 to-teal-500', 'from-amber-400 to-orange-500'];
                             $grad = $colors[$user->id % count($colors)];
+                            
+                            $userAvatar = null;
+                            if ($user->avatar) {
+                                $userAvatar = $avatarCollection->firstWhere('id', $user->avatar);
+                            }
                         @endphp
                         <div class="bg-white rounded-2xl border border-slate-200/60 p-5 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_30px_-6px_rgba(0,0,0,0.1)] hover:-translate-y-0.5 transition-all duration-300">
                             <div class="flex items-start justify-between mb-3">
-                                <div
-                                    class="w-10 h-10 rounded-full bg-gradient-to-br {{ $grad }} flex items-center justify-center text-white font-bold shadow-sm">
-                                    {{ strtoupper(substr($user->first_name, 0, 1)) }}
-                                </div>
+                                @if($userAvatar)
+                                    <div class="w-10 h-10 rounded-full flex items-center justify-center text-2xl shadow-sm" style="{{ $userAvatar['style'] }}">
+                                        {{ $userAvatar['emoji'] }}
+                                    </div>
+                                @else
+                                    <div class="w-10 h-10 rounded-full bg-gradient-to-br {{ $grad }} flex items-center justify-center text-white font-bold shadow-sm">
+                                        {{ strtoupper(substr($user->first_name, 0, 1)) }}
+                                    </div>
+                                @endif
                                 <span @class([
                                     'px-2 py-0.5 rounded-xl text-[10px] font-bold uppercase border',
                                     'bg-green-50 text-green-700 border-green-200' => $user->is_active,
@@ -1210,14 +1241,30 @@
             },
 
             // ── PSGC loaders ─────────────────────────────────────────
+            async fetchWithRetry(url, retries = 2, delay = 1000) {
+                for (let i = 0; i <= retries; i++) {
+                    try {
+                        const res = await fetch(url);
+                        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                        return await res.json();
+                    } catch (e) {
+                        if (i === retries) throw e;
+                        console.warn(`Fetch failed for ${url}, retrying (${i + 1}/${retries})...`, e);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }
+                }
+            },
+
             async loadRegions() {
                 if (this.loc.region.items.length > 0) return;
                 this.loc.region.loading = true;
                 try {
-                    const res = await fetch('https://psgc.cloud/api/regions');
-                    if (!res.ok) throw new Error();
-                    this.loc.region.items = (await res.json()).sort((a, b) => a.name.localeCompare(b.name));
-                } catch (e) { console.error('Regions fetch failed', e); }
+                    const data = await this.fetchWithRetry('https://psgc.cloud/api/regions');
+                    this.loc.region.items = data.sort((a, b) => a.name.localeCompare(b.name));
+                } catch (e) { 
+                    console.error('Regions fetch failed', e);
+                    this.dispatchNotification('error', 'Failed to load regions. Please check your connection.');
+                }
                 finally { this.loc.region.loading = false; }
             },
 
@@ -1226,20 +1273,20 @@
                 if (!regionCode) return;
                 this.loc.province.loading = true;
                 try {
-                    const res = await fetch(`https://psgc.cloud/api/regions/${regionCode}/provinces`);
-                    if (!res.ok) throw new Error();
-                    const data = await res.json();
+                    const data = await this.fetchWithRetry(`https://psgc.cloud/api/regions/${regionCode}/provinces`);
                     this.loc.province.items = data.sort((a, b) => a.name.localeCompare(b.name));
                     
-                    // Handle regions that are also cities (e.g. NCR)
                     if (this.loc.province.items.length === 0) {
                         this.loc.province.loading = false;
                         this.loc.city.loading = true;
-                        const res2 = await fetch(`https://psgc.cloud/api/regions/${regionCode}/cities-municipalities`);
-                        this.loc.city.items = (await res2.json()).sort((a, b) => a.name.localeCompare(b.name));
+                        const data2 = await this.fetchWithRetry(`https://psgc.cloud/api/regions/${regionCode}/cities-municipalities`);
+                        this.loc.city.items = data2.sort((a, b) => a.name.localeCompare(b.name));
                         this.loc.city.loading = false;
                     }
-                } catch (e) { console.error(e); }
+                } catch (e) { 
+                    console.error('Provinces fetch failed', e);
+                    this.dispatchNotification('error', 'Failed to load provinces.');
+                }
                 finally { this.loc.province.loading = false; }
             },
 
@@ -1248,10 +1295,12 @@
                 if (!provinceCode) return;
                 this.loc.city.loading = true;
                 try {
-                    const res = await fetch(`https://psgc.cloud/api/provinces/${provinceCode}/cities-municipalities`);
-                    if (!res.ok) throw new Error();
-                    this.loc.city.items = (await res.json()).sort((a, b) => a.name.localeCompare(b.name));
-                } catch (e) { console.error(e); }
+                    const data = await this.fetchWithRetry(`https://psgc.cloud/api/provinces/${provinceCode}/cities-municipalities`);
+                    this.loc.city.items = data.sort((a, b) => a.name.localeCompare(b.name));
+                } catch (e) { 
+                    console.error('Cities fetch failed', e);
+                    this.dispatchNotification('error', 'Failed to load cities.');
+                }
                 finally { this.loc.city.loading = false; }
             },
 
@@ -1260,16 +1309,24 @@
                 if (!cityCode) return;
                 this.loc.barangay.loading = true;
                 try {
-                    const res = await fetch(`https://psgc.cloud/api/cities-municipalities/${cityCode}/barangays`);
-                    if (!res.ok) throw new Error();
-                    this.loc.barangay.items = (await res.json()).sort((a, b) => a.name.localeCompare(b.name));
-                } catch (e) { console.error(e); }
+                    const data = await this.fetchWithRetry(`https://psgc.cloud/api/cities-municipalities/${cityCode}/barangays`);
+                    this.loc.barangay.items = data.sort((a, b) => a.name.localeCompare(b.name));
+                } catch (e) { 
+                    console.error('Barangays fetch failed', e);
+                    this.dispatchNotification('error', 'Failed to load barangays.');
+                }
                 finally { this.loc.barangay.loading = false; }
+            },
+
+            dispatchNotification(type, message) {
+                window.dispatchEvent(new CustomEvent('notify', {
+                    detail: { type, message }
+                }));
             },
 
             // ── Cascade handlers ─────────────────────────────────────
             async selectRegion(region) {
-                const lw = window.livewire.find('{{ $_instance->id }}');
+                const lw = Livewire.find('{{ $this->id() }}');
                 lw.set('addr_region', region.name);
                 lw.set('addr_province', ''); lw.set('addr_city', ''); lw.set('addr_barangay', '');
                 this.loc.region.search = ''; this.loc.region.open = false;
@@ -1277,7 +1334,7 @@
                 await this.loadProvinces(region.code);
             },
             async selectProvince(province) {
-                const lw = window.livewire.find('{{ $_instance->id }}');
+                const lw = Livewire.find('{{ $this->id() }}');
                 lw.set('addr_province', province.name);
                 lw.set('addr_city', ''); lw.set('addr_barangay', '');
                 this.loc.province.search = ''; this.loc.province.open = false;
@@ -1285,7 +1342,7 @@
                 await this.loadCities(province.code);
             },
             async selectCity(city) {
-                const lw = window.livewire.find('{{ $_instance->id }}');
+                const lw = Livewire.find('{{ $this->id() }}');
                 lw.set('addr_city', city.name);
                 lw.set('addr_barangay', '');
                 this.loc.city.search = ''; this.loc.city.open = false;
@@ -1293,7 +1350,7 @@
                 await this.loadBarangays(city.code);
             },
             selectBarangay(brgy) {
-                window.livewire.find('{{ $_instance->id }}').set('addr_barangay', brgy.name);
+                Livewire.find('{{ $this->id() }}').set('addr_barangay', brgy.name);
                 this.loc.barangay.search = ''; this.loc.barangay.open = false;
             },
 
@@ -1377,8 +1434,8 @@
                         const container = document.getElementById('userMap');
                         if (!container) return;
                         this.map.invalidateSize(); 
-                        let lat = await window.livewire.find('{{ $_instance->id }}').get('addr_lat');
-                        let lng = await window.livewire.find('{{ $_instance->id }}').get('addr_lng');
+                        let lat = await Livewire.find('{{ $this->id() }}').get('addr_lat');
+                        let lng = await Livewire.find('{{ $this->id() }}').get('addr_lng');
                         if (lat && lng) {
                             this.map.setView([lat, lng], 16);
                             if (this.marker) this.marker.setLatLng([lat, lng]);
@@ -1390,23 +1447,30 @@
                     const container = document.getElementById('userMap');
                     if (!container) return;
 
-                    let lat = await window.livewire.find('{{ $_instance->id }}').get('addr_lat');
-                    let lng = await window.livewire.find('{{ $_instance->id }}').get('addr_lng');
+                    let lat = await Livewire.find('{{ $this->id() }}').get('addr_lat');
+                    let lng = await Livewire.find('{{ $this->id() }}').get('addr_lng');
                     let startLat = lat || 14.2189;
                     let startLng = lng || 121.1672;
                     let startZoom = lat ? 15 : 11;
                     
-                    const lagunaBounds = L.latLngBounds([13.9, 120.9], [14.5, 121.6]);
-                    this.map = L.map('userMap', {
-                        maxBounds: lagunaBounds,
-                        maxBoundsViscosity: 1.0
-                    }).setView([startLat, startLng], startZoom);
-
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    const street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                         maxZoom: 19,
                         minZoom: 10,
                         attribution: '© OpenStreetMap'
-                    }).addTo(this.map);
+                    });
+                    const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                    });
+
+                    const lagunaBounds = L.latLngBounds([13.9, 120.9], [14.5, 121.6]);
+
+                    this.map = L.map('userMap', {
+                        maxBounds: lagunaBounds,
+                        maxBoundsViscosity: 1.0,
+                        layers: [street]
+                    }).setView([startLat, startLng], startZoom);
+
+                    L.control.layers({ "Street": street, "Satellite": satellite }).addTo(this.map);
                     
                     if (lat && lng) {
                         this.marker = L.marker([lat, lng]).addTo(this.map);
@@ -1418,8 +1482,8 @@
                         if (this.marker) this.marker.setLatLng(e.latlng);
                         else this.marker = L.marker(e.latlng).addTo(this.map);
                         
-                        window.livewire.find('{{ $_instance->id }}').set('addr_lat', lat);
-                        window.livewire.find('{{ $_instance->id }}').set('addr_lng', lng);
+                        Livewire.find('{{ $this->id() }}').set('addr_lat', lat);
+                        Livewire.find('{{ $this->id() }}').set('addr_lng', lng);
                         
                         try {
                             const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&countrycodes=ph`);
@@ -1428,7 +1492,7 @@
                                 let st = data.address.road || data.address.pedestrian || '';
                                 let num = data.address.house_number || '';
                                 let fst = (num + ' ' + st).trim();
-                                if(fst) window.livewire.find('{{ $_instance->id }}').set('addr_street', fst);
+                                if(fst) Livewire.find('{{ $this->id() }}').set('addr_street', fst);
                                 
                                 await this.autoMatchLocation(data.address);
                             }

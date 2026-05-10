@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Livewire;
 
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -244,7 +244,7 @@ class StockManagement extends Component
         $this->wasteTargetQty = $batch->current_quantity;
         $this->wasteTargetUnit = $batch->ingredient->unit ?? 'pcs';
         
-        $this->dispatchBrowserEvent('open-modal', ['name' => 'confirm-waste-batch']);
+        $this->dispatch('open-modal', name: 'confirm-waste-batch');
     }
 
     public function wasteBatch()
@@ -255,7 +255,7 @@ class StockManagement extends Component
         $batch = StockBatch::with('ingredient', 'branch')->findOrFail($this->wasteTargetId);
 
         if ($batch->current_quantity <= 0) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'warning', 'message' => 'Batch is already empty.']);
+            $this->dispatch('notify', type: 'warning', message: 'Batch is already empty.');
             return;
         }
 
@@ -282,8 +282,8 @@ class StockManagement extends Component
         });
 
         $this->wasteTargetId = null;
-        $this->dispatchBrowserEvent('close-modal', 'confirm-waste-batch');
-        $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => 'Batch disposed and logged as waste.']);
+        $this->dispatch('close-modal', name: 'confirm-waste-batch');
+        $this->dispatch('notify', type: 'success', message: 'Batch disposed and logged as waste.');
     }
 
     // ── UI Actions ────────────────────────────────────────────────
@@ -291,19 +291,19 @@ class StockManagement extends Component
     {
         if (auth()->user()->isStaff()) return;
         if (!auth()->user()->isSuperAdmin()) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => 'Unauthorized action.']);
+            $this->dispatch('notify', type: 'error', message: 'Unauthorized action.');
             return;
         }
         $this->resetIngredientForm();
         $this->updateGlobalHeader('create');
-        $this->dispatchBrowserEvent('switch-panel', ['panel' => 'form', 'mode' => 'create']);
+        $this->dispatch('switch-panel', panel: 'form', mode: 'create');
     }
 
     public function showEdit($id)
     {
         if (auth()->user()->isStaff()) return;
         if (!auth()->user()->isSuperAdmin()) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => 'Unauthorized action.']);
+            $this->dispatch('notify', type: 'error', message: 'Unauthorized action.');
             return;
         }
         $ing = Ingredient::with('unitConversions')->findOrFail($id);
@@ -327,7 +327,7 @@ class StockManagement extends Component
         
         $this->resetValidation();
         $this->updateGlobalHeader('edit');
-        $this->dispatchBrowserEvent('switch-panel', ['panel' => 'form', 'mode' => 'edit']); 
+        $this->dispatch('switch-panel', panel: 'form', mode: 'edit');
     }
 
     // ── Packaging Conversion Rows Management ─────────────────────
@@ -433,7 +433,7 @@ class StockManagement extends Component
     {
         $this->resetIngredientForm();
         $this->updateGlobalHeader('list');
-        $this->dispatchBrowserEvent('switch-panel', ['panel' => 'list', 'mode' => 'list']);
+        $this->dispatch('switch-panel', panel: 'list', mode: 'list');
         $this->resetPage();
     }
 
@@ -443,13 +443,13 @@ class StockManagement extends Component
         $this->logSearch    = '';
         $this->resetPage('logPage');
         $this->updateGlobalHeader('log');
-        $this->dispatchBrowserEvent('switch-panel', ['panel' => 'log', 'mode' => 'log']);
+        $this->dispatch('switch-panel', panel: 'log', mode: 'log');
     }
 
     public function validateBeforeSaveIngredient()
     {
         if (!auth()->user()->isSuperAdmin()) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => 'Unauthorized action.']);
+            $this->dispatch('notify', type: 'error', message: 'Unauthorized action.');
             return;
         }
 
@@ -566,8 +566,8 @@ class StockManagement extends Component
         });
 
         $msg = $this->editIngredientId ? 'Ingredient updated successfully.' : 'Ingredient created and assigned successfully.';
-        $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => $msg]);
-        $this->dispatchBrowserEvent('close-modal', ['name' => 'confirm-save-ingredient']);
+        $this->dispatch('notify', type: 'success', message: $msg);
+        $this->dispatch('close-modal', name: 'confirm-save-ingredient');
         $this->backToList();
     }
 
@@ -575,7 +575,7 @@ class StockManagement extends Component
     {
         if (auth()->user()->isStaff()) abort(403);
         if (!auth()->user()->isSuperAdmin()) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => 'Unauthorized action.']);
+            $this->dispatch('notify', type: 'error', message: 'Unauthorized action.');
             return;
         }
 
@@ -592,22 +592,22 @@ class StockManagement extends Component
         $this->newCategoryName = '';
         $this->ingredientCategoryId = $cat->id; // Auto select for draft
 
-        $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => 'New ingredient category ' . $cat->name . ' launched.']);
-        $this->dispatchBrowserEvent('close-modal', ['name' => 'quick-add-ingredient-category']);
+        $this->dispatch('notify', type: 'success', message: 'New ingredient category ' . $cat->name . ' launched.');
+        $this->dispatch('close-modal', name: 'quick-add-ingredient-category');
     }
 
     public function confirmIngredientDeletion($id)
     {
         if (auth()->user()->isStaff()) return;
         if (!auth()->user()->isSuperAdmin()) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => 'Unauthorized action.']);
+            $this->dispatch('notify', type: 'error', message: 'Unauthorized action.');
             return;
         }
 
         $ing = Ingredient::findOrFail($id);
         $this->deleteTargetId = $ing->id;
         $this->deleteTargetName = $ing->name;
-        $this->dispatchBrowserEvent('open-modal', ['name' => 'confirm-delete-ingredient']);
+        $this->dispatch('open-modal', name: 'confirm-delete-ingredient');
     }
 
     public function deleteIngredient()
@@ -625,8 +625,8 @@ class StockManagement extends Component
         $this->deleteTargetId = null;
         $this->deleteTargetName = '';
         
-        $this->dispatchBrowserEvent('close-modal', 'confirm-delete-ingredient');
-        $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => 'Ingredient "' . $name . '" deleted globally.']);
+        $this->dispatch('close-modal', name: 'confirm-delete-ingredient');
+        $this->dispatch('notify', type: 'success', message: 'Ingredient "' . $name . '" deleted globally.');
         $this->backToList();
     }
 
@@ -669,11 +669,11 @@ class StockManagement extends Component
             $title = 'Stock Movement Log';
         }
 
-        $this->emit('setHeader', [
-            'icon' => 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
-            'title' => $title,
-            'breadcrumbs' => $breadcrumbs
-        ]);
+        $this->dispatch('setHeader', 
+            icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
+            title: $title,
+            breadcrumbs: $breadcrumbs
+        );
     }
 
     // ── Render ────────────────────────────────────────────────────
@@ -702,12 +702,13 @@ class StockManagement extends Component
         $lowStockWarnings = 0;
 
         if ($branchId) {
+            $globalLow = (int)($inventoryConfig['low_stock_threshold'] ?? 10);
             $lowStockWarnings = DB::table('ingredients')
                 ->leftJoin('branch_ingredient_stocks', function ($join) use ($branchId) {
                     $join->on('ingredients.id', '=', 'branch_ingredient_stocks.ingredient_id')
                          ->where('branch_ingredient_stocks.branch_id', '=', $branchId);
                 })
-                ->whereRaw('COALESCE(branch_ingredient_stocks.stock_quantity, 0) < ingredients.minimum_stock')
+                ->whereRaw('COALESCE(branch_ingredient_stocks.stock_quantity, 0) <= CASE WHEN ingredients.minimum_stock > 0 THEN ingredients.minimum_stock ELSE ? END', [$globalLow])
                 ->count();
         }
 

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire\Sidebar;
+namespace App\Livewire\Sidebar;
 
 use Livewire\Component;
 use App\Services\BranchContext;

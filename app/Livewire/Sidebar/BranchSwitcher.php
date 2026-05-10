@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire\Sidebar;
+namespace App\Livewire\Sidebar;
 
 use Livewire\Component;
 use App\Models\Branch;
@@ -16,8 +16,8 @@ class BranchSwitcher extends Component
         BranchContext::setActiveBranch($id);
         
         // Signal a context change across the entire application
-        $this->emit('branchContextUpdated');
-        $this->dispatchBrowserEvent('branch-switched');
+        $this->dispatch('branchContextUpdated');
+        $this->dispatch('branch-switched');
     }
 
     public function render()

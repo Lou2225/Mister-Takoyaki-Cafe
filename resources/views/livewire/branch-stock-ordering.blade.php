@@ -1,4 +1,4 @@
-<div class="px-2 py-2 space-y-6" x-data="slidingTabs({ panel: @entangle('panel') }, ['panel'])">
+<div class="px-2 py-2 space-y-6" x-data="slidingTabs({ panel: @entangle('panel').live }, ['panel'])">
     {{-- ════════════════ DYNAMIC HEADER ════════════════ --}}
     <div class="px-1 pt-2">
         <div class="mb-4 flex items-center justify-between">
@@ -154,11 +154,11 @@
                                 </div>
 
                                 <div class="grid grid-cols-2 gap-3">
-                                    <div><x-input-label value="Quantity" class="text-[11px]" /><div class="mt-1.5 relative"><x-text-input wire:model="cartQty" type="number" step="0.01" class="w-full h-10 pr-10 font-black text-[13px]" /><span class="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-400 uppercase">{{ $cartUnit }}</span></div></div>
+                                    <div><x-input-label value="Quantity" class="text-[11px]" /><div class="mt-1.5 relative"><x-text-input wire:model.live="cartQty" type="number" step="0.01" class="w-full h-10 pr-10 font-black text-[13px]" /><span class="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-400 uppercase">{{ $cartUnit }}</span></div></div>
                                     <div><x-input-label value="Subtotal" class="text-[11px]" /><div class="mt-1.5 h-10 bg-slate-50 border border-slate-200 rounded-xl px-3 flex items-center text-[13px] font-black text-slate-900 tabular-nums italic">₱{{ number_format((float)($cartQty ?: 0) * (float)($cartPrice ?: 0), 2) }}</div></div>
                                 </div>
 
-                                <div><x-input-label value="Remarks" class="text-[11px]" /><textarea wire:model="cartNotes" rows="1" class="mt-1.5 w-full bg-white border-slate-200 rounded-xl text-[12px] focus:ring-indigo-500 transition-all placeholder-slate-300" placeholder="Optional..."></textarea></div>
+                                <div><x-input-label value="Remarks" class="text-[11px]" /><textarea wire:model.live="cartNotes" rows="1" class="mt-1.5 w-full bg-white border-slate-200 rounded-xl text-[12px] focus:ring-indigo-500 transition-all placeholder-slate-300" placeholder="Optional..."></textarea></div>
                             @endif
                         </div>
 
@@ -216,7 +216,7 @@
                 <x-search-bar wireModel="search" placeholder="Reference..." width="w-64" />
                 <div class="flex items-center gap-3">
                     <span class="text-[10px] font-black text-slate-400 uppercase">Status</span>
-                    <select wire:model="statusFilter" class="h-8 rounded-lg border-slate-200 text-[11px] font-bold text-slate-700 pr-9">
+                    <select wire:model.live="statusFilter" class="h-8 rounded-lg border-slate-200 text-[11px] font-bold text-slate-700 pr-9">
                         <option value="all">All</option>
                         @if($panel === 'requests')
                             <option value="pending">Pending</option><option value="approved">Approved</option><option value="preparing">Preparing</option><option value="in_transit">In Transit</option>

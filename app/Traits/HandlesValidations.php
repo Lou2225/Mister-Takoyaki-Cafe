@@ -57,9 +57,9 @@ trait HandlesValidations
         } catch (ValidationException $e) {
             if ($closeModalId) {
                 // Standardize: always dispatch as object for robust event handling
-                $this->dispatchBrowserEvent('close-modal', ['name' => $closeModalId]);
+                $this->dispatch('close-modal', ['name' => $closeModalId]);
             }
-            $this->dispatchBrowserEvent('scroll-to-error');
+            $this->dispatch('scroll-to-error');
             throw $e;
         }
     }
@@ -99,10 +99,10 @@ trait HandlesValidations
                 $this->validate($rules, $messages, $attributes);
             }
             // Standardize: always dispatch as object for robust event handling
-            $this->dispatchBrowserEvent('open-modal', ['name' => $modalId]);
+            $this->dispatch('open-modal', ['name' => $modalId]);
             return true;
         } catch (ValidationException $e) {
-            $this->dispatchBrowserEvent('scroll-to-error');
+            $this->dispatch('scroll-to-error');
             throw $e;
         }
     }

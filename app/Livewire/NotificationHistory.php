@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Livewire;
 
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -50,7 +50,7 @@ class NotificationHistory extends Component
         $notification = Notification::find($id);
         if ($notification) {
             $notification->update(['is_read' => true]);
-            $this->emit('refreshTopbar');
+            $this->dispatch('refreshTopbar');
         }
     }
 
@@ -59,13 +59,13 @@ class NotificationHistory extends Component
     {
         // Clone the base query and restrict to unread only — respects all active filters
         $this->baseQuery()->where('is_read', false)->update(['is_read' => true]);
-        $this->emit('refreshTopbar');
+        $this->dispatch('refreshTopbar');
     }
 
     public function deleteNotification(int $id): void
     {
         Notification::destroy($id);
-        $this->emit('refreshTopbar');
+        $this->dispatch('refreshTopbar');
     }
 
     // Fix #8: clearAll() intentionally clears ALL (ignores filters) — documented explicitly
@@ -81,7 +81,7 @@ class NotificationHistory extends Component
             ->where(fn ($q) => $q->where('branch_id', $branchId)->orWhereNull('branch_id'))
             ->delete();
 
-        $this->emit('refreshTopbar');
+        $this->dispatch('refreshTopbar');
     }
 
     public function trace(int $id): mixed
@@ -90,7 +90,7 @@ class NotificationHistory extends Component
         if (!$notification) return null;
 
         $notification->update(['is_read' => true]);
-        $this->emit('refreshTopbar');
+        $this->dispatch('refreshTopbar');
 
         if ($notification->link) {
             return redirect($notification->link);

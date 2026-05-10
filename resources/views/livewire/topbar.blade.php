@@ -131,9 +131,15 @@
                     <p class="text-[13px] font-semibold text-gray-900 leading-tight">{{ $firstName }} {{ $lastName }}</p>
                     <p class="text-[11px] text-gray-500 leading-tight">{{ $roleName }}</p>
                 </div>
-                <div class="flex items-center justify-center w-8 h-8 rounded-full bg-gray-900 text-white font-bold text-[11px] ring-2 ring-white shadow-sm">
-                    {{ $initials }}
-                </div>
+                @if($avatarDisplay)
+                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-lg shadow-sm ring-2 ring-white" style="{{ $avatarDisplay['style'] }}">
+                        {{ $avatarDisplay['emoji'] }}
+                    </div>
+                @else
+                    <div class="flex items-center justify-center w-8 h-8 rounded-full bg-gray-900 text-white font-bold text-[11px] ring-2 ring-white shadow-sm">
+                        {{ $initials }}
+                    </div>
+                @endif
             </button>
             <div x-show="profileMenuOpen" x-transition x-cloak
                 class="absolute right-0 mt-2 w-52 bg-white border border-gray-100 rounded-xl shadow-[0_4px_25px_rgba(0,0,0,0.1)] py-1 z-50 overflow-hidden">

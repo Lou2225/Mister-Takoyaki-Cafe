@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Livewire;
 
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -301,7 +301,7 @@ class BranchStockOrdering extends Component
             return;
         }
 
-        $this->dispatchBrowserEvent('open-modal', ['name' => 'confirm-submit-order']);
+        $this->dispatch('open-modal', name: 'confirm-submit-order');
     }
 
     public function submitOrder(): void
@@ -355,9 +355,9 @@ class BranchStockOrdering extends Component
 
             $this->clearCart();
             $this->panel = 'requests';
-            $this->dispatchBrowserEvent('close-modal', 'confirm-submit-order');
+            $this->dispatch('close-modal', 'confirm-submit-order');
             $this->notify('success', 'Stock request submitted!');
-            $this->emit('order-submitted');
+            $this->dispatch('order-submitted');
             $this->updateHeader();
 
         } catch (\Exception $e) {
@@ -378,8 +378,8 @@ class BranchStockOrdering extends Component
         }
 
         $this->reset(['cancelTargetId', 'cancelTargetRef']);
-        $this->dispatchBrowserEvent('close-modal', 'confirm-cancel-order');
-        $this->dispatchBrowserEvent('close-modal', 'order-details');
+        $this->dispatch('close-modal', 'confirm-cancel-order');
+        $this->dispatch('close-modal', 'order-details');
     }
 
     public function markDelivered(): void
@@ -401,8 +401,8 @@ class BranchStockOrdering extends Component
         }
 
         $this->reset(['deliverTargetId', 'deliverTargetRef']);
-        $this->dispatchBrowserEvent('close-modal', 'confirm-delivery');
-        $this->dispatchBrowserEvent('close-modal', 'order-details');
+        $this->dispatch('close-modal', 'confirm-delivery');
+        $this->dispatch('close-modal', 'order-details');
     }
 
     public function getCartTotalProperty(): float
@@ -424,7 +424,7 @@ class BranchStockOrdering extends Component
 
     private function notify(string $type, string $message): void
     {
-        $this->dispatchBrowserEvent('notify', ['type' => $type, 'message' => $message]);
+        $this->dispatch('notify', type: $type, message: $message);
     }
 
     private function notifyAdmins(string $title, string $message, string $link, $order = null): void
@@ -456,11 +456,11 @@ class BranchStockOrdering extends Component
 
     private function updateHeader(): void
     {
-        $this->emit('setHeader', [
-            'icon'        => 'M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z',
-            'title'       => 'Stock Requests',
-            'breadcrumbs' => [['label' => 'Inventory', 'url' => '#'], ['label' => 'Stock Requests', 'url' => route('stock.orders')]],
-        ]);
+        $this->dispatch('setHeader', 
+            icon: 'M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z',
+            title: 'Stock Requests',
+            breadcrumbs: [['label' => 'Inventory', 'url' => '#'], ['label' => 'Stock Requests', 'url' => route('stock.orders')]]
+        );
     }
 
     // ── Rendering ─────────────────────────────────────────────────
@@ -545,7 +545,7 @@ class BranchStockOrdering extends Component
     {
         $this->selectedOrderId = $id;
         $this->selectedOrder = StockOrder::with(['items.ingredient', 'requestingBranch', 'sourceBranch', 'requester', 'approver'])->findOrFail($id);
-        $this->dispatchBrowserEvent('open-modal', ['name' => 'order-details']);
+        $this->dispatch('open-modal', name: 'order-details');
     }
 
     public function confirmCancel(int $id): void
@@ -554,7 +554,7 @@ class BranchStockOrdering extends Component
         if ($order->isPending()) {
             $this->cancelTargetId = $id;
             $this->cancelTargetRef = $order->reference_no;
-            $this->dispatchBrowserEvent('open-modal', ['name' => 'confirm-cancel-order']);
+            $this->dispatch('open-modal', name: 'confirm-cancel-order');
         }
     }
 
@@ -564,7 +564,7 @@ class BranchStockOrdering extends Component
         if ($order->isInTransit()) {
             $this->deliverTargetId = $id;
             $this->deliverTargetRef = $order->reference_no;
-            $this->dispatchBrowserEvent('open-modal', ['name' => 'confirm-delivery']);
+            $this->dispatch('open-modal', name: 'confirm-delivery');
         }
     }
 }

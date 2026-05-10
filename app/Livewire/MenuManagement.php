@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Livewire;
 
 use Livewire\Component;
 use Livewire\WithPagination;
 use Livewire\WithFileUploads;
-use Livewire\TemporaryUploadedFile;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use App\Models\Product;
 use App\Models\ProductCategory;
 use App\Models\Ingredient;
@@ -35,8 +35,8 @@ class MenuManagement extends Component
         // Duplicate check
         foreach ($this->optionGroups as $group) {
             if (strtolower($group['name']) === strtolower($template->name)) {
-                $this->dispatchBrowserEvent('close-modal', ['name' => 'import-template-library']);
-                $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => "The '{$template->name}' template is already added to this product."]);
+                $this->dispatch('close-modal', name: 'import-template-library');
+                $this->dispatch('notify', type: 'error', message: "The '{$template->name}' template is already added to this product.");
                 return;
             }
         }
@@ -58,8 +58,8 @@ class MenuManagement extends Component
             'options'     => $options
         ];
 
-        $this->dispatchBrowserEvent('close-modal', ['name' => 'import-template-library']);
-        $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => "Imported '{$template->name}' template."]);
+        $this->dispatch('close-modal', name: 'import-template-library');
+        $this->dispatch('notify', type: 'success', message: "Imported '{$template->name}' template.");
     }
 
     public function saveGroupToLibrary(int $index)
@@ -69,7 +69,7 @@ class MenuManagement extends Component
 
         // Duplicate check in Library
         if (OptionTemplate::where('name', $groupData['name'])->exists()) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => "A template named '{$groupData['name']}' already exists in the library."]);
+            $this->dispatch('notify', type: 'error', message: "A template named '{$groupData['name']}' already exists in the library.");
             return;
         }
 
@@ -89,7 +89,7 @@ class MenuManagement extends Component
             }
         });
 
-        $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => "Group '{$groupData['name']}' saved to library."]);
+        $this->dispatch('notify', type: 'success', message: "Group '{$groupData['name']}' saved to library.");
     }
 
     // ── Filters & Display ─────────────────────────────────────────
@@ -98,6 +98,9 @@ class MenuManagement extends Component
     public $selectedBranchId = '';
     public $perPage = 5;
     public $view = 'table';
+    public string $newCategoryStation = 'kitchen'; // Default
+    public string $categorySearch = '';
+    public string $categoryFilterSearch = '';
     public $panel = 'list';
     public $mode = 'list';
 
@@ -174,7 +177,7 @@ class MenuManagement extends Component
 
     public function updatedDescription()
     {
-        $this->validateFieldLive('description', ValidationHelper::rulesNotes(false, 500), ValidationHelper::commonMessages());
+        $this->validateFieldLive('description', ['nullable', 'string', 'max:500'], ValidationHelper::commonMessages());
     }
 
     public function updatedNewGroupName()
@@ -243,7 +246,7 @@ class MenuManagement extends Component
         $this->panel = 'form';
         $this->mode = 'create';
         $this->updateGlobalHeader('create');
-        $this->dispatchBrowserEvent('switch-panel', ['panel' => 'form']);
+        $this->dispatch('switch-panel', panel: 'form');
     }
 
     public function showEdit(int $id)
@@ -290,7 +293,7 @@ class MenuManagement extends Component
         $this->panel = 'form';
         $this->mode = 'edit';
         $this->updateGlobalHeader('edit');
-        $this->dispatchBrowserEvent('switch-panel', ['panel' => 'form']);
+        $this->dispatch('switch-panel', panel: 'form');
     }
 
     public function backToList()
@@ -299,7 +302,7 @@ class MenuManagement extends Component
         $this->mode = 'list';
         $this->resetProductForm();
         $this->updateGlobalHeader('list');
-        $this->dispatchBrowserEvent('switch-panel', ['panel' => 'list']);
+        $this->dispatch('switch-panel', panel: 'list');
     }
 
     public function toggleStatus(int $id)
@@ -308,7 +311,7 @@ class MenuManagement extends Component
         $product = Product::findOrFail($id);
         $product->is_active = !$product->is_active;
         $product->save();
-        $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => "Product '{$product->name}' status updated."]);
+        $this->dispatch('notify', type: 'success', message: "Product '{$product->name}' status updated.");
     }
 
     public function getActiveCountProperty()
@@ -347,7 +350,7 @@ class MenuManagement extends Component
         // Duplicate check
         foreach ($this->optionGroups as $group) {
             if (strtolower($group['name']) === strtolower($this->newGroupName)) {
-                $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => "An option group named '{$this->newGroupName}' already exists."]);
+                $this->dispatch('notify', type: 'error', message: "An option group named '{$this->newGroupName}' already exists.");
                 return;
             }
         }
@@ -362,7 +365,7 @@ class MenuManagement extends Component
         $this->newGroupPriceMode = 'additive';
         $this->newGroupIsRequired = false;
 
-        $this->dispatchBrowserEvent('close-modal', ['name' => 'add-option-group']);
+        $this->dispatch('close-modal', name: 'add-option-group');
     }
 
     public function removeOptionGroup(int $index)
@@ -408,7 +411,7 @@ class MenuManagement extends Component
 
         foreach ($this->recipeIngredients as $ri) {
             if ($ri['id'] == $this->newIngredientId && $ri['owner'] == $this->newIngredientOwner) {
-                $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => 'Ingredient already added for this option.']);
+                $this->dispatch('notify', type: 'error', message: 'Ingredient already added for this option.');
                 return;
             }
         }
@@ -446,12 +449,17 @@ class MenuManagement extends Component
         if (!$this->isSuperAdmin() && !$this->isAdmin()) return;
         $this->validateSecure([
             'newCategoryName' => ['required', 'string', 'max:255', 'regex:' . ValidationHelper::REGEX_NAME, 'unique:product_categories,name'],
+            'newCategoryStation' => ['required', 'string', 'in:kitchen,barista'],
         ]);
-        $cat = ProductCategory::create(['name' => $this->newCategoryName]);
+        $cat = ProductCategory::create([
+            'name' => $this->newCategoryName,
+            'production_station' => $this->newCategoryStation,
+        ]);
         $this->newCategoryName = '';
+        $this->newCategoryStation = 'kitchen';
         $this->categoryId = $cat->id;
-        $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => 'Category "' . $cat->name . '" created.']);
-        $this->dispatchBrowserEvent('close-modal', ['name' => 'quick-add-category']);
+        $this->dispatch('notify', type: 'success', message: 'Category "' . $cat->name . '" created.');
+        $this->dispatch('close-modal', name: 'quick-add-category');
     }
 
     public function setCategoryAndValidate(int|string|null $categoryId)
@@ -583,12 +591,12 @@ class MenuManagement extends Component
             });
 
             $msg = $this->editProductId ? 'Product updated successfully.' : 'Product added to catalog.';
-            $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => $msg]);
-            $this->dispatchBrowserEvent('close-modal', ['name' => 'confirm-save-product']);
+            $this->dispatch('notify', type: 'success', message: $msg);
+            $this->dispatch('close-modal', name: 'confirm-save-product');
             $this->backToList();
         } catch (\Exception $e) {
             Log::error('MenuManagement.saveProduct failed: ' . $e->getMessage());
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => 'Failed to save product. Please try again.']);
+            $this->dispatch('notify', type: 'error', message: 'Failed to save product. Please try again.');
         }
     }
 
@@ -599,7 +607,7 @@ class MenuManagement extends Component
         $product = Product::findOrFail($id);
         $this->deleteTargetId = $product->id;
         $this->deleteTargetName = $product->name;
-        $this->dispatchBrowserEvent('open-modal', ['name' => 'delete-product']);
+        $this->dispatch('open-modal', name: 'delete-product');
     }
 
     public function deleteProduct()
@@ -621,11 +629,11 @@ class MenuManagement extends Component
             $name = $this->deleteTargetName;
             $this->deleteTargetId = null;
             $this->deleteTargetName = '';
-            $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => '"' . $name . '" removed from catalog.']);
+            $this->dispatch('notify', type: 'success', message: '"' . $name . '" removed from catalog.');
             $this->backToList();
         } catch (\Exception $e) {
             Log::error('MenuManagement.deleteProduct failed: ' . $e->getMessage());
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => 'Failed to delete product.']);
+            $this->dispatch('notify', type: 'error', message: 'Failed to delete product.');
         }
     }
 
@@ -699,11 +707,11 @@ class MenuManagement extends Component
             $breadcrumbs[] = ['label' => 'Edit Product', 'url' => '#'];
             $title = 'Edit Product';
         }
-        $this->emit('setHeader', [
-            'icon'        => 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
-            'title'       => $title,
-            'breadcrumbs' => $breadcrumbs,
-        ]);
+        $this->dispatch('setHeader', 
+            icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
+            title: $title,
+            breadcrumbs: $breadcrumbs
+        );
     }
 
     // ── Render ────────────────────────────────────────────────────
@@ -721,7 +729,11 @@ class MenuManagement extends Component
             $query->where('is_active', $this->isActive === '1' || $this->isActive === 1 || $this->isActive === true);
         }
 
-        $products      = $query->orderBy('name', 'asc')->paginate($this->perPage);
+        $products = $query->leftJoin('product_categories', 'products.category_id', '=', 'product_categories.id')
+            ->select('products.*')
+            ->orderBy('product_categories.sort_order', 'asc')
+            ->orderBy('products.name', 'asc')
+            ->paginate($this->perPage);
         $categories    = ProductCategory::orderBy('name', 'asc')->get();
         $branches      = Branch::orderBy('branch_name', 'asc')->get();
         $allIngredients = Ingredient::orderBy('name', 'asc')->get();

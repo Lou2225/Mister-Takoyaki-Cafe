@@ -1,7 +1,7 @@
 <div
     x-data="{ 
-        panel: $wire.entangle('panel'),
-        search: $wire.entangle('search')
+        panel: $wire.$entangle('panel', true),
+        search: $wire.$entangle('search', true)
     }"
     class="relative overflow-hidden">
 
@@ -249,12 +249,12 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <x-input-label value="Reference *" />
-                                <x-text-input wire:model.debounce.400ms="globalReference" placeholder="e.g. ADJ-{{ now()->format('Ymd') }}-01" class="mt-1.5 h-11 w-full font-medium" :hasError="$errors->has('globalReference')" />
+                                <x-text-input wire:model.live.debounce.400ms="globalReference" placeholder="e.g. ADJ-{{ now()->format('Ymd') }}-01" class="mt-1.5 h-11 w-full font-medium" :hasError="$errors->has('globalReference')" />
                                 <x-input-error :messages="$errors->get('globalReference')" class="mt-1" />
                             </div>
                             <div>
                                 <x-input-label value="Notes" />
-                                <x-text-input wire:model="globalRemarks" placeholder="e.g. Correction for monthly audit..." class="mt-1.5 h-11 w-full font-medium" />
+                                <x-text-input wire:model.live="globalRemarks" placeholder="e.g. Correction for monthly audit..." class="mt-1.5 h-11 w-full font-medium" />
                             </div>
                         </div>
                     </div>
@@ -369,7 +369,7 @@
                             <div>
                                 <x-input-label value="Quantity" />
                                 <div class="relative mt-1.5">
-                                    <x-text-input wire:model="newItemQty" class="w-full h-11 pr-14 text-[13px] font-black" placeholder="0.00" x-on:input="restrictInput($event, 'price')" />
+                                    <x-text-input wire:model.live="newItemQty" class="w-full h-11 pr-14 text-[13px] font-black" placeholder="0.00" x-on:input="restrictInput($event, 'price')" />
                                     <span class="absolute inset-y-0 right-4 flex items-center text-[10px] font-black text-slate-400 uppercase pointer-events-none">{{ $newItemSelectedUnit ?: $newItemUnit ?: '—' }}</span>
                                 </div>
                                 <x-input-error :messages="$errors->get('newItemQty')" class="mt-1" />
@@ -443,7 +443,7 @@
                             <div class="animate-fadeIn">
                                 <x-input-label value="Procurement Cost" />
                                 <div class="mt-1.5">
-                                    <x-text-input wire:model="newItemCost" class="h-11 text-[13px] font-bold w-full" placeholder="Cost (₱)" x-on:input="restrictInput($event, 'price')" />
+                                    <x-text-input wire:model.live="newItemCost" class="h-11 text-[13px] font-bold w-full" placeholder="Cost (₱)" x-on:input="restrictInput($event, 'price')" />
                                 </div>
                                 @if($newItemQty > 0 && $newItemCost > 0)
                                     <div class="mt-2 p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between">
@@ -453,7 +453,7 @@
                                 @endif
                                 <div class="mt-3">
                                     <x-input-label value="Expiry Date" />
-                                    <x-text-input type="date" wire:model="newItemExpiry" min="{{ now()->format('Y-m-d') }}" class="mt-1.5 h-11 text-[13px] font-medium w-full" />
+                                    <x-text-input type="date" wire:model.live="newItemExpiry" min="{{ now()->format('Y-m-d') }}" class="mt-1.5 h-11 text-[13px] font-medium w-full" />
                                 </div>
                             </div>
                         @endif

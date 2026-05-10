@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Livewire;
 
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -18,6 +18,7 @@ class OptionLibraryManagement extends Component
     public $panel = 'list'; // list | form
     public $mode = 'list'; // list | create | edit
     public $priceModeFilter = ''; // '' | additive | fixed
+    public $perPage = 5;
 
     // Form State
     public $editTemplateId = null;
@@ -33,6 +34,7 @@ class OptionLibraryManagement extends Component
     protected $queryString = [
         'search' => ['except' => ''],
         'view' => ['except' => 'table'],
+        'perPage' => ['except' => 5],
     ];
 
     protected $listeners = ['refresh' => '$refresh'];
@@ -45,6 +47,11 @@ class OptionLibraryManagement extends Component
     }
 
     public function updatedSearch()
+    {
+        $this->resetPage();
+    }
+
+    public function updatedPerPage()
     {
         $this->resetPage();
     }
@@ -68,7 +75,7 @@ class OptionLibraryManagement extends Component
         $this->templateItems = collect($template->items)->map(fn($item) => [
             'id'         => $item instanceof OptionTemplateItem ? $item->id : ($item['id'] ?? null),
             'name'       => $item instanceof OptionTemplateItem ? $item->name : ($item['name'] ?? ''),
-            'price'      => $item instanceof OptionTemplateItem ? $item->price : ($item['price'] ?? 0),
+            'price'      => $item instanceof OptionTemplateItem ? ($item->price == 0 ? '' : $item->price) : ($item['price'] == 0 ? '' : $item['price']),
             'is_default' => (bool)($item instanceof OptionTemplateItem ? $item->is_default : ($item['is_default'] ?? false)),
         ])->values()->toArray();
 
@@ -89,7 +96,7 @@ class OptionLibraryManagement extends Component
         $this->templateItems[] = [
             'id' => null,
             'name' => '',
-            'price' => 0,
+            'price' => '',
             'is_default' => false,
         ];
     }
@@ -119,7 +126,7 @@ class OptionLibraryManagement extends Component
             'name' => 'required|string|max:255',
             'priceMode' => 'required|in:fixed,additive',
             'templateItems.*.name' => 'required|string|max:100',
-            'templateItems.*.price' => 'required|numeric|min:0',
+            'templateItems.*.price' => 'nullable|numeric|min:0',
         ]);
 
         // Duplicate check
@@ -128,7 +135,7 @@ class OptionLibraryManagement extends Component
             ->exists();
 
         if ($exists) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => "A template named '{$this->name}' already exists in the library."]);
+            $this->dispatch('notify', type: 'error', message: "A template named '{$this->name}' already exists in the library.");
             return;
         }
 
@@ -148,8 +155,8 @@ class OptionLibraryManagement extends Component
                     $item = !empty($itemData['id']) ? $template->items()->find($itemData['id']) : null;
                     $payload = [
                         'name' => $itemData['name'],
-                        'price' => $itemData['price'],
-                        'is_default' => $itemData['is_default'],
+                        'price' => (float)($itemData['price'] ?: 0),
+                        'is_default' => (bool)($itemData['is_default'] ?? false),
                     ];
 
                     $item = $item ? tap($item, fn($i) => $i->update($payload)) : $template->items()->create($payload);
@@ -158,11 +165,11 @@ class OptionLibraryManagement extends Component
                 $template->items()->whereNotIn('id', $keepIds)->delete();
             });
 
-            $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => 'Template saved to library.']);
+            $this->dispatch('notify', type: 'success', message: 'Template saved to library.');
             $this->backToList();
         } catch (\Exception $e) {
             Log::error('OptionLibraryManagement.saveTemplate failed: ' . $e->getMessage());
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => 'Failed to save template.']);
+            $this->dispatch('notify', type: 'error', message: 'Failed to save template.');
         }
     }
 
@@ -171,7 +178,7 @@ class OptionLibraryManagement extends Component
         $template = OptionTemplate::findOrFail($id);
         $this->deleteTargetId = $template->id;
         $this->deleteTargetName = $template->name;
-        $this->dispatchBrowserEvent('open-modal', ['name' => 'delete-template']);
+        $this->dispatch('open-modal', name: 'delete-template');
     }
 
     public function deleteTemplate()
@@ -184,8 +191,8 @@ class OptionLibraryManagement extends Component
 
         $this->deleteTargetId = null;
         $this->deleteTargetName = '';
-        $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => "Template '{$name}' removed from library."]);
-        $this->dispatchBrowserEvent('close-modal', ['name' => 'delete-template']);
+        $this->dispatch('notify', type: 'success', message: "Template '{$name}' removed from library.");
+        $this->dispatch('close-modal', name: 'delete-template');
         $this->backToList();
     }
 
@@ -206,7 +213,7 @@ class OptionLibraryManagement extends Component
             ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%"))
             ->when($this->priceModeFilter, fn($q) => $q->where('price_mode', $this->priceModeFilter))
             ->orderBy('name', 'asc')
-            ->paginate(5);
+            ->paginate($this->perPage);
 
         return view('livewire.option-library-management', [
             'templates' => $templates

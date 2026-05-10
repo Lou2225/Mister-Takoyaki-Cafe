@@ -2,7 +2,7 @@
 
 namespace Tests\Unit;
 
-use App\Http\Livewire\CategoryManagement;
+use App\Livewire\CategoryManagement;
 use App\Models\ProductCategory;
 use Tests\TestCase;
 

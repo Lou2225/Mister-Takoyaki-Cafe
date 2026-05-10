@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Livewire;
 
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -58,13 +58,13 @@ class CustomerReviewManagement extends Component
         }
 
         $this->viewingReview = $query->findOrFail($id);
-        $this->dispatchBrowserEvent('open-modal', 'view-review-detail');
+        $this->dispatch('open-modal', 'view-review-detail');
     }
 
     public function closeReview()
     {
         $this->viewingReview = null;
-        $this->dispatchBrowserEvent('close-modal', 'view-review-detail');
+        $this->dispatch('close-modal', 'view-review-detail');
     }
 
     public function render()

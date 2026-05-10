@@ -51,7 +51,7 @@ class ValidationHelper
      * Alphanumeric with basic punctuation (for notes/remarks fields).
      * Allows letters, numbers, spaces, common punctuation.
      */
-    const REGEX_NOTES = '~^[\pL\pN\s\-\.\,\!\?\:\;\(\)\'\"/#\\\]+$~u';
+    const REGEX_NOTES = '~^[\pL\pN\s\-\.\,\!\?\:\;\(\)\'\"/#\\\\\+\*\=\%\&\$\@\^\~\|\<\>]+$~u';
 
     // ── Reusable Rule Sets ──────────────────────────────────────────
 

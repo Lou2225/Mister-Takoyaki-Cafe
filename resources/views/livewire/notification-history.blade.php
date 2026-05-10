@@ -22,7 +22,7 @@
             <input type="text" wire:model.live.debounce.300ms="search" placeholder="Search alerts..."
                 class="w-full bg-white border border-gray-200 rounded-xl px-4 py-2 text-[12px] focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all">
         </div>
-        <select wire:model="type" class="bg-white border border-gray-200 rounded-xl px-4 py-2 text-[12px] focus:ring-2 focus:ring-indigo-500/20 transition-all min-w-[140px]">
+        <select wire:model.live="type" class="bg-white border border-gray-200 rounded-xl px-4 py-2 text-[12px] focus:ring-2 focus:ring-indigo-500/20 transition-all min-w-[140px]">
             <option value="">All Types</option>
             <option value="stock">Inventory Alerts</option>
             <option value="expiry">Expiry Warnings</option>

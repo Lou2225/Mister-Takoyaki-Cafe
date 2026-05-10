@@ -1,4 +1,4 @@
-<div x-data="{ panel: @entangle('panel'), mode: @entangle('mode'), tableView: @entangle('view') }" class="relative">
+<div x-data="{ panel: @entangle('panel').live, mode: @entangle('mode').live, tableView: @entangle('view').live }" class="relative">
     {{-- ════════════════ PANEL 1 — LIST ════════════════ --}}
     <div x-show="panel === 'list'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="px-1">
         
@@ -63,13 +63,7 @@
             
             {{-- Left: Search Bar --}}
             <div class="flex flex-1 w-full lg:w-auto">
-                <div class="relative w-full lg:w-72 group">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                    </div>
-                    <input type="text" wire:model.debounce.300ms="search" placeholder="Search templates..." 
-                        class="h-9 pl-9 pr-4 w-full bg-slate-50 border-none rounded-lg text-[13px] font-medium placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all">
-                </div>
+                <x-search-bar wireModel="search" placeholder="Search templates..." width="w-full lg:w-72" />
             </div>
 
             {{-- Right: Filters & View Toggle --}}
@@ -243,7 +237,7 @@
                             <div class="flex items-center gap-4 p-4 rounded-xl bg-slate-50/50 border border-slate-100 hover:bg-white hover:border-indigo-100 hover:shadow-sm transition-all group animate-fadeIn">
                                 <div class="flex-1">
                                     <x-input-label value="Option Name" class="text-[10px] mb-1 ml-1" />
-                                    <x-text-input type="text" wire:model="templateItems.{{ $idx }}.name" 
+                                    <x-text-input type="text" wire:model.live="templateItems.{{ $idx }}.name" 
                                         class="w-full h-10 text-[13px] font-bold text-slate-800 placeholder-slate-300" 
                                         placeholder="e.g. Regular Size" />
                                 </div>
@@ -253,7 +247,7 @@
                                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                             <span class="text-[12px] font-black text-slate-400">₱</span>
                                         </div>
-                                        <x-text-input type="text" wire:model="templateItems.{{ $idx }}.price" 
+                                        <x-text-input type="text" wire:model.live="templateItems.{{ $idx }}.price" 
                                             class="w-full h-10 pl-7 text-[13px] font-black text-slate-800 text-right" 
                                             placeholder="0.00" />
                                     </div>
@@ -294,7 +288,7 @@
                     <div class="space-y-6">
                         <div>
                             <x-input-label value="Template Identity *" />
-                            <x-text-input wire:model="name" class="w-full mt-1.5 h-10 font-bold text-slate-800" placeholder="e.g. Premium Flavors" />
+                            <x-text-input wire:model.live="name" class="w-full mt-1.5 h-10 font-bold text-slate-800" placeholder="e.g. Premium Flavors" />
                             <x-input-error :messages="$errors->get('name')" class="mt-1" />
                         </div>
 
@@ -314,7 +308,7 @@
 
                         <div class="pt-5 border-t border-slate-50">
                             <label class="flex items-center gap-3 cursor-pointer group">
-                                <input type="checkbox" wire:model="isRequired" class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                <input type="checkbox" wire:model.live="isRequired" class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
                                 <div>
                                     <span class="text-[13px] font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">Mandatory Field</span>
                                     <p class="text-[11px] text-slate-400 font-medium leading-none mt-1">Require customer selection</p>

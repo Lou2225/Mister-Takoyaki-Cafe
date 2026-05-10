@@ -171,7 +171,11 @@
     // Safety check for Livewire
     const setupLivewire = () => {
         if (window.Livewire) {
-            Livewire.hook('message.processed', init);
+            Livewire.hook('request', ({ respond }) => {
+                respond(() => {
+                    init();
+                });
+            });
         }
     };
 

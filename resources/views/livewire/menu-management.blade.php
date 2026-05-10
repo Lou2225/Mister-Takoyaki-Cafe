@@ -1,28 +1,10 @@
 <div 
     x-data="{ 
-        panel: @entangle('panel'), 
-        tableView: @entangle('view'), 
-        mode: @entangle('mode'), 
-        activeTab: @entangle('activeTab'),
-        activeTabWidth: 0,
-        activeTabLeft: 0,
-        recalculateActiveTab() {
-            this.$nextTick(() => {
-                const el = this.$refs.tabList.querySelector('[data-active=\'true\']');
-                if (el) {
-                    this.activeTabWidth = el.offsetWidth;
-                    this.activeTabLeft = el.offsetLeft;
-                }
-            });
-        }
+        panel: @entangle('panel').live, 
+        tableView: @entangle('view').live, 
+        mode: @entangle('mode').live, 
+        ...slidingTabs(@entangle('activeTab').live, 'activeTab')
     }"
-    x-init="
-        recalculateActiveTab();
-        $watch('activeTab', () => recalculateActiveTab());
-        $watch('panel', () => {
-            if ($refs.tabList) recalculateActiveTab();
-        });
-    "
     x-on:switch-panel.window="panel = $event.detail.panel"
     class="relative">
     {{-- Panel: Form --}}
@@ -66,7 +48,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
                             <div>
                                 <x-input-label value="Product Name *" />
-                                <x-text-input wire:model.debounce.400ms="name" class="w-full mt-1.5 h-11 font-medium" placeholder="e.g. Classic Takoyaki (8pcs)" inputFilter="productName" :hasError="$errors->has('name')" />
+                                <x-text-input wire:model.live.debounce.400ms="name" class="w-full mt-1.5 h-11 font-medium" placeholder="e.g. Classic Takoyaki (8pcs)" inputFilter="productName" :hasError="$errors->has('name')" />
                                 <x-input-error :messages="$errors->get('name')" class="mt-1" />
                             </div>
                             <div>
@@ -81,11 +63,24 @@
                                                 </button>
                                             </x-slot>
                                             <x-slot name="content">
-                                                <x-dropdown-link href="#" wire:click.prevent="$set('categoryId', '')">Uncategorized</x-dropdown-link>
-                                                <hr class="border-slate-50">
-                                                @foreach($categories as $cat)
-                                                    <x-dropdown-link href="#" wire:click.prevent="$set('categoryId', {{ $cat->id }})">{{ $cat->name }}</x-dropdown-link>
-                                                @endforeach
+                                                <div x-data="{ catSearch: '' }" class="p-2">
+                                                    <div class="px-2 pb-2 mb-2 border-b border-slate-50">
+                                                        <div class="relative">
+                                                            <svg class="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                                            <input x-model="catSearch" type="text" placeholder="Search categories..." 
+                                                                   class="w-full pl-9 pr-4 py-2 bg-slate-50 border-none rounded-lg text-[12px] font-medium focus:ring-1 focus:ring-indigo-500 placeholder-slate-400">
+                                                        </div>
+                                                    </div>
+                                                    <div class="max-h-60 overflow-y-auto custom-scrollbar">
+                                                        <x-dropdown-link href="#" x-show="!catSearch" wire:click.prevent="$set('categoryId', '')">Uncategorized</x-dropdown-link>
+                                                        <hr x-show="!catSearch" class="border-slate-50">
+                                                        @foreach($categories as $cat)
+                                                            <div x-show="!catSearch || @js($cat->name).toLowerCase().includes(catSearch.toLowerCase())">
+                                                                <x-dropdown-link href="#" wire:click.prevent="$set('categoryId', {{ $cat->id }})">{{ $cat->name }}</x-dropdown-link>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
                                             </x-slot>
                                         </x-dropdown>
                                     </div>
@@ -106,7 +101,7 @@
                                     <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                                         <span class="text-[13px] font-medium">₱</span>
                                     </div>
-                                    <x-text-input wire:model.debounce.400ms="price" class="w-full h-11 pl-10 pr-4 font-medium" placeholder="0.00" inputFilter="price" :hasError="$errors->has('price')" />
+                                    <x-text-input wire:model.live.debounce.400ms="price" class="w-full h-11 pl-10 pr-4 font-medium" placeholder="0.00" inputFilter="price" :hasError="$errors->has('price')" />
                                 </div>
                                 <x-input-error :messages="$errors->get('price')" class="mt-1" />
                             </div>
@@ -114,11 +109,11 @@
                                 <x-input-label value="Status *" />
                                 <div class="flex items-center gap-4 mt-3">
                                     <label class="flex items-center gap-2 cursor-pointer group">
-                                        <input type="radio" wire:model="isActive" value="1" class="w-4 h-4 text-indigo-600 border-slate-200 focus:ring-indigo-500 transition-all">
+                                        <input type="radio" wire:model.live="isActive" value="1" class="w-4 h-4 text-indigo-600 border-slate-200 focus:ring-indigo-500 transition-all">
                                         <span class="text-[13px] font-medium text-slate-600 group-hover:text-slate-900 transition-colors">Available</span>
                                     </label>
                                     <label class="flex items-center gap-2 cursor-pointer group">
-                                        <input type="radio" wire:model="isActive" value="0" class="w-4 h-4 text-indigo-600 border-slate-200 focus:ring-indigo-500 transition-all">
+                                        <input type="radio" wire:model.live="isActive" value="0" class="w-4 h-4 text-indigo-600 border-slate-200 focus:ring-indigo-500 transition-all">
                                         <span class="text-[13px] font-medium text-slate-600 group-hover:text-slate-900 transition-colors">Hidden</span>
                                     </label>
                                 </div>
@@ -127,7 +122,7 @@
 
                         <div>
                             <x-input-label value="Product Description" />
-                            <textarea wire:model.debounce.400ms="description" rows="4" 
+                            <textarea wire:model.live.debounce.400ms="description" rows="4" 
                                 class="w-full mt-1.5 rounded-xl border-slate-200 text-[13px] font-medium focus:ring-indigo-500 focus:border-indigo-500 placeholder-slate-400 resize-none h-32" 
                                 placeholder="Describe this item for customers... (Numbers and symbols allowed)"></textarea>
                             <x-input-error :messages="$errors->get('description')" class="mt-1" />
@@ -194,13 +189,13 @@
                                             @foreach($group['options'] as $oIdx => $option)
                                                 <div class="flex items-center gap-4">
                                                     <div class="flex-1">
-                                                        <x-text-input wire:model="optionGroups.{{ $idx }}.options.{{ $oIdx }}.name" class="w-full h-10 text-[13px] font-bold" placeholder="Option name..." inputFilter="productName" />
+                                                        <x-text-input wire:model.live="optionGroups.{{ $idx }}.options.{{ $oIdx }}.name" class="w-full h-10 text-[13px] font-bold" placeholder="Option name..." inputFilter="productName" />
                                                     </div>
                                                     <div class="w-28 relative">
                                                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                                                             <span class="text-[12px] font-bold">₱</span>
                                                         </div>
-                                                        <x-text-input wire:model="optionGroups.{{ $idx }}.options.{{ $oIdx }}.price" class="w-full h-10 pl-7 text-[13px] font-black text-right" placeholder="0.00" inputFilter="price" />
+                                                        <x-text-input wire:model.live="optionGroups.{{ $idx }}.options.{{ $oIdx }}.price" class="w-full h-10 pl-7 text-[13px] font-black text-right" placeholder="0.00" inputFilter="price" />
                                                     </div>
                                                     <div class="flex items-center gap-3">
                                                         <label class="flex items-center gap-2 cursor-pointer">
@@ -296,7 +291,7 @@
                                         <div>
                                             <x-input-label value="Quantity" />
                                             <div class="relative mt-1.5">
-                                                <x-text-input wire:model="newIngredientQty" class="w-full h-11 pr-14 text-[13px] font-black" placeholder="0.00" inputFilter="price" />
+                                                <x-text-input wire:model.live="newIngredientQty" class="w-full h-11 pr-14 text-[13px] font-black" placeholder="0.00" inputFilter="price" />
                                                 <span class="absolute inset-y-0 right-4 flex items-center text-[10px] font-black text-slate-400 uppercase">{{ $newIngredientUnit ?: '—' }}</span>
                                             </div>
                                             <x-input-error :messages="$errors->get('newIngredientQty')" class="mt-1" />
@@ -471,7 +466,7 @@
                                     <span class="text-[10px] font-black text-slate-600 uppercase tracking-widest bg-white/90 px-2 py-1 rounded backdrop-blur-sm shadow-sm">Upload</span>
                                 </div>
                             @endif
-                            <input type="file" wire:model="image" class="absolute inset-0 opacity-0 cursor-pointer" accept="image/*">
+                            <input type="file" wire:model.live="image" class="absolute inset-0 opacity-0 cursor-pointer" accept="image/*">
                         </div>
                     </div>
                     <x-input-error :messages="$errors->get('image')" class="mt-3 text-center" />
@@ -634,7 +629,7 @@
 
             {{-- Right: Filters --}}
             <div class="flex items-center gap-2">
-                <x-dropdown align="right" width="48">
+                <x-dropdown align="right" width="56">
                     <x-slot name="trigger">
                         <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
                             <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 0 1 3 12V7a4 4 0 0 1 4-4z" /></svg>
@@ -643,11 +638,24 @@
                         </x-secondary-button>
                     </x-slot>
                     <x-slot name="content">
-                        <x-dropdown-link href="#" wire:click.prevent="$set('selectedCategoryId', '')">All Categories</x-dropdown-link>
-                        <hr class="border-slate-50">
-                        @foreach($categories as $cat)
-                            <x-dropdown-link href="#" wire:click.prevent="$set('selectedCategoryId', {{ $cat->id }})">{{ $cat->name }}</x-dropdown-link>
-                        @endforeach
+                        <div x-data="{ filterCatSearch: '' }" class="p-2">
+                            <div class="px-2 pb-2 mb-2 border-b border-slate-50">
+                                <div class="relative">
+                                    <svg class="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                    <input x-model="filterCatSearch" type="text" placeholder="Search..." 
+                                           class="w-full pl-9 pr-4 py-2 bg-slate-50 border-none rounded-lg text-[12px] font-medium focus:ring-1 focus:ring-indigo-500 placeholder-slate-400">
+                                </div>
+                            </div>
+                            <div class="max-h-60 overflow-y-auto custom-scrollbar">
+                                <x-dropdown-link href="#" x-show="!filterCatSearch" wire:click.prevent="$set('selectedCategoryId', '')">All Categories</x-dropdown-link>
+                                <hr x-show="!filterCatSearch" class="border-slate-50">
+                                @foreach($categories as $cat)
+                                    <div x-show="!filterCatSearch || @js($cat->name).toLowerCase().includes(filterCatSearch.toLowerCase())">
+                                        <x-dropdown-link href="#" wire:click.prevent="$set('selectedCategoryId', {{ $cat->id }})">{{ $cat->name }}</x-dropdown-link>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
                     </x-slot>
                 </x-dropdown>
 
@@ -877,14 +885,34 @@
             
             <div class="mt-4">
                 <x-input-label value="Category Name" />
-                <x-text-input wire:model.debounce.400ms="newCategoryName" class="w-full mt-1.5 h-10" placeholder="e.g. Snacks, Beverages, Desserts" inputFilter="name" :hasError="$errors->has('newCategoryName')" />
+                <x-text-input wire:model.live.debounce.400ms="newCategoryName" class="w-full mt-1.5 h-10" placeholder="e.g. Snacks, Beverages, Desserts" inputFilter="name" :hasError="$errors->has('newCategoryName')" />
                 <x-input-error :messages="$errors->get('newCategoryName')" class="mt-1" />
+            </div>
+
+            <div class="mt-4">
+                <x-input-label value="Production Station" />
+                <div class="mt-2 flex items-center gap-4">
+                    <label class="flex items-center gap-2 cursor-pointer group">
+                        <input type="radio" wire:model.live="newCategoryStation" value="kitchen" class="w-4 h-4 text-indigo-600 border-slate-200 focus:ring-indigo-500 transition-all">
+                        <span class="text-[13px] font-medium text-slate-600 group-hover:text-slate-900 transition-colors">Kitchen</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer group">
+                        <input type="radio" wire:model.live="newCategoryStation" value="barista" class="w-4 h-4 text-indigo-600 border-slate-200 focus:ring-indigo-500 transition-all">
+                        <span class="text-[13px] font-medium text-slate-600 group-hover:text-slate-900 transition-colors">Barista</span>
+                    </label>
+                </div>
+                <x-input-error :messages="$errors->get('newCategoryStation')" class="mt-1" />
             </div>
             
             <div class="flex items-center justify-end gap-2 mt-6">
                 <x-secondary-button @click="$dispatch('close-modal', 'quick-add-category')" class="h-10">Cancel</x-secondary-button>
                 <x-primary-button wire:click="quickAddCategory" class="h-10">Create Category</x-primary-button>
-              <x-modal name="add-option-group" maxWidth="sm" focusable wire:key="modal-add-option-group">
+            </div>
+        </div>
+    </x-modal>
+
+    {{-- Add Option Group Modal --}}
+    <x-modal name="add-option-group" maxWidth="sm" focusable wire:key="modal-add-option-group">
         <div class="h-1 w-full bg-gradient-to-r from-indigo-400 to-sky-500 rounded-t-lg"></div>
         <div class="p-6">
             <div class="flex items-start gap-4 mb-4">
@@ -900,7 +928,7 @@
             <div class="mt-4 space-y-4">
                 <div>
                     <x-input-label value="Group Name" />
-                    <x-text-input wire:model="newGroupName" class="w-full mt-1.5 h-10" placeholder="e.g. Extras, Sizes, Flavors" inputFilter="productName" />
+                    <x-text-input wire:model.live="newGroupName" class="w-full mt-1.5 h-10" placeholder="e.g. Extras, Sizes, Flavors" inputFilter="productName" />
                     <x-input-error :messages="$errors->get('newGroupName')" class="mt-1" />
                 </div>
                 <div>
@@ -921,7 +949,7 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-3 p-3 bg-slate-50/50 rounded-xl border border-slate-100 transition-all hover:bg-indigo-50/30">
-                    <input type="checkbox" wire:model="newGroupIsRequired" id="is_req_group" class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                    <input type="checkbox" wire:model.live="newGroupIsRequired" id="is_req_group" class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
                     <label for="is_req_group" class="text-[12px] font-medium text-slate-700 cursor-pointer">Mandatory Selection (Customer must choose)</label>
                 </div>
             </div>
@@ -929,8 +957,6 @@
                 <x-secondary-button @click="$dispatch('close-modal', 'add-option-group')" class="h-10">Cancel</x-secondary-button>
                 <x-primary-button wire:click="addOptionGroup" class="h-10">Add Group</x-primary-button>
             </div>
-        </div>
-    </x-modal>    </div>
         </div>
     </x-modal>
 </div>

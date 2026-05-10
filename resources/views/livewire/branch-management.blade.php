@@ -23,7 +23,7 @@
                 panel: initialPanel || 'list',
                 mode: 'list',
                 view: initialView || 'table',
-                status: @entangle('status'),
+                status: @entangle('status').live,
                 
                 // ── Location ──
                 loc: {
@@ -113,14 +113,21 @@
                         const container = document.getElementById('branchMap');
                         if (!container) return;
                         
+                        const street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            attribution: '&copy; OpenStreetMap contributors'
+                        });
+                        const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                        });
+
                         this.map = L.map('branchMap', {
                             maxBounds: [[13.85, 120.85], [14.65, 121.95]],
                             maxBoundsViscosity: 1.0,
-                            minZoom: 10
+                            minZoom: 10,
+                            layers: [street]
                         }).setView([14.2189, 121.1672], 11);
-                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                            attribution: '&copy; OpenStreetMap contributors'
-                        }).addTo(this.map);
+
+                        L.control.layers({ "Street": street, "Satellite": satellite }).addTo(this.map);
 
                         this.map.on('click', (e) => {
                             if (this.marker) this.marker.setLatLng(e.latlng);
@@ -164,12 +171,21 @@
                         const container = document.getElementById('globalBranchMap');
                         if (!container) return;
 
+                        const street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            attribution: '&copy; OpenStreetMap contributors'
+                        });
+                        const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                        });
+
                         this.gMap = L.map('globalBranchMap', {
                             maxBounds: [[13.85, 120.85], [14.65, 121.95]],
                             maxBoundsViscosity: 1.0,
-                            minZoom: 10
+                            minZoom: 10,
+                            layers: [street]
                         }).setView([14.2189, 121.1672], 11);
-                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.gMap);
+
+                        L.control.layers({ "Street": street, "Satellite": satellite }).addTo(this.gMap);
                         this.updateGlobalBranches();
                     }, 300);
                 },
@@ -180,11 +196,34 @@
                     this.gMarkers.forEach(m => this.gMap.removeLayer(m));
                     this.gMarkers = [];
                     
+                    let mainBranch = null;
+
                     bData.forEach(b => {
                         const marker = L.marker([b.lat, b.lng]).addTo(this.gMap)
-                            .bindPopup(`<b>${b.name}</b><br>${b.formatted}<br><span class="text-[10px] font-bold ${b.status ? 'text-green-600' : 'text-red-600'}">${b.status ? 'ACTIVE' : 'INACTIVE'}</span>`);
+                            .bindPopup(`
+                                <div class="p-1">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <b class="text-[14px] text-slate-900">${b.name}</b>
+                                        ${b.is_main ? '<span class="px-1.5 py-0.5 bg-indigo-600 text-white text-[9px] font-black rounded uppercase tracking-tighter">Main Hub<\/span>' : ''}
+                                    <\/div>
+                                    <p class="text-[11px] text-slate-500 mb-2">${b.formatted}<\/p>
+                                    <span class="text-[10px] font-bold ${b.status ? 'text-green-600' : 'text-red-600'} uppercase tracking-widest">
+                                        ${b.status ? '● Operational' : '○ Inactive'}
+                                    <\/span>
+                                <\/div>
+                            `);
                         this.gMarkers.push(marker);
+                        if (b.is_main) mainBranch = b;
                     });
+
+                    // Center on main branch if found
+                    if (mainBranch) {
+                        this.gMap.setView([mainBranch.lat, mainBranch.lng], 15);
+                    } else if (bData.length > 0) {
+                        // Fallback: fit bounds to all branches if no main
+                        const bounds = L.latLngBounds(bData.map(b => [b.lat, b.lng]));
+                        this.gMap.fitBounds(bounds, { padding: [50, 50] });
+                    }
                 }
             };
         }
@@ -212,7 +251,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <x-input-label for="f_branch_name" value="Branch Name *" />
-                                <x-text-input id="f_branch_name" name="branch_name" wire:model.debounce.500ms="branch_name" type="text" 
+                                <x-text-input id="f_branch_name" name="branch_name" wire:model.live.debounce.500ms="branch_name" type="text" 
                                     class="mt-1 block w-full" placeholder="e.g. Mister Takoyaki - Makati" 
                                     inputFilter="name" maxlength="150"
                                     @keydown="FormFilters.nameKeydown($event)" @paste="FormFilters.namePaste($event)"
@@ -221,7 +260,7 @@
                             </div>
                             <div>
                                 <x-input-label for="f_branch_code" value="Branch Code *" />
-                                <x-text-input id="f_branch_code" name="branch_code" wire:model.debounce.500ms="branch_code" type="text" 
+                                <x-text-input id="f_branch_code" name="branch_code" wire:model.live.debounce.500ms="branch_code" type="text" 
                                     class="mt-1 block w-full uppercase" placeholder="e.g. MAKATI-01" 
                                     maxlength="50"
                                     :hasError="$errors->has('branch_code')" />
@@ -233,7 +272,7 @@
                                     <div class="flex-shrink-0 inline-flex items-center px-3 h-10 rounded-l-lg border border-r-0 border-gray-200 bg-gray-50 text-gray-500 text-[13px] font-bold">
                                         +63
                                     </div>
-                                    <x-text-input id="f_phone" name="phone" wire:model.debounce.500ms="phone" type="text"
+                                    <x-text-input id="f_phone" name="phone" wire:model.live.debounce.500ms="phone" type="text"
                                         class="block w-full rounded-l-none" placeholder="912 345 6789" autocomplete="tel"
                                         inputFilter="number" maxlength="10"
                                         @keydown="FormFilters.numberKeydown($event)" @paste="FormFilters.numberPaste($event)"
@@ -243,7 +282,7 @@
                             </div>
                             <div>
                                 <x-input-label for="f_email" value="Email Address" />
-                                <x-text-input id="f_email" name="email" wire:model.debounce.500ms="email" type="email" 
+                                <x-text-input id="f_email" name="email" wire:model.live.debounce.500ms="email" type="email" 
                                     class="mt-1 block w-full" placeholder="e.g. makati@mistertakoyaki.com" 
                                     autocomplete="email" inputFilter="email" maxlength="255"
                                     @keydown="FormFilters.emailKeydown($event)" @paste="FormFilters.emailPaste($event)"
@@ -361,7 +400,7 @@
 
                         <div class="mt-4">
                             <x-input-label value="Street / House No. / Landmark" />
-                            <x-text-input wire:model.debounce.500ms="addr_street" type="text" class="mt-1 block w-full h-10" placeholder="e.g. 123 Maple St, Unit 12A" :hasError="$errors->has('addr_street')" />
+                            <x-text-input wire:model.live.debounce.500ms="addr_street" type="text" class="mt-1 block w-full h-10" placeholder="e.g. 123 Maple St, Unit 12A" :hasError="$errors->has('addr_street')" />
                             <x-input-error :messages="$errors->get('addr_street')" class="mt-1" />
                         </div>
                     </div>
@@ -395,7 +434,7 @@
                         <div class="mt-6 pt-6 border-t border-slate-100">
                             <h3 class="text-[12px] font-bold text-slate-800 uppercase tracking-widest mb-4">Operational Status</h3>
                             <label for="f_status" class="flex items-center gap-3 cursor-pointer select-none">
-                                <input type="checkbox" id="f_status" name="status" wire:model.lazy="status"
+                                <input type="checkbox" id="f_status" name="status" wire:model.blur="status"
                                     class="rounded border-gray-300 text-gray-900 shadow-sm focus:ring-indigo-600 h-4 w-4">
                                 <div>
                                     <span class="block text-[13px] font-semibold text-gray-800">Active Node</span>
@@ -913,6 +952,7 @@
                 </div>
             </div>
         </div>
+    </div>
 
     {{-- Map Picker Modal --}}
     <x-modal name="map-modal" maxWidth="4xl" focusable>
@@ -1012,7 +1052,7 @@
 
             <div class="mb-6">
                 <label class="flex items-start gap-3 cursor-pointer group p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition-all">
-                    <input type="checkbox" wire:model="confirmMainDesignation" class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4">
+                    <input type="checkbox" wire:model.live="confirmMainDesignation" class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4">
                     <span class="text-[12px] font-bold text-slate-700 leading-relaxed select-none group-hover:text-slate-900 transition-colors">
                         I understand that this will reconfigure the company's logistics hub and transfer all primary procurement privileges.
                     </span>

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Livewire;
 
 use Livewire\Component;
 use App\Models\Branch;
@@ -24,6 +24,9 @@ class CustomerReviewForm extends Component
 
     public function mount($branch = null)
     {
+        // Try to get branch from route parameter or query string
+        $branch = $branch ?: request()->query('branch');
+
         if ($branch) {
             $this->branch = Branch::where('id', $branch)->orWhere('branch_code', $branch)->first();
             if ($this->branch) {

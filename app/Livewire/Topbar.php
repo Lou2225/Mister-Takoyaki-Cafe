@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Livewire;
 
 use Livewire\Component;
 use App\Models\Branch;
@@ -22,6 +22,7 @@ class Topbar extends Component
     public string $roleName     = '';
     public string $initials     = '';
     public string $email        = '';
+    public ?array $avatarDisplay = null;
 
     public array $notifications = [];
     public int   $unreadCount   = 0;
@@ -67,6 +68,13 @@ class Topbar extends Component
         $this->email     = $user->email       ?? '';
         $this->initials  = strtoupper(substr($this->firstName, 0, 1))
                          . strtoupper(substr($this->lastName,  0, 1));
+
+        // Load avatar display data if user has a chosen avatar
+        $this->avatarDisplay = null;
+        if ($user->avatar) {
+            $all = collect(\App\Livewire\ProfileSettings::avatarCollection())->flatten(1);
+            $this->avatarDisplay = $all->firstWhere('id', $user->avatar);
+        }
     }
 
     private function fetchNotifications(): void
@@ -243,7 +251,7 @@ class Topbar extends Component
             return redirect($notification->link);
         }
 
-        $this->dispatchBrowserEvent('close-notifications');
+        $this->dispatch('close-notifications');
         return null;
     }
 

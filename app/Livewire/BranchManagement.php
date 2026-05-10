@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Livewire;
 
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -38,13 +38,13 @@ class BranchManagement extends Component
     public $dateError = '';
     
     // Form fields
-    public ?int $branch_id;
-    public string $branch_name;
-    public string $branch_code;
-    public string $phone;
-    public string $email;
-    public string $address; // Full JSON address blob
-    public ?int $user_id; // Manager
+    public ?int $branch_id = null;
+    public ?string $branch_name = null;
+    public ?string $branch_code = null;
+    public ?string $phone = null;
+    public ?string $email = null;
+    public ?string $address = null; // Full JSON address blob
+    public ?int $user_id = null; // Manager
     public bool $status = true;
     public bool $is_main = false;
     public bool $confirmMainDesignation = false;
@@ -204,7 +204,7 @@ class BranchManagement extends Component
         $this->mode = 'create';
         $this->resetForm();
         $this->updateGlobalHeader('create');
-        $this->dispatchBrowserEvent('switch-panel', ['panel' => 'form', 'mode' => 'create']);
+        $this->dispatch('switch-panel', panel: 'form', mode: 'create');
     }
 
     public function showEdit(int $id)
@@ -236,14 +236,14 @@ class BranchManagement extends Component
 
         $this->resetValidation();
         $this->updateGlobalHeader('edit');
-        $this->dispatchBrowserEvent('switch-panel', ['panel' => 'form', 'mode' => 'edit']);
+        $this->dispatch('switch-panel', panel: 'form', mode: 'edit');
     }
 
     public function showInsights()
     {
         $this->panel = 'insights';
         $this->updateGlobalHeader('insights');
-        $this->dispatchBrowserEvent('switch-panel', ['panel' => 'insights', 'mode' => 'insights']);
+        $this->dispatch('switch-panel', panel: 'insights', mode: 'insights');
     }
 
     // ── Deletion Workflow ──────────────────────────────────────────
@@ -274,7 +274,7 @@ class BranchManagement extends Component
 
         $this->deleteTargetId = $id;
         $this->deleteTargetName = $branch->branch_name;
-        $this->dispatchBrowserEvent('open-modal', 'delete-branch');
+        $this->dispatch('open-modal', 'delete-branch');
     }
 
     public function deleteBranch(int $id)
@@ -289,10 +289,10 @@ class BranchManagement extends Component
             $branch->delete();
         });
 
-        $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => 'Branch node decommissioned successfully.']);
-        $this->dispatchBrowserEvent('refresh-global-map', ['branches' => json_decode($this->buildPlottableBranches(), true)]);
-        $this->emit('refreshTopbar');
-        $this->emit('branchContextUpdated');
+        $this->dispatch('notify', type: 'success', message: 'Branch node decommissioned successfully.');
+        $this->dispatch('refresh-global-map', branches: json_decode($this->buildPlottableBranches(), true));
+        $this->dispatch('refreshTopbar');
+        $this->dispatch('branchContextUpdated');
         $this->deleteTargetId = null;
         $this->deleteTargetName = '';
         $this->backToList();
@@ -391,10 +391,10 @@ class BranchManagement extends Component
             User::where('id', $this->user_id)->update(['branch_id' => $branch->id]);
         }
 
-        $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => 'Branch successfully registered.']);
-        $this->dispatchBrowserEvent('refresh-global-map', ['branches' => json_decode($this->buildPlottableBranches(), true)]);
-        $this->emit('refreshTopbar');
-        $this->emit('branchContextUpdated');
+        $this->dispatch('notify', type: 'success', message: 'Branch successfully registered.');
+        $this->dispatch('refresh-global-map', branches: json_decode($this->buildPlottableBranches(), true));
+        $this->dispatch('refreshTopbar');
+        $this->dispatch('branchContextUpdated');
         $this->backToList();
     }
 
@@ -472,10 +472,10 @@ class BranchManagement extends Component
             User::where('id', $newManagerId)->update(['branch_id' => $branch->id]);
         }
 
-        $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => 'Node configuration updated.']);
-        $this->dispatchBrowserEvent('refresh-global-map', ['branches' => json_decode($this->buildPlottableBranches(), true)]);
-        $this->emit('refreshTopbar');
-        $this->emit('branchContextUpdated');
+        $this->dispatch('notify', type: 'success', message: 'Node configuration updated.');
+        $this->dispatch('refresh-global-map', branches: json_decode($this->buildPlottableBranches(), true));
+        $this->dispatch('refreshTopbar');
+        $this->dispatch('branchContextUpdated');
         $this->backToList();
     }
 
@@ -486,7 +486,7 @@ class BranchManagement extends Component
         $this->panel = 'list';
         $this->resetForm();
         $this->updateGlobalHeader('list');
-        $this->dispatchBrowserEvent('switch-panel', ['panel' => 'list', 'mode' => 'list']);
+        $this->dispatch('switch-panel', panel: 'list', mode: 'list');
     }
 
     public function toggleStatus(int $id)
@@ -495,7 +495,7 @@ class BranchManagement extends Component
         $branch = Branch::findOrFail($id);
         $branch->status = !$branch->status;
         $branch->save();
-        $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => "Operational status for {$branch->branch_name} updated."]);
+        $this->dispatch('notify', type: 'success', message: "Operational status for {$branch->branch_name} updated.");
     }
 
     public function validateBeforeSetMain()
@@ -506,7 +506,7 @@ class BranchManagement extends Component
         if ($this->is_main) return;
 
         $this->confirmMainDesignation = false;
-        $this->dispatchBrowserEvent('open-modal', 'confirm-set-main');
+        $this->dispatch('open-modal', 'confirm-set-main');
     }
 
     public function setMainBranch(int $id)
@@ -533,11 +533,11 @@ class BranchManagement extends Component
         });
 
         $this->is_main = true;
-        $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => 'Primary operations center successfully reassigned.']);
-        $this->dispatchBrowserEvent('refresh-global-map', ['branches' => json_decode($this->buildPlottableBranches(), true)]);
-        $this->emit('refreshTopbar');
-        $this->emit('branchContextUpdated');
-        $this->emit('refresh');
+        $this->dispatch('notify', type: 'success', message: 'Primary operations center successfully reassigned.');
+        $this->dispatch('refresh-global-map', branches: json_decode($this->buildPlottableBranches(), true));
+        $this->dispatch('refreshTopbar');
+        $this->dispatch('branchContextUpdated');
+        $this->dispatch('refresh');
     }
 
     public function setView(string $view)
@@ -595,7 +595,7 @@ class BranchManagement extends Component
             if (strtotime($this->startDate) > strtotime($this->endDate)) {
                 $this->dateError = 'Start date cannot be after end date.';
             } else {
-                $this->activeFilter = 'Custom Range';
+                $this->activeFilter = 'All Time';
             }
         }
     }
@@ -774,11 +774,11 @@ class BranchManagement extends Component
             $title = 'Performance Comparison';
         }
 
-        $this->emit('setHeader', [
-            'icon' => 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4',
-            'title' => $title,
-            'breadcrumbs' => $breadcrumbs
-        ]);
+        $this->dispatch('setHeader', 
+            icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4',
+            title: $title,
+            breadcrumbs: $breadcrumbs
+        );
     }
 
     private function buildPlottableBranches($collection = null): string
@@ -794,6 +794,7 @@ class BranchManagement extends Component
                 'lng'       => $addr['lng'] ?? null,
                 'formatted' => $addr['formatted'] ?? '',
                 'status'    => (bool)$b->status,
+                'is_main'   => (bool)$b->is_main,
             ];
         })->filter(fn($b) => $b['lat'] && $b['lng'])->values()->toJson();
     }

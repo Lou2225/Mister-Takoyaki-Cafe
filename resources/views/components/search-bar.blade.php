@@ -8,7 +8,7 @@
 @php
     $theme = auth()->user()?->getRoleTheme() ?? ['primary' => 'indigo'];
     $primaryColor = $theme['primary'];
-    $wireModelName = $wireModel ?? (($attributes->has('x-model') || $attributes->has('wire:model')) ? null : 'search');
+    $wireModelName = $wireModel ?? (($attributes->has('x-model') || $attributes->has('wire:model.live')) ? null : 'search');
     $searchId = $id ?? 'search_' . ($wireModelName ? str_replace(['.', '$'], '_', $wireModelName) : ($attributes->get('x-model') ?? 'input'));
 @endphp
 
@@ -21,7 +21,7 @@
     <label for="{{ $searchId }}" class="sr-only">{{ $placeholder }}</label>
     <input id="{{ $searchId }}" type="text" placeholder="{{ $placeholder }}"
         {{ $attributes->merge([
-            'wire:model' => $wireModelName,
+            'wire:model.live' => $wireModelName,
             'wire:key' => 'input_' . $searchId
         ])->class([
             "pl-10 pr-4 py-2 $width text-[13px] font-medium text-slate-900 bg-white border border-slate-200/60 rounded-xl transition-all duration-300 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.05)] placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-{$primaryColor}-500/20 focus:border-{$primaryColor}-500 h-[42px]"

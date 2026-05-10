@@ -7,8 +7,8 @@
 @endphp
 
 <div
-    x-data="{ ...slidingTabs(@js($panel), 'panel'), mode: 'list' }"
-    x-on:switch-panel.window="panel = $event.detail.panel; mode = $event.detail.mode || mode"
+    x-data="{ ...slidingTabs(@entangle('panel').live, 'panel'), mode: 'list' }"
+    x-on:switch-panel.window="panel = $event.detail.panel; if($event.detail.mode) mode = $event.detail.mode"
     @trigger-edit-ingredient.window="$wire.showEdit($event.detail.id)"
     class="relative">
 
@@ -33,7 +33,7 @@
             </div>
 
             {{-- High-Fidelity Sliding Tabs --}}
-            <x-sliding-tabs model="panel" class="mb-6">
+            <x-sliding-tabs model="panel" ref="panelList" class="mb-6">
                 <x-sliding-tab value="list" model="panel">
                     <x-slot name="icon">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
@@ -89,7 +89,7 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </div>
                     <div>
-                        <span class="block text-[10px] font-black {{ $expiringCount > 0 ? 'text-rose-700/60' : 'text-slate-700/60' }} uppercase tracking-widest leading-none mb-1">Expiring â‰¤{{ $alertDays }}d</span>
+                        <span class="block text-[10px] font-black {{ $expiringCount > 0 ? 'text-rose-700/60' : 'text-slate-700/60' }} uppercase tracking-widest leading-none mb-1">Expiring &le;{{ $alertDays }}d</span>
                         <span class="block text-[20px] font-black {{ $expiringCount > 0 ? 'text-rose-600' : 'text-gray-900' }} leading-none">{{ $expiringCount }}</span>
                     </div>
                 </div>
@@ -106,17 +106,6 @@
                 </div>
             </div>
 
-            {{-- Settings Context Banner --}}
-            <div class="flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-xl text-[11px] text-indigo-700 mb-4">
-                <svg class="w-3.5 h-3.5 shrink-0 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                <span>
-                    Thresholds from <strong>System Settings â†’ Inventory Controls</strong>: 
-                    Low Stock Warning = <strong>{{ $inventoryConfig['low_stock_threshold'] }}</strong> units &nbsp;Â·&nbsp;
-                    Critical Level = <strong>{{ $inventoryConfig['critical_stock_threshold'] }}</strong> units &nbsp;Â·&nbsp;
-                    Expiry Alert Window = <strong>{{ $alertDays }} days</strong>
-                </span>
-                <a href="{{ route('settings.index') }}" class="ml-auto shrink-0 font-bold underline hover:text-indigo-900 transition-colors">Configure â†’</a>
-            </div>
 
             {{-- macOS Style Unified Toolbar --}}
             <div class="relative z-20 flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
@@ -172,13 +161,21 @@
                             @php
                                 $stockToDisplay = 0;
                                 $isLow = false;
+                                $isCritical = false;
+                                
+                                $globalLow = $inventoryConfig['low_stock_threshold'] ?? 10;
+                                $globalCritical = $inventoryConfig['critical_stock_threshold'] ?? 5;
+                                $effectiveMin = $ing->minimum_stock > 0 ? $ing->minimum_stock : $globalLow;
+
                                 if ($selectedBranchId) {
                                     $stockRecord = collect($ing->branchStocks)->where('branch_id', $selectedBranchId)->first();
                                     $stockToDisplay = $stockRecord ? $stockRecord->stock_quantity : 0;
-                                    $isLow = $stockToDisplay <= $ing->minimum_stock;
                                 } else {
                                     $stockToDisplay = collect($ing->branchStocks)->sum('stock_quantity');
                                 }
+                                
+                                $isLow = $stockToDisplay <= $effectiveMin;
+                                $isCritical = $stockToDisplay <= $globalCritical;
                                 
                                 $colors = ['from-indigo-400 to-violet-500', 'from-emerald-400 to-teal-500', 'from-amber-400 to-orange-500', 'from-rose-400 to-pink-500'];
                                 $grad = $colors[$ing->id % count($colors)];
@@ -210,11 +207,13 @@
                                 
                                 <td class="py-4 px-6 border-r border-slate-100/50 text-right whitespace-nowrap">
                                     <div class="flex flex-col items-end">
-                                        <span class="text-[15px] font-black {{ $isLow ? 'text-red-600' : 'text-slate-900' }}">
+                                        <span class="text-[15px] font-black {{ $isCritical ? 'text-red-600' : ($isLow ? 'text-amber-600' : 'text-slate-900') }}">
                                             {{ \App\Helpers\StockHelper::formatForDisplay($stockToDisplay, $ing->unit) }}
                                         </span>
-                                        @if($isLow)
-                                            <span class="text-[9px] font-black text-red-400 uppercase tracking-widest animate-pulse">Low Stock</span>
+                                        @if($isCritical)
+                                            <span class="text-[9px] font-black text-red-500 uppercase tracking-widest animate-pulse">Critical</span>
+                                        @elseif($isLow)
+                                            <span class="text-[9px] font-black text-amber-500 uppercase tracking-widest">Low Stock</span>
                                         @endif
                                     </div>
                                 </td>
@@ -276,7 +275,7 @@
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                 <div>
                                     <x-input-label value="Ingredient Name *" />
-                                    <x-text-input wire:model.debounce.400ms="ingredientName" class="w-full mt-1.5 h-11 font-medium" placeholder="e.g. Octopus Bits" inputFilter="name" :hasError="$errors->has('ingredientName')" />
+                                    <x-text-input wire:model.live.debounce.400ms="ingredientName" class="w-full mt-1.5 h-11 font-medium" placeholder="e.g. Octopus Bits" inputFilter="name" :hasError="$errors->has('ingredientName')" />
                                     <x-input-error :messages="$errors->get('ingredientName')" class="mt-1" />
                                 </div>
                                 <div>
@@ -457,7 +456,7 @@
                                                 @else
                                                     <div class="h-8 w-full border border-slate-100 bg-slate-50/30 rounded-lg flex items-center px-3 text-[11px] font-black text-slate-400 italic">
                                                         1 {{ strtoupper($ingredientUnit) }}
-                                                        <input type="hidden" wire:model="conversionRows.{{ $i }}.chain_from_index" value="base">
+                                                        <input type="hidden" wire:model.live="conversionRows.{{ $i }}.chain_from_index" value="base">
                                                     </div>
                                                 @endif
                                             </div>
@@ -639,7 +638,7 @@
             <p class="mt-1 text-[13px] text-gray-500 font-medium">Add a new sorting group for your kitchen supplies.</p>
             <div class="mt-5">
                 <x-input-label for="new_ing_category_name" value="Category Label" />
-                <x-text-input id="new_ing_category_name" wire:model.debounce.400ms="newCategoryName" type="text" class="block w-full h-11 mt-1.5" placeholder="e.g. Seafood & Frozen" autofocus inputFilter="name" :hasError="$errors->has('newCategoryName')" />
+                <x-text-input id="new_ing_category_name" wire:model.live.debounce.400ms="newCategoryName" type="text" class="block w-full h-11 mt-1.5" placeholder="e.g. Seafood & Frozen" autofocus inputFilter="name" :hasError="$errors->has('newCategoryName')" />
                 <x-input-error :messages="$errors->get('newCategoryName')" class="mt-1" />
             </div>
             <div class="mt-6 flex justify-end gap-3">
@@ -768,7 +767,7 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </div>
                 <div>
-                    <span class="block text-[10px] font-black text-amber-700/60 uppercase tracking-widest leading-none mb-1">Expiring â‰¤{{ $alertDays }}d</span>
+                    <span class="block text-[10px] font-black text-amber-700/60 uppercase tracking-widest leading-none mb-1">Expiring &le;{{ $alertDays }}d</span>
                     <span class="block text-[20px] font-black text-amber-700 leading-none">{{ number_format($expiryStats['expiring']) }}</span>
                 </div>
                 @if($expiryStats['expiring'] > 0)

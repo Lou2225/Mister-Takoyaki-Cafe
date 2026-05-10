@@ -1,4 +1,4 @@
-<div class="px-2 py-2 space-y-6" x-data="slidingTabs({ panel: @entangle('panel') }, ['panel'])">
+<div class="px-2 py-2 space-y-6" x-data="slidingTabs({ panel: @entangle('panel').live }, ['panel'])">
     {{-- ════════════════ DYNAMIC HEADER ════════════════ --}}
     <div class="px-1 pt-2">
         <div class="mb-6 flex items-center justify-between">
@@ -266,7 +266,7 @@
                                     <label class="block text-[11px] font-black text-indigo-300 uppercase tracking-[0.2em] mb-3">Global Logistics Rate</label>
                                     <div class="relative">
                                         <span class="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 font-black text-lg">₱</span>
-                                        <input wire:model="globalRate" type="number" class="w-full bg-white/5 border-white/10 rounded-2xl h-14 pl-10 pr-6 text-[18px] font-black text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all placeholder-white/10">
+                                        <input wire:model.live="globalRate" type="number" class="w-full bg-white/5 border-white/10 rounded-2xl h-14 pl-10 pr-6 text-[18px] font-black text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all placeholder-white/10">
                                     </div>
                                     <p class="text-[10px] text-slate-500 font-medium italic mt-3 leading-relaxed">System applies this multiplier (₱/km) to calculate suggested delivery fees for all incoming branch requests.</p>
                                 </div>
@@ -359,7 +359,7 @@
                                             <div class="grid grid-cols-2 gap-3 bg-slate-50/50 p-3 rounded-2xl border border-slate-100/50">
                                                 <div>
                                                     <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Approved Amount</span>
-                                                    <x-text-input wire:model="editItemQuantities.{{ $item->id }}" type="number" step="0.01" class="w-full !py-1 !px-2 !text-xs font-black tabular-nums" />
+                                                    <x-text-input wire:model.live="editItemQuantities.{{ $item->id }}" type="number" step="0.01" class="w-full !py-1 !px-2 !text-xs font-black tabular-nums" />
                                                 </div>
                                                 <div class="flex flex-col justify-center text-right">
                                                     <span class="text-[9px] font-black text-indigo-400 uppercase tracking-widest block mb-0.5">Price/{{ $item->unit }}</span>
@@ -403,7 +403,7 @@
                                         </div>
                                         <div class="relative">
                                             <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-xs">₱</span>
-                                            <input wire:model="deliveryFee" type="number" step="0.01" class="w-full h-10 bg-white/10 border-white/10 rounded-xl pl-7 pr-3 text-[13px] font-black text-white focus:ring-indigo-500 focus:border-indigo-500">
+                                            <input wire:model.live="deliveryFee" type="number" step="0.01" class="w-full h-10 bg-white/10 border-white/10 rounded-xl pl-7 pr-3 text-[13px] font-black text-white focus:ring-indigo-500 focus:border-indigo-500">
                                         </div>
                                     </div>
                                 @else
@@ -424,7 +424,7 @@
                 <div class="p-5 border-t border-slate-100 bg-white">
                     @if($selectedOrder->isPending())
                         <div class="space-y-4">
-                            <x-textarea wire:model="adminRemarks" rows="2" class="w-full text-xs font-medium" placeholder="Add fulfillment remarks..."></x-textarea>
+                            <x-textarea wire:model.live="adminRemarks" rows="2" class="w-full text-xs font-medium" placeholder="Add fulfillment remarks..."></x-textarea>
                             <div class="flex gap-3"><x-secondary-button wire:click="confirmReject({{ $selectedOrder->id }})" class="flex-1 justify-center h-11 text-red-600 border-red-100">Reject</x-secondary-button><x-primary-button wire:click="confirmApprove({{ $selectedOrder->id }})" class="flex-[2] justify-center h-11">Approve Request</x-primary-button></div>
                         </div>
                     @elseif($selectedOrder->isApproved())
@@ -476,7 +476,7 @@
         <div class="p-6 text-center" x-data="{ processing: false }">
             <div class="w-16 h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4"><svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></div>
             <h3 class="text-lg font-black text-red-600 uppercase">Reject Request?</h3>
-            <div class="mt-6"><x-textarea wire:model="rejectionReason" rows="3" class="w-full text-xs" placeholder="Reason..."></x-textarea></div>
+            <div class="mt-6"><x-textarea wire:model.live="rejectionReason" rows="3" class="w-full text-xs" placeholder="Reason..."></x-textarea></div>
             <div class="flex items-center gap-3 mt-8">
                 <x-secondary-button @click="$dispatch('close-modal', 'confirm-reject-order')" class="flex-1 justify-center h-11">Cancel</x-secondary-button>
                 <x-primary-button 

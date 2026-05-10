@@ -212,7 +212,7 @@
         </div>
 
         {{-- ─── Breakdown Side Panel ────────────────────────────────────────── --}}
-        <x-side-panel wire:model="showBreakdown" name="kpi-breakdown" width="max-w-md">
+        <x-side-panel wire:model.live="showBreakdown" name="kpi-breakdown" width="max-w-md">
             <div class="flex flex-col h-full bg-white">
                 {{-- Premium Header --}}
                 <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/40">
@@ -430,37 +430,48 @@
             </div>
         </div>
 
-        {{-- ─── Secondary Analytical Grid (Non-Circular) ────────────────── --}}
+        {{-- ─── Secondary Analytical Grid ────────────────── --}}
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-            {{-- 1: Payment Distribution (New Horizontal Bar Design) --}}
+            {{-- 1: Revenue Channels (Dynamic from POS Config) --}}
             <div class="lg:col-span-4 rounded-xl bg-white border border-gray-200 shadow-sm p-6 flex flex-col h-[320px]">
                 <h2 class="text-[14px] font-black text-gray-900 uppercase tracking-widest mb-6">Revenue Channels</h2>
                 <div class="flex-1 flex flex-col justify-center space-y-6">
                     @php
-                        $totalOrders = array_sum($chart['payment']['series']);
-                        $channelLabels = $chart['payment']['labels'];
+                        $totalOrders = array_sum($chart['channels']['series']);
+                        $channelLabels = $chart['channels']['labels'];
+                        $channelSeries = $chart['channels']['series'];
                         $channelValues = array_map(function($val) use ($totalOrders) {
                             return $totalOrders > 0 ? round(($val / $totalOrders) * 100, 1) : 0;
-                        }, $chart['payment']['series']);
-                        $colors = ['bg-emerald-500', 'bg-blue-500', 'bg-amber-500'];
+                        }, $channelSeries);
+                        
+                        // Dynamic Color Mapping
+                        $channelColors = [
+                            'Dine-in' => 'bg-emerald-500',
+                            'Take-out' => 'bg-blue-500',
+                            'Delivery' => 'bg-amber-500',
+                            'Pick-up' => 'bg-indigo-500',
+                        ];
                     @endphp
                     @forelse($channelLabels as $idx => $label)
                         <div class="space-y-2">
                             <div class="flex justify-between items-center">
                                 <span class="text-[12px] font-black text-gray-600 uppercase tracking-wider">{{ $label }}</span>
-                                <span class="text-[12px] font-black text-gray-900">{{ $channelValues[$idx] }}%</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[10px] font-bold text-gray-400">{{ $channelSeries[$idx] }} orders</span>
+                                    <span class="text-[12px] font-black text-gray-900">{{ $channelValues[$idx] }}%</span>
+                                </div>
                             </div>
                             <div class="h-3 w-full bg-gray-50 border border-gray-100 rounded-full overflow-hidden">
-                                <div class="h-full {{ $colors[$idx] ?? 'bg-gray-400' }} transition-all duration-1000" style="width: {{ $channelValues[$idx] }}%"></div>
+                                <div class="h-full {{ $channelColors[$label] ?? 'bg-slate-400' }} transition-all duration-1000" style="width: {{ $channelValues[$idx] }}%"></div>
                             </div>
                         </div>
                     @empty
                         <div class="flex-1 flex flex-col items-center justify-center -mt-6">
                             <div class="w-12 h-12 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-300 mb-3">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
                             </div>
-                            <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">No Channel Distribution</p>
+                            <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">No Active Channels</p>
                         </div>
                     @endforelse
                 </div>
@@ -572,7 +583,7 @@
             </div>
 
             {{-- Enhanced Stock Intelligence (col-span-4) --}}
-            <div class="lg:col-span-4 rounded-xl bg-white border border-gray-200 shadow-sm overflow-hidden flex flex-col h-[400px]" x-data="{ stockTab: 'deficiency', ...slidingTabs('deficiency', 'stockTab') }">
+            <div class="lg:col-span-4 rounded-xl bg-white border border-gray-200 shadow-sm overflow-hidden flex flex-col h-[400px]" x-data="slidingTabs(@entangle('stockTab').live, 'stockTab')">
                 <div class="px-6 py-5 flex items-center justify-between bg-white sticky top-0 z-20 shrink-0">
                     <h2 class="text-[14px] font-black text-gray-900 uppercase tracking-widest">Stock Intelligence</h2>
                 </div>

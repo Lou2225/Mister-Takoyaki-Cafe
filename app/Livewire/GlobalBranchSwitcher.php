@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Livewire;
 
 use Livewire\Component;
 use App\Models\Branch;
@@ -47,8 +47,8 @@ class GlobalBranchSwitcher extends Component
         if (!$this->isSuperAdmin) return;
 
         \App\Services\BranchContext::setActiveBranch($id);
-        $this->emit('branch-switched');
-        $this->emit('refreshTopbar');
+        $this->dispatch('branch-switched');
+        $this->dispatch('refreshTopbar');
         
         // Redirect to same page to refresh all components with new context
         return redirect(request()->header('Referer'));

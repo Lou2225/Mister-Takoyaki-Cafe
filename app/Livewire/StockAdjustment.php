@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Livewire;
 
 use Livewire\Component;
 use App\Models\Ingredient;
@@ -121,7 +121,7 @@ class StockAdjustment extends Component
             ->where('reference_id', $refId)
             ->get();
         
-        $this->dispatchBrowserEvent('open-modal', 'view-adjustment-details');
+        $this->dispatch('open-modal', name: 'view-adjustment-details');
     }
 
     public function closeView()
@@ -134,14 +134,14 @@ class StockAdjustment extends Component
 
     private function updateHeader()
     {
-        $this->emit('setHeader', [
-            'icon' => 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
-            'title' => 'Inventory Logistics',
-            'breadcrumbs' => [
+        $this->dispatch('setHeader', 
+            icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+            title: 'Inventory Logistics',
+            breadcrumbs: [
                 ['label' => 'Logistics', 'url' => '#'],
                 ['label' => 'Adjustments', 'url' => '#'],
             ]
-        ]);
+        );
     }
 
     public function updatedSelectedBranchId()
@@ -362,11 +362,11 @@ class StockAdjustment extends Component
                 }
             });
 
-            $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => 'Transaction successfully committed.']);
+            $this->dispatch('notify', type: 'success', message: 'Transaction successfully committed.');
             $this->backToList();
             $this->triggerLowStockAlert($this->selectedBranchId);
         } catch (\Exception $e) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => $e->getMessage()]);
+            $this->dispatch('notify', type: 'error', message: $e->getMessage());
         }
     }
 
@@ -376,7 +376,7 @@ class StockAdjustment extends Component
         $hasActual = collect($this->bulkAdjustments)->contains(fn($i) => $i['actual'] !== '');
         
         if (!$hasActual) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => 'Please enter at least one physical count.']);
+            $this->dispatch('notify', type: 'error', message: 'Please enter at least one physical count.');
             return;
         }
 
@@ -412,12 +412,12 @@ class StockAdjustment extends Component
             });
 
             if ($modifiedCount > 0) {
-                $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => "Reconciled $modifiedCount items."]);
+                $this->dispatch('notify', type: 'success', message: "Reconciled $modifiedCount items.");
                 $this->triggerLowStockAlert($this->selectedBranchId);
             }
             $this->backToList();
         } catch (\Exception $e) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => $e->getMessage()]);
+            $this->dispatch('notify', type: 'error', message: $e->getMessage());
         }
     }
 

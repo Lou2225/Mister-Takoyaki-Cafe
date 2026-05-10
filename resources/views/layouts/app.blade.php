@@ -31,7 +31,7 @@
     <script src="{{ asset('js/form-validation.js') }}"></script>
 
     {{-- Leaflet: only on branches + users pages --}}
-    @if(request()->routeIs('branches.index') || request()->routeIs('users.index'))
+    @if(request()->routeIs('branches.index') || request()->routeIs('users.index') || request()->routeIs('settings.index'))
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <style>

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Livewire;
 
 use Livewire\Component;
 use App\Models\StockBatch;
@@ -65,7 +65,7 @@ class StockExpiry extends Component
         $batch = StockBatch::with('ingredient', 'branch')->findOrFail($batchId);
 
         if ($batch->current_quantity <= 0) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'warning', 'message' => 'Batch is already empty.']);
+            $this->dispatch('notify', type: 'warning', message: 'Batch is already empty.');
             return;
         }
 
@@ -95,7 +95,7 @@ class StockExpiry extends Component
         });
 
         $this->loadStats();
-        $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => 'Batch disposed and logged as waste.']);
+        $this->dispatch('notify', type: 'success', message: 'Batch disposed and logged as waste.');
     }
 
     public function updatedSearch()    { $this->resetPage(); }

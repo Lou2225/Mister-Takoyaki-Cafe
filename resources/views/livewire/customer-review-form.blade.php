@@ -16,7 +16,7 @@
             </div>
         </div>
     @else
-        <form wire:submit.prevent="submit" class="bg-white rounded-3xl shadow-xl shadow-gray-200/50 p-6 sm:p-8 border border-gray-100 transition-all">
+        <form wire:submit="submit" class="bg-white rounded-3xl shadow-xl shadow-gray-200/50 p-6 sm:p-8 border border-gray-100 transition-all">
             
             <div class="mb-8 text-center pb-6 border-b border-gray-50">
                 <h1 class="text-xl font-black tracking-tight text-gray-900 mb-1">{{ tap($title) ? $title : 'How was your experience?' }}</h1>
@@ -74,7 +74,7 @@
                     <div class="space-y-4">
                         <div>
                             <label for="customer_name" class="block text-[13px] font-bold text-gray-700 mb-1.5">Name</label>
-                            <input type="text" wire:model.debounce.400ms="customer_name" id="customer_name" 
+                            <input type="text" wire:model.live.debounce.400ms="customer_name" id="customer_name" 
                                 class="w-full bg-gray-50 border {{ $errors->has('customer_name') ? 'border-red-500 bg-red-50' : 'border-gray-200' }} text-gray-900 text-[14px] rounded-xl focus:ring-rose-500 focus:border-rose-500 block px-3.5 py-2.5 transition-all shadow-sm placeholder-gray-400" 
                                 placeholder="Juan Dela Cruz" x-on:input="restrictInput($event, 'name')">
                             @error('customer_name') <span class="text-xs text-rose-500 font-bold mt-1 block">{{ $message }}</span> @enderror
@@ -82,7 +82,7 @@
 
                         <div>
                             <label for="contact_number" class="block text-[13px] font-bold text-gray-700 mb-1.5">Contact Number</label>
-                            <input type="tel" wire:model.debounce.400ms="contact_number" id="contact_number" 
+                            <input type="tel" wire:model.live.debounce.400ms="contact_number" id="contact_number" 
                                 class="w-full bg-gray-50 border {{ $errors->has('contact_number') ? 'border-red-500 bg-red-50' : 'border-gray-200' }} text-gray-900 text-[14px] rounded-xl focus:ring-rose-500 focus:border-rose-500 block px-3.5 py-2.5 transition-all shadow-sm placeholder-gray-400" 
                                 placeholder="09xxxxxxxxx" x-on:input="restrictInput($event, 'phone')">
                             @error('contact_number') <span class="text-xs text-rose-500 font-bold mt-1 block">{{ $message }}</span> @enderror

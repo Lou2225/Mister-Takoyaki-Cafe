@@ -1,5 +1,4 @@
 import './bootstrap';
-import Alpine from 'alpinejs';
 
 /**
  * ──────────────────────────────────────────────────────────
@@ -57,13 +56,16 @@ window.addEventListener('open-receipt', (e) => {
  * ──────────────────────────────────────────────────────────
  */
 
-// Shared Tab Logic Factory (Globalized for Blade template access)
-window.createTabComponent = function (initialValues = {}, tabProperties = []) {
-    const props = Array.isArray(tabProperties) ? tabProperties : [tabProperties];
-    const state = { indicatorWidth: 0, indicatorLeft: 0 };
+// Consolidated Sliding Tabs Logic
+const slidingTabsLogic = (initialValue, propertyName = 'tab') => {
+    const props = Array.isArray(propertyName) ? propertyName : [propertyName];
+    const state = {};
 
     props.forEach(p => {
-        state[p] = initialValues[p] || (typeof initialValues === 'string' ? initialValues : 'active');
+        // If initialValue is an object containing the property, use it. 
+        // Otherwise, use the initialValue itself (handles both static values and entangled proxies).
+        const isObject = initialValue !== null && typeof initialValue === 'object';
+        state[p] = (isObject && p in initialValue) ? initialValue[p] : initialValue;
         state[`${p}Width`] = 0;
         state[`${p}Left`] = 0;
     });
@@ -71,10 +73,11 @@ window.createTabComponent = function (initialValues = {}, tabProperties = []) {
     return {
         ...state,
         init() {
-            // Initial render of indicators
-            this.$nextTick(() => props.forEach(p => this.updateIndicator(p)));
+            // Initial sync with multiple attempts for layout stability
+            setTimeout(() => props.forEach(p => this.updateIndicator(p)), 50);
+            setTimeout(() => props.forEach(p => this.updateIndicator(p)), 300);
 
-            // Watch for changes and sync to Livewire
+            // Watchers for automatic updates
             props.forEach(p => {
                 this.$watch(p, (val) => {
                     this.updateIndicator(p);
@@ -82,37 +85,20 @@ window.createTabComponent = function (initialValues = {}, tabProperties = []) {
                 });
             });
 
-            // Deduplicate listeners if Livewire re-initializes the component
-            if (this.$el && this.$el._hasTabListener) return;
-            if (this.$el) this.$el._hasTabListener = true;
-
-            // Handle global refreshes (resize/navigation)
-            const onRefresh = () => {
-                // Self-cleanup for inline x-data if $cleanup isn't available
-                if (this.$el && !document.contains(this.$el)) {
-                    window.removeEventListener(UI_REFRESH_EVENT, onRefresh);
-                    return;
-                }
-                props.forEach(p => this.updateIndicator(p));
-            };
-            window.addEventListener(UI_REFRESH_EVENT, onRefresh);
-
-            // Cleanup to prevent memory leaks via Alpine magic if available
-            if (this.$cleanup) this.$cleanup(() => window.removeEventListener(UI_REFRESH_EVENT, onRefresh));
+            // Layout & Lifecycle listeners
+            const onRefresh = () => props.forEach(p => this.updateIndicator(p));
+            window.addEventListener('resize', onRefresh);
+            window.addEventListener('app:refresh-ui', onRefresh);
+            document.addEventListener('livewire:navigated', onRefresh);
+            document.addEventListener('livewire:update', onRefresh);
         },
 
         syncToLivewire(prop, value) {
-            const el = this.$el ? this.$el.closest('[wire\\:id]') : null;
+            const el = this.$el.closest('[wire\\:id]');
             if (!window.Livewire || !el) return;
             const component = window.Livewire.find(el.getAttribute('wire:id'));
-            if (component) {
-                try {
-                    if (component.get(prop) !== value) {
-                        component.set(prop, value);
-                    }
-                } catch (e) {
-                    // Prop might not exist on component, safely ignore
-                }
+            if (component && component.get(prop) !== value) {
+                try { component.set(prop, value); } catch(e) {}
             }
         },
 
@@ -120,31 +106,32 @@ window.createTabComponent = function (initialValues = {}, tabProperties = []) {
             const active = this[p];
             if (!active) return;
 
-            this.$nextTick(() => {
-                const list = this.$refs[`${p}List`] || this.$refs.tabList;
+            requestAnimationFrame(() => {
+                const list = this.$refs[`${p}List`] || this.$refs.tabList || this.$el.querySelector(`[x-ref="${p}List"], [x-ref="tabList"]`);
                 if (!list) return;
-                const el = list.querySelector(`[data-tab='${active}'], [data-panel='${active}']`);
 
-                if (el) {
+                const el = list.querySelector(`[data-tab='${active}'], [data-panel='${active}'], [value='${active}']`);
+
+                if (el && el.offsetWidth > 0) {
                     this[`${p}Width`] = el.offsetWidth;
                     this[`${p}Left`] = el.offsetLeft;
-                    if (p === props[0]) {
-                        this.indicatorWidth = el.offsetWidth;
-                        this.indicatorLeft = el.offsetLeft;
-                    }
+                } else if (el) {
+                    // Retry once if element is found but has no width (e.g. during transitions)
+                    setTimeout(() => {
+                        if (el.offsetWidth > 0) {
+                            this[`${p}Width`] = el.offsetWidth;
+                            this[`${p}Left`] = el.offsetLeft;
+                        }
+                    }, 150);
                 }
             });
         }
     };
 };
 
-// Component Registrations
-window.slidingTabs = window.createTabComponent;
-Alpine.data('slidingTabs', (val, props) => window.createTabComponent(val, props));
+document.addEventListener('alpine:init', () => {
+    Alpine.data('slidingTabs', slidingTabsLogic);
+});
 
-// Start Alpine
-if (!window.AlpineStarted) {
-    window.Alpine = Alpine;
-    Alpine.start();
-    window.AlpineStarted = true;
-}
+// Global alias for compatibility
+window.slidingTabs = slidingTabsLogic;

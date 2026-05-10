@@ -423,10 +423,16 @@
                 <div class="receipt-footer">
                     <p class="receipt-footer-text">{{ $settings['receipt_footer_message'] ?? 'Thank you for your visit!' }}</p>
 
-                    @if($qrCode)
+                    @if(!empty($settings['receipt_return_policy']))
+                        <div style="font-size: 7px; color: #6b7280; margin-top: 6px; padding-top: 4px; border-top: 1px dashed #e5e7eb;">
+                            {{ $settings['receipt_return_policy'] }}
+                        </div>
+                    @endif
+
+                    @if(!empty($settings['qr_code']))
                         <div class="receipt-qr">
                             <div class="receipt-qr-label">Scan to Review:</div>
-                            <img src="{{ $qrCode }}" alt="Review QR Code">
+                            <img src="{{ $settings['qr_code'] }}" alt="Review QR Code">
                         </div>
                     @endif
                 </div>

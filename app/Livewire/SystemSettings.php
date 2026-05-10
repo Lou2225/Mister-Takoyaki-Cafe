@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Livewire;
 
 use Livewire\Component;
 
@@ -327,10 +327,10 @@ class SystemSettings extends Component
         $isOperationsTab = in_array($this->tab, ['inventory', 'pos', 'reviews']);
         
         if (!$this->isSuperAdmin() && !$isOperationsTab) {
-            $this->dispatchBrowserEvent('notify', [
-                'type' => 'error', 
-                'message' => 'Unauthorized operation. You only have permission to modify operational settings.'
-            ]);
+            $this->dispatch('notify', 
+                type: 'error', 
+                message: 'Unauthorized operation. You only have permission to modify operational settings.'
+            );
             return;
         }
 
@@ -425,10 +425,10 @@ class SystemSettings extends Component
         $isOperationsTab = in_array($this->tab, ['inventory', 'pos', 'reviews']);
         
         if (!$this->isSuperAdmin() && !$isOperationsTab) {
-            $this->dispatchBrowserEvent('notify', [
-                'type' => 'error', 
-                'message' => 'Unauthorized: You only have permission to modify operational settings.'
-            ]);
+            $this->dispatch('notify', 
+                type: 'error', 
+                message: 'Unauthorized: You only have permission to modify operational settings.'
+            );
             return;
         }
 
@@ -530,39 +530,39 @@ class SystemSettings extends Component
         ConfigurationService::invalidateCache();
 
         // Broadcast update events so other Livewire components can react
-        $this->emit('settingsUpdated', [
-            'type' => 'all',
-            'business' => ConfigurationService::getBusinessConfig(),
-            'financial' => ConfigurationService::getFinancialConfig(),
-            'inventory' => ConfigurationService::getInventoryConfig(),
-            'pos' => ConfigurationService::getPosConfig(),
-        ]);
+        $this->dispatch('settingsUpdated', 
+            type: 'all',
+            business: ConfigurationService::getBusinessConfig(),
+            financial: ConfigurationService::getFinancialConfig(),
+            inventory: ConfigurationService::getInventoryConfig(),
+            pos: ConfigurationService::getPosConfig(),
+        );
 
         // Broadcast to specific modules
-        $this->emit('businessSettingsUpdated', ConfigurationService::getBusinessConfig());
-        $this->emit('financialSettingsUpdated', ConfigurationService::getFinancialConfig());
-        $this->emit('inventorySettingsUpdated', ConfigurationService::getInventoryConfig());
-        $this->emit('posSettingsUpdated', ConfigurationService::getPosConfig());
+        $this->dispatch('businessSettingsUpdated', ConfigurationService::getBusinessConfig());
+        $this->dispatch('financialSettingsUpdated', ConfigurationService::getFinancialConfig());
+        $this->dispatch('inventorySettingsUpdated', ConfigurationService::getInventoryConfig());
+        $this->dispatch('posSettingsUpdated', ConfigurationService::getPosConfig());
 
-        $this->dispatchBrowserEvent('notify', [
-            'type'    => 'success',
-            'message' => 'System configuration persisted successfully. All modules reloading...'
-        ]);
+        $this->dispatch('notify', 
+            type: 'success',
+            message: 'System configuration persisted successfully. All modules reloading...'
+        );
 
-        $this->dispatchBrowserEvent('close-modal', 'confirm-update-settings');
+        $this->dispatch('close-modal', name: 'confirm-update-settings');
         
         // Dispatch to browser to refresh sidebar logo and business name
-        $this->dispatchBrowserEvent('businessConfigUpdated', [
-            'logo_url' => ConfigurationService::getBusinessLogoUrl(),
-            'business_name' => ConfigurationService::getBusinessName(),
-        ]);
+        $this->dispatch('businessConfigUpdated', 
+            logo_url: ConfigurationService::getBusinessLogoUrl(),
+            business_name: ConfigurationService::getBusinessName(),
+        );
 
-        $this->dispatchBrowserEvent('accessibility-config-updated', [
-            'hide_modules' => (bool)$this->hideOperationalModules
-        ]);
+        $this->dispatch('accessibility-config-updated', 
+            hide_modules: (bool)$this->hideOperationalModules
+        );
 
-        $this->emit('refreshTopbar');
-        $this->emit('branchContextUpdated');
+        $this->dispatch('refreshTopbar');
+        $this->dispatch('branchContextUpdated');
         $this->updateHeader();
         $this->regenerateQrCode();
     }
@@ -576,7 +576,7 @@ class SystemSettings extends Component
     {
         // Authorize: Only super admins can download backups
         if (!auth()->user()->isSuperAdmin()) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => 'Unauthorized: Only administrators can download database backups.']);
+            $this->dispatch('notify', type: 'error', message: 'Unauthorized: Only administrators can download database backups.');
             return;
         }
 
@@ -600,7 +600,7 @@ class SystemSettings extends Component
             return response()->download($path)->deleteFileAfterSend(true);
         }
 
-        $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => 'Database backup failed. Check server permissions.']);
+        $this->dispatch('notify', type: 'error', message: 'Database backup failed. Check server permissions.');
     }
 
     public $backupFile;
@@ -608,7 +608,7 @@ class SystemSettings extends Component
     {
         // Authorize: Only super admins can restore backups
         if (!auth()->user()->isSuperAdmin()) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => 'Unauthorized: Only administrators can restore database backups.']);
+            $this->dispatch('notify', type: 'error', message: 'Unauthorized: Only administrators can restore database backups.');
             return;
         }
 
@@ -631,11 +631,11 @@ class SystemSettings extends Component
         Storage::delete($path);
 
         if ($returnVar === 0) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => 'System state restored successfully. Initializing...']);
+            $this->dispatch('notify', type: 'success', message: 'System state restored successfully. Initializing...');
             return redirect()->route('settings.index');
         }
 
-        $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => 'Recovery failed. SQL syntax error or connection drop.']);
+        $this->dispatch('notify', type: 'error', message: 'Recovery failed. SQL syntax error or connection drop.');
     }
 
     public function downloadMediaBackup()
@@ -657,20 +657,20 @@ class SystemSettings extends Component
             return response()->download($path)->deleteFileAfterSend(true);
         }
 
-        $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => 'Media backup failed. Zip extension might be missing.']);
+        $this->dispatch('notify', type: 'error', message: 'Media backup failed. Zip extension might be missing.');
     }
 
     private function updateHeader()
     {
-        $this->emit('setHeader', [
-            'icon' => 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z',
-            'title' => 'System Settings',
-            'breadcrumbs' => [
+        $this->dispatch('setHeader', 
+            icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z',
+            title: 'System Settings',
+            breadcrumbs: [
                 ['label' => 'Configuration', 'url' => '#'],
                 ['label' => 'System Settings', 'url' => route('settings.index')],
                 ['label' => ucwords(str_replace('_', ' ', $this->tab)), 'url' => '#'],
             ]
-        ]);
+        );
     }
 
     public function render()

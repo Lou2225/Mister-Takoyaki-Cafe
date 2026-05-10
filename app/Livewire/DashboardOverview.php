@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Livewire;
 
 use Livewire\Component;
 use App\Models\Product;
@@ -44,7 +44,7 @@ class DashboardOverview extends Component
     {
         $this->selectedChartMetric = $metric;
         $data = $this->getChartData();
-        $this->dispatchBrowserEvent('updateSalesChart', $data);
+        $this->dispatch('updateSalesChart', $data);
     }
 
     public function openBreakdown($metric)
@@ -59,13 +59,13 @@ class DashboardOverview extends Component
             default   => [],
         };
         $this->showBreakdown = true;
-        $this->dispatchBrowserEvent('open-modal', ['name' => 'kpi-breakdown']);
+        $this->dispatch('open-modal', name: 'kpi-breakdown');
     }
 
     public function closeBreakdown()
     {
         $this->showBreakdown = false;
-        $this->dispatchBrowserEvent('close-modal', ['name' => 'kpi-breakdown']);
+        $this->dispatch('close-modal', name: 'kpi-breakdown');
     }
     private function getRevenueBreakdown(): array
     {
@@ -354,7 +354,7 @@ class DashboardOverview extends Component
                 return;
             }
 
-            $this->activeFilter = 'Custom Range';
+            $this->activeFilter = 'All Time';
         }
     }
 
@@ -389,8 +389,8 @@ class DashboardOverview extends Component
     public function refreshChart()
     {
         $chartData = $this->getChartData();
-        $this->dispatchBrowserEvent('updateSalesChart', $chartData);
-        $this->emit('branchSelectionUpdated');
+        $this->dispatch('updateSalesChart', $chartData);
+        $this->dispatch('branchSelectionUpdated');
     }
 
     public function resetDates()
@@ -400,14 +400,14 @@ class DashboardOverview extends Component
 
     private function updateHeader()
     {
-        $this->emit('setHeader', [
-            'icon' => 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
-            'title' => 'Network Intelligence',
-            'breadcrumbs' => [
+        $this->dispatch('setHeader', 
+            icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
+            title: 'Network Intelligence',
+            breadcrumbs: [
                 ['label' => 'Operations', 'url' => '#'],
                 ['label' => 'Dashboard', 'url' => route('dashboard')],
             ]
-        ]);
+        );
     }
 
     public function render()
@@ -717,14 +717,24 @@ class DashboardOverview extends Component
         $avgVal = ($totalVal > 0 && count($series) > 0) ? $totalVal / count($series) : 0;
         $forecast = array_map(fn($v) => $v > 0 ? $v : round($avgVal * 0.8, 2), $series);
 
+        // Dynamic Configuration from POS Platform
+        $posConfig = ConfigurationService::getPosConfig();
+        
         // Payment Distribution
         $paymentRaw = $orders->groupBy('payment_method')->map->count();
-        $labels = ['Cash', 'GCash', 'Card'];
-        $paymentSeries = [
-            (int)($paymentRaw['Cash'] ?? 0),
-            (int)($paymentRaw['GCash'] ?? 0),
-            (int)($paymentRaw['Card'] ?? 0),
-        ];
+        $paymentLabels = $posConfig['payment_methods'] ?? ['Cash', 'GCash'];
+        $paymentSeries = [];
+        foreach ($paymentLabels as $label) {
+            $paymentSeries[] = (int)($paymentRaw[$label] ?? 0);
+        }
+
+        // Revenue Channels (Order Types)
+        $channelsRaw = $orders->groupBy('order_type')->map->count();
+        $channelLabels = $posConfig['order_types'] ?? ['Dine-in', 'Take-out'];
+        $channelSeries = [];
+        foreach ($channelLabels as $label) {
+            $channelSeries[] = (int)($channelsRaw[$label] ?? 0);
+        }
 
         return [
             'categories' => $categories,
@@ -732,7 +742,11 @@ class DashboardOverview extends Component
             'forecast'   => $forecast,
             'payment'    => [
                 'series' => $paymentSeries,
-                'labels' => $labels
+                'labels' => $paymentLabels
+            ],
+            'channels'   => [
+                'series' => $channelSeries,
+                'labels' => $channelLabels
             ],
             'metric' => $this->selectedChartMetric
         ];

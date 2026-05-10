@@ -8,7 +8,7 @@
 
 <div
     x-data="{ 
-        filterType: @entangle('filterType'),
+        view: @entangle('view').live,
         panel: @js($panel),
         deleteTargetId: null,
         deleteTargetName: ''
@@ -98,27 +98,41 @@
 
                 {{-- Right: Filters --}}
                 <div class="flex flex-wrap items-center lg:justify-end gap-2">
-                    {{-- Category Focus Filter --}}
+                    {{-- Category Focus Filter (Converted to Dropdown) --}}
                     <x-dropdown align="right" width="48">
                         <x-slot name="trigger">
                             <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
                                 <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-                                <span class="text-[12px] whitespace-nowrap">{{ $filterType === 'all' ? 'All Categories' : ucfirst($filterType) . ' Only' }}</span>
-                                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                <span class="text-[12px] font-semibold whitespace-nowrap">{{ $filterType === 'all' ? 'All Types' : ucfirst($filterType . 's') }}</span>
+                                <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
                             </x-secondary-button>
                         </x-slot>
                         <x-slot name="content">
-                            <x-dropdown-link href="#" wire:click.prevent="$set('filterType', 'all')">All Categories</x-dropdown-link>
-                            <x-dropdown-link href="#" wire:click.prevent="$set('filterType', 'product')">Product Focus</x-dropdown-link>
-                            <x-dropdown-link href="#" wire:click.prevent="$set('filterType', 'ingredient')">Ingredient Focus</x-dropdown-link>
+                            <x-dropdown-link href="#" wire:click.prevent="$set('filterType', 'all')" class="{{ $filterType === 'all' ? 'bg-slate-50 font-bold text-indigo-600' : '' }}">All Types</x-dropdown-link>
+                            <hr class="border-slate-50">
+                            <x-dropdown-link href="#" wire:click.prevent="$set('filterType', 'product')" class="{{ $filterType === 'product' ? 'bg-slate-50 font-bold text-indigo-600' : '' }}">Product Categories</x-dropdown-link>
+                            <x-dropdown-link href="#" wire:click.prevent="$set('filterType', 'ingredient')" class="{{ $filterType === 'ingredient' ? 'bg-slate-50 font-bold text-indigo-600' : '' }}">Ingredient Categories</x-dropdown-link>
                         </x-slot>
                     </x-dropdown>
+
+                    {{-- macOS Divider --}}
+                    <div class="hidden lg:block w-px h-6 bg-slate-200 mx-2"></div>
+
+                    {{-- View Toggle --}}
+                    <button type="button" @click="view = (view === 'table' ? 'board' : 'table')"
+                        class="w-9 h-9 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors focus:outline-none shrink-0"
+                        :title="view === 'table' ? 'Switch to Board View' : 'Switch to Table View'">
+                        <svg x-cloak x-show="view === 'table'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+                        <svg x-cloak x-show="view === 'board'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                    </button>
                 </div>
             </div>
 
             {{-- Panel Container --}}
-            <div class="relative min-h-[500px]" wire:key="table-container-{{ $filterType }}">
-                <div class="animate-fadeIn">
+            <div class="relative min-h-[500px]" wire:key="container-{{ $filterType }}">
+                
+                {{-- ── Table View ── --}}
+                <div x-show="view === 'table'" class="animate-fadeIn">
                     <x-data-table>
                         <x-slot name="header">
                             <th class="py-3 px-6 text-[11px] font-black text-slate-500 uppercase tracking-widest">Category Information</th>
@@ -150,9 +164,16 @@
                                         </div>
                                     </td>
                                     <td class="py-4 px-6 border-r border-slate-100/50 text-center whitespace-nowrap">
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider {{ $category->cat_type === 'product' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-rose-50 text-rose-700 border border-rose-100' }}">
-                                            {{ ucfirst($category->cat_type) }}
-                                        </span>
+                                        <div class="flex flex-col items-center gap-1">
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider {{ $category->cat_type === 'product' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-rose-50 text-rose-700 border border-rose-100' }}">
+                                                {{ ucfirst($category->cat_type) }}
+                                            </span>
+                                            @if($category->cat_type === 'product')
+                                                <span class="text-[9px] font-black {{ $category->production_station === 'barista' ? 'text-sky-600' : 'text-slate-400' }} uppercase tracking-widest">
+                                                    {{ $category->production_station === 'barista' ? 'Barista' : 'Kitchen' }}
+                                                </span>
+                                            @endif
+                                        </div>
                                     </td>
                                     <td class="py-4 px-6 border-r border-slate-100/50 text-center whitespace-nowrap">
                                         <div class="text-[13px] font-black text-slate-900">{{ $category->associated_count ?? 0 }}</div>
@@ -178,6 +199,62 @@
                             @endforelse
                         </tbody>
                     </x-data-table>
+                </div>
+
+                {{-- ── Board View ── --}}
+                <div x-show="view === 'board'" class="animate-fadeIn" x-cloak>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        @forelse($categories as $category)
+                            <div wire:key="cat-board-{{ $category->cat_type }}-{{ $category->id }}" 
+                                class="group relative bg-white border border-slate-100 rounded-[24px] p-6 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300 cursor-pointer overflow-hidden"
+                                wire:click="selectCategory({{ $category->id }}, '{{ $category->cat_type }}')">
+                                
+                                @php $catColor = $category->cat_type === 'product' ? 'indigo' : 'rose'; @endphp
+                                
+                                {{-- Background Glow --}}
+                                <div class="absolute -top-10 -right-10 w-32 h-32 bg-{{ $catColor }}-50/50 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+
+                                <div class="flex items-start justify-between mb-4 relative z-10">
+                                    <div class="w-12 h-12 bg-{{ $catColor }}-50 rounded-2xl flex items-center justify-center text-{{ $catColor }}-600 group-hover:scale-110 transition-transform duration-300 shadow-sm border border-{{ $catColor }}-100/50">
+                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+                                        </svg>
+                                    </div>
+                                    <div class="flex flex-col items-end gap-1">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider {{ $category->cat_type === 'product' ? 'bg-indigo-50 text-indigo-700' : 'bg-rose-50 text-rose-700' }}">
+                                            {{ ucfirst($category->cat_type) }}
+                                        </span>
+                                        @if($category->cat_type === 'product')
+                                            <span class="text-[9px] font-black {{ $category->production_station === 'barista' ? 'text-sky-600' : 'text-slate-400' }} uppercase tracking-widest">
+                                                {{ $category->production_station === 'barista' ? 'Barista' : 'Kitchen' }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                <h3 class="text-[16px] font-black text-slate-900 tracking-tight mb-2 group-hover:text-{{ $catColor }}-600 transition-colors relative z-10">{{ $category->name }}</h3>
+                                <p class="text-[12px] text-slate-500 font-medium line-clamp-2 min-h-[32px] mb-6 relative z-10">{{ $category->description ?: 'No operational description provided for this category segment.' }}</p>
+
+                                <div class="flex items-center justify-between pt-4 border-t border-slate-50 relative z-10">
+                                    <div class="flex flex-col">
+                                        <span class="text-[14px] font-black text-slate-900">{{ $category->associated_count ?? 0 }}</span>
+                                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{{ $category->cat_type === 'product' ? 'Products' : 'Ingredients' }}</span>
+                                    </div>
+                                    <div class="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-{{ $catColor }}-600 group-hover:text-white transition-all">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" /></svg>
+                                    </div>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="col-span-full py-12 bg-white rounded-3xl border border-dashed border-slate-200">
+                                <x-empty-state 
+                                    title="No Categories Found"
+                                    description="Start organizing your catalog by creating a new category group."
+                                    icon="M4 6h16M4 12h16M4 18h16"
+                                />
+                            </div>
+                        @endforelse
+                    </div>
                 </div>
                 <div class="mt-4">
                     <x-pagination :paginator="$categories" />
@@ -221,7 +298,7 @@
                                 <div>
                                     <x-input-label value="Display Name *" />
                                     <div class="relative mt-1">
-                                        <x-text-input type="text" wire:model.debounce.400ms="name" placeholder="e.g. Premium Seafood Platter"
+                                        <x-text-input type="text" wire:model.live.debounce.400ms="name" placeholder="e.g. Premium Seafood Platter"
                                             class="w-full pl-4 pr-10 text-[13px] {{ $errors->has('name') ? 'border-red-400 bg-red-50/30' : 'border-slate-200/60 bg-white' }} rounded-lg h-10 shadow-sm"
                                             inputFilter="name" :hasError="$errors->has('name')"
                                         />
@@ -234,13 +311,56 @@
 
                                 <div>
                                     <x-input-label value="Operational Summary" />
-                                    <x-textarea wire:model.debounce.400ms="description" rows="4" placeholder="Briefly describe the purpose or contents of this category..."
+                                    <x-textarea wire:model.live.debounce.400ms="description" rows="4" placeholder="Briefly describe the purpose or contents of this category..."
                                         class="mt-1 w-full px-4 py-3 text-[13px] text-slate-900 bg-white rounded-lg shadow-sm resize-none {{ $errors->has('description') ? 'border-red-400 bg-red-50/30' : 'border-slate-200/60' }}"
                                     ></x-textarea>
                                     <x-input-error :messages="$errors->get('description')" class="mt-1"/>
                                 </div>
 
 
+                                @if($editCategoryType === 'product')
+                                <div class="mt-4">
+                                    <x-input-label value="Production Station *" />
+                                    <div class="grid grid-cols-2 gap-3 mt-1.5">
+                                        <label class="relative flex items-center justify-between p-3 border rounded-xl cursor-pointer transition-all {{ $production_station === 'kitchen' ? 'bg-indigo-50 border-indigo-200 ring-2 ring-indigo-500/10' : 'bg-white border-slate-200 hover:border-slate-300' }}">
+                                            <div class="flex items-center gap-3">
+                                                <div class="w-8 h-8 rounded-lg {{ $production_station === 'kitchen' ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-400' }} flex items-center justify-center">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                                                </div>
+                                                <div>
+                                                    <div class="text-[13px] font-black {{ $production_station === 'kitchen' ? 'text-indigo-900' : 'text-slate-900' }}">Kitchen</div>
+                                                    <div class="text-[10px] font-bold {{ $production_station === 'kitchen' ? 'text-indigo-600' : 'text-slate-400' }} uppercase tracking-tighter">Cooked Meals</div>
+                                                </div>
+                                            </div>
+                                            <input type="radio" wire:model.live="production_station" value="kitchen" class="sr-only">
+                                            @if($production_station === 'kitchen')
+                                                <div class="text-indigo-600">
+                                                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                                                </div>
+                                            @endif
+                                        </label>
+
+                                        <label class="relative flex items-center justify-between p-3 border rounded-xl cursor-pointer transition-all {{ $production_station === 'barista' ? 'bg-sky-50 border-sky-200 ring-2 ring-sky-500/10' : 'bg-white border-slate-200 hover:border-slate-300' }}">
+                                            <div class="flex items-center gap-3">
+                                                <div class="w-8 h-8 rounded-lg {{ $production_station === 'barista' ? 'bg-sky-600 text-white' : 'bg-slate-50 text-slate-400' }} flex items-center justify-center">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                                                </div>
+                                                <div>
+                                                    <div class="text-[13px] font-black {{ $production_station === 'barista' ? 'text-sky-900' : 'text-slate-900' }}">Barista</div>
+                                                    <div class="text-[10px] font-bold {{ $production_station === 'barista' ? 'text-sky-600' : 'text-slate-400' }} uppercase tracking-tighter">Drinks & Shakes</div>
+                                                </div>
+                                            </div>
+                                            <input type="radio" wire:model.live="production_station" value="barista" class="sr-only">
+                                            @if($production_station === 'barista')
+                                                <div class="text-sky-600">
+                                                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                                                </div>
+                                            @endif
+                                        </label>
+                                    </div>
+                                    <x-input-error :messages="$errors->get('production_station')" class="mt-1"/>
+                                </div>
+                                @endif
                             </div>
                         </div>
                     </div>

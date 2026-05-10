@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Livewire;
 
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -57,7 +57,7 @@ class OrderManagement extends Component
             if (!$this->selectedOrder) {
                 $this->backToList();
             } else {
-                $this->dispatchBrowserEvent('open-modal', 'view-order-detail');
+                $this->dispatch('open-modal', name: 'view-order-detail');
             }
         }
 
@@ -118,13 +118,13 @@ class OrderManagement extends Component
 
     public function updatedStartDate()
     {
-        $this->activeFilter = 'Custom Range';
+        $this->activeFilter = 'All Time';
         $this->resetPage();
     }
 
     public function updatedEndDate()
     {
-        $this->activeFilter = 'Custom Range';
+        $this->activeFilter = 'All Time';
         $this->resetPage();
     }
 
@@ -214,8 +214,8 @@ class OrderManagement extends Component
             ->find($order->id);
         $this->selectedOrderId = $order->id;
         $this->activeTab = 'summary';
-        $this->dispatchBrowserEvent('open-modal', 'view-order-detail');
-        $this->dispatchBrowserEvent('update-active-tab', ['activeTab' => 'summary']);
+        $this->dispatch('open-modal', name: 'view-order-detail');
+        $this->dispatch('update-active-tab', activeTab: 'summary');
     }
 
     public function backToList()
@@ -223,7 +223,7 @@ class OrderManagement extends Component
         $this->selectedOrder = null;
         $this->selectedOrderId = null;
         $this->updateHeader('list');
-        $this->dispatchBrowserEvent('close-modal', 'view-order-detail');
+        $this->dispatch('close-modal', name: 'view-order-detail');
     }
 
     public function closeDetailModal()
@@ -231,10 +231,10 @@ class OrderManagement extends Component
         $this->backToList();
         $this->refundAmount = 0;
         $this->refundReason = '';
-        $this->dispatchBrowserEvent('close-modal', 'refund-modal');
-        $this->dispatchBrowserEvent('close-modal', 'confirm-void-order');
-        $this->dispatchBrowserEvent('close-modal', 'receipt-modal');
-        $this->dispatchBrowserEvent('close-modal', 'reject-modal');
+        $this->dispatch('close-modal', 'refund-modal');
+        $this->dispatch('close-modal', 'confirm-void-order');
+        $this->dispatch('close-modal', 'receipt-modal');
+        $this->dispatch('close-modal', 'reject-modal');
     }
 
     public function openRejectModal(Order $order)
@@ -242,7 +242,7 @@ class OrderManagement extends Component
         if ($order->status !== Order::STATUS_PENDING) return;
         $this->selectedOrder = $order;
         $this->rejectReason = '';
-        $this->dispatchBrowserEvent('open-modal', 'reject-modal');
+        $this->dispatch('open-modal', 'reject-modal');
     }
 
     public function openRefundModal(Order $order)
@@ -257,7 +257,7 @@ class OrderManagement extends Component
 
         $this->selectedOrder = $order;
         $this->refundAmount = $order->refundable_amount;
-        $this->dispatchBrowserEvent('open-modal', 'refund-modal');
+        $this->dispatch('open-modal', 'refund-modal');
     }
 
     public function openVoidModal(Order $order)
@@ -271,13 +271,13 @@ class OrderManagement extends Component
         }
 
         $this->selectedOrder = $order;
-        $this->dispatchBrowserEvent('open-modal', 'confirm-void-order');
+        $this->dispatch('open-modal', 'confirm-void-order');
     }
 
     public function openReceiptModal(Order $order)
     {
         $this->selectedOrder = $order;
-        $this->dispatchBrowserEvent('open-modal', 'receipt-modal');
+        $this->dispatch('open-modal', 'receipt-modal');
     }
 
     public function confirmVoid()
@@ -300,7 +300,7 @@ class OrderManagement extends Component
             'message' => "Order #{$order->reference_no} has been voided."
         ]);
 
-        $this->dispatchBrowserEvent('close-modal', 'confirm-void-order');
+        $this->dispatch('close-modal', 'confirm-void-order');
         $this->backToList();
         $this->resetPage();
     }
@@ -342,7 +342,7 @@ class OrderManagement extends Component
 
             $this->refundAmount = 0;
             $this->refundReason = '';
-            $this->dispatchBrowserEvent('close-modal', 'refund-modal');
+            $this->dispatch('close-modal', 'refund-modal');
         } catch (\Exception $e) {
             $this->dispatchBrowserEvent('notify', [
                 'type' => 'error',
@@ -360,10 +360,10 @@ class OrderManagement extends Component
                 $this->selectedOrder = Order::with(['branch', 'user', 'items.product', 'customer', 'refundedBy', 'rider'])
                     ->find($order->id);
             }
-            $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => "Order #{$order->reference_no} accepted and preparing."]);
+            $this->dispatch('notify', type: 'success', message: "Order #{$order->reference_no} accepted and preparing.");
             $this->backToList();
         } catch (\Exception $e) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => $e->getMessage()]);
+            $this->dispatch('notify', type: 'error', message: $e->getMessage());
         }
     }
 
@@ -376,10 +376,10 @@ class OrderManagement extends Component
                 $this->selectedOrder = Order::with(['branch', 'user', 'items.product', 'customer', 'refundedBy', 'rider'])
                     ->find($order->id);
             }
-            $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => "Order #{$order->reference_no} is out for delivery."]);
+            $this->dispatch('notify', type: 'success', message: "Order #{$order->reference_no} is out for delivery.");
             $this->backToList();
         } catch (\Exception $e) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => $e->getMessage()]);
+            $this->dispatch('notify', type: 'error', message: $e->getMessage());
         }
     }
 
@@ -388,7 +388,7 @@ class OrderManagement extends Component
         $this->selectedOrder = $order;
         $this->selectedOrderId = $order->id;
         $this->selectedRiderId = $order->rider_id;
-        $this->dispatchBrowserEvent('open-modal', 'hand-to-rider-modal');
+        $this->dispatch('open-modal', 'hand-to-rider-modal');
     }
 
     public function handToRider()
@@ -415,10 +415,10 @@ class OrderManagement extends Component
                 'message' => "Order #{$order->reference_no} handed to {$order->rider->first_name}."
             ]);
             
-            $this->dispatchBrowserEvent('close-modal', 'hand-to-rider-modal');
+            $this->dispatch('close-modal', 'hand-to-rider-modal');
             $this->backToList();
         } catch (\Exception $e) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => $e->getMessage()]);
+            $this->dispatch('notify', type: 'error', message: $e->getMessage());
         }
     }
 
@@ -431,10 +431,10 @@ class OrderManagement extends Component
                 $this->selectedOrder = Order::with(['branch', 'user', 'items.product', 'customer', 'refundedBy', 'rider'])
                     ->find($order->id);
             }
-            $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => "Order #{$order->reference_no} marked as completed."]);
+            $this->dispatch('notify', type: 'success', message: "Order #{$order->reference_no} marked as completed.");
             $this->backToList();
         } catch (\Exception $e) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => $e->getMessage()]);
+            $this->dispatch('notify', type: 'error', message: $e->getMessage());
         }
     }
 
@@ -451,7 +451,7 @@ class OrderManagement extends Component
 
         event(new OrderStatusUpdated($order));
 
-        $this->dispatchBrowserEvent('notify', ['type' => 'info', 'message' => "Order #{$order->reference_no} cancelled."]);
+        $this->dispatch('notify', type: 'info', message: "Order #{$order->reference_no} cancelled.");
     }
 
     public function rejectOrder()
@@ -468,8 +468,8 @@ class OrderManagement extends Component
             $this->selectedOrder = $order->fresh(['branch', 'user', 'items.product', 'customer', 'refundedBy', 'rider']);
         }
 
-        $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => "Order #{$order->reference_no} rejected."]);
-        $this->dispatchBrowserEvent('close-modal', 'reject-modal');
+        $this->dispatch('notify', type: 'error', message: "Order #{$order->reference_no} rejected.");
+        $this->dispatch('close-modal', 'reject-modal');
         $this->backToList();
     }
 
@@ -529,11 +529,11 @@ class OrderManagement extends Component
             $title = 'Order #' . ($this->selectedOrder?->reference_no ?? 'Details');
         }
 
-        $this->emit('setHeader', [
-            'icon'        => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01',
-            'title'       => $title,
-            'breadcrumbs' => $breadcrumbs,
-        ]);
+        $this->dispatch('setHeader', 
+            icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01',
+            title: $title,
+            breadcrumbs: $breadcrumbs
+        );
     }
 
     public function render()

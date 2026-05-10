@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Livewire;
 
 use App\Models\Branch;
 use App\Models\BranchIngredientStock;
@@ -150,12 +150,12 @@ class PosTerminal extends Component
     public function toggleEditMode(): void
     {
         if (!$this->canEditLayout()) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => 'Unauthorized to edit layout.']);
+            $this->dispatch('notify', type: 'error', message: 'Unauthorized to edit layout.');
             return;
         }
         $this->isEditMode = !$this->isEditMode;
         if ($this->isEditMode) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'info', 'message' => 'Layout Edit Mode Enabled. Drag items to reorder.']);
+            $this->dispatch('notify', type: 'info', message: 'Layout Edit Mode Enabled. Drag items to reorder.');
         }
     }
 
@@ -179,7 +179,7 @@ class PosTerminal extends Component
             }
         });
 
-        $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => 'Branch menu layout updated.']);
+        $this->dispatch('notify', type: 'success', message: 'Branch menu layout updated.');
     }
 
     public function reorderCategories(array $orderedIds): void
@@ -196,7 +196,7 @@ class PosTerminal extends Component
             }
         });
 
-        $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => 'Branch category layout updated.']);
+        $this->dispatch('notify', type: 'success', message: 'Branch category layout updated.');
     }
 
     // ─── Computed: Products ────────────────────────────────────────────────
@@ -230,12 +230,15 @@ class PosTerminal extends Component
             $query->where('name', 'like', '%' . $this->search . '%');
         }
 
+        $query->leftJoin('product_categories', 'products.category_id', '=', 'product_categories.id');
+
         $orderBy = $this->branchId 
             ? DB::raw('COALESCE(branch_product.sort_order, products.sort_order)') 
-            : 'sort_order';
+            : 'products.sort_order';
 
-        $products = $query->orderBy($orderBy, 'asc')
-            ->orderBy('name', 'asc')
+        $products = $query->orderBy('product_categories.sort_order', 'asc')
+            ->orderBy($orderBy, 'asc')
+            ->orderBy('products.name', 'asc')
             ->get();
 
         // Performance Optimization: Bulk fetch stocks for all products in this view
@@ -270,13 +273,13 @@ class PosTerminal extends Component
     {
         $this->showDraftsModal = true;
         // Standard payload for modal component
-        $this->dispatchBrowserEvent('open-modal', ['name' => 'pos-drafts-list']);
+        $this->dispatch('open-modal', name: 'pos-drafts-list');
     }
 
     public function closeDraftsModal(): void
     {
         $this->showDraftsModal = false;
-        $this->dispatchBrowserEvent('close-modal', 'pos-drafts-list');
+        $this->dispatch('close-modal', 'pos-drafts-list');
     }
 
     // ─── Computed: Categories ──────────────────────────────────────────────
@@ -431,7 +434,7 @@ class PosTerminal extends Component
             : true;
 
         if (!$available) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'warning', 'message' => 'This item is currently unavailable (Out of Stock).']);
+            $this->dispatch('notify', type: 'warning', message: 'This item is currently unavailable (Out of Stock).');
             return;
         }
 
@@ -459,7 +462,7 @@ class PosTerminal extends Component
             }
             
             $this->selectedModifierIds = [];
-            $this->dispatchBrowserEvent('open-modal', 'pos-options');
+            $this->dispatch('open-modal', 'pos-options');
             return;
         }
 
@@ -523,16 +526,20 @@ class PosTerminal extends Component
 
         // Validate stock availability for selected options
         $optionAvail = $this->currentProduct->getOptionAvailability($this->branchId, $stocks);
-        foreach ($this->selectedOptions as $groupId => $optionId) {
-            if (!$optionId) continue; // Skip if no option is selected for this group
+        foreach ($this->selectedOptions as $groupId => $optionIds) {
+            if (!$optionIds) continue; 
+
+            $ids = is_array($optionIds) ? $optionIds : [$optionIds];
             
-            if (($optionAvail[$optionId] ?? 0) <= 0) {
-                $option = ProductOption::find($optionId);
-                $this->dispatchBrowserEvent('notify', [
-                    'type' => 'error',
-                    'message' => "The selected option '" . ($option->name ?? 'Unknown') . "' is out of stock."
-                ]);
-                return;
+            foreach ($ids as $optionId) {
+                if (($optionAvail[$optionId] ?? 0) <= 0) {
+                    $option = ProductOption::find($optionId);
+                    $this->dispatchBrowserEvent('notify', [
+                        'type' => 'error',
+                        'message' => "The selected option '" . ($option->name ?? 'Unknown') . "' is out of stock."
+                    ]);
+                    return;
+                }
             }
         }
 
@@ -570,27 +577,27 @@ class PosTerminal extends Component
         $this->selectedOptions = [];
         $this->selectedModifierIds = [];
         $this->currentProduct = null;
-        $this->dispatchBrowserEvent('close-modal', 'pos-options');
+        $this->dispatch('close-modal', 'pos-options');
     }
 
     public function closePaymentModal(): void
     {
         $this->paymentReference = '';
-        $this->dispatchBrowserEvent('close-modal', 'pos-payment');
+        $this->dispatch('close-modal', 'pos-payment');
     }
 
     public function closeEditItemModal(): void
     {
         $this->editCartItemId = null;
         $this->editCartItemQty = 1;
-        $this->dispatchBrowserEvent('close-modal', 'edit-cart-item');
+        $this->dispatch('close-modal', 'edit-cart-item');
     }
 
     protected function confirmAdd(int $productId, array $optionIds = [], array $modifierIds = [])
     {
         $product = Product::find($productId);
         if (!$product) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => 'Product no longer available.']);
+            $this->dispatch('notify', type: 'error', message: 'Product no longer available.');
             return;
         }
 
@@ -696,7 +703,7 @@ class PosTerminal extends Component
         $this->editCartItemNotes = $this->cart[$key]['instructions'] ?? '';
         $this->applyRegularDiscount = $this->cart[$key]['apply_regular_discount'] ?? false;
         $this->applySeniorDiscount = $this->cart[$key]['apply_senior_discount'] ?? false;
-        $this->dispatchBrowserEvent('open-modal', 'edit-cart-item');
+        $this->dispatch('open-modal', 'edit-cart-item');
     }
 
     public function saveEditItem(): void
@@ -736,12 +743,12 @@ class PosTerminal extends Component
     public function saveDraft(): void
     {
         if (empty($this->cart)) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'warning', 'message' => 'Cart is empty. Nothing to save.']);
+            $this->dispatch('notify', type: 'warning', message: 'Cart is empty. Nothing to save.');
             return;
         }
 
         if (!$this->branchId) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => 'No branch assigned.']);
+            $this->dispatch('notify', type: 'error', message: 'No branch assigned.');
             return;
         }
 
@@ -885,7 +892,7 @@ class PosTerminal extends Component
                 ];
             }
 
-            $this->dispatchBrowserEvent('close-modal', ['name' => 'pos-drafts-list']);
+            $this->dispatch('close-modal', name: 'pos-drafts-list');
             
             // Delete draft ONLY after successful load into memory
             $draft->delete();
@@ -1045,23 +1052,23 @@ class PosTerminal extends Component
         if (empty($this->cart)) return;
         $this->amountTendered = $this->total;
         $this->paymentReference = '';
-        $this->dispatchBrowserEvent('open-modal', 'pos-payment');
+        $this->dispatch('open-modal', 'pos-payment');
     }
 
     public function confirmPayment(): void
     {
         if (empty($this->cart)) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => 'Cart is empty.']);
+            $this->dispatch('notify', type: 'error', message: 'Cart is empty.');
             return;
         }
 
         if (!$this->branchId) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => 'No branch assigned.']);
+            $this->dispatch('notify', type: 'error', message: 'No branch assigned.');
             return;
         }
 
         if ($this->paymentMethod === 'Cash' && $this->amountTendered < $this->total) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => 'Amount tendered is less than total amount.']);
+            $this->dispatch('notify', type: 'error', message: 'Amount tendered is less than total amount.');
             return;
         }
 
@@ -1184,14 +1191,14 @@ class PosTerminal extends Component
             }
 
             $this->clearCart();
-            $this->dispatchBrowserEvent('close-modal', 'pos-payment');
-            $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => "Order #{$order->reference_no} placed successfully!"]);
+            $this->dispatch('close-modal', 'pos-payment');
+            $this->dispatch('notify', type: 'success', message: "Order #{$order->reference_no} placed successfully!");
             
             // 🖨️ AUTOMATIC RECEIPT PRINTING
             // This dispatches to browser event listener in layouts/app.blade.php
             // The receipt window will open and automatically trigger print() for the wired printer
             $receiptUrl = route('receipts.thermal', ['order' => $order->id]);
-            $this->dispatchBrowserEvent('open-receipt', ['url' => $receiptUrl]);
+            $this->dispatch('open-receipt', url: $receiptUrl);
         });
     }
 

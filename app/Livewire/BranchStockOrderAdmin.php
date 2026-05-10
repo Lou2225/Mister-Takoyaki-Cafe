@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Livewire;
 
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -109,7 +109,7 @@ class BranchStockOrderAdmin extends Component
             $this->editItemQuantities[$item->id] = $item->approved_quantity ?? $item->requested_quantity;
         }
 
-        $this->dispatchBrowserEvent('open-modal', ['name' => 'fulfillment-review']);
+        $this->dispatch('open-modal', name: 'fulfillment-review');
     }
 
     public function closeDetail(): void
@@ -117,7 +117,7 @@ class BranchStockOrderAdmin extends Component
         $this->selectedOrderId = null;
         $this->selectedOrder   = null;
         $this->editItemQuantities = [];
-        $this->dispatchBrowserEvent('close-modal', 'fulfillment-review');
+        $this->dispatch('close-modal', 'fulfillment-review');
     }
 
     // ── Logistics Management ──────────────────────────────────────
@@ -229,7 +229,7 @@ class BranchStockOrderAdmin extends Component
 
         $this->adminRemarks = '';
         $this->closeDetail();
-        $this->dispatchBrowserEvent('close-modal', 'confirm-approve-order');
+        $this->dispatch('close-modal', 'confirm-approve-order');
         $this->reset(['approveTargetId', 'approveTargetRef']);
         $this->notify('success', "Order {$order->reference_no} approved.");
     }
@@ -250,7 +250,7 @@ class BranchStockOrderAdmin extends Component
 
         $this->reset(['rejectTargetId', 'rejectionReason']);
         $this->closeDetail();
-        $this->dispatchBrowserEvent('close-modal', 'confirm-reject-order');
+        $this->dispatch('close-modal', 'confirm-reject-order');
         $this->notify('success', "Order rejected.");
     }
 
@@ -312,7 +312,7 @@ class BranchStockOrderAdmin extends Component
 
             $this->reset(['dispatchTargetId', 'dispatchTargetRef']);
             $this->closeDetail();
-            $this->dispatchBrowserEvent('close-dispatch-modals');
+            $this->dispatch('close-dispatch-modals');
             $this->notify('success', 'Transfer dispatched!');
 
         } catch (\Exception $e) {
@@ -322,7 +322,7 @@ class BranchStockOrderAdmin extends Component
 
     private function notify(string $type, string $message): void
     {
-        $this->dispatchBrowserEvent('notify', ['type' => $type, 'message' => $message]);
+        $this->dispatch('notify', type: $type, message: $message);
     }
 
     private function notifyBranch($order, $title, $message): void
@@ -360,11 +360,11 @@ class BranchStockOrderAdmin extends Component
 
     private function updateHeader(): void
     {
-        $this->emit('setHeader', [
-            'icon'        => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4',
-            'title'       => 'Order Inbox',
-            'breadcrumbs' => [['label' => 'Inventory', 'url' => '#'], ['label' => 'Order Inbox', 'url' => route('stock.orders.admin')]],
-        ]);
+        $this->dispatch('setHeader', 
+            icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4',
+            title: 'Order Inbox',
+            breadcrumbs: [['label' => 'Inventory', 'url' => '#'], ['label' => 'Order Inbox', 'url' => route('stock.orders.admin')]]
+        );
     }
 
     public function render()
@@ -437,20 +437,20 @@ class BranchStockOrderAdmin extends Component
         $order = StockOrder::findOrFail($id);
         $this->approveTargetId = $id;
         $this->approveTargetRef = $order->reference_no;
-        $this->dispatchBrowserEvent('open-modal', ['name' => 'confirm-approve-order']);
+        $this->dispatch('open-modal', name: 'confirm-approve-order');
     }
 
     public function confirmReject(int $id): void {
         $order = StockOrder::findOrFail($id);
         $this->rejectTargetId = $id;
         $this->rejectTargetRef = $order->reference_no;
-        $this->dispatchBrowserEvent('open-modal', ['name' => 'confirm-reject-order']);
+        $this->dispatch('open-modal', name: 'confirm-reject-order');
     }
 
     public function confirmDispatch(int $id): void {
         $order = StockOrder::findOrFail($id);
         $this->dispatchTargetId = $id;
         $this->dispatchTargetRef = $order->reference_no;
-        $this->dispatchBrowserEvent('open-modal', ['name' => 'confirm-dispatch-order']);
+        $this->dispatch('open-modal', name: 'confirm-dispatch-order');
     }
 }
