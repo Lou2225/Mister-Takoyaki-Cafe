@@ -42,6 +42,8 @@ class StockManagement extends Component
     public $editIngredientId = null;
     public $ingredientName = '';
     public $ingredientCategoryId = '';
+    public $ingredientCategorySearch = ''; // Search for the category dropdown
+    public $selectedCategoryName = 'Select Category'; // Persistent display name
     public $ingredientScope = 'global';
     public $ingredientUnit = 'pcs';
     public $ingredientMinStock = '';
@@ -229,7 +231,9 @@ class StockManagement extends Component
     public function __call($method, $parameters)
     {
         if (str_starts_with($method, 'updating') && !str_ends_with($method, 'Page')) {
-            $this->resetPage();
+            $this->resetPage(); // Resets default 'page'
+            $this->resetPage('logPage');
+            $this->resetPage('expiryPage');
         }
     }
 
@@ -679,27 +683,59 @@ class StockManagement extends Component
     // ── Render ────────────────────────────────────────────────────
     public function render()
     {
-        $query = Ingredient::query();
+        $inventoryConfig = ConfigurationService::getInventoryConfig();
+        $today = Carbon::today();
+        $alertDays = (int)($inventoryConfig['expiry_alert_days'] ?? 7);
 
-        if ($this->search) {
-            $query->where('name', 'like', "%{$this->search}%");
+        // Ensure a branch is always selected
+        if (!$this->selectedBranchId) {
+            $this->selectedBranchId = \App\Services\BranchContext::getActiveBranchId() ?: (Branch::first()?->id ?? '');
         }
-
         $branchId = $this->selectedBranchId;
 
-        $ingredients = $query->with(['branchStocks', 'category'])->orderBy('name', 'asc')->paginate($this->perPage);
+        // ── Component Data ──
+        $ingredientsList = $this->getIngredientsList();
+        $branches = $this->getAvailableBranches();
+        $kpis = $this->getKpiMetrics($branchId, $today, $alertDays, $inventoryConfig);
+        $movementLog = $this->getMovementLog($branchId);
+        $expiryTracking = $this->getExpiryTracking($branchId, $today, $alertDays);
+        
+        $ingredientCategories = IngredientCategory::orderBy('name', 'asc')->get();
+        $this->updateCategorySelection($ingredientCategories);
 
-        $branches = [];
-        if (auth()->user()->isSuperAdmin()) {
-            $branches = Branch::orderBy('branch_name', 'asc')->get();
-        } elseif (auth()->user()->isAdmin()) {
-            // Admins need all branches for the Transfer destination dropdown
-            $branches = Branch::orderBy('branch_name', 'asc')->get();
+        return view('livewire.stock-management', array_merge([
+            'ingredients' => $ingredientsList,
+            'branches' => $branches,
+            'ingredientCategories' => $this->getFilteredCategories($ingredientCategories),
+            'inventoryConfig' => $inventoryConfig,
+            'alertDays' => $alertDays,
+            'movementLog' => $movementLog,
+        ], $kpis, $expiryTracking))->layout('layouts.app');
+    }
+
+    private function getIngredientsList()
+    {
+        $query = Ingredient::query();
+        if ($this->search) {
+            $query->where('ingredients.name', 'like', "%{$this->search}%");
         }
+        return $query->with(['branchStocks', 'category'])->orderBy('name', 'asc')->paginate($this->perPage);
+    }
 
-        // For KPI calculation
+    private function getAvailableBranches()
+    {
+        if (auth()->user()->isSuperAdmin() || auth()->user()->isAdmin()) {
+            return Branch::orderBy('branch_name', 'asc')->get();
+        }
+        return collect([]);
+    }
+
+    private function getKpiMetrics($branchId, $today, $alertDays, $inventoryConfig)
+    {
         $totalIngredients = Ingredient::count();
         $lowStockWarnings = 0;
+        $expiringCount = 0;
+        $monthlyProcurement = 0;
 
         if ($branchId) {
             $globalLow = (int)($inventoryConfig['low_stock_threshold'] ?? 10);
@@ -710,40 +746,54 @@ class StockManagement extends Component
                 })
                 ->whereRaw('COALESCE(branch_ingredient_stocks.stock_quantity, 0) <= CASE WHEN ingredients.minimum_stock > 0 THEN ingredients.minimum_stock ELSE ? END', [$globalLow])
                 ->count();
+
+            $expiringCount = StockBatch::where('branch_id', $branchId)
+                ->where('current_quantity', '>', 0)
+                ->where('expiry_date', '>', $today)
+                ->where('expiry_date', '<=', $today->copy()->addDays($alertDays))
+                ->count();
+
+            $monthlyProcurement = StockMovement::where('branch_id', $branchId)
+                ->where('type', 'in')
+                ->whereMonth('created_at', now()->month)
+                ->whereYear('created_at', now()->year)
+                ->sum(DB::raw('unit_cost * quantity'));
         }
 
-        $allIngredients = Ingredient::orderBy('name', 'asc')->get();
-        $ingredientCategories = IngredientCategory::orderBy('name', 'asc')->get();
+        return [
+            'totalIngredients' => $totalIngredients,
+            'lowStockWarnings' => $lowStockWarnings,
+            'expiringCount' => $expiringCount,
+            'monthlyProcurement' => $monthlyProcurement,
+            'allIngredients' => Ingredient::orderBy('name', 'asc')->get(),
+        ];
+    }
 
-        // Load inventory configuration from system settings
-        $inventoryConfig = ConfigurationService::getInventoryConfig();
-
-        // ── Movement Log (Panel 5) ─────────────────────────────────
-        $movementLogQuery = StockMovement::with(['ingredient', 'user'])
+    private function getMovementLog($branchId)
+    {
+        $query = StockMovement::with(['ingredient', 'user'])
             ->where('branch_id', $branchId ?: 0)
             ->latest();
 
         if ($this->logTypeFilter) {
-            $movementLogQuery->where('type', $this->logTypeFilter);
+            $query->where('type', $this->logTypeFilter);
         }
         if ($this->logSearch) {
-            $movementLogQuery->whereHas('ingredient', function ($q) {
-                $q->where('name', 'like', "%{$this->logSearch}%");
-            });
+            $query->whereHas('ingredient', fn($q) => $q->where('ingredients.name', 'like', "%{$this->logSearch}%"));
         }
 
-        $movementLog = $movementLogQuery->paginate(15, ['*'], 'logPage');
+        return $query->paginate(15, ['*'], 'logPage');
+    }
 
-        // ── Expiry Tracking (Panel: Expiry) ───────────────────────
-        $today    = Carbon::today();
-        $alertDays = (int)($inventoryConfig['expiry_alert_days'] ?? 7);
-        $nextWeek = Carbon::today()->addDays($alertDays);
+    private function getExpiryTracking($branchId, $today, $alertDays)
+    {
+        $nextWeek = $today->copy()->addDays($alertDays);
 
         $expiryQuery = StockBatch::with(['ingredient', 'branch'])
             ->where('current_quantity', '>', 0)
             ->when($this->expiryBranchFilter, fn($q) => $q->where('branch_id', $this->expiryBranchFilter))
             ->when($this->expirySearch, fn($q) =>
-                $q->whereHas('ingredient', fn($i) => $i->where('name', 'like', '%' . $this->expirySearch . '%'))
+                $q->whereHas('ingredient', fn($i) => $i->where('ingredients.name', 'like', '%' . $this->expirySearch . '%'))
             )
             ->when($this->expiryStatusFilter === 'expired',  fn($q) => $q->where('expiry_date', '<', $today))
             ->when($this->expiryStatusFilter === 'expiring', fn($q) => $q->whereBetween('expiry_date', [$today, $nextWeek]))
@@ -760,21 +810,27 @@ class StockManagement extends Component
             'no_date'  => StockBatch::where('current_quantity', '>', 0)->whereNull('expiry_date')->count(),
         ];
 
-        $alertDays = $inventoryConfig['expiry_alert_days'] ?? 7;
+        return [
+            'expiryQuery' => $expiryQuery,
+            'expiryStats' => $expiryStats
+        ];
+    }
 
-        return view('livewire.stock-management', compact(
-            'ingredients',
-            'branches',
-            'totalIngredients',
-            'lowStockWarnings',
-            'allIngredients',
-            'ingredientCategories',
-            'inventoryConfig',
-            'alertDays',
-            'movementLog',
-            'expiryQuery',
-            'expiryStats'
-        ))->layout('layouts.app');
+    private function updateCategorySelection($ingredientCategories)
+    {
+        $this->selectedCategoryName = $this->ingredientCategoryId 
+            ? ($ingredientCategories->firstWhere('id', $this->ingredientCategoryId)?->name ?? 'Select Category')
+            : 'Select Category';
+    }
+
+    private function getFilteredCategories($categories)
+    {
+        if ($this->ingredientCategorySearch) {
+            return $categories->filter(fn($c) => 
+                str_contains(strtolower($c->name), strtolower($this->ingredientCategorySearch))
+            );
+        }
+        return $categories;
     }
 
     // ── Reports ───────────────────────────────────────────────────

@@ -144,6 +144,11 @@ class StockAdjustment extends Component
         );
     }
 
+    public function updatedSearch()
+    {
+        $this->resetPage();
+    }
+
     public function updatedSelectedBranchId()
     {
         $this->resetPage();
@@ -585,7 +590,7 @@ class StockAdjustment extends Component
             ->where('branch_id', $this->selectedBranchId)
             ->when($this->search, function($q) {
                 $q->where(function($sub) {
-                    $sub->whereHas('ingredient', fn($ing) => $ing->where('name', 'like', '%' . $this->search . '%'))
+                    $sub->whereHas('ingredient', fn($ing) => $ing->where('ingredients.name', 'like', '%' . $this->search . '%'))
                         ->orWhere('reference_id', 'like', '%' . $this->search . '%')
                         ->orWhere('remarks', 'like', '%' . $this->search . '%');
                 });

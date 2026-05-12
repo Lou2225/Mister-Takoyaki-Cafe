@@ -45,7 +45,7 @@ class MenuManagement extends Component
         foreach ($template->items as $item) {
             $options[] = [
                 'name'       => $item->name,
-                'price'      => $item->price,
+                'price'      => $item->price == 0 ? '' : $item->price,
                 'is_default' => $item->is_default,
                 'sort_order' => count($options)
             ];
@@ -101,6 +101,7 @@ class MenuManagement extends Component
     public string $newCategoryStation = 'kitchen'; // Default
     public string $categorySearch = '';
     public string $categoryFilterSearch = '';
+    public string $ingredientSearch = '';
     public $panel = 'list';
     public $mode = 'list';
 
@@ -271,7 +272,7 @@ class MenuManagement extends Component
             'options'     => $g->options->map(fn($o) => [
                 'id'         => $o->id,
                 'name'       => $o->name,
-                'price'      => $o->price,
+                'price'      => $o->price == 0 ? '' : $o->price,
                 'is_default' => (bool)$o->is_default,
             ])->toArray(),
         ])->toArray();
@@ -380,7 +381,7 @@ class MenuManagement extends Component
     public function addOptionToGroup(int $groupIndex)
     {
         $this->optionGroups[$groupIndex]['options'][] = [
-            'id' => null, 'name' => '', 'price' => 0, 'is_default' => false,
+            'id' => null, 'name' => '', 'price' => '', 'is_default' => false,
         ];
     }
 
@@ -481,7 +482,7 @@ class MenuManagement extends Component
             'optionGroups.*.name'              => 'required|string|max:100',
             'optionGroups.*.price_mode'        => 'required|in:fixed,additive',
             'optionGroups.*.options.*.name'    => 'required|string|max:100',
-            'optionGroups.*.options.*.price'   => 'required|numeric|min:0',
+            'optionGroups.*.options.*.price'   => 'nullable|numeric|min:0',
             'recipeIngredients.*.id'           => 'required|exists:ingredients,id',
             'recipeIngredients.*.quantity'     => 'required|numeric|min:0.01',
         ];
@@ -554,7 +555,12 @@ class MenuManagement extends Component
                     $keepOptionIds = [];
                     foreach ($gData['options'] as $oIdx => $oData) {
                         $option = !empty($oData['id']) ? $group->options()->find($oData['id']) : null;
-                        $optPayload = ['name' => $oData['name'], 'price' => $oData['price'], 'is_default' => (bool)$oData['is_default'], 'sort_order' => $oIdx];
+                        $optPayload = [
+                            'name' => $oData['name'], 
+                            'price' => (float)($oData['price'] ?: 0), 
+                            'is_default' => (bool)$oData['is_default'], 
+                            'sort_order' => $oIdx
+                        ];
                         $option = $option ? tap($option, fn($o) => $o->update($optPayload)) : $group->options()->create($optPayload);
                         $keepOptionIds[] = $option->id;
                         $optionIdMap["option:{$gIdx}_{$oIdx}"] = $option->id;
@@ -690,6 +696,7 @@ class MenuManagement extends Component
         $this->newIngredientId   = '';
         $this->newIngredientQty  = '';
         $this->newIngredientOwner = 'base';
+        $this->activeTab         = 'basic';
         $this->resetValidation();
     }
 
@@ -720,7 +727,7 @@ class MenuManagement extends Component
         $query = $this->getBaseProductQuery()->with(['category', 'branches']);
 
         if ($this->search) {
-            $query->where('name', 'like', "%{$this->search}%");
+            $query->where('products.name', 'like', "%{$this->search}%");
         }
         if ($this->selectedCategoryId) {
             $query->where('category_id', $this->selectedCategoryId);
@@ -734,11 +741,42 @@ class MenuManagement extends Component
             ->orderBy('product_categories.sort_order', 'asc')
             ->orderBy('products.name', 'asc')
             ->paginate($this->perPage);
-        $categories    = ProductCategory::orderBy('name', 'asc')->get();
-        $branches      = Branch::orderBy('branch_name', 'asc')->get();
-        $allIngredients = Ingredient::orderBy('name', 'asc')->get();
         $totalProducts = $this->getBaseProductQuery()->count();
         $totalCategories = ProductCategory::count();
+
+        // ── Dropdown Data with Filtering ──
+        $categoriesQuery = ProductCategory::orderBy('name', 'asc');
+        if ($this->categorySearch) {
+            $categoriesQuery->where('name', 'like', "%{$this->categorySearch}%");
+        }
+        $categories = $categoriesQuery->get();
+
+        $filterCategoriesQuery = ProductCategory::orderBy('name', 'asc');
+        if ($this->categoryFilterSearch) {
+            $filterCategoriesQuery->where('name', 'like', "%{$this->categoryFilterSearch}%");
+        }
+        $filterCategories = $filterCategoriesQuery->get();
+
+        $allIngredientsQuery = Ingredient::orderBy('name', 'asc');
+        if ($this->ingredientSearch) {
+            $allIngredientsQuery->where('name', 'like', "%{$this->ingredientSearch}%");
+        }
+        $allIngredients = $allIngredientsQuery->get();
+
+        $branches = Branch::orderBy('branch_name', 'asc')->get();
+
+        // ── Selected Display Names (Persistent during search) ──
+        $selectedCategoryName = $this->categoryId 
+            ? (ProductCategory::find($this->categoryId)?->name ?? 'Uncategorized')
+            : 'Uncategorized';
+
+        $selectedFilterCategoryName = $this->selectedCategoryId 
+            ? (ProductCategory::find($this->selectedCategoryId)?->name ?? 'All Categories')
+            : 'All Categories';
+
+        $selectedIngredientName = $this->newIngredientId 
+            ? (Ingredient::find($this->newIngredientId)?->name ?? 'Choose an item...')
+            : 'Choose an item...';
 
         $recipeCost   = $this->calculateRecipeCost();
         $salePrice    = (float)($this->price ?: 0);
@@ -746,7 +784,8 @@ class MenuManagement extends Component
         $profitMargin = $salePrice > 0 ? round(($netProfit / $salePrice) * 100, 2) : 0;
 
         return view('livewire.menu-management', compact(
-            'products', 'categories', 'branches', 'allIngredients',
+            'products', 'categories', 'filterCategories', 'branches', 'allIngredients',
+            'selectedCategoryName', 'selectedFilterCategoryName', 'selectedIngredientName',
             'totalProducts', 'totalCategories',
             'recipeCost', 'salePrice', 'netProfit', 'profitMargin'
         ))->layout('layouts.app');

@@ -1,7 +1,6 @@
 <div
     x-data="{ 
-        panel: $wire.$entangle('panel', true),
-        search: $wire.$entangle('search', true)
+        panel: $wire.$entangle('panel', true)
     }"
     class="relative overflow-hidden">
 

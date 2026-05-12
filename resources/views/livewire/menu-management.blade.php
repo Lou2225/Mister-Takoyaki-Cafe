@@ -3,7 +3,7 @@
         panel: @entangle('panel').live, 
         tableView: @entangle('view').live, 
         mode: @entangle('mode').live, 
-        ...slidingTabs(@entangle('activeTab').live, 'activeTab')
+        ...slidingTabs({ activeTab: @entangle('activeTab').live }, 'activeTab')
     }"
     x-on:switch-panel.window="panel = $event.detail.panel"
     class="relative">
@@ -44,7 +44,7 @@
 
                 <div class="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm min-h-[400px]">
                     {{-- Tab: Product Information --}}
-                    <div x-show="activeTab === 'basic'" x-cloak class="space-y-6">
+                    <div x-show="activeTab === 'basic'" class="space-y-6">
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
                             <div>
                                 <x-input-label value="Product Name *" />
@@ -58,27 +58,30 @@
                                         <x-dropdown align="left" width="full" containerClasses="block w-full">
                                             <x-slot name="trigger">
                                                 <button type="button" class="flex items-center justify-between w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-[13px] text-slate-700 shadow-sm hover:border-slate-300 focus:outline-none transition-all h-11">
-                                                    <span class="font-medium text-slate-600">{{ $categoryId ? $categories->firstWhere('id', $categoryId)?->name : 'Select Category' }}</span>
+                                                    <span class="font-medium text-slate-600">{{ $selectedCategoryName }}</span>
                                                     <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
                                                 </button>
                                             </x-slot>
                                             <x-slot name="content">
-                                                <div x-data="{ catSearch: '' }" class="p-2">
+                                                <div class="p-2">
                                                     <div class="px-2 pb-2 mb-2 border-b border-slate-50">
                                                         <div class="relative">
                                                             <svg class="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                                                            <input x-model="catSearch" type="text" placeholder="Search categories..." 
-                                                                   class="w-full pl-9 pr-4 py-2 bg-slate-50 border-none rounded-lg text-[12px] font-medium focus:ring-1 focus:ring-indigo-500 placeholder-slate-400">
+                                                            <input wire:model.live.debounce.300ms="categorySearch" type="text" placeholder="Search categories..." 
+                                                                    class="w-full pl-9 pr-4 py-2 bg-slate-50 border-none rounded-lg text-[12px] font-medium focus:ring-1 focus:ring-indigo-500 placeholder-slate-400">
                                                         </div>
                                                     </div>
                                                     <div class="max-h-60 overflow-y-auto custom-scrollbar">
-                                                        <x-dropdown-link href="#" x-show="!catSearch" wire:click.prevent="$set('categoryId', '')">Uncategorized</x-dropdown-link>
-                                                        <hr x-show="!catSearch" class="border-slate-50">
-                                                        @foreach($categories as $cat)
-                                                            <div x-show="!catSearch || @js($cat->name).toLowerCase().includes(catSearch.toLowerCase())">
-                                                                <x-dropdown-link href="#" wire:click.prevent="$set('categoryId', {{ $cat->id }})">{{ $cat->name }}</x-dropdown-link>
-                                                            </div>
-                                                        @endforeach
+                                                        @if(empty($categorySearch))
+                                                            <x-dropdown-link href="#" wire:click.prevent="$set('categoryId', '')">Uncategorized</x-dropdown-link>
+                                                            <hr class="border-slate-50">
+                                                        @endif
+                                                        
+                                                        @forelse($categories as $cat)
+                                                            <x-dropdown-link href="#" wire:click.prevent="$set('categoryId', {{ $cat->id }})">{{ $cat->name }}</x-dropdown-link>
+                                                        @empty
+                                                            <div class="px-4 py-2 text-[12px] text-slate-400 italic">No categories found</div>
+                                                        @endforelse
                                                     </div>
                                                 </div>
                                             </x-slot>
@@ -130,7 +133,7 @@
                     </div>
 
                     {{-- Tab: Options and Groups --}}
-                    <div x-show="activeTab === 'variants'" x-cloak class="space-y-6">
+                    <div x-show="activeTab === 'variants'" class="space-y-6">
                         {{-- Operation Guide --}}
                         <div class="flex items-start gap-4 p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100/50 mb-2">
                             <div class="w-8 h-8 bg-white rounded-xl flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
@@ -219,7 +222,7 @@
                     </div>
 
                     {{-- Tab: Recipe --}}
-                    <div x-show="activeTab === 'recipe'" x-cloak class="space-y-6">
+                    <div x-show="activeTab === 'recipe'" class="space-y-6">
                         {{-- Operation Guide --}}
                         <div class="flex items-start gap-4 p-4 bg-amber-50/50 rounded-2xl border border-amber-100/50 mb-2">
                             <div class="w-8 h-8 bg-white rounded-xl flex items-center justify-center text-amber-600 shadow-sm shrink-0">
@@ -255,30 +258,30 @@
                                             <x-dropdown align="left" width="full" containerClasses="block w-full">
                                                 <x-slot name="trigger">
                                                     <button type="button" class="flex items-center justify-between w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-[13px] text-slate-700 shadow-sm hover:border-slate-300 focus:outline-none transition-all h-11">
-                                                        <span class="font-bold truncate">{{ $newIngredientId ? $allIngredients->firstWhere('id', $newIngredientId)?->name : 'Choose an item...' }}</span>
+                                                        <span class="font-bold truncate">{{ $selectedIngredientName }}</span>
                                                         <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
                                                     </button>
                                                 </x-slot>
                                                 <x-slot name="content">
-                                                    <div x-data="{ ingSearch: '' }" class="p-2">
+                                                    <div class="p-2">
                                                         <div class="px-2 pb-2 mb-2 border-b border-slate-50">
                                                             <div class="relative">
                                                                 <svg class="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                                                                <input x-model="ingSearch" type="text" placeholder="Search ingredients..." 
+                                                                <input wire:model.live.debounce.300ms="ingredientSearch" type="text" placeholder="Search ingredients..." 
                                                                        class="w-full pl-9 pr-4 py-2 bg-slate-50 border-none rounded-lg text-[12px] font-medium focus:ring-1 focus:ring-indigo-500 placeholder-slate-400">
                                                             </div>
                                                         </div>
                                                         <div class="max-h-60 overflow-y-auto custom-scrollbar">
-                                                            @foreach($allIngredients as $ing)
-                                                                <div x-show="!ingSearch || @js($ing->name).toLowerCase().includes(ingSearch.toLowerCase())">
-                                                                    <x-dropdown-link href="#" wire:click.prevent="$set('newIngredientId', {{ $ing->id }})">
-                                                                        <div class="flex items-center justify-between">
-                                                                            <span class="font-medium text-slate-700">{{ $ing->name }}</span>
-                                                                            <span class="text-[10px] font-black text-slate-300 uppercase tracking-widest">{{ $ing->unit }}</span>
-                                                                        </div>
-                                                                    </x-dropdown-link>
-                                                                </div>
-                                                            @endforeach
+                                                            @forelse($allIngredients as $ing)
+                                                                <x-dropdown-link href="#" wire:click.prevent="$set('newIngredientId', {{ $ing->id }})">
+                                                                    <div class="flex items-center justify-between">
+                                                                        <span class="font-medium text-slate-700">{{ $ing->name }}</span>
+                                                                        <span class="text-[10px] font-black text-slate-300 uppercase tracking-widest">{{ $ing->unit }}</span>
+                                                                    </div>
+                                                                </x-dropdown-link>
+                                                            @empty
+                                                                <div class="px-4 py-2 text-[12px] text-slate-400 italic">No ingredients found</div>
+                                                            @endforelse
                                                         </div>
                                                     </div>
                                                 </x-slot>
@@ -377,7 +380,7 @@
                     </div>
 
                     {{-- Tab: Profitability Analysis --}}
-                    <div x-show="activeTab === 'analysis'" x-cloak class="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-8">
+                    <div x-show="activeTab === 'analysis'" class="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-8">
                             <div class="flex items-center gap-4">
                                 <div class="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm border border-indigo-100">
                                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
@@ -633,27 +636,34 @@
                     <x-slot name="trigger">
                         <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
                             <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 0 1 3 12V7a4 4 0 0 1 4-4z" /></svg>
-                            <span class="text-[12px] font-semibold whitespace-nowrap">{{ $selectedCategoryId ? ($categories->firstWhere('id', $selectedCategoryId)->name ?? 'All Categories') : 'All Categories' }}</span>
+                            <span class="text-[12px] font-semibold whitespace-nowrap">{{ $selectedFilterCategoryName }}</span>
                             <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
                         </x-secondary-button>
                     </x-slot>
                     <x-slot name="content">
-                        <div x-data="{ filterCatSearch: '' }" class="p-2">
+                        <div class="p-2">
                             <div class="px-2 pb-2 mb-2 border-b border-slate-50">
                                 <div class="relative">
                                     <svg class="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                                    <input x-model="filterCatSearch" type="text" placeholder="Search..." 
+                                    <input wire:model.live.debounce.300ms="categoryFilterSearch" type="text" placeholder="Search..." 
                                            class="w-full pl-9 pr-4 py-2 bg-slate-50 border-none rounded-lg text-[12px] font-medium focus:ring-1 focus:ring-indigo-500 placeholder-slate-400">
                                 </div>
                             </div>
                             <div class="max-h-60 overflow-y-auto custom-scrollbar">
-                                <x-dropdown-link href="#" x-show="!filterCatSearch" wire:click.prevent="$set('selectedCategoryId', '')">All Categories</x-dropdown-link>
-                                <hr x-show="!filterCatSearch" class="border-slate-50">
-                                @foreach($categories as $cat)
-                                    <div x-show="!filterCatSearch || @js($cat->name).toLowerCase().includes(filterCatSearch.toLowerCase())">
-                                        <x-dropdown-link href="#" wire:click.prevent="$set('selectedCategoryId', {{ $cat->id }})">{{ $cat->name }}</x-dropdown-link>
-                                    </div>
-                                @endforeach
+                                @if(empty($categoryFilterSearch))
+                                    <x-dropdown-link href="#" wire:click.prevent="$set('selectedCategoryId', '')" class="{{ $selectedCategoryId === '' ? 'bg-indigo-50 text-indigo-600 font-bold' : '' }}">
+                                        All Categories
+                                    </x-dropdown-link>
+                                    <hr class="border-slate-50">
+                                @endif
+                                
+                                @forelse($filterCategories as $cat)
+                                    <x-dropdown-link href="#" wire:click.prevent="$set('selectedCategoryId', {{ $cat->id }})" class="{{ $selectedCategoryId == $cat->id ? 'bg-indigo-50 text-indigo-600 font-bold' : '' }}">
+                                        {{ $cat->name }}
+                                    </x-dropdown-link>
+                                @empty
+                                    <div class="px-4 py-2 text-[12px] text-slate-400 italic">No categories found</div>
+                                @endforelse
                             </div>
                         </div>
                     </x-slot>
@@ -959,4 +969,5 @@
             </div>
         </div>
     </x-modal>
+</div>
 </div>

@@ -18,7 +18,7 @@
         @endphp
 
         <div
-            class="h-[65px] flex items-center border-b border-gray-200 transition-all duration-300"
+            class="h-[65px] min-h-[65px] flex items-center border-b border-gray-200 transition-all duration-300"
             :class="sidebarOpen ? 'px-5' : 'px-0 justify-center'"
             x-data="{ logoUrl: @js($initialLogoUrl), bName: @js($initialBusinessName) }"
             @businessconfigupdated.window="logoUrl = $event.detail.logo_url; bName = $event.detail.business_name"

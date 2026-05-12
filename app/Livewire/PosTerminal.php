@@ -255,6 +255,18 @@ class PosTerminal extends Component
                 // We'll use a dynamic property to carry the stocks to the view loop
                 $product->prefetched_stocks = $stocks;
             }
+
+            // SORT: Available items first, then Out of Stock
+            // We use sortBy and return an array of keys to maintain existing sort order within groups
+            $products = $products->sortBy(function($product) {
+                $isAvailable = $product->getMaxAvailableQuantity((int)$this->branchId, $product->prefetched_stocks) > 0;
+                return [
+                    $isAvailable ? 0 : 1, // Available (0) first, OOS (1) last
+                    $product->category->sort_order ?? 0,
+                    $product->branch_sort_order ?? $product->sort_order,
+                    $product->name
+                ];
+            });
         }
 
         return $this->productsCache = $products;

@@ -98,7 +98,7 @@ const slidingTabsLogic = (initialValue, propertyName = 'tab') => {
             if (!window.Livewire || !el) return;
             const component = window.Livewire.find(el.getAttribute('wire:id'));
             if (component && component.get(prop) !== value) {
-                try { component.set(prop, value); } catch(e) {}
+                try { component.set(prop, value); } catch (e) { }
             }
         },
 

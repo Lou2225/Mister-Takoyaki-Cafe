@@ -65,7 +65,7 @@
                     </div>
                     <div>
                         <span class="block text-[10px] font-black text-indigo-700/60 uppercase tracking-widest leading-none mb-1">Total Catalog</span>
-                        <span class="block text-[20px] font-black text-gray-900 leading-none">&#8369;{{ number_format($totalIngredients) }}</span>
+                        <span class="block text-[20px] font-black text-gray-900 leading-none">{{ number_format($totalIngredients) }} Items</span>
                     </div>
                 </div>
                 
@@ -80,10 +80,6 @@
                     </div>
                 </div>
 
-                {{-- Expiring Batches --}}
-                @php
-                    $expiringCount = \App\Models\StockBatch::where('expiry_date', '>', now())->where('expiry_date', '<=', now()->addDays($alertDays))->where('branch_id', $selectedBranchId)->where('current_quantity', '>', 0)->count();
-                @endphp
                 <div class="bg-gradient-to-br {{ $expiringCount > 0 ? 'from-rose-50 to-rose-100 border-rose-200' : 'from-slate-50 to-slate-100 border-slate-200' }} border rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
                     <div class="w-10 h-10 rounded-xl bg-white border {{ $expiringCount > 0 ? 'border-rose-100 text-rose-600' : 'border-slate-100 text-slate-400' }} flex items-center justify-center shadow-sm">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -101,7 +97,7 @@
                     </div>
                     <div>
                         <span class="block text-[10px] font-black text-emerald-700/60 uppercase tracking-widest leading-none mb-1">Procurement (Mo)</span>
-                        <span class="block text-[20px] font-black text-gray-900 leading-none">&#8369;{{ number_format(\App\Models\StockMovement::where('branch_id', $selectedBranchId)->where('type', 'in')->whereMonth('created_at', now()->month)->sum(DB::raw('unit_cost * quantity')), 0) }}</span>
+                        <span class="block text-[20px] font-black text-gray-900 leading-none">&#8369;{{ number_format($monthlyProcurement, 0) }}</span>
                     </div>
                 </div>
             </div>
@@ -112,7 +108,7 @@
                 
                 {{-- Left: Search Bar --}}
                 <div class="flex flex-1 w-full lg:w-auto">
-                    <x-search-bar wireModel="search" placeholder="Find ingredient..." width="w-full lg:w-72" />
+                    <x-search-bar wireModel="search" wire:model.live.debounce.0ms="search" placeholder="Find ingredient..." width="w-full lg:w-72" />
                 </div>
 
                 {{-- Right: Branch Switcher --}}
@@ -122,12 +118,11 @@
                             <x-slot name="trigger">
                                 <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
                                     <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                                    <span class="text-[12px] whitespace-nowrap">{{ $selectedBranchId ? ($branches->firstWhere('id', $selectedBranchId)->branch_name ?? 'Select Branch') : 'Global Inventory' }}</span>
+                                    <span class="text-[12px] whitespace-nowrap">{{ $selectedBranchId ? ($branches->firstWhere('id', $selectedBranchId)->branch_name ?? 'Select Branch') : 'Select Branch' }}</span>
                                     <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                                 </x-secondary-button>
                             </x-slot>
                             <x-slot name="content">
-                                <x-dropdown-link href="#" wire:click.prevent="$set('selectedBranchId', '')">Global Inventory</x-dropdown-link>
                                 @foreach($branches as $branch)
                                     <x-dropdown-link href="#" wire:click.prevent="$set('selectedBranchId', '{{ $branch->id }}')">
                                         {{ $branch->branch_name }}
@@ -285,16 +280,31 @@
                                             <x-dropdown align="left" width="full" containerClasses="block w-full">
                                                 <x-slot name="trigger">
                                                     <button type="button" class="flex items-center justify-between w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-[13px] text-slate-700 shadow-sm hover:border-slate-300 focus:outline-none transition-all h-11">
-                                                        <span class="font-medium text-slate-600">{{ $ingredientCategoryId ? $ingredientCategories->firstWhere('id', $ingredientCategoryId)?->name : 'Select Category' }}</span>
+                                                        <span class="font-medium text-slate-600">{{ $selectedCategoryName }}</span>
                                                         <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
                                                     </button>
                                                 </x-slot>
                                                 <x-slot name="content">
-                                                    <x-dropdown-link href="#" wire:click.prevent="$set('ingredientCategoryId', '')">Uncategorized</x-dropdown-link>
-                                                    <hr class="border-slate-50">
-                                                    @foreach($ingredientCategories as $cat)
-                                                        <x-dropdown-link href="#" wire:click.prevent="$set('ingredientCategoryId', {{ $cat->id }})">{{ $cat->name }}</x-dropdown-link>
-                                                    @endforeach
+                                                    <div class="p-2">
+                                                        <div class="px-2 pb-2 mb-2 border-b border-slate-50">
+                                                            <div class="relative">
+                                                                <svg class="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                                                <input wire:model.live.debounce.300ms="ingredientCategorySearch" type="text" placeholder="Search categories..." 
+                                                                       class="w-full pl-9 pr-4 py-2 bg-slate-50 border-none rounded-lg text-[12px] font-medium focus:ring-1 focus:ring-indigo-500 placeholder-slate-400">
+                                                            </div>
+                                                        </div>
+                                                        <div class="max-h-60 overflow-y-auto custom-scrollbar">
+                                                            @if(empty($ingredientCategorySearch))
+                                                                <x-dropdown-link href="#" wire:click.prevent="$set('ingredientCategoryId', '')">Uncategorized</x-dropdown-link>
+                                                                <hr class="border-slate-50">
+                                                            @endif
+                                                            @forelse($ingredientCategories as $cat)
+                                                                <x-dropdown-link href="#" wire:click.prevent="$set('ingredientCategoryId', {{ $cat->id }})">{{ $cat->name }}</x-dropdown-link>
+                                                            @empty
+                                                                <div class="px-4 py-3 text-[11px] text-slate-400 text-center italic">No categories found</div>
+                                                            @endforelse
+                                                        </div>
+                                                    </div>
                                                 </x-slot>
                                             </x-dropdown>
                                         </div>
