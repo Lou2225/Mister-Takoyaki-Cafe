@@ -1085,6 +1085,11 @@ class PosTerminal extends Component
         }
 
         if ($this->paymentMethod === 'GCash') {
+            if (!$this->gcashVerified) {
+                $this->addError('gcashVerified', 'Please verify the GCash transaction first before submitting the order.');
+                return;
+            }
+
             $this->validate([
                 'paymentReference' => ['required', 'string', 'max:50', 'regex:' . ValidationHelper::REGEX_NAME_BASIC]
             ], ValidationHelper::commonMessages());

@@ -348,7 +348,7 @@ class BranchStockOrdering extends Component
                 $this->notifyAdmins(
                     '📦 New Stock Request',
                     "New request ({$order->reference_no}) from " . Branch::find($this->selectedBranchId)?->branch_name,
-                    route('stock.orders.admin'),
+                    route('stock.orders.admin', ['oa_search' => $order->reference_no]),
                     $order
                 );
             });

@@ -22,7 +22,7 @@ $maxWidth = [
 
 <div
     wire:ignore.self
-    x-data="typeof modal === 'function' ? modal({ name: '{{ $name }}', show: @js($show) }) : { isModalOpen: @js($show), name: '{{ $name }}', open() {}, close() {} }"
+    x-data="modal({ name: '{{ $name }}', show: @js($show) })"
     x-on:open-modal.window="open($event.detail)"
     x-on:close-modal.window="close($event.detail)"
     x-on:close.stop="isModalOpen = false"

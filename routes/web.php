@@ -45,6 +45,9 @@ Route::middleware('auth')->group(function () {
         // Order Management
         Route::get('/orders', \App\Livewire\OrderManagement::class)->name('orders.index');
         
+        // Notifications
+        Route::get('/notifications', \App\Livewire\NotificationHistory::class)->name('notifications.index');
+        
         // Sidebar Placeholder Routes
         Route::get('/kds', \App\Livewire\KitchenDisplay::class)->name('kds.index');
         Route::get('/menu', \App\Livewire\MenuManagement::class)->name('menu.index');

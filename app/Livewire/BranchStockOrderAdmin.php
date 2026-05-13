@@ -335,7 +335,7 @@ class BranchStockOrderAdmin extends Component
                 'type'      => 'stock_order',
                 'title'     => $title,
                 'message'   => $message,
-                'link'      => route('stock.orders'),
+                'link'      => route('stock.orders', ['so_search' => $order->reference_no]),
             ]);
 
             try {

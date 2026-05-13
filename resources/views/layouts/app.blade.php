@@ -235,10 +235,10 @@
                         </div>
                     @endforelse
                 </div>
-                <button @click="$dispatch('open-modal', { name: 'notification-history-modal' }); notificationsOpen = false;" 
-                    class="w-full px-4 py-2 bg-gray-50 text-center text-[10px] font-black text-gray-500 hover:bg-gray-100 hover:text-gray-700 uppercase tracking-[0.2em] transition-all">
+                <a href="{{ route('notifications.index') }}" wire:navigate
+                    class="block w-full px-4 py-2 bg-gray-50 text-center text-[10px] font-black text-gray-500 hover:bg-gray-100 hover:text-gray-700 uppercase tracking-[0.2em] transition-all">
                     Notification History
-                </button>
+                </a>
             </div>
         </div>
 
@@ -322,9 +322,6 @@
 
 {{-- [FIX] @livewireScripts moved from <head> to end of <body> so it runs after the DOM is ready --}}
     {{-- Global Modals --}}
-    <x-modal name="notification-history-modal" maxWidth="2xl">
-        @livewire('notification-history')
-    </x-modal>
 
     @livewireScripts
 

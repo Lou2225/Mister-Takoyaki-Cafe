@@ -6,7 +6,7 @@
 
 <div
     wire:ignore.self
-    x-data="typeof sidePanel === 'function' ? sidePanel({ name: '{{ $name }}', show: @js($initialShow)@if($attributes->hasAny(['wire:model', 'wire:model.live', 'wire:model.defer'])), entangled: true @endif }) : { isPanelOpen: @js($initialShow), name: '{{ $name }}', open() { this.isPanelOpen = true }, close() { this.isPanelOpen = false }, closePanel() { this.isPanelOpen = false } }"
+    x-data="sidePanel({ name: '{{ $name }}', show: @js($initialShow) })"
     x-on:open-modal.window="open($event.detail)"
     x-on:close-modal.window="close($event.detail)"
     x-on:keydown.escape.window="closePanel()"

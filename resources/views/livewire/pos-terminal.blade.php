@@ -708,6 +708,7 @@
                                                 Verify Transaction
                                             @endif
                                         </button>
+                                        <x-input-error :messages="$errors->get('gcashVerified')" class="mt-2 text-center" />
                                     </div>
                                 </div>
                                 
@@ -721,6 +722,7 @@
                                     <x-text-input id="pos_gcash_reference" wire:model.live.debounce.400ms="paymentReference" type="text"
                                         inputFilter="name_basic"
                                         class="block w-full text-[13px] py-2.5 px-3 font-mono font-bold border-gray-200 bg-gray-50 focus:bg-white" placeholder="Enter manually if needed"/>
+                                    <x-input-error :messages="$errors->get('paymentReference')" class="mt-1" />
                                 </div>
                             @else
                                 <div class="bg-emerald-50 rounded-2xl p-5 border border-emerald-100 space-y-4">
