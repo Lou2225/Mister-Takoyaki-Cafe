@@ -1,12 +1,14 @@
 <div 
-    x-data="{ 
+    x-data="window.menuManagement({ 
         panel: @entangle('panel').live, 
         tableView: @entangle('view').live, 
         mode: @entangle('mode').live, 
-        ...slidingTabs({ activeTab: @entangle('activeTab').live }, 'activeTab')
-    }"
+        activeTab: @entangle('activeTab').live
+    })"
     x-on:switch-panel.window="panel = $event.detail.panel"
-    class="relative">
+    class="relative"
+    wire:ignore.self
+    wire:key="menu-management-main-container">
     {{-- Panel: Form --}}
     <div x-show="panel === 'form'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="px-1">
         <div class="mb-5 flex items-center justify-between">
@@ -170,7 +172,7 @@
                         @else
                             <div class="space-y-4">
                                 @foreach($optionGroups as $idx => $group)
-                                    <div class="border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
+                                    <div class="border border-slate-100 rounded-2xl overflow-hidden shadow-sm" wire:key="opt-group-{{ $idx }}">
                                         <div class="flex items-center justify-between p-4 bg-slate-50/50 border-b border-slate-100">
                                             <div class="flex items-center gap-3">
                                                 <span class="text-[13px] font-bold text-slate-900 uppercase tracking-tight">{{ $group['name'] }}</span>
@@ -190,7 +192,7 @@
                                         </div>
                                         <div class="p-4 bg-white space-y-3">
                                             @foreach($group['options'] as $oIdx => $option)
-                                                <div class="flex items-center gap-4">
+                                                <div class="flex items-center gap-4" wire:key="opt-item-{{ $idx }}-{{ $oIdx }}">
                                                     <div class="flex-1">
                                                         <x-text-input wire:model.live="optionGroups.{{ $idx }}.options.{{ $oIdx }}.name" class="w-full h-10 text-[13px] font-bold" placeholder="Option name..." inputFilter="productName" />
                                                     </div>
@@ -521,7 +523,8 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                 @foreach($this->optionTemplates as $tmpl)
                     <div class="group relative bg-slate-50/50 border border-slate-100 rounded-2xl p-5 hover:bg-white hover:border-indigo-200 hover:shadow-md transition-all cursor-pointer" 
-                         wire:click="importOptionTemplate({{ $tmpl->id }})">
+                         wire:click="importOptionTemplate({{ $tmpl->id }})"
+                         wire:key="tmpl-card-{{ $tmpl->id }}">
                         <div class="flex items-start justify-between mb-3">
                             <div>
                                 <h4 class="text-[14px] font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{{ $tmpl->name }}</h4>
@@ -970,4 +973,23 @@
         </div>
     </x-modal>
 </div>
-</div>
+
+@push('scripts')
+<script>
+    (function() {
+        window.menuManagement = function(initials) {
+            return {
+                panel: initials.panel,
+                tableView: initials.tableView,
+                mode: initials.mode,
+                ...window.slidingTabs(initials.activeTab, 'activeTab'),
+                
+                init() {
+                    const base = window.slidingTabs(initials.activeTab, 'activeTab');
+                    if (base.init) base.init.call(this);
+                }
+            };
+        };
+    })();
+</script>
+@endpush

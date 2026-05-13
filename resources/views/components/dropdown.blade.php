@@ -1,4 +1,4 @@
-@props(['align' => 'right', 'width' => '48', 'contentClasses' => 'py-1 bg-white', 'containerClasses' => 'inline-block'])
+@props(['align' => 'right', 'width' => '48', 'contentClasses' => 'py-1 bg-white', 'containerClasses' => 'inline-block', 'wireKey' => null])
 
 @php
 switch ($align) {
@@ -26,7 +26,14 @@ switch ($width) {
         break;
 }
 @endphp
-<div wire:ignore.self {{ $attributes->merge(['class' => 'relative ' . $containerClasses . ' text-left']) }} :class="dropdownOpen ? 'z-40' : ''" x-data="{ dropdownOpen: false }" @click.away="dropdownOpen = false" @close.stop="dropdownOpen = false">
+<div wire:ignore.self 
+     {{ $wireKey ? 'wire:key='.$wireKey : '' }}
+     {{ $attributes->merge(['class' => 'relative ' . $containerClasses . ' text-left']) }} 
+     :class="dropdownOpen ? 'z-40' : ''" 
+     x-data="{ dropdownOpen: false }" 
+     @click.away="dropdownOpen = false" 
+     @close.stop="dropdownOpen = false" 
+     data-has-alpine-state="true">
     <div @click="dropdownOpen = !dropdownOpen" x-ref="trigger" class="relative z-0">
         {{ $trigger }}
     </div>
@@ -38,7 +45,7 @@ switch ($width) {
          x-transition:leave="transition ease-in duration-200" 
          x-transition:leave-start="transform opacity-100 scale-100" 
          x-transition:leave-end="transform opacity-0 scale-95" 
-         class="absolute z-50 {{ $alignmentClasses }} {{ $widthClass }} rounded-md shadow-lg {{ $contentClasses }}" style="display: none;" :style="dropdownOpen ? '' : 'display: none;'">
+         class="absolute z-50 {{ $alignmentClasses }} {{ $widthClass }} rounded-md shadow-lg {{ $contentClasses }}" style="display: none;">
         <div class="rounded-md ring-1 ring-black ring-opacity-5 py-1 bg-white" @click.stop>
             {{ $content }}
         </div>

@@ -521,10 +521,10 @@ class PosTerminal extends Component
         // Validate required options are selected
         foreach ($this->currentProduct->optionGroups as $group) {
             if ($group->is_required && empty($this->selectedOptions[$group->id])) {
-                $this->dispatchBrowserEvent('notify', [
-                    'type' => 'error', 
-                    'message' => "Please select {$group->name} to continue."
-                ]);
+                $this->dispatch('notify', 
+                    type: 'error', 
+                    message: "Please select {$group->name} to continue."
+                );
                 return;
             }
         }
@@ -546,10 +546,10 @@ class PosTerminal extends Component
             foreach ($ids as $optionId) {
                 if (($optionAvail[$optionId] ?? 0) <= 0) {
                     $option = ProductOption::find($optionId);
-                    $this->dispatchBrowserEvent('notify', [
-                        'type' => 'error',
-                        'message' => "The selected option '" . ($option->name ?? 'Unknown') . "' is out of stock."
-                    ]);
+                    $this->dispatch('notify', 
+                        type: 'error',
+                        message: "The selected option '" . ($option->name ?? 'Unknown') . "' is out of stock."
+                    );
                     return;
                 }
             }
@@ -560,10 +560,10 @@ class PosTerminal extends Component
         foreach ($this->selectedModifierIds as $modId) {
             if (($modifierAvail[$modId] ?? 0) <= 0) {
                 $modifier = Modifier::find($modId);
-                $this->dispatchBrowserEvent('notify', [
-                    'type' => 'error',
-                    'message' => "The selected add-on '{$modifier->name}' is out of stock."
-                ]);
+                $this->dispatch('notify', 
+                    type: 'error',
+                    message: "The selected add-on '{$modifier->name}' is out of stock."
+                );
                 return;
             }
         }
@@ -660,10 +660,10 @@ class PosTerminal extends Component
         $stockValidation = $this->validateStockAvailability();
         if (!$stockValidation['available']) {
             $this->cart = $oldCart;
-            $this->dispatchBrowserEvent('notify', [
-                'type' => 'error',
-                'message' => 'Cannot add item. ' . $stockValidation['message']
-            ]);
+            $this->dispatch('notify', 
+                type: 'error',
+                message: 'Cannot add item. ' . $stockValidation['message']
+            );
             return;
         }
 
@@ -692,10 +692,10 @@ class PosTerminal extends Component
         $stockValidation = $this->validateStockAvailability();
         if (!$stockValidation['available']) {
             $this->cart = $oldCart;
-            $this->dispatchBrowserEvent('notify', [
-                'type' => 'error',
-                'message' => 'Cannot add item. ' . $stockValidation['message']
-            ]);
+            $this->dispatch('notify', 
+                type: 'error',
+                message: 'Cannot add item. ' . $stockValidation['message']
+            );
             return;
         }
 
@@ -818,16 +818,16 @@ class PosTerminal extends Component
                 }
 
                 $this->clearCart();
-                $this->dispatchBrowserEvent('notify', [
-                    'type' => 'success',
-                    'message' => "Draft order #{$draftOrder->reference_no} saved successfully!"
-                ]);
+                $this->dispatch('notify', 
+                    type: 'success',
+                    message: "Draft order #{$draftOrder->reference_no} saved successfully!"
+                );
             });
         } catch (\Exception $e) {
-            $this->dispatchBrowserEvent('notify', [
-                'type' => 'error',
-                'message' => 'Failed to save draft: ' . $e->getMessage()
-            ]);
+            $this->dispatch('notify', 
+                type: 'error',
+                message: 'Failed to save draft: ' . $e->getMessage()
+            );
         }
     }
 
@@ -841,10 +841,10 @@ class PosTerminal extends Component
 
             // Check authorization
             if (!auth()->user()->can('manageDraft', $draft)) {
-                $this->dispatchBrowserEvent('notify', [
-                    'type' => 'error',
-                    'message' => 'Unauthorized to load this draft.'
-                ]);
+                $this->dispatch('notify', 
+                    type: 'error',
+                    message: 'Unauthorized to load this draft.'
+                );
                 return;
             }
 
@@ -909,15 +909,15 @@ class PosTerminal extends Component
             // Delete draft ONLY after successful load into memory
             $draft->delete();
 
-            $this->dispatchBrowserEvent('notify', [
-                'type' => 'success',
-                'message' => "Draft order #{$draft->reference_no} loaded successfully!"
-            ]);
+            $this->dispatch('notify', 
+                type: 'success',
+                message: "Draft order #{$draft->reference_no} loaded successfully!"
+            );
         } catch (\Exception $e) {
-            $this->dispatchBrowserEvent('notify', [
-                'type' => 'error',
-                'message' => 'Failed to load draft: ' . $e->getMessage()
-            ]);
+            $this->dispatch('notify', 
+                type: 'error',
+                message: 'Failed to load draft: ' . $e->getMessage()
+            );
         }
     }
 
@@ -930,24 +930,24 @@ class PosTerminal extends Component
 
             // Check authorization
             if (!auth()->user()->can('manageDraft', $draft)) {
-                $this->dispatchBrowserEvent('notify', [
-                    'type' => 'error',
-                    'message' => 'Unauthorized to delete this draft.'
-                ]);
+                $this->dispatch('notify', 
+                    type: 'error',
+                    message: 'Unauthorized to delete this draft.'
+                );
                 return;
             }
 
             $draft->delete();
 
-            $this->dispatchBrowserEvent('notify', [
-                'type' => 'success',
-                'message' => 'Draft deleted successfully.'
-            ]);
+            $this->dispatch('notify', 
+                type: 'success',
+                message: 'Draft deleted successfully.'
+            );
         } catch (\Exception $e) {
-            $this->dispatchBrowserEvent('notify', [
-                'type' => 'error',
-                'message' => 'Failed to delete draft: ' . $e->getMessage()
-            ]);
+            $this->dispatch('notify', 
+                type: 'error',
+                message: 'Failed to delete draft: ' . $e->getMessage()
+            );
         }
     }
     public function verifyGCashPayment(): void
@@ -969,10 +969,10 @@ class PosTerminal extends Component
             'reference' => $this->paymentReference
         ];
 
-        $this->dispatchBrowserEvent('notify', [
-            'type' => 'success',
-            'message' => 'GCash Payment Verified Legitimate!'
-        ]);
+        $this->dispatch('notify', 
+            type: 'success',
+            message: 'GCash Payment Verified Legitimate!'
+        );
     }
 
     protected function validateStockAvailability(): array
@@ -1097,10 +1097,10 @@ class PosTerminal extends Component
         // ──── STOCK VALIDATION ────────────────────────────────────────────────
         $stockValidation = $this->validateStockAvailability();
         if (!$stockValidation['available']) {
-            $this->dispatchBrowserEvent('notify', [
-                'type' => 'error',
-                'message' => 'Insufficient stock: ' . $stockValidation['message']
-            ]);
+            $this->dispatch('notify', 
+                type: 'error',
+                message: 'Insufficient stock: ' . $stockValidation['message']
+            );
             return;
         }
 

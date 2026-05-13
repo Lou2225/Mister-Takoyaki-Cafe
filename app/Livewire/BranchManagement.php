@@ -255,20 +255,20 @@ class BranchManagement extends Component
         
         // Safety Check 1: Is there an active manager?
         if ($branch->user_id) {
-            $this->dispatchBrowserEvent('notify', [
-                'type' => 'error',
-                'message' => "Safety Lock: '{$branch->branch_name}' currently has an active Branch Manager assigned. Reassign or remove the manager before deleting."
-            ]);
+            $this->dispatch('notify', 
+                type: 'error',
+                message: "Safety Lock: '{$branch->branch_name}' currently has an active Branch Manager assigned. Reassign or remove the manager before deleting."
+            );
             return;
         }
 
         // Safety Check 2: Are there active staff members?
         $staffCount = User::where('branch_id', $id)->count();
         if ($staffCount > 0) {
-            $this->dispatchBrowserEvent('notify', [
-                'type' => 'error',
-                'message' => "Integrity Guard: '{$branch->branch_name}' has {$staffCount} staff members registered. Transfer these users before decommissioning the node."
-            ]);
+            $this->dispatch('notify', 
+                type: 'error',
+                message: "Integrity Guard: '{$branch->branch_name}' has {$staffCount} staff members registered. Transfer these users before decommissioning the node."
+            );
             return;
         }
 
@@ -627,9 +627,9 @@ class BranchManagement extends Component
         $filteredBranches = $this->getBranches();
         $plottableBranches = $this->buildPlottableBranches($filteredBranches);
 
-        $this->dispatchBrowserEvent('refresh-global-map', [
-            'branches' => json_decode($plottableBranches, true)
-        ]);
+        $this->dispatch('refresh-global-map', 
+            branches: json_decode($plottableBranches, true)
+        );
 
         $matrix = $this->getComparisonMatrix();
         $maxNetSales = $matrix->max('net_sales') ?? 0;

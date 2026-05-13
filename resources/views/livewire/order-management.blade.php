@@ -7,10 +7,7 @@
 @endphp
 
 <div 
-    x-data="{ 
-        sourceFilter: @entangle('sourceFilter').live,
-        ...slidingTabs(@js($sourceFilter ?: 'App'), 'sourceFilter') 
-    }"
+    x-data="slidingTabs(@entangle('sourceFilter').live, 'sourceFilter')"
     class="relative overflow-hidden">
 
     <div class="relative min-h-[600px]">
@@ -180,7 +177,9 @@
         {{-- ── Order Detail Side Panel ── --}}
         <x-side-panel name="view-order-detail" width="max-w-md">
             @if($selectedOrder)
-                <div class="flex flex-col h-full bg-white" x-data="slidingTabs('summary', 'currentTab')" @update-active-tab.window="currentTab = $event.detail.activeTab">
+                <div class="flex flex-col h-full bg-white" 
+                    x-data="slidingTabs(@entangle('activeTab').live, 'activeTab')" 
+                    @update-active-tab.window="activeTab = $event.detail.activeTab">
                     {{-- Premium Header --}}
                     <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/40">
                         <div class="flex items-center gap-3">
@@ -199,15 +198,15 @@
 
                     {{-- Tabs Navigation --}}
                     <div class="px-6 bg-white">
-                        <x-sliding-tabs model="currentTab">
-                            <x-sliding-tab value="summary" model="currentTab">Summary</x-sliding-tab>
-                            <x-sliding-tab value="activity" model="currentTab">Order History</x-sliding-tab>
+                        <x-sliding-tabs model="activeTab">
+                            <x-sliding-tab value="summary" model="activeTab">Summary</x-sliding-tab>
+                            <x-sliding-tab value="activity" model="activeTab">Order History</x-sliding-tab>
                         </x-sliding-tabs>
                     </div>
 
                     {{-- Content Area --}}
                     <div class="flex-1 overflow-y-auto custom-scrollbar relative">
-                        <div x-show="currentTab === 'summary'">
+                        <div x-show="activeTab === 'summary'">
                             {{-- Transaction Context Section --}}
                         <div class="p-6 bg-gradient-to-b from-slate-50/80 to-white border-b border-slate-50">
                             <div class="grid grid-cols-2 gap-4">
@@ -347,7 +346,7 @@
                         </div>
                         </div>
 
-                        <div x-show="currentTab === 'activity'" style="display: none;">
+                        <div x-show="activeTab === 'activity'" style="display: none;">
                             <div class="p-6">
                                 <h5 class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-6">Activity Timeline</h5>
                                 <div class="space-y-6 relative">
@@ -413,7 +412,7 @@
                     </div>
 
                     {{-- Action Footer --}}
-                    <div class="p-5 border-t border-slate-100 bg-white grid grid-cols-2 gap-2" x-show="currentTab === 'summary'">
+                    <div class="p-5 border-t border-slate-100 bg-white grid grid-cols-2 gap-2" x-show="activeTab === 'summary'">
                         @if($selectedOrder->source === 'App')
                             @if($selectedOrder->status === 'Pending')
                                 <x-primary-button wire:click="acceptOrder({{ $selectedOrder->id }})" class="col-span-2 h-10 justify-center">

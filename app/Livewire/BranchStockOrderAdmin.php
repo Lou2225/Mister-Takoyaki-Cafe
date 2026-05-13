@@ -127,10 +127,10 @@ class BranchStockOrderAdmin extends Component
         // Refresh all branch distances to ensure data accuracy
         $this->syncAllDistances();
         
-        $this->dispatchBrowserEvent('notify', [
-            'type' => 'success',
-            'message' => 'Logistics configuration updated. Network distances have been synchronized.'
-        ]);
+        $this->dispatch('notify', 
+            type: 'success',
+            message: 'Logistics configuration updated. Network distances have been synchronized.'
+        );
     }
 
     public function syncAllDistances()

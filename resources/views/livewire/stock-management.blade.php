@@ -220,7 +220,7 @@
                                                 Edit
                                             </x-secondary-button>
                                             
-                                            <a href="{{ route('stock.adjustment', ['id' => $ing->id, 'selectedBranchId' => $selectedBranchId]) }}" 
+                                            <a href="{{ route('stock.adjustment', ['id' => $ing->id, 'selectedBranchId' => $selectedBranchId]) }}" wire:navigate 
                                                class="h-8 px-3 inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all text-[11px] font-black uppercase tracking-widest shadow-sm">
                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
                                                 Adjust Stock

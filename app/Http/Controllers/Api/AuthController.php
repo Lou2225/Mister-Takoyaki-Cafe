@@ -68,7 +68,7 @@ class AuthController extends Controller
         $request->validate([
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
+            'email' => 'required|email|unique:users,email,NULL,id,role_id,4',
             'address' => 'nullable|string',
             'password' => 'required|string|min:8|confirmed',
         ]);
@@ -115,7 +115,9 @@ class AuthController extends Controller
             'email' => 'required|email',
         ]);
 
-        $exists = User::where('email', $request->email)->exists();
+        $exists = User::where('email', $request->email)
+            ->where('role_id', 4)
+            ->exists();
 
         return response()->json([
             'exists' => $exists,

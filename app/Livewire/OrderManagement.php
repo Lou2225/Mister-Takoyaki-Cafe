@@ -248,10 +248,10 @@ class OrderManagement extends Component
     public function openRefundModal(Order $order)
     {
         if (!$order->canBeRefunded()) {
-            $this->dispatchBrowserEvent('notify', [
-                'type' => 'error',
-                'message' => 'This order cannot be refunded.'
-            ]);
+            $this->dispatch('notify', 
+                type: 'error',
+                message: 'This order cannot be refunded.'
+            );
             return;
         }
 
@@ -263,10 +263,10 @@ class OrderManagement extends Component
     public function openVoidModal(Order $order)
     {
         if (!$order->canBeRefunded()) {
-            $this->dispatchBrowserEvent('notify', [
-                'type' => 'error',
-                'message' => 'This order cannot be voided.'
-            ]);
+            $this->dispatch('notify', 
+                type: 'error',
+                message: 'This order cannot be voided.'
+            );
             return;
         }
 
@@ -286,19 +286,19 @@ class OrderManagement extends Component
 
         // Authorization check
         if (!auth()->user()->can('void', $order)) {
-            $this->dispatchBrowserEvent('notify', [
-                'type' => 'error',
-                'message' => 'You do not have permission to void this order.'
-            ]);
+            $this->dispatch('notify', 
+                type: 'error',
+                message: 'You do not have permission to void this order.'
+            );
             return;
         }
 
         $order->void('Voided by ' . auth()->user()->name);
 
-        $this->dispatchBrowserEvent('notify', [
-            'type' => 'success',
-            'message' => "Order #{$order->reference_no} has been voided."
-        ]);
+        $this->dispatch('notify', 
+            type: 'success',
+            message: "Order #{$order->reference_no} has been voided."
+        );
 
         $this->dispatch('close-modal', 'confirm-void-order');
         $this->backToList();
@@ -315,10 +315,10 @@ class OrderManagement extends Component
         $order = $this->selectedOrder;
 
         if (!$order || !$order->canBeRefunded()) {
-            $this->dispatchBrowserEvent('notify', [
-                'type' => 'error',
-                'message' => 'Refund not possible.'
-            ]);
+            $this->dispatch('notify', 
+                type: 'error',
+                message: 'Refund not possible.'
+            );
             return;
         }
 
@@ -335,19 +335,19 @@ class OrderManagement extends Component
             $this->selectedOrder = Order::with(['branch', 'user', 'items.product', 'customer', 'refundedBy', 'rider'])
                 ->find($order->id);
 
-            $this->dispatchBrowserEvent('notify', [
-                'type' => 'success',
-                'message' => "Refund of ₱" . number_format($this->refundAmount, 2) . " processed."
-            ]);
+            $this->dispatch('notify', 
+                type: 'success',
+                message: "Refund of ₱" . number_format($this->refundAmount, 2) . " processed."
+            );
 
             $this->refundAmount = 0;
             $this->refundReason = '';
             $this->dispatch('close-modal', 'refund-modal');
         } catch (\Exception $e) {
-            $this->dispatchBrowserEvent('notify', [
-                'type' => 'error',
-                'message' => 'Refund failed: ' . $e->getMessage()
-            ]);
+            $this->dispatch('notify', 
+                type: 'error',
+                message: 'Refund failed: ' . $e->getMessage()
+            );
         }
     }
 
@@ -410,10 +410,10 @@ class OrderManagement extends Component
                 $this->selectedOrder = $order->load(['branch', 'user', 'items.product', 'customer', 'refundedBy', 'rider']);
             }
 
-            $this->dispatchBrowserEvent('notify', [
-                'type' => 'success', 
-                'message' => "Order #{$order->reference_no} handed to {$order->rider->first_name}."
-            ]);
+            $this->dispatch('notify', 
+                type: 'success', 
+                message: "Order #{$order->reference_no} handed to {$order->rider->first_name}."
+            );
             
             $this->dispatch('close-modal', 'hand-to-rider-modal');
             $this->backToList();
@@ -507,10 +507,10 @@ class OrderManagement extends Component
         $refNo = $order->reference_no;
         $order->delete();
 
-        $this->dispatchBrowserEvent('notify', [
-            'type' => 'success',
-            'message' => "Draft #{$refNo} deleted."
-        ]);
+        $this->dispatch('notify', 
+            type: 'success',
+            message: "Draft #{$refNo} deleted."
+        );
 
         $this->backToList();
         $this->resetPage();

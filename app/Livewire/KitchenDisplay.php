@@ -201,10 +201,10 @@ class KitchenDisplay extends Component
             // Close modal and reset
             $this->closeRiderModal();
             
-            $this->dispatchBrowserEvent('notify', [
-                'type' => 'success',
-                'message' => "Order #{$order->reference_no} assigned to {$riderName} and ready for delivery."
-            ]);
+            $this->dispatch('notify', 
+                type: 'success',
+                message: "Order #{$order->reference_no} assigned to {$riderName} and ready for delivery."
+            );
         } catch (\Exception $e) {
             $this->dispatch('notify', type: 'error', message: "Error: " . $e->getMessage());
         }

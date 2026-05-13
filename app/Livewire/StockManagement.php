@@ -192,10 +192,10 @@ class StockManagement extends Component
     public function onInventorySettingsUpdated($newConfig)
     {
         // Settings were updated in system config, refresh the inventory view
-        $this->dispatchBrowserEvent('notify', [
-            'type' => 'info',
-            'message' => 'Inventory settings updated. Refresh required for thresholds.'
-        ]);
+        $this->dispatch('notify', 
+            type: 'info',
+            message: 'Inventory settings updated. Refresh required for thresholds.'
+        );
     }
 
     /**
@@ -804,10 +804,10 @@ class StockManagement extends Component
             ->paginate(5, ['*'], 'expiryPage');
 
         $expiryStats = [
-            'expired'  => StockBatch::where('current_quantity', '>', 0)->where('expiry_date', '<', $today)->count(),
-            'expiring' => StockBatch::where('current_quantity', '>', 0)->whereBetween('expiry_date', [$today, $nextWeek])->count(),
-            'fresh'    => StockBatch::where('current_quantity', '>', 0)->where('expiry_date', '>', $nextWeek)->count(),
-            'no_date'  => StockBatch::where('current_quantity', '>', 0)->whereNull('expiry_date')->count(),
+            'expired'  => StockBatch::where('current_quantity', '>', 0)->where('expiry_date', '<', $today)->when($branchId, fn($q) => $q->where('branch_id', $branchId))->count(),
+            'expiring' => StockBatch::where('current_quantity', '>', 0)->whereBetween('expiry_date', [$today, $nextWeek])->when($branchId, fn($q) => $q->where('branch_id', $branchId))->count(),
+            'fresh'    => StockBatch::where('current_quantity', '>', 0)->where('expiry_date', '>', $nextWeek)->when($branchId, fn($q) => $q->where('branch_id', $branchId))->count(),
+            'no_date'  => StockBatch::where('current_quantity', '>', 0)->whereNull('expiry_date')->when($branchId, fn($q) => $q->where('branch_id', $branchId))->count(),
         ];
 
         return [

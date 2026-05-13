@@ -244,7 +244,16 @@ class StockAdjustment extends Component
 
         // Auto-compute unit_cost from conversion table if stocking in bulk
         $unitCostPerBase = StockHelper::getPricePerBase($selectedUnit, $ing);
-        $costToStore = $this->newItemCost ?: ($unitCostPerBase > 0 ? $unitCostPerBase : null);
+        
+        // If user entered a manual cost, it's likely for the selected bulk unit (e.g. per sack)
+        // We must convert it to cost-per-base-unit (e.g. per gram) to maintain KPI accuracy.
+        $costToStore = $this->newItemCost ? (float)$this->newItemCost : ($unitCostPerBase > 0 ? $unitCostPerBase : null);
+        if ($this->newItemCost && $selectedUnit !== $this->newItemUnit) {
+            $multiplier = StockHelper::convertToBase(1, $selectedUnit, $ing);
+            if ($multiplier > 1) {
+                $costToStore = (float)$this->newItemCost / $multiplier;
+            }
+        }
 
         $this->rows[] = [
             'ingredient_id'   => $ing->id,

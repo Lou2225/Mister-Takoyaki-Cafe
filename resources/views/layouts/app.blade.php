@@ -50,7 +50,7 @@
 
     {{-- Styles --}}
     @livewireStyles
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['resources/js/app.js'])
 
     {{-- ApexCharts --}}
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
@@ -74,12 +74,16 @@
 
 <div
     x-data="{
-        sidebarOpen: window.innerWidth >= 1024,
+        sidebarOpen: localStorage.getItem('sidebarOpen') ? JSON.parse(localStorage.getItem('sidebarOpen')) : (window.innerWidth >= 1024),
         isMobile: window.innerWidth < 1024,
         userMenuOpen: false,
         hideOperationalModules: {{ $user?->hide_modules ? 'true' : 'false' }},
         isSuperAdmin: {{ $user?->isSuperAdmin() ? 'true' : 'false' }},
         init() {
+            // Watch sidebarOpen and save to localStorage
+            this.$watch('sidebarOpen', (value) => {
+                localStorage.setItem('sidebarOpen', JSON.stringify(value));
+            });
             window.addEventListener('resize', () => {
                 const wasMobile = this.isMobile;
                 this.isMobile = window.innerWidth < 1024;
@@ -150,6 +154,9 @@
                 init() {
                     this.updateTime();
                     this._int = setInterval(() => this.updateTime(), 1000);
+                },
+                destroy() {
+                    clearInterval(this._int);
                 }
             }" 
             x-init="init()" 
@@ -258,7 +265,7 @@
                     <p class="text-[12px] font-bold text-gray-900">{{ $firstName }} {{ $lastName }}</p>
                     <p class="text-[11px] text-gray-500 truncate">{{ $email }}</p>
                 </div>
-                <x-dropdown-link :href="route('profile.edit')">Profile Settings</x-dropdown-link>
+                <x-dropdown-link :href="route('profile.edit')" navigate="true">Profile Settings</x-dropdown-link>
                 <div class="border-t border-gray-50 mt-1">
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf

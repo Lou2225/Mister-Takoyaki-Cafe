@@ -10,6 +10,8 @@
 @endphp
 
 <div
+    wire:ignore.self
+    wire:key="kds-master-container"
     x-data="kdsDisplay(@js($activeTab))"
     class="relative bg-[#F9FAFB] min-h-[calc(100vh-65px)] p-4"
     x-cloak>
@@ -108,8 +110,8 @@
 
             {{-- ── Operational Content Area ── --}}
             <div class="flex flex-col bg-white rounded-b-2xl">
-                <div x-cloak x-show="activeTab === 'history'" 
-                     class="p-6 animate-fadeIn" wire:poll.2s>
+                <div x-cloak x-show="$wire.activeTab === 'history'" 
+                     class="p-6 animate-fadeIn" wire:poll.10s wire:key="kds-history-poll">
                     
                     {{-- macOS Style Unified Toolbar --}}
                     <div class="relative z-20 flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
@@ -174,8 +176,8 @@
                     </div>
                 </div>
 
-                <div x-cloak x-show="activeTab === 'active' || activeTab === 'ready'" 
-                    class="p-6 animate-fadeIn" wire:poll.2s>
+                <div x-cloak x-show="$wire.activeTab === 'active' || $wire.activeTab === 'ready'" 
+                    class="p-6 animate-fadeIn" wire:poll.5s wire:key="kds-active-ready-poll">
                     <div class="flex gap-4 items-stretch flex-wrap pb-2">
                         @forelse($orders as $order)
                             <div class="w-[340px] shrink-0 bg-white border border-slate-200 rounded-2xl flex flex-col shadow-sm hover:shadow-md hover:border-{{ $primaryColor }}-200 transition-all group">
@@ -314,16 +316,17 @@
         .animate-growWidth { animation: growWidth 1s ease-out forwards; }
     </style>
 
-    @once
+    @push('scripts')
     <script>
-    document.addEventListener('alpine:init', () => {
-        Alpine.data('kdsDisplay', (tab) => {
+        window.kdsDisplay = function(tab) {
             const tabs = window.slidingTabs({ activeTab: tab }, 'activeTab');
             return {
                 ...tabs,
                 _int: null,
                 init() {
-                    tabs.init.call(this);
+                    if (typeof tabs.init === 'function') {
+                        tabs.init.call(this);
+                    }
                     this.updateTimers();
                     this._int = setInterval(() => this.updateTimers(), 1000);
                 },
@@ -349,8 +352,7 @@
                     });
                 }
             };
-        });
-    });
+        };
     </script>
-    @endonce
+    @endpush
 </div>

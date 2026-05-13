@@ -18,6 +18,8 @@
 
     <div
         x-data="{ show: true }"
+        wire:ignore.self
+        wire:key="welcome-banner-wrapper"
     >
         {{-- Welcome Banner --}}
         <div
@@ -76,7 +78,7 @@
             <div class="flex flex-wrap items-center gap-2">
                 {{-- Branch Dropdown --}}
                 @if($isSuperAdmin)
-                    <x-dropdown align="left" width="56">
+                    <x-dropdown align="left" width="56" wire:key="dashboard-branch-filter">
                         <x-slot name="trigger">
                             <x-secondary-button type="button" class="gap-2">
                                 <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
@@ -359,7 +361,7 @@
         </x-side-panel>
 
         {{-- ─── Main Analytical Layer ────────────────────────────────────────── --}}
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6" x-data="dashboardCharts()">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6" x-data="dashboardCharts()" @update-sales-chart.window="handleChartUpdate($event.detail)" wire:ignore.self wire:key="dashboard-charts-container">
             {{-- 1: Financial Pulse (Line Chart) --}}
             <div class="lg:col-span-8 rounded-xl bg-white border border-gray-200 shadow-sm p-6 overflow-hidden h-[400px]">
                 <div class="flex items-center justify-between mb-6">
@@ -513,7 +515,7 @@
                     {{-- Vertical Level Indicator (No Circle) --}}
                     <div class="h-40 w-12 bg-gray-50 border-2 border-gray-100 rounded-xl relative overflow-hidden flex flex-col justify-end">
                         <div class="absolute inset-0 opacity-10" style="background-image: repeating-linear-gradient(0deg, #9ca3af, #9ca3af 1px, transparent 1px, transparent 10px);"></div>
-                        <div class="w-full transition-all duration-1000 shadow-[0_0_15px_rgba(16,185,129,0.3)] {{ $inventoryIntel['variance_pct'] > 5 ? 'bg-red-500' : 'bg-emerald-500' }}" style="height: {{ $inventoryIntel['health_score'] }}%"></div>
+                        <div class="w-full transition-all duration-1000 shadow-[0_0_15px_rgba(16,185,129,0.3)] {{ $inventoryIntel['health_score'] > 80 ? 'bg-emerald-500' : ($inventoryIntel['health_score'] > 50 ? 'bg-amber-500' : 'bg-red-500') }}" style="height: {{ $inventoryIntel['health_score'] }}%"></div>
                     </div>
                     <div class="flex-1 space-y-6">
                         <div>
@@ -521,8 +523,9 @@
                             <h3 class="text-4xl font-black text-gray-900 tracking-tighter">{{ $inventoryIntel['health_score'] }}%</h3>
                         </div>
                         <div class="pt-4 border-t border-gray-100">
-                            <p class="text-[11px] font-bold text-gray-400 mb-1 uppercase tracking-widest text-red-600">Variance Loss</p>
-                            <p class="text-[16px] font-black text-gray-900">{{ $inventoryIntel['waste_qty'] }} <span class="text-[12px] font-bold text-gray-400">UNITS</span></p>
+                            <p class="text-[11px] font-bold mb-1 uppercase tracking-widest {{ $inventoryIntel['health_score'] > 80 ? 'text-emerald-600' : ($inventoryIntel['health_score'] > 50 ? 'text-amber-600' : 'text-red-600') }}">Variance Loss</p>
+                            <p class="text-[16px] font-black text-gray-900">{{ $financialConfig['currency_symbol'] ?? '₱' }} {{ number_format($inventoryIntel['waste_value'], 2) }} <span class="text-[12px] font-bold text-gray-400">VALUE</span></p>
+                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">{{ number_format($inventoryIntel['variance_pct'], 2) }}% of consumed stock value</p>
                         </div>
                     </div>
                 </div>
@@ -575,7 +578,7 @@
                     </table>
                 </div>
                 <div class="p-4 border-t border-gray-50 text-center">
-                    <a href="{{ route('menu.index') }}" 
+                    <a href="{{ route('menu.index') }}" wire:navigate 
                        class="inline-block text-[11px] font-bold text-{{ $user->role_id === 1 ? 'indigo' : ($user->role_id === 2 ? 'rose' : 'emerald') }}-600 uppercase tracking-[0.2em] hover:text-{{ $user->role_id === 1 ? 'indigo' : ($user->role_id === 2 ? 'rose' : 'emerald') }}-800 transition-colors">
                         Load Extended Catalog
                     </a>
@@ -583,7 +586,7 @@
             </div>
 
             {{-- Enhanced Stock Intelligence (col-span-4) --}}
-            <div class="lg:col-span-4 rounded-xl bg-white border border-gray-200 shadow-sm overflow-hidden flex flex-col h-[400px]" x-data="slidingTabs(@entangle('stockTab').live, 'stockTab')">
+            <div class="lg:col-span-4 rounded-xl bg-white border border-gray-200 shadow-sm overflow-hidden flex flex-col h-[400px]" x-data="slidingTabs(@entangle('stockTab').live, 'stockTab')" wire:ignore.self wire:key="stock-intelligence-tabs">
                 <div class="px-6 py-5 flex items-center justify-between bg-white sticky top-0 z-20 shrink-0">
                     <h2 class="text-[14px] font-black text-gray-900 uppercase tracking-widest">Stock Intelligence</h2>
                 </div>
@@ -658,7 +661,7 @@
                     </div>
                 </div>
                 <div class="p-4 border-t border-gray-50 text-center">
-                    <a href="{{ route('stock.index') }}" 
+                    <a href="{{ route('stock.index') }}" wire:navigate 
                        class="inline-block text-[11px] font-bold text-gray-400 uppercase tracking-widest hover:text-gray-900 transition-colors">
                         Expand Full Ledger
                     </a>
@@ -698,7 +701,7 @@
                 </div>
                 
                 <div class="p-4 border-t border-gray-800 bg-gray-950/80">
-                    <a href="{{ route('pos.index') }}" 
+                    <a href="{{ route('pos.index') }}" wire:navigate 
                        class="block w-full py-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 text-[11px] font-black tracking-[0.2em] uppercase text-center transition-all transform active:scale-[0.98]">
                         POS Console
                     </a>
@@ -715,7 +718,6 @@
     </style>
 
 @push('scripts')
-
     <script>
         function dashboardCharts() {
             return {
@@ -725,29 +727,39 @@
                 init() {
                     this.initSales();
                     
-                    window.addEventListener('updateSalesChart', (event) => {
-                        const data = event.detail;
-                        if (this.salesChart) {
-                            this.salesChart.updateOptions({
-                                xaxis: {
-                                    categories: data.categories
-                                }
-                            });
-                            this.salesChart.updateSeries([{
-                                name: data.metric === 'Volume' ? "Order Volume" : (data.metric === 'Profit' ? "Net Profit" : "Gross Revenue"),
-                                data: data.history
-                            }, {
-                                name: "Predictive Forecast",
-                                data: data.forecast
-                            }]);
-                        }
-                    });
-                    
                     if (this.$cleanup) {
                         this.$cleanup(() => {
-                            if (this.salesChart) this.salesChart.destroy();
-                            if (this.paymentChart) this.paymentChart.destroy();
+                            if (this.salesChart) {
+                                try { this.salesChart.destroy(); } catch(e) {}
+                                this.salesChart = null;
+                            }
+                            if (this.paymentChart) {
+                                try { this.paymentChart.destroy(); } catch(e) {}
+                                this.paymentChart = null;
+                            }
                         });
+                    }
+                },
+
+                handleChartUpdate(detail) {
+                    const data = detail?.chart ?? detail?.[0] ?? detail;
+                    if (!this.salesChart || !data || !this.$refs.salesChart) return;
+
+                    try {
+                        this.salesChart.updateOptions({
+                            xaxis: { categories: data.categories ?? [] }
+                        });
+
+                        this.salesChart.updateSeries([{
+                            name: data.metric === 'Volume' ? "Order Volume" : (data.metric === 'Profit' ? "Net Profit" : "Gross Revenue"),
+                            data: data.history ?? []
+                        }, {
+                            name: "Predictive Forecast",
+                            data: data.forecast ?? []
+                        }]);
+                    } catch (e) {
+                        console.warn("Chart update failed, re-initializing...", e);
+                        this.initSales();
                     }
                 },
 

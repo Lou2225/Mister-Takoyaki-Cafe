@@ -40,11 +40,11 @@ class DashboardOverview extends Component
     public $breakdownData = [];
     public $stockTab = 'deficiency';
 
+
     public function setChartMetric($metric)
     {
         $this->selectedChartMetric = $metric;
-        $data = $this->getChartData();
-        $this->dispatch('updateSalesChart', $data);
+        $this->refreshChart();
     }
 
     public function openBreakdown($metric)
@@ -274,9 +274,6 @@ class DashboardOverview extends Component
 
     public function updatedSelectedBranchId($value)
     {
-        if ($this->isSuperAdmin) {
-            \App\Services\BranchContext::setActiveBranch($value);
-        }
         $this->refreshChart();
     }
 
@@ -389,7 +386,7 @@ class DashboardOverview extends Component
     public function refreshChart()
     {
         $chartData = $this->getChartData();
-        $this->dispatch('updateSalesChart', $chartData);
+        $this->dispatch('update-sales-chart', chart: $chartData);
         $this->dispatch('branchSelectionUpdated');
     }
 
@@ -802,28 +799,13 @@ class DashboardOverview extends Component
     private function getInventoryIntelligence(): array
     {
         $branchId = $this->selectedBranchId;
-        
-        // Determine the time window for daily average calculation
-        if ($this->startDate && $this->endDate) {
-            $start = Carbon::parse($this->startDate);
-            $end = Carbon::parse($this->endDate);
-            $days = max(1, $start->diffInDays($end));
-        } else {
-            // All Time: find the earliest order movement to get a realistic daily average
-            $earliest = StockMovement::where('type', 'order')
-                ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
-                ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
-                ->min('created_at');
-            
-            $start = $earliest ? Carbon::parse($earliest) : now()->subDays(30);
-            $end = now();
-            $days = max(1, $start->diffInDays($end));
-        }
+        [$filterStart, $filterEnd, $days] = $this->resolveInventoryIntelDateWindow($branchId);
+        [$branchCostMap, $globalCostMap] = $this->resolveInventoryIntelCostMaps($branchId);
 
         // 1. Consumption Velocity (Top 5 fastest moving ingredients)
         $velocity = StockMovement::where('type', 'order') // 'order' represents sales deduction
-            ->when($this->startDate, fn($q) => $q->where('created_at', '>=', $this->startDate . ' 00:00:00'))
-            ->when($this->endDate, fn($q) => $q->where('created_at', '<=', $this->endDate . ' 23:59:59'))
+            ->when($filterStart, fn($q) => $q->where('created_at', '>=', $filterStart))
+            ->when($filterEnd, fn($q) => $q->where('created_at', '<=', $filterEnd))
             ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
             ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
             ->select('ingredient_id', DB::raw('SUM(ABS(quantity)) as total_consumed'))
@@ -839,30 +821,99 @@ class DashboardOverview extends Component
                 'progress' => min(100, ($m->total_consumed / ($m->ingredient->minimum_stock ?: 1)) * 10) // Visualization proxy
             ])->toArray();
 
-        // 2. Waste Variance: Comparison between physical adjustments and sales deductions
-        $salesDeduction = StockMovement::where('type', 'order')
-            ->when($this->startDate, fn($q) => $q->where('created_at', '>=', $this->startDate . ' 00:00:00'))
-            ->when($this->endDate, fn($q) => $q->where('created_at', '<=', $this->endDate . ' 23:59:59'))
+        // 2. Health Index: compare real loss events against consumed inventory value.
+        $salesMovements = StockMovement::where('type', 'order')
+            ->when($filterStart, fn($q) => $q->where('created_at', '>=', $filterStart))
+            ->when($filterEnd, fn($q) => $q->where('created_at', '<=', $filterEnd))
             ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
             ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
-            ->sum(DB::raw('ABS(quantity)'));
+            ->get(['branch_id', 'ingredient_id', 'quantity']);
 
-        $wasteDeduction = StockMovement::whereIn('type', ['waste', 'out', 'adjust'])
-            ->when($this->startDate, fn($q) => $q->where('created_at', '>=', $this->startDate . ' 00:00:00'))
-            ->when($this->endDate, fn($q) => $q->where('created_at', '<=', $this->endDate . ' 23:59:59'))
+        // Exclude generic "adjust" records here because positive reconciliations store
+        // the final counted stock level, which would distort loss calculations.
+        $wasteMovements = StockMovement::whereIn('type', ['waste', 'waste_expired', 'out', 'return_to_supplier'])
+            ->when($filterStart, fn($q) => $q->where('created_at', '>=', $filterStart))
+            ->when($filterEnd, fn($q) => $q->where('created_at', '<=', $filterEnd))
             ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
             ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
-            ->sum(DB::raw('ABS(quantity)'));
+            ->get(['branch_id', 'ingredient_id', 'quantity']);
 
-        $variancePct = $salesDeduction > 0 ? ($wasteDeduction / $salesDeduction) * 100 : 0;
+        $salesValue = $salesMovements->sum(fn ($movement) => abs((float) $movement->quantity) * $this->resolveInventoryIntelUnitCost(
+            (int) $movement->branch_id,
+            (int) $movement->ingredient_id,
+            $branchCostMap,
+            $globalCostMap
+        ));
+
+        $wasteValue = $wasteMovements->sum(fn ($movement) => abs((float) $movement->quantity) * $this->resolveInventoryIntelUnitCost(
+            (int) $movement->branch_id,
+            (int) $movement->ingredient_id,
+            $branchCostMap,
+            $globalCostMap
+        ));
+
+        $variancePct = $salesValue > 0
+            ? ($wasteValue / $salesValue) * 100
+            : ($wasteValue > 0 ? 100 : 0);
 
         return [
             'velocity' => $velocity,
             'variance_pct' => round($variancePct, 2),
-            'waste_qty' => number_format($wasteDeduction, 2),
+            'sales_value' => round($salesValue, 2),
+            'waste_value' => round($wasteValue, 2),
             'health_score' => round(max(0, 100 - $variancePct), 2)
         ];
     }
+
+    private function resolveInventoryIntelDateWindow($branchId): array
+    {
+        if ($this->startDate && $this->endDate && !$this->dateError) {
+            $start = Carbon::parse($this->startDate)->startOfDay();
+            $end = Carbon::parse($this->endDate)->endOfDay();
+
+            return [$start, $end, max(1, $start->diffInDays($end) + 1)];
+        }
+
+        $earliest = StockMovement::where('type', 'order')
+            ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
+            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->min('created_at');
+
+        $start = $earliest ? Carbon::parse($earliest)->startOfDay() : now()->subDays(30)->startOfDay();
+        $end = now()->endOfDay();
+
+        return [$start, $end, max(1, $start->diffInDays($end) + 1)];
+    }
+
+    private function resolveInventoryIntelCostMaps($branchId): array
+    {
+        $branchCosts = IngredientCost::query()
+            ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
+            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->get()
+            ->groupBy('branch_id')
+            ->map(function ($costs) {
+                return $costs->mapWithKeys(function ($cost) {
+                    $resolvedCost = (float) ($cost->cost_per_base_unit ?: $cost->unit_cost ?: 0);
+
+                    return [$cost->ingredient_id => $resolvedCost];
+                });
+            });
+
+        $globalCosts = Ingredient::pluck('cost', 'id')->map(fn ($cost) => (float) $cost);
+
+        return [$branchCosts, $globalCosts];
+    }
+
+    private function resolveInventoryIntelUnitCost(int $branchId, int $ingredientId, $branchCostMap, $globalCostMap): float
+    {
+        return (float) (
+            $branchCostMap->get($branchId)?->get($ingredientId)
+            ?? $globalCostMap->get($ingredientId)
+            ?? 0
+        );
+    }
+
     private function calculateItemCogs($item, $branchCostMap, $globalCostMap, &$productMap, &$optionMap, &$modifierMap): float
     {
         $itemCost = 0;

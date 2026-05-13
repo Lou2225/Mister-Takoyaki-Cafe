@@ -1,55 +1,40 @@
 @props([
     'name',
-    'show' => false,
+    'initialShow' => false,
     'width' => 'max-w-md'
 ])
 
 <div
-    x-data="{ 
-        @if($attributes->has('wire:model.live'))
-            show: @entangle($attributes->wire('model')).live,
-        @else
-            show: @js($show),
-        @endif
-        close() { this.show = false }
-    }"
-    x-init="$watch('show', value => {
-        if (value) {
-            document.body.classList.add('overflow-y-hidden');
-        } else {
-            document.body.classList.remove('overflow-y-hidden');
-        }
-    })"
-    x-on:open-modal.window="(() => {
-        const target = $event.detail?.name || $event.detail?.[0]?.name || $event.detail;
-        if (target == '{{ $name }}') show = true;
-    })()"
-    x-on:close-modal.window="(() => {
-        const target = $event.detail?.name || $event.detail?.[0]?.name || $event.detail;
-        if (target == '{{ $name }}') show = false;
-    })()"
-    x-on:keydown.escape.window="close()"
-    x-show="show"
+    wire:ignore.self
+    x-data="typeof sidePanel === 'function' ? sidePanel({ name: '{{ $name }}', show: @js($initialShow)@if($attributes->hasAny(['wire:model', 'wire:model.live', 'wire:model.defer'])), entangled: true @endif }) : { isPanelOpen: @js($initialShow), name: '{{ $name }}', open() { this.isPanelOpen = true }, close() { this.isPanelOpen = false }, closePanel() { this.isPanelOpen = false } }"
+    x-on:open-modal.window="open($event.detail)"
+    x-on:close-modal.window="close($event.detail)"
+    x-on:keydown.escape.window="closePanel()"
+    x-show="isPanelOpen"
+    x-cloak
     class="fixed inset-0 z-[100] overflow-hidden"
-    style="display: none;"
 >
+    {{-- Outer wrapper --}}
     <div class="absolute inset-0 overflow-hidden">
-        {{-- Overlay --}}
-        <div 
-            x-show="show"
+
+        {{-- Backdrop overlay --}}
+        <div
+            x-show="isPanelOpen"
             x-transition:enter="ease-in-out duration-500"
             x-transition:enter-start="opacity-0"
             x-transition:enter-end="opacity-100"
             x-transition:leave="ease-in-out duration-500"
             x-transition:leave-start="opacity-100"
             x-transition:leave-end="opacity-0"
-            @click="close()"
+            @click="closePanel()"
             class="absolute inset-0 bg-gray-900/20 backdrop-blur-md transition-opacity"
         ></div>
 
+        {{-- Panel container --}}
         <div class="pointer-events-none fixed inset-y-0 right-0 flex max-w-full">
-            <div 
-                x-show="show"
+            <div
+                wire:ignore.self
+                x-show="isPanelOpen"
                 x-transition:enter="transform transition ease-in-out duration-500 sm:duration-700"
                 x-transition:enter-start="translate-x-full"
                 x-transition:enter-end="translate-x-0"
@@ -58,10 +43,13 @@
                 x-transition:leave-end="translate-x-full"
                 class="pointer-events-auto w-screen {{ $width }}"
             >
+                {{-- Panel body --}}
                 <div class="flex h-full flex-col bg-white shadow-2xl border-l border-slate-200 overflow-hidden">
                     {{ $slot }}
                 </div>
             </div>
         </div>
+
     </div>
 </div>
+

@@ -1,6 +1,6 @@
 @props(['module' => 'Report'])
 
-<div x-data="{ open: false }" class="relative inline-block text-left">
+<div x-data="{ open: false }" wire:ignore.self class="relative inline-block text-left">
     <button @click="open = !open" @click.outside="open = false" 
         class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl shadow-sm text-[12px] font-bold text-gray-700 hover:bg-gray-50 transition-all">
         <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

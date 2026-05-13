@@ -1,4 +1,4 @@
-<div wire:poll.15s>
+<div>
     {{-- ═══════════════════════ SIDEBAR ═══════════════════════ --}}
     <aside
         id="main-sidebar"
@@ -53,7 +53,7 @@
                         Overview
                     </h3>
 
-                    <a href="{{ route('dashboard') }}"
+                    <a href="{{ route('dashboard') }}" wire:navigate
                         class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
                             {{ request()->routeIs('dashboard') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
                         <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -65,7 +65,7 @@
                     </a>
 
                     <div x-show="!hideOperationalModules" x-transition.opacity x-cloak>
-                        <a href="{{ route('pos.index') }}"
+                        <a href="{{ route('pos.index') }}" wire:navigate
                             class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
                                 {{ request()->routeIs('pos.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
                             <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -76,7 +76,7 @@
                                 :class="sidebarOpen ? 'opacity-100' : 'opacity-0 hidden'">POS Terminal</span>
                         </a>
 
-                        <a href="{{ route('orders.index') }}"
+                        <a href="{{ route('orders.index') }}" wire:navigate
                             class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
                                 {{ request()->routeIs('orders.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
                             <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -87,7 +87,7 @@
                                 :class="sidebarOpen ? 'opacity-100' : 'opacity-0 hidden'">Order Management</span>
                         </a>
 
-                        <a href="{{ route('kds.index') }}"
+                        <a href="{{ route('kds.index') }}" wire:navigate
                             class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
                                 {{ request()->routeIs('kds.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
                             <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -108,7 +108,7 @@
                     </h3>
 
                     @if($user->role_id <= 2)
-                        <a href="{{ route('menu.index') }}"
+                        <a href="{{ route('menu.index') }}" wire:navigate
                             class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
                                 {{ request()->routeIs('menu.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
                             <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -119,7 +119,7 @@
                         </a>
 
                         @if($user->isSuperAdmin())
-                            <a href="{{ route('categories.index') }}"
+                            <a href="{{ route('categories.index') }}" wire:navigate
                                 class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
                                     {{ request()->routeIs('categories.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
                                 <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -130,7 +130,7 @@
                                     :class="sidebarOpen ? 'opacity-100' : 'opacity-0 hidden'">Categories Catalog</span>
                             </a>
 
-                            <a href="{{ route('library.index') }}"
+                            <a href="{{ route('library.index') }}" wire:navigate
                                 class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
                                     {{ request()->routeIs('library.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
                                 <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -154,7 +154,7 @@
 
                         <div x-data="{ stockOpen: {{ $stockActive ? 'true' : 'false' }} }">
                             <div class="flex items-center mt-0.5">
-                                <a href="{{ route('stock.index') }}"
+                                <a href="{{ route('stock.index') }}" wire:navigate
                                     class="flex flex-1 items-center gap-3 px-3 py-1.5 rounded-lg transition-colors
                                         {{ $isStockPage ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
                                     <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -179,7 +179,7 @@
                             @if($user->role_id <= 2)
                                 <div x-show="stockOpen && sidebarOpen" x-cloak x-transition.opacity
                                     class="mt-0.5 ml-7 pl-3 border-l-2 border-gray-100 space-y-0.5">
-                                    <a href="{{ route('stock.adjustment') }}"
+                                    <a href="{{ route('stock.adjustment') }}" wire:navigate
                                         class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors
                                             {{ request()->routeIs('stock.adjustment') ? 'bg-purple-50 text-purple-700' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800' }}">
                                         <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -195,7 +195,7 @@
                                     @endphp
 
                                     @if($isSubBranch)
-                                        <a href="{{ route('stock.orders') }}"
+                                        <a href="{{ route('stock.orders') }}" wire:navigate
                                             class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors
                                                 {{ request()->routeIs('stock.orders') ? 'bg-indigo-50 text-indigo-700' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800' }}">
                                             <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -212,7 +212,7 @@
                                     @endphp
 
                                     @if($showOrderInbox)
-                                        <a href="{{ route('stock.orders.admin') }}"
+                                        <a href="{{ route('stock.orders.admin') }}" wire:navigate
                                             class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors
                                                 {{ request()->routeIs('stock.orders.admin') ? 'bg-amber-50 text-amber-700' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800' }}">
                                             <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -240,7 +240,7 @@
                     </h3>
 
                     @if($user->role_id <= 2)
-                        <a href="{{ route('branches.index') }}"
+                        <a href="{{ route('branches.index') }}" wire:navigate
                             class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
                                 {{ request()->routeIs('branches.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
                             <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -251,7 +251,7 @@
                                 :class="sidebarOpen ? 'opacity-100' : 'opacity-0 hidden'">Branch Locations</span>
                         </a>
 
-                        <a href="{{ route('users.index') }}"
+                        <a href="{{ route('users.index') }}" wire:navigate
                             class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
                                 {{ request()->routeIs('users.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
                             <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -264,7 +264,7 @@
                             </span>
                         </a>
 
-                        <a href="{{ route('customers.index') }}"
+                        <a href="{{ route('customers.index') }}" wire:navigate
                             class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
                                 {{ request()->routeIs('customers.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
                             <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -285,7 +285,7 @@
                             System
                         </h3>
 
-                        <a href="{{ route('reports.index') }}"
+                        <a href="{{ route('reports.index') }}" wire:navigate
                             class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
                                 {{ request()->routeIs('reports.*') || request()->routeIs('intelligence.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
                             <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -297,7 +297,7 @@
                         </a>
 
                         @if($user->isSuperAdmin())
-                            <a href="{{ route('settings.index') }}"
+                            <a href="{{ route('settings.index') }}" wire:navigate
                                 class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
                                     {{ request()->routeIs('settings.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
                                 <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -328,7 +328,7 @@
                         Please use the Rider mobile app to manage your deliveries.
                     </p>
 
-                    <a href="{{ route('profile.edit') }}"
+                    <a href="{{ route('profile.edit') }}" wire:navigate
                         class="flex items-center gap-3 px-3 py-1.5 mt-6 rounded-lg transition-colors hover:bg-gray-50 hover:text-gray-900">
                         <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"

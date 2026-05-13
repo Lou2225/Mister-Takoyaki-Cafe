@@ -226,10 +226,10 @@ class CategoryManagement extends Component
         $count = $this->editCategoryType === 'product' ? $category->products()->count() : $category->ingredients()->count();
         
         if ($count > 0) {
-            $this->dispatchBrowserEvent('notify', [
-                'type' => 'error', 
-                'message' => "Cannot delete category. It still has $count assigned " . ($this->editCategoryType === 'product' ? 'products' : 'ingredients') . "."
-            ]);
+            $this->dispatch('notify', 
+                type: 'error', 
+                message: "Cannot delete category. It still has $count assigned " . ($this->editCategoryType === 'product' ? 'products' : 'ingredients') . "."
+            );
             $this->dispatch('close-modal', 'confirm-delete-category');
             return;
         }

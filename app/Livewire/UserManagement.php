@@ -113,8 +113,13 @@ class UserManagement extends Component
     public function updatedEmail()
     {
         if ($this->skipValidation) return;
+        
+        // System users (all except role 4) share the same email uniqueness pool.
+        // In this component, we only manage system users.
         $rules = array_merge(ValidationHelper::rulesEmail(), [
-            $this->editUserId ? Rule::unique('users', 'email')->ignore($this->editUserId) : 'unique:users,email'
+            $this->editUserId 
+                ? Rule::unique('users', 'email')->whereNot('role_id', 4)->ignore($this->editUserId) 
+                : Rule::unique('users', 'email')->whereNot('role_id', 4)
         ]);
         $this->validateFieldLive('email', $rules, ValidationHelper::commonMessages());
     }
@@ -378,7 +383,9 @@ class UserManagement extends Component
             'middleName'   => ValidationHelper::rulesOptionalName(),
             'lastName'     => ValidationHelper::rulesName(),
             'email'        => array_merge(ValidationHelper::rulesEmail(), [
-                $this->editUserId ? Rule::unique('users', 'email')->ignore($this->editUserId) : 'unique:users,email'
+                $this->editUserId 
+                    ? Rule::unique('users', 'email')->whereNot('role_id', 4)->ignore($this->editUserId) 
+                    : Rule::unique('users', 'email')->whereNot('role_id', 4)
             ]),
             'phone'        => ['nullable', 'string', 'regex:/^[0-9]{10}$/'],
             'formRoleId'   => ['required', 'exists:roles,id', 'in:1,2,3'],
@@ -418,7 +425,7 @@ class UserManagement extends Component
             'firstName'    => ValidationHelper::rulesName(),
             'middleName'   => ValidationHelper::rulesOptionalName(),
             'lastName'     => ValidationHelper::rulesName(),
-            'email'        => ['required', 'email:rfc', 'max:255', 'unique:users,email'],
+            'email'        => ['required', 'email:rfc', 'max:255', Rule::unique('users', 'email')->whereNot('role_id', 4)],
             'phone'        => ['nullable', 'string', 'regex:/^[0-9]{10}$/'],
             'formRoleId'   => ['required', 'exists:roles,id', 'in:1,2,3'],
             'formBranchId' => ['required', 'exists:branches,id'],
@@ -566,7 +573,7 @@ class UserManagement extends Component
             'firstName'    => ValidationHelper::rulesName(),
             'middleName'   => ValidationHelper::rulesOptionalName(),
             'lastName'     => ValidationHelper::rulesName(),
-            'email'        => ['required', 'email:rfc', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'email'        => ['required', 'email:rfc', 'max:255', Rule::unique('users', 'email')->whereNot('role_id', 4)->ignore($user->id)],
             'phone'        => ['nullable', 'string', 'regex:/^[0-9]{10}$/'],
             'formRoleId'   => ['required', 'exists:roles,id', 'in:1,2,3'],
             'formBranchId' => ['required', 'exists:branches,id'],
