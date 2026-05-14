@@ -13,14 +13,14 @@
     wire:ignore.self
     wire:key="kds-master-container"
     x-data="kdsDisplay(@js($activeTab))"
-    class="relative bg-[#F9FAFB] min-h-[calc(100vh-65px)] p-4"
+    class="relative bg-[#F9FAFB] h-[calc(100vh-65px)] p-2 md:p-4 overflow-hidden flex flex-col"
     x-cloak>
 
     {{-- ════════════════ MASTER PAGE CONTAINER ════════════════ --}}
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col">
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col h-full overflow-hidden">
         
         {{-- Section 1: Title & Action (Matching Stock Header) --}}
-        <div class="px-4 py-4 md:px-6 md:py-6">
+        <div class="px-4 py-4 md:px-6 md:py-6 shrink-0">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h2 class="text-[16px] md:text-[17px] font-bold text-gray-900 tracking-tight">Kitchen Operations Board</h2>
@@ -32,7 +32,8 @@
         </div>
 
         {{-- Section 2: Tab Navigation (Mirrored from BI) --}}
-        <x-sliding-tabs model="activeTab" class="mb-6 px-1" ref="tabList" wire:ignore>
+        <div class="shrink-0">
+            <x-sliding-tabs model="activeTab" class="mb-6 px-1" ref="tabList" wire:ignore>
             @foreach([
                 'active' => ['Processing Queue', 'M13 10V3L4 14h7v7l9-11h-7'],
                 'ready' => ['Ready Board', 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'],
@@ -49,6 +50,7 @@
                 </x-sliding-tab>
             @endforeach
         </x-sliding-tabs>
+    </div>
 
         {{-- Section 3: Metrics & Content Flow --}}
                     {{-- ── KDS Health Dashboard Area ── --}}
@@ -101,7 +103,7 @@
             </div>
 
             {{-- ── Operational Content Area ── --}}
-            <div class="flex flex-col bg-white rounded-b-2xl">
+            <div class="flex-1 overflow-y-auto custom-scrollbar bg-white rounded-b-2xl">
                 <div x-cloak x-show="$wire.activeTab === 'history'" 
                      class="p-6 animate-fadeIn" wire:key="kds-history-container">
                     

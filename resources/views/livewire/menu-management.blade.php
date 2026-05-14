@@ -6,26 +6,39 @@
         activeTab: @entangle('activeTab').live
     })"
     x-on:switch-panel.window="panel = $event.detail.panel"
-    class="relative"
+    class="relative h-[calc(100vh-65px)] overflow-hidden flex flex-col p-2 md:p-4"
     wire:ignore.self
     wire:key="menu-management-main-container">
     {{-- Panel: Form --}}
-    <div x-show="panel === 'form'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="px-1">
-        <div class="mb-5 flex items-center justify-between">
-            <div>
-                <h2 class="text-[17px] font-bold text-gray-900 tracking-tight" x-text="mode === 'edit' ? 'Update Product' : 'Add New Product'"></h2>
-                <p class="text-[12px] text-gray-500 font-medium whitespace-nowrap overflow-hidden text-ellipsis" x-text="mode === 'edit' ? 'Configure product details and pricing' : 'Add a new item to the menu'"></p>
+    <div x-show="panel === 'form'" 
+         x-transition:enter="transition ease-out duration-200" 
+         x-transition:enter-start="opacity-0 translate-y-4" 
+         x-transition:enter-end="opacity-100 translate-y-0" 
+         x-cloak 
+         class="flex-1 flex flex-col min-h-0 bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        
+        <div class="px-4 py-4 md:px-6 md:py-5 shrink-0 border-b border-gray-100 bg-slate-50/30">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-[17px] font-black text-gray-900 tracking-tight" x-text="mode === 'edit' ? 'Update Product' : 'Add New Product'"></h2>
+                    <p class="text-[12px] text-gray-500 font-medium truncate max-w-[200px] sm:max-w-none" x-text="mode === 'edit' ? 'Configure product details and pricing' : 'Add a new item to the menu'"></p>
+                </div>
+                <x-secondary-button wire:click="backToList" class="h-10 text-[11px] font-black uppercase tracking-widest">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                    <span class="hidden sm:inline">Back to Products</span>
+                    <span class="sm:hidden">Back</span>
+                </x-secondary-button>
             </div>
-            <x-secondary-button wire:click="backToList" class="h-10">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-                Back to Products
-            </x-secondary-button>
         </div>
+
+        <div class="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6">
 
         <form @submit.prevent class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div class="lg:col-span-2 space-y-6">
                 {{-- Unified Form Tabs --}}
-                <x-sliding-tabs model="activeTab" class="mb-2" ref="tabList">
+                <div class="mb-4 -mx-4 px-4 overflow-x-auto custom-scrollbar no-scrollbar scroll-smooth">
+                    <div class="inline-flex min-w-full border-b border-slate-100">
+                        <x-sliding-tabs model="activeTab" class="w-max" ref="tabList">
                     <x-sliding-tab value="basic" model="activeTab">
                         <x-slot name="icon"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></x-slot>
                         Information
@@ -42,7 +55,9 @@
                         <x-slot name="icon"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg></x-slot>
                         Profitability
                     </x-sliding-tab>
-                </x-sliding-tabs>
+                        </x-sliding-tabs>
+                    </div>
+                </div>
 
                 <div class="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm min-h-[400px]">
                     {{-- Tab: Product Information --}}
@@ -151,17 +166,19 @@
                             </div>
                         </div>
 
-                        <div class="flex items-center justify-between border-b border-slate-50 pb-4 mb-2">
-                            <div>
+                        <div class="border-b border-slate-50 pb-4 mb-4">
+                            <div class="mb-4">
                                 <h3 class="text-[14px] font-black text-slate-900 uppercase tracking-widest">Configuration Groups</h3>
                                 <p class="text-[11px] text-slate-400 font-medium mt-1">Define mandatory or optional item variations</p>
                             </div>
-                            <div class="flex items-center gap-2">
-                                <button type="button" @click="$dispatch('open-modal', 'import-template-library')" class="h-9 px-4 bg-slate-50 text-slate-500 text-[11px] font-black uppercase tracking-widest rounded-lg hover:bg-slate-100 transition-all flex items-center gap-2">
+                            <div class="grid grid-cols-2 gap-2">
+                                <button type="button" @click="$dispatch('open-modal', 'import-template-library')" class="h-10 px-3 bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-slate-100 transition-all flex items-center justify-center gap-1.5 border border-slate-100">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18 18.247 18.477 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
-                                    Import Template
+                                    <span class="truncate">Import Template</span>
                                 </button>
-                                <button type="button" @click="$dispatch('open-modal', 'add-option-group')" class="h-9 px-4 bg-indigo-50 text-indigo-600 text-[11px] font-black uppercase tracking-widest rounded-lg hover:bg-indigo-100 transition-all">+ Add Group</button>
+                                <button type="button" @click="$dispatch('open-modal', 'add-option-group')" class="h-10 px-3 bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-indigo-100 transition-all border border-indigo-100/50 flex items-center justify-center truncate">
+                                    + Add Group
+                                </button>
                             </div>
                         </div>
 
@@ -477,8 +494,8 @@
                     <x-input-error :messages="$errors->get('image')" class="mt-3 text-center" />
                 </div>
 
-                {{-- Summary & Actions --}}
-                <div class="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
+                {{-- Summary & Actions (Hidden on mobile as we use the sticky footer) --}}
+                <div class="hidden lg:block bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
                     <div class="space-y-3">
                         <x-primary-button type="button" wire:click="validateBeforeSave" class="w-full justify-center h-12 text-[12px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">
                             <span x-text="mode === 'edit' ? 'Update Catalog' : 'Register Product'"></span>
@@ -499,7 +516,20 @@
                     @endif
                 </div>
             </div>
+            </div>
         </form>
+    </div>
+
+    {{-- Mobile Sticky Action Bar --}}
+    <div x-show="panel === 'form'" class="lg:hidden shrink-0 p-4 bg-white border-t border-slate-100 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-30">
+        <div class="flex flex-col gap-2">
+            <x-primary-button type="button" wire:click="validateBeforeSave" class="w-full justify-center h-12 text-[12px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">
+                <span x-text="mode === 'edit' ? 'Update Catalog' : 'Register Product'"></span>
+            </x-primary-button>
+            <x-secondary-button wire:click="backToList" class="w-full justify-center h-11 text-[11px] font-black uppercase tracking-widest border-slate-100 text-slate-400">
+                Discard Draft
+            </x-secondary-button>
+        </div>
     </div>
 
     {{-- Option Template Library Modal --}}
@@ -561,25 +591,33 @@
     </x-modal>
 
     {{-- Panel: List --}}
-    <div x-show="panel === 'list'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="px-1">
+    <div x-show="panel === 'list'" 
+         x-transition:enter="transition ease-out duration-200" 
+         x-transition:enter-start="opacity-0 translate-y-4" 
+         x-transition:enter-end="opacity-100 translate-y-0" 
+         x-cloak 
+         class="flex-1 flex flex-col min-h-0 bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
         
-        <div class="mb-5 flex items-center justify-between">
-            <div>
-                <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Menu Management</h2>
-                <p class="text-[12px] text-gray-500 font-medium">Managing <span class="text-indigo-600 font-bold">{{ $products->total() }} catalog assets</span></p>
-            </div>
-            <div class="flex items-center gap-3">
-                @if($this->isSuperAdmin() || $this->isAdmin())
-                    <x-primary-button wire:click="showCreate" class="h-10">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-                        Add Product
-                    </x-primary-button>
-                @endif
+        <div class="px-4 py-4 md:px-6 md:py-5 shrink-0 border-b border-gray-100 bg-slate-50/30">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-[17px] font-black text-gray-900 tracking-tight">Menu Management</h2>
+                    <p class="text-[12px] text-gray-500 font-medium">Managing <span class="text-indigo-600 font-bold">{{ $products->total() }} catalog assets</span></p>
+                </div>
+                <div class="flex items-center gap-3">
+                    @if($this->isSuperAdmin() || $this->isAdmin())
+                        <x-primary-button wire:click="showCreate" class="h-10 text-[11px] font-black uppercase tracking-widest">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                            Add Product
+                        </x-primary-button>
+                    @endif
+                </div>
             </div>
         </div>
 
-        {{-- ── Menu Health Overview ── --}}
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
+        <div class="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-6">
+            {{-- ── Menu Health Overview ── --}}
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
             {{-- Total Assets --}}
             <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-2 sm:gap-4 group hover:shadow-md transition-all">
                 <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
@@ -626,7 +664,7 @@
         </div>
 
         {{-- macOS Style Unified Toolbar --}}
-        <div class="relative z-20 flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
+        <div class="sticky top-0 z-20 flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 bg-white/80 backdrop-blur-md p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
             
             {{-- Left: Search & View Switcher --}}
             <div class="w-full lg:w-auto flex-1">
@@ -822,8 +860,8 @@
                     <x-pagination :paginator="$products" keyPrefix="menu-board" />
                 </div>
             </div>
+            </div>
         </div>
-
         </div>
     </div>{{-- end panel list --}}
 
@@ -985,6 +1023,14 @@
                 init() {
                     const base = window.slidingTabs(initials.activeTab, 'activeTab');
                     if (base.init) base.init.call(this);
+
+                    // Sync tabs when panel changes to form
+                    this.$watch('panel', value => {
+                        if (value === 'form') {
+                            setTimeout(() => this.updateIndicator('activeTab'), 50);
+                            setTimeout(() => this.updateIndicator('activeTab'), 300);
+                        }
+                    });
                 }
             };
         };
