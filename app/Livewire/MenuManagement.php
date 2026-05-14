@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Log;
 class MenuManagement extends Component
 {
     use WithPagination, WithFileUploads, HandlesValidations;
+    public $noPadding = true;
 
     public function importOptionTemplate(int $templateId)
     {
