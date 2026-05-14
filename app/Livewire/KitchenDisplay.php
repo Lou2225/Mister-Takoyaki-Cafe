@@ -19,6 +19,7 @@ class KitchenDisplay extends Component
     public $perPage = 5;
     public $startDate;
     public $endDate;
+    public $activeFilter = 'Today';
     
     // Rider Modal State
     public $showRiderModal = false;
@@ -46,6 +47,32 @@ class KitchenDisplay extends Component
 
     public function updatedEndDate()
     {
+        $this->activeFilter = 'Custom Range';
+        $this->resetPage();
+    }
+
+    public function applyQuickDateFilter($filter)
+    {
+        $this->activeFilter = ucfirst($filter === 'all' ? 'All Time' : ($filter === 'today' ? 'Today' : ($filter === 'week' ? 'Last 7 Days' : 'Last 30 Days')));
+        
+        switch ($filter) {
+            case 'today':
+                $this->startDate = now()->startOfDay()->format('Y-m-d');
+                $this->endDate = now()->endOfDay()->format('Y-m-d');
+                break;
+            case 'week':
+                $this->startDate = now()->subDays(7)->startOfDay()->format('Y-m-d');
+                $this->endDate = now()->endOfDay()->format('Y-m-d');
+                break;
+            case 'month':
+                $this->startDate = now()->subDays(30)->startOfDay()->format('Y-m-d');
+                $this->endDate = now()->endOfDay()->format('Y-m-d');
+                break;
+            case 'all':
+                $this->startDate = null;
+                $this->endDate = null;
+                break;
+        }
         $this->resetPage();
     }
 
@@ -77,34 +104,44 @@ class KitchenDisplay extends Component
         ];
     }
 
-    public function getOrdersProperty()
+    public function updatedActiveTab()
+    {
+        $this->resetPage();
+    }
+
+    public function getActiveOrdersProperty()
+    {
+        return Order::with(['items.product', 'items.options.option', 'items.modifiers.modifier'])
+            ->where('branch_id', $this->branchId)
+            ->where('status', Order::STATUS_PREPARING)
+            ->orderBy('created_at', 'asc')
+            ->get();
+    }
+
+    public function getReadyOrdersProperty()
+    {
+        return Order::with(['items.product', 'items.options.option', 'items.modifiers.modifier'])
+            ->where('branch_id', $this->branchId)
+            ->where('status', Order::STATUS_READY)
+            ->orderBy('updated_at', 'desc')
+            ->take(50)
+            ->get();
+    }
+
+    public function getHistoryOrdersProperty()
     {
         $query = Order::with(['items.product', 'items.options.option', 'items.modifiers.modifier'])
-            ->where('branch_id', $this->branchId);
-
-        if ($this->activeTab === 'active') {
-            return $query->where('status', Order::STATUS_PREPARING)
-                ->orderBy('created_at', 'asc')
-                ->get();
-        }
-
-        if ($this->activeTab === 'ready') {
-            return $query->where('status', Order::STATUS_READY)
-                ->orderBy('updated_at', 'desc')
-                ->take(50)
-                ->get();
-        }
-
-        $historyQuery = $query->whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_OUT_FOR_DELIVERY]);
+            ->where('branch_id', $this->branchId)
+            ->whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_OUT_FOR_DELIVERY]);
 
         if ($this->startDate) {
-            $historyQuery->whereDate('created_at', '>=', $this->startDate);
+            $query->whereDate('created_at', '>=', $this->startDate);
         }
         if ($this->endDate) {
-            $historyQuery->whereDate('created_at', '<=', $this->endDate);
+            $query->whereDate('created_at', '<=', $this->endDate);
         }
 
-        return $historyQuery->orderBy('updated_at', 'desc')
+        return $query->orderBy('updated_at', 'desc')
             ->paginate($this->perPage);
     }
 
@@ -225,7 +262,9 @@ class KitchenDisplay extends Component
     public function render()
     {
         return view('livewire.kitchen-display', [
-            'orders' => $this->orders,
+            'activeOrders' => $this->activeOrders,
+            'readyOrders' => $this->readyOrders,
+            'historyOrders' => $this->historyOrders,
             'showRiderModal' => $this->showRiderModal,
             'availableRiders' => $this->availableRiders,
             'selectedOrderForDelivery' => $this->selectedOrderForDelivery,
