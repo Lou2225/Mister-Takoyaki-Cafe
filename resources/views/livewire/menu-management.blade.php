@@ -6,7 +6,7 @@
         activeTab: @entangle('activeTab').live
     })"
     x-on:switch-panel.window="panel = $event.detail.panel"
-    class="relative h-[calc(100vh-65px)] overflow-hidden flex flex-col p-2 md:p-4"
+    class="relative min-h-full flex flex-col p-2 md:p-4"
     wire:ignore.self
     wire:key="menu-management-main-container">
     {{-- Panel: Form --}}
@@ -15,7 +15,7 @@
          x-transition:enter-start="opacity-0 translate-y-4" 
          x-transition:enter-end="opacity-100 translate-y-0" 
          x-cloak 
-         class="flex-1 flex flex-col min-h-0 bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+         class="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-gray-200">
         
         <div class="px-4 py-4 md:px-6 md:py-5 shrink-0 border-b border-gray-100 bg-slate-50/30">
             <div class="flex items-center justify-between">
@@ -31,7 +31,7 @@
             </div>
         </div>
 
-        <div class="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6">
+        <div class="p-4 md:p-6">
 
         <form @submit.prevent class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div class="lg:col-span-2 space-y-6">
@@ -596,7 +596,7 @@
          x-transition:enter-start="opacity-0 translate-y-4" 
          x-transition:enter-end="opacity-100 translate-y-0" 
          x-cloak 
-         class="flex-1 flex flex-col min-h-0 bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+         class="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-gray-200">
         
         <div class="px-4 py-4 md:px-6 md:py-5 shrink-0 border-b border-gray-100 bg-slate-50/30">
             <div class="flex items-center justify-between">
@@ -615,7 +615,7 @@
             </div>
         </div>
 
-        <div class="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 space-y-6">
+        <div class="p-4 md:p-6 space-y-6">
             {{-- ── Menu Health Overview ── --}}
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
             {{-- Total Assets --}}
@@ -664,7 +664,7 @@
         </div>
 
         {{-- macOS Style Unified Toolbar --}}
-        <div class="sticky top-0 z-20 flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 bg-white/80 backdrop-blur-md p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
             
             {{-- Left: Search & View Switcher --}}
             <div class="w-full lg:w-auto flex-1">

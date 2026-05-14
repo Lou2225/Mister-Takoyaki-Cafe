@@ -789,6 +789,6 @@ class MenuManagement extends Component
             'selectedCategoryName', 'selectedFilterCategoryName', 'selectedIngredientName',
             'totalProducts', 'totalCategories',
             'recipeCost', 'salePrice', 'netProfit', 'profitMargin'
-        ))->layout('layouts.app');
+        ))->layout('layouts.app', ['noPadding' => true]);
     }
 }
