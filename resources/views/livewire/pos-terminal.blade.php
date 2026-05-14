@@ -1,11 +1,27 @@
-<div class="flex flex-col h-full overflow-hidden bg-gray-100" style="min-height: calc(100vh - 65px);" wire:key="pos-terminal-root">
+<div class="flex flex-col h-[calc(100vh-58px)] sm:h-[calc(100vh-65px)] overflow-hidden bg-gray-100" 
+    wire:key="pos-terminal-root"
+    x-data="{ 
+        cartExpanded: false,
+        init() {
+            this.$watch('$wire.cart', value => { 
+                if (!value || Object.keys(value).length === 0) {
+                    this.cartExpanded = false; 
+                }
+            });
+        }
+    }"
+    @cart-expanded.window="cartExpanded = true"
+    @cart-collapsed.window="cartExpanded = false"
+    @cart-toggle.window="cartExpanded = !cartExpanded"
+    @cart-reset.window="cartExpanded = false"
+>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
 
     {{-- ══════════════════════════════════════════════
          FULL-WIDTH CATEGORY TAB CARD
     ══════════════════════════════════════════════ --}}
     <div class="px-3 pt-3 flex-shrink-0">
-        <div class="bg-white rounded-xl border border-gray-200 shadow-sm px-3 py-2 flex items-center gap-2">
+        <div class="bg-white rounded-xl border border-gray-200 shadow-sm px-3 py-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-2">
 
             {{-- Category Tabs — horizontally scrollable, no wrap --}}
             <div 
@@ -77,7 +93,7 @@
                     </div>
                     <label for="pos_search" class="sr-only">Search Menu</label>
                     <input id="pos_search" wire:model.live="search" type="text" placeholder="Search Menu"
-                        class="pl-8 pr-3 py-1.5 w-36 text-[12px] font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:border-gray-300 placeholder-gray-400 transition-all focus:w-44">
+                        class="pl-8 pr-3 py-1.5 w-full sm:w-36 text-[12px] font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:border-gray-300 placeholder-gray-400 transition-all sm:focus:w-44">
                 </div>
 
                 <button wire:click.prevent="openDraftsModal" title="Held Orders" class="relative p-2 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all border border-indigo-100 flex items-center justify-center">
@@ -106,10 +122,10 @@
     {{-- ══════════════════════════════════════════════
          CONTENT ROW — Product Grid + Order Summary
     ══════════════════════════════════════════════ --}}
-    <div class="flex flex-1 overflow-hidden gap-3 p-3 min-h-0">
+    <div class="flex flex-col md:flex-row flex-1 overflow-hidden gap-3 p-3 min-h-0">
 
         {{-- LEFT: Product Grid --}}
-        <div class="flex-1 overflow-y-auto min-w-0">
+        <div class="flex-1 overflow-y-auto min-w-0 pb-20 md:pb-0">
 
             @if($products->isEmpty())
                 <div class="flex flex-col items-center justify-center h-full text-gray-400 py-16">
@@ -240,18 +256,48 @@
             @endif
         </div>{{-- end LEFT --}}
 
+        {{-- Mobile Cart Backdrop --}}
+        <div x-show="isMobile && cartExpanded" 
+             x-transition.opacity.duration.300ms
+             @click="cartExpanded = false"
+             class="fixed inset-0 bg-gray-900/60 z-[115] backdrop-blur-sm lg:hidden"
+             x-cloak>
+        </div>
+
         {{-- RIGHT: Order Summary Card --}}
-        <div class="w-[300px] xl:w-[320px] flex-shrink-0 flex flex-col min-h-0">
-            <div class="flex flex-col bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex-1 min-h-0">
+        <div 
+            :class="[
+                isMobile ? 'fixed inset-x-0 bottom-0 z-[120] transition-transform duration-500 ease-in-out' : 'w-full md:w-[300px] xl:w-[320px] flex-shrink-0 flex flex-col min-h-0',
+                isMobile ? (cartExpanded ? 'translate-y-0' : 'translate-y-[calc(100%-65px)]') : ''
+            ]"
+            class="flex flex-col h-[85vh] md:h-auto"
+        >
+            <div class="flex flex-col bg-white rounded-t-3xl md:rounded-2xl border border-gray-200 shadow-2xl md:shadow-sm overflow-hidden flex-1 min-h-0">
+
+                {{-- Pull Handle (Mobile Only) --}}
+                <div class="md:hidden flex justify-center pt-2 pb-1" @click="cartExpanded = !cartExpanded">
+                    <div class="w-10 h-1 rounded-full bg-gray-200"></div>
+                </div>
 
                 {{-- Card Header --}}
-                <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100 flex-shrink-0 bg-gray-50/20">
-                    <h2 class="text-[15px] font-black text-gray-900 tracking-tight">Order Summary</h2>
+                <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100 flex-shrink-0 bg-gray-50/20 cursor-pointer md:cursor-default" @click="if(isMobile) cartExpanded = !cartExpanded">
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-[15px] font-black text-gray-900 tracking-tight">Order Summary</h2>
+                        @if(!empty($cart))
+                            <span class="md:hidden flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-black text-white">
+                                {{ collect($cart)->sum('qty') }}
+                            </span>
+                        @endif
+                    </div>
                     <div class="flex items-center gap-2">
                         <span class="text-[11px] font-black text-gray-900 font-mono tracking-tighter uppercase">#{{ $referenceNo }}</span>
-                        <button wire:click.prevent="saveDraft" title="Hold Order" class="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 transition-all" @if(empty($cart)) disabled @endif>
+                        <button wire:click.prevent="saveDraft" title="Hold Order" class="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 transition-all" @if(empty($cart)) disabled @endif @click.stop>
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
                         </button>
+                        <div class="flex items-center md:hidden ml-2">
+                             <span class="text-[14px] font-black text-indigo-600 font-mono" x-show="!cartExpanded">{{ $currencySymbol }}{{ number_format($total, 2) }}</span>
+                             <svg class="w-4 h-4 ml-1 text-gray-400 transition-transform duration-300" :class="cartExpanded ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
+                        </div>
                     </div>
                 </div>
 
@@ -551,14 +597,14 @@
     <div class="p-6">
         <h2 class="text-[18px] font-bold text-gray-900 mb-6">Confirm Payment</h2>
         
-        <div class="grid grid-cols-2 gap-6 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6">
             {{-- LEFT CARD: Order Summary --}}
             <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
                 <div class="px-4 py-3 border-b border-gray-100 bg-gray-50">
                     <h3 class="text-[13px] font-bold text-gray-900">Order Summary</h3>
                 </div>
                 
-                <div class="flex-1 overflow-y-auto px-4 py-3 max-h-[50vh]">
+                <div class="flex-1 overflow-y-auto px-4 py-3 max-h-[30vh] md:max-h-[50vh]">
                     @if(!empty($cart))
                         <div class="space-y-3">
                             @foreach($cart as $key => $item)
@@ -656,11 +702,11 @@
                             </div>
                             
                             {{-- Quick Tenders --}}
-                            <div class="grid grid-cols-4 gap-2">
-                                <button type="button" wire:click="$set('amountTendered', {{ $total }})" class="py-2 px-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-[11px] font-bold rounded-lg transition-colors">Exact</button>
-                                <button type="button" wire:click="$set('amountTendered', 100)" class="py-2 px-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-[11px] font-bold font-mono rounded-lg transition-colors">{{ $currencySymbol }}100</button>
-                                <button type="button" wire:click="$set('amountTendered', 500)" class="py-2 px-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-[11px] font-bold font-mono rounded-lg transition-colors">{{ $currencySymbol }}500</button>
-                                <button type="button" wire:click="$set('amountTendered', 1000)" class="py-2 px-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-[11px] font-bold font-mono rounded-lg transition-colors">{{ $currencySymbol }}1000</button>
+                            <div class="grid grid-cols-2 xs:grid-cols-4 gap-2">
+                                <button type="button" wire:click="$set('amountTendered', {{ $total }})" class="py-2.5 px-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-[12px] font-bold rounded-lg transition-colors">Exact</button>
+                                <button type="button" wire:click="$set('amountTendered', 100)" class="py-2.5 px-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-[12px] font-bold font-mono rounded-lg transition-colors">{{ $currencySymbol }}100</button>
+                                <button type="button" wire:click="$set('amountTendered', 500)" class="py-2.5 px-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-[12px] font-bold font-mono rounded-lg transition-colors">{{ $currencySymbol }}500</button>
+                                <button type="button" wire:click="$set('amountTendered', 1000)" class="py-2.5 px-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-[12px] font-bold font-mono rounded-lg transition-colors">{{ $currencySymbol }}1000</button>
                             </div>
 
                             @if($amountTendered >= $total)
@@ -679,15 +725,15 @@
                                 <div class="bg-blue-50 rounded-2xl p-6 border border-blue-100 flex flex-col items-center text-center">
                                     <p class="text-[11px] font-black text-blue-600 uppercase tracking-widest mb-4">Scan QR to Pay</p>
                                     
-                                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-blue-200 mb-4">
+                                    <div class="bg-white p-2 rounded-2xl shadow-sm border border-blue-200 mb-4">
                                         @if($gcashQrImage)
-                                            <img src="{{ Storage::url($gcashQrImage) }}" alt="GCash QR" class="w-48 h-48 object-contain">
+                                            <img src="{{ Storage::url($gcashQrImage) }}" alt="GCash QR" class="w-full max-w-[180px] mx-auto aspect-square object-contain">
                                         @else
                                             @php
                                                 $qrData = "gcash://pay?amount=" . $total . "&merchant=" . urlencode($gcashAccountName) . "&number=" . $gcashAccountNumber . "&ref=" . $referenceNo;
                                                 $qrImage = \App\Helpers\QrCodeHelper::generateDataUri($qrData, 150);
                                             @endphp
-                                            <img src="{{ $qrImage }}" alt="GCash QR" class="w-32 h-32">
+                                            <img src="{{ $qrImage }}" alt="GCash QR" class="w-full max-w-[150px] mx-auto aspect-square">
                                         @endif
                                     </div>
                                     
@@ -891,7 +937,7 @@
                     </h2>
                     <p class="text-[13px] text-gray-500 mt-1">Review or reload previously saved orders for this branch.</p>
                 </div>
-                <button @click="show = false" class="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-all">
+                <button @click="isModalOpen = false" class="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-all">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
@@ -951,7 +997,7 @@
             </div>
 
             <div class="mt-8 pt-6 border-t border-gray-100">
-                <x-secondary-button @click="show = false" class="w-full justify-center py-3">
+                <x-secondary-button @click="isModalOpen = false" class="w-full justify-center py-3">
                     Close Monitor
                 </x-secondary-button>
             </div>

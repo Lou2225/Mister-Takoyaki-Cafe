@@ -57,47 +57,47 @@
         <div x-show="panel === 'list'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="px-1">
 
             {{-- KPI Dashboard (User Management Aesthetic) --}}
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
                 {{-- Total Assets --}}
-                <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-2 sm:gap-4 group hover:shadow-md transition-all">
+                    <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                     </div>
                     <div>
-                        <span class="block text-[10px] font-black text-indigo-700/60 uppercase tracking-widest leading-none mb-1">Total Catalog</span>
-                        <span class="block text-[20px] font-black text-gray-900 leading-none">{{ number_format($totalIngredients) }} Items</span>
+                        <span class="block text-[8px] sm:text-[10px] font-black text-indigo-700/60 uppercase tracking-widest leading-none mb-1">Total Catalog</span>
+                        <span class="block text-[16px] sm:text-[20px] font-black text-gray-900 leading-none">{{ number_format($totalIngredients) }}</span>
                     </div>
                 </div>
                 
                 {{-- Low Stock Alerts --}}
-                <div class="bg-gradient-to-br {{ $lowStockWarnings > 0 ? 'from-amber-50 to-amber-100 border-amber-200' : 'from-emerald-50 to-emerald-100 border-emerald-200' }} border rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border {{ $lowStockWarnings > 0 ? 'border-amber-100 text-amber-600' : 'border-emerald-100 text-emerald-600' }} flex items-center justify-center shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                <div class="bg-gradient-to-br {{ $lowStockWarnings > 0 ? 'from-amber-50 to-amber-100 border-amber-200' : 'from-emerald-50 to-emerald-100 border-emerald-200' }} border rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-2 sm:gap-4 group hover:shadow-md transition-all">
+                    <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white border {{ $lowStockWarnings > 0 ? 'border-amber-100 text-amber-600' : 'border-emerald-100 text-emerald-600' }} flex items-center justify-center shadow-sm">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                     </div>
                     <div>
-                        <span class="block text-[10px] font-black {{ $lowStockWarnings > 0 ? 'text-amber-700/60' : 'text-emerald-700/60' }} uppercase tracking-widest leading-none mb-1">Low Stock Alerts</span>
-                        <span class="block text-[20px] font-black {{ $lowStockWarnings > 0 ? 'text-amber-600' : 'text-emerald-600' }} leading-none">{{ $lowStockWarnings }}</span>
+                        <span class="block text-[8px] sm:text-[10px] font-black {{ $lowStockWarnings > 0 ? 'text-amber-700/60' : 'text-emerald-700/60' }} uppercase tracking-widest leading-none mb-1">Low Stock</span>
+                        <span class="block text-[16px] sm:text-[20px] font-black {{ $lowStockWarnings > 0 ? 'text-amber-600' : 'text-emerald-600' }} leading-none">{{ $lowStockWarnings }}</span>
                     </div>
                 </div>
 
-                <div class="bg-gradient-to-br {{ $expiringCount > 0 ? 'from-rose-50 to-rose-100 border-rose-200' : 'from-slate-50 to-slate-100 border-slate-200' }} border rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border {{ $expiringCount > 0 ? 'border-rose-100 text-rose-600' : 'border-slate-100 text-slate-400' }} flex items-center justify-center shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <div class="bg-gradient-to-br {{ $expiringCount > 0 ? 'from-rose-50 to-rose-100 border-rose-200' : 'from-slate-50 to-slate-100 border-slate-200' }} border rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-2 sm:gap-4 group hover:shadow-md transition-all">
+                    <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white border {{ $expiringCount > 0 ? 'border-rose-100 text-rose-600' : 'border-slate-100 text-slate-400' }} flex items-center justify-center shadow-sm">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </div>
                     <div>
-                        <span class="block text-[10px] font-black {{ $expiringCount > 0 ? 'text-rose-700/60' : 'text-slate-700/60' }} uppercase tracking-widest leading-none mb-1">Expiring &le;{{ $alertDays }}d</span>
-                        <span class="block text-[20px] font-black {{ $expiringCount > 0 ? 'text-rose-600' : 'text-gray-900' }} leading-none">{{ $expiringCount }}</span>
+                        <span class="block text-[8px] sm:text-[10px] font-black {{ $expiringCount > 0 ? 'text-rose-700/60' : 'text-slate-700/60' }} uppercase tracking-widest leading-none mb-1">Expiring</span>
+                        <span class="block text-[16px] sm:text-[20px] font-black {{ $expiringCount > 0 ? 'text-rose-600' : 'text-gray-900' }} leading-none">{{ $expiringCount }}</span>
                     </div>
                 </div>
 
                 {{-- Monthly Procurement --}}
-                <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-2 sm:gap-4 group hover:shadow-md transition-all">
+                    <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                     </div>
                     <div>
-                        <span class="block text-[10px] font-black text-emerald-700/60 uppercase tracking-widest leading-none mb-1">Procurement (Mo)</span>
-                        <span class="block text-[20px] font-black text-gray-900 leading-none">&#8369;{{ number_format($monthlyProcurement, 0) }}</span>
+                        <span class="block text-[8px] sm:text-[10px] font-black text-emerald-700/60 uppercase tracking-widest leading-none mb-1">Procurement</span>
+                        <span class="block text-[16px] sm:text-[20px] font-black text-gray-900 leading-none">₱{{ number_format($monthlyProcurement, 0) }}</span>
                     </div>
                 </div>
             </div>
@@ -107,19 +107,21 @@
             <div class="relative z-20 flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
                 
                 {{-- Left: Search Bar --}}
-                <div class="flex flex-1 w-full lg:w-auto">
-                    <x-search-bar wireModel="search" wire:model.live.debounce.0ms="search" placeholder="Find ingredient..." width="w-full lg:w-72" />
+                <div class="w-full lg:w-auto flex-1">
+                    <x-search-bar wireModel="search" wire:model.live.debounce.0ms="search" placeholder="Find ingredient..." width="w-full lg:w-80" />
                 </div>
 
                 {{-- Right: Branch Switcher --}}
-                <div class="flex items-center gap-2">
+                <div class="w-full lg:w-auto">
                     @if($this->isSuperAdmin())
-                        <x-dropdown align="right" width="48">
+                        <x-dropdown align="right" width="full">
                             <x-slot name="trigger">
-                                <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
-                                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                                    <span class="text-[12px] whitespace-nowrap">{{ $selectedBranchId ? ($branches->firstWhere('id', $selectedBranchId)->branch_name ?? 'Select Branch') : 'Select Branch' }}</span>
-                                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                <x-secondary-button type="button" class="w-full justify-between gap-1.5 h-10 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
+                                    <div class="flex items-center gap-1.5 truncate">
+                                        <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                                        <span class="text-[12px] truncate">{{ $selectedBranchId ? ($branches->firstWhere('id', $selectedBranchId)->branch_name ?? 'Select Branch') : 'Select Branch' }}</span>
+                                    </div>
+                                    <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                                 </x-secondary-button>
                             </x-slot>
                             <x-slot name="content">
@@ -131,10 +133,12 @@
                             </x-slot>
                         </x-dropdown>
                     @else
-                        <span class="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-lg font-bold text-[11px] text-emerald-700 h-9">
-                            <svg class="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                            Branch Stock
-                        </span>
+                        <div class="inline-flex items-center justify-between px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-lg font-bold text-[11px] text-emerald-700 h-10 w-full">
+                            <div class="flex items-center gap-2">
+                                <svg class="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                <span>Branch Stock</span>
+                            </div>
+                        </div>
                     @endif
                 </div>
             </div>

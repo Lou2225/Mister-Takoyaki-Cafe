@@ -198,7 +198,7 @@ class Order extends Model
     {
         return in_array($this->status, [self::STATUS_COMPLETED]) 
             && $this->refundable_amount > 0 
-            && $this->created_at->diffInHours(now()) <= 24;
+            && $this->created_at->diffInHours(now()) < 1;
     }
 
     public function isPending(): bool
@@ -223,9 +223,7 @@ class Order extends Model
 
     public function canBeVoided(): bool
     {
-        return in_array($this->status, [self::STATUS_COMPLETED]) 
-            && !$this->isVoid() 
-            && !$this->isRefunded()
+        return !in_array($this->status, [self::STATUS_COMPLETED, self::STATUS_VOID, self::STATUS_REFUNDED, self::STATUS_PARTIALLY_REFUNDED]) 
             && $this->created_at->diffInHours(now()) <= 24;
     }
 

@@ -63,15 +63,15 @@
         <div class="px-1 mt-4">
 
             {{-- ── Order Health Overview ── --}}
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
                 {{-- Total Orders --}}
-                <div class="bg-gradient-to-br from-{{ $primaryColor }}-50 to-{{ $primaryColor }}-100 border border-{{ $primaryColor }}-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-{{ $primaryColor }}-100 flex items-center justify-center text-{{ $primaryColor }}-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                <div class="bg-gradient-to-br from-{{ $primaryColor }}-50 to-{{ $primaryColor }}-100 border border-{{ $primaryColor }}-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-2 sm:gap-4 group hover:shadow-md transition-all">
+                    <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white border border-{{ $primaryColor }}-100 flex items-center justify-center text-{{ $primaryColor }}-600 shadow-sm">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                     </div>
                     <div>
-                        <span class="block text-[10px] font-black text-{{ $primaryColor }}-700/60 uppercase tracking-widest leading-none mb-1">Total Orders</span>
-                        <span class="block text-[20px] font-black text-gray-900 leading-none">{{ $orders->total() }}</span>
+                        <span class="block text-[8px] sm:text-[10px] font-black text-{{ $primaryColor }}-700/60 uppercase tracking-widest leading-none mb-1">Total Orders</span>
+                        <span class="block text-[16px] sm:text-[20px] font-black text-gray-900 leading-none">{{ $orders->total() }}</span>
                     </div>
                 </div>
                 
@@ -81,13 +81,13 @@
                         ->whereIn('status', ['Pending', 'Preparing'])
                         ->count();
                 @endphp
-                <div class="bg-gradient-to-br {{ $pendingCount > 0 ? 'from-amber-50 to-amber-100 border-amber-200' : 'from-emerald-50 to-emerald-100 border-emerald-200' }} border rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border {{ $pendingCount > 0 ? 'border-amber-100 text-amber-600' : 'border-emerald-100 text-emerald-600' }} flex items-center justify-center shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <div class="bg-gradient-to-br {{ $pendingCount > 0 ? 'from-amber-50 to-amber-100 border-amber-200' : 'from-emerald-50 to-emerald-100 border-emerald-200' }} border rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-2 sm:gap-4 group hover:shadow-md transition-all">
+                    <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white border {{ $pendingCount > 0 ? 'border-amber-100 text-amber-600' : 'border-emerald-100 text-emerald-600' }} flex items-center justify-center shadow-sm">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </div>
                     <div>
-                        <span class="block text-[10px] font-black {{ $pendingCount > 0 ? 'text-amber-700/60' : 'text-emerald-700/60' }} uppercase tracking-widest leading-none mb-1">Pending</span>
-                        <span class="block text-[20px] font-black {{ $pendingCount > 0 ? 'text-amber-600' : 'text-emerald-600' }} leading-none">{{ number_format($pendingCount) }}</span>
+                        <span class="block text-[8px] sm:text-[10px] font-black {{ $pendingCount > 0 ? 'text-amber-700/60' : 'text-emerald-700/60' }} uppercase tracking-widest leading-none mb-1">Pending</span>
+                        <span class="block text-[16px] sm:text-[20px] font-black {{ $pendingCount > 0 ? 'text-amber-600' : 'text-emerald-600' }} leading-none">{{ number_format($pendingCount) }}</span>
                     </div>
                 </div>
 
@@ -98,13 +98,13 @@
                         ->whereDate('created_at', today())
                         ->count();
                 @endphp
-                <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-2 sm:gap-4 group hover:shadow-md transition-all">
+                    <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </div>
                     <div>
-                        <span class="block text-[10px] font-black text-emerald-700/60 uppercase tracking-widest leading-none mb-1">Completed Today</span>
-                        <span class="block text-[20px] font-black text-emerald-600 leading-none">{{ number_format($completedToday) }}</span>
+                        <span class="block text-[8px] sm:text-[10px] font-black text-emerald-700/60 uppercase tracking-widest leading-none mb-1">Completed Today</span>
+                        <span class="block text-[16px] sm:text-[20px] font-black text-emerald-600 leading-none">{{ number_format($completedToday) }}</span>
                     </div>
                 </div>
 
@@ -115,13 +115,13 @@
                         ->whereDate('created_at', today())
                         ->sum('total_amount');
                 @endphp
-                <div class="bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <div class="bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-2 sm:gap-4 group hover:shadow-md transition-all">
+                    <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </div>
                     <div>
-                        <span class="block text-[10px] font-black text-rose-700/60 uppercase tracking-widest leading-none mb-1">Today's Revenue</span>
-                        <span class="block text-[20px] font-black text-rose-600 leading-none">₱{{ number_format($todayRevenue, 0) }}</span>
+                        <span class="block text-[8px] sm:text-[10px] font-black text-rose-700/60 uppercase tracking-widest leading-none mb-1">Today's Revenue</span>
+                        <span class="block text-[16px] sm:text-[20px] font-black text-rose-600 leading-none">₱{{ number_format($todayRevenue, 0) }}</span>
                     </div>
                 </div>
             </div>
@@ -130,40 +130,50 @@
             <div class="relative z-20 flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
                 
                 {{-- Left: Search Bar --}}
-                <div class="flex flex-1 w-full lg:w-auto">
-                    <x-search-bar wireModel="search" placeholder="Search order #..." width="w-full lg:w-72" />
+                <div class="w-full lg:w-auto lg:flex-1">
+                    <x-search-bar wireModel="search" placeholder="Search order #..." width="w-full lg:w-80" />
                 </div>
 
                 {{-- Right: Filters --}}
-                <div class="flex flex-wrap items-center lg:justify-end gap-2">
-                    
-                    {{-- Quick Date Dropdown --}}
-                    <x-quick-date-filter :activeFilter="$activeFilter" class="shadow-none border-slate-200" />
+                <div class="w-full lg:w-auto">
+                    <div class="flex flex-col lg:flex-row lg:items-center gap-2 w-full">
+                        {{-- Grid for Quick Date & Status --}}
+                        <div class="grid grid-cols-2 gap-2 w-full lg:w-auto">
+                            {{-- Quick Date Dropdown --}}
+                            <div class="col-span-1 w-full">
+                                <x-quick-date-filter :activeFilter="$activeFilter" class="w-full h-10 shadow-none border-slate-200" />
+                            </div>
 
-                    @if($sourceFilter === 'History')
-                        <x-date-range-filter startModel="startDate" endModel="endDate" :startValue="$startDate" :endValue="$endDate" class="h-9 border-slate-200 shadow-none bg-slate-50/50" />
-                    @endif
+                            {{-- Status Filter Dropdown --}}
+                            <div class="col-span-1 w-full">
+                                <x-dropdown align="right" width="full" containerClasses="w-full">
+                                    <x-slot name="trigger">
+                                        <x-secondary-button type="button" class="w-full gap-1.5 h-10 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none justify-between truncate">
+                                            <div class="flex items-center gap-1.5 truncate">
+                                                <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                                                <span class="text-[12px] truncate">{{ $statusFilter ?: 'All Status' }}</span>
+                                            </div>
+                                            <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                        </x-secondary-button>
+                                    </x-slot>
+                                    <x-slot name="content">
+                                        <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', '')">All Status</x-dropdown-link>
+                                        <hr class="my-1 border-slate-100">
+                                        @foreach($statuses as $status => $label)
+                                            <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', '{{ $status }}')">{{ $label }}</x-dropdown-link>
+                                        @endforeach
+                                    </x-slot>
+                                </x-dropdown>
+                            </div>
+                        </div>
 
-                    {{-- macOS Divider --}}
-                    <div class="hidden lg:block w-px h-6 bg-slate-200 mx-1"></div>
-
-                    {{-- Status Filter Dropdown --}}
-                    <x-dropdown align="right" width="48">
-                        <x-slot name="trigger">
-                            <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
-                                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-                                <span class="text-[12px] whitespace-nowrap">{{ $statusFilter ?: 'All Status' }}</span>
-                                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-                            </x-secondary-button>
-                        </x-slot>
-                        <x-slot name="content">
-                            <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', '')">All Status</x-dropdown-link>
-                            <hr class="my-1 border-slate-100">
-                            @foreach($statuses as $status => $label)
-                                <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', '{{ $status }}')">{{ $label }}</x-dropdown-link>
-                            @endforeach
-                        </x-slot>
-                    </x-dropdown>
+                        {{-- Date Range (History only) --}}
+                        @if($sourceFilter === 'History')
+                            <div class="w-full lg:w-[280px] animate-fadeIn">
+                                <x-date-range-filter startModel="startDate" endModel="endDate" :startValue="$startDate" :endValue="$endDate" class="w-full h-10 border-slate-200 shadow-none bg-slate-50/50" />
+                            </div>
+                        @endif
+                    </div>
                 </div>
             </div>
 
@@ -413,6 +423,7 @@
 
                     {{-- Action Footer --}}
                     <div class="p-5 border-t border-slate-100 bg-white grid grid-cols-2 gap-2" x-show="activeTab === 'summary'">
+                        {{-- 1. App Specific Progress Actions --}}
                         @if($selectedOrder->source === 'App')
                             @if($selectedOrder->status === 'Pending')
                                 <x-primary-button wire:click="acceptOrder({{ $selectedOrder->id }})" class="col-span-2 h-10 justify-center">
@@ -438,33 +449,31 @@
                             @endif
                         @endif
 
-                        {{-- Universal Actions --}}
-                        @if($selectedOrder->canBeRefunded())
-                            <x-danger-button wire:click="openRefundModal({{ $selectedOrder->id }})" class="col-span-1 h-10 justify-center text-red-600 bg-red-50 hover:bg-red-100 border-red-200">
-                                Refund
-                            </x-danger-button>
+                        {{-- 2. POS Draft Actions --}}
+                        @if($selectedOrder->source === 'POS' && $selectedOrder->status === 'Drafted')
+                            <x-primary-button wire:click="restoreDraft({{ $selectedOrder->id }})" class="col-span-2 h-10 justify-center">
+                                Restore to Cart
+                            </x-primary-button>
+                            <x-secondary-button wire:click="deleteDraft({{ $selectedOrder->id }})" class="col-span-2 h-10 justify-center text-red-600 border-red-200">
+                                Delete Draft
+                            </x-secondary-button>
                         @endif
+
+                        {{-- 3. Consolidated Refund Action (Respects 1-hour window via model) --}}
+                        @if($selectedOrder->canBeRefunded())
+                            <x-primary-button wire:click="openRefundModal({{ $selectedOrder->id }})" class="col-span-2 h-10 justify-center">
+                                Refund Order
+                            </x-primary-button>
+                        @endif
+
+                        {{-- 4. Consolidated Void Action (Forbidden for Completed status) --}}
                         @if($selectedOrder->canBeVoided())
-                            <x-danger-button wire:click="openVoidModal({{ $selectedOrder->id }})" class="col-span-1 h-10 justify-center text-red-600 bg-red-50 hover:bg-red-100 border-red-200">
+                            <x-danger-button wire:click="openVoidModal({{ $selectedOrder->id }})" class="col-span-2 h-10 justify-center text-red-600 bg-red-50 hover:bg-red-100 border-red-200">
                                 Void Order
                             </x-danger-button>
                         @endif
 
-                        @if($selectedOrder->source === 'POS')
-                            @if($selectedOrder->status === 'Drafted')
-                                <x-primary-button wire:click="restoreDraft({{ $selectedOrder->id }})" class="col-span-2 h-10 justify-center">
-                                    Restore to Cart
-                                </x-primary-button>
-                                <x-secondary-button wire:click="deleteDraft({{ $selectedOrder->id }})" class="col-span-2 h-10 justify-center text-red-600 border-red-200">
-                                    Delete Draft
-                                </x-secondary-button>
-                            @elseif(in_array($selectedOrder->status, ['Completed', 'Delivered']))
-                                <x-primary-button wire:click="openRefundModal({{ $selectedOrder->id }})" class="col-span-2 h-10 justify-center">
-                                    Refund Order
-                                </x-primary-button>
-                            @endif
-                        @endif
-
+                        {{-- 5. Standard Global Actions --}}
                         <x-secondary-button wire:click="openReceiptModal({{ $selectedOrder->id }})" class="col-span-2 h-10 justify-center">
                             View Receipt
                         </x-secondary-button>

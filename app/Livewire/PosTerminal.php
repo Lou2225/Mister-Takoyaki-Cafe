@@ -667,6 +667,7 @@ class PosTerminal extends Component
             return;
         }
 
+        $this->dispatch('cart-expanded');
     }
 
     public function decrementCart(string $key): void
@@ -700,6 +701,7 @@ class PosTerminal extends Component
         }
 
         $this->cart = array_merge($this->cart, []);
+        $this->dispatch('cart-expanded');
     }
 
     public function removeFromCart(string $key): void
@@ -1209,6 +1211,8 @@ class PosTerminal extends Component
 
             $this->clearCart();
             $this->dispatch('close-modal', 'pos-payment');
+            $this->dispatch('cart-collapsed');
+            $this->dispatch('cart-reset');
             $this->dispatch('notify', type: 'success', message: "Order #{$order->reference_no} placed successfully!");
             
             // 🖨️ AUTOMATIC RECEIPT PRINTING

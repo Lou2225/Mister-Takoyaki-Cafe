@@ -40,10 +40,10 @@
                 </div>
 
                 {{-- Content --}}
-                <div class="relative px-6 py-5 flex items-center justify-between gap-4">
-                    <div class="flex items-center gap-4">
+                <div class="relative px-4 py-4 sm:px-6 sm:py-5 flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
                         {{-- Role Icon --}}
-                        <div class="w-12 h-12 rounded-2xl {{ $bannerConfig['icon_bg'] }} flex items-center justify-center flex-shrink-0 shadow-inner border border-white/10">
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl {{ $bannerConfig['icon_bg'] }} flex items-center justify-center flex-shrink-0 shadow-inner border border-white/10">
                             <svg class="w-6 h-6 {{ $bannerConfig['icon_color'] }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="{{ $bannerConfig['icon_path'] }}"/>
                             </svg>
@@ -55,7 +55,7 @@
                                 {{ $bannerConfig['badge_text'] }}
                             </span>
                             {{-- Greeting --}}
-                            <h2 class="text-[20px] font-black text-white leading-tight {{ $bannerConfig['header_track'] ?? 'tracking-tight' }}">
+                            <h2 class="text-[17px] sm:text-[20px] font-black text-white leading-tight {{ $bannerConfig['header_track'] ?? 'tracking-tight' }}">
                                 {{ $greeting }}, <span class="text-white/90">{{ $firstName }}.</span>
                             </h2>
                             <p class="text-[12px] font-medium {{ $bannerConfig['sub_color'] }} mt-0.5 {{ $bannerConfig['header_track'] ?? 'tracking-tight' }}">
@@ -72,50 +72,61 @@
             </div>
         </div>
 
-        {{-- ─── Dashboard Filters (Compact Inline Style) ─────────────── --}}
-        <div class="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-            {{-- Branch Selection & Date Filters --}}
-            <div class="flex flex-wrap items-center gap-2">
-                {{-- Branch Dropdown --}}
-                @if($isSuperAdmin)
-                    <x-dropdown align="left" width="56" wire:key="dashboard-branch-filter">
-                        <x-slot name="trigger">
-                            <x-secondary-button type="button" class="gap-2">
-                                <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                                <span>{{ $branches->firstWhere('id', $selectedBranchId)?->branch_name ?? 'Enterprise Overview' }}</span>
-                                <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-                            </x-secondary-button>
-                        </x-slot>
-                        <x-slot name="content">
-                            <x-dropdown-link href="#" wire:click.prevent="$set('selectedBranchId', null)">
-                                <span class="font-bold text-indigo-600">All Locations (Global)</span>
-                            </x-dropdown-link>
-                            <div class="border-t border-gray-100 my-1"></div>
-                            @foreach($branches as $branch)
-                                <x-dropdown-link href="#" wire:click.prevent="$set('selectedBranchId', {{ $branch->id }})">
-                                    {{ $branch->branch_name }}
-                                </x-dropdown-link>
-                            @endforeach
-                        </x-slot>
-                    </x-dropdown>
-                @else
-                    @php $adminBranch = auth()->user()->branch; @endphp
-                    @if($adminBranch)
-                    <div class="inline-flex items-center gap-2 px-4 py-1.5 text-[12px] font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-sm h-10">
-                        <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                        <span>{{ $adminBranch->branch_name }}</span>
-                    </div>
-                    @endif
-                @endif
-
-                {{-- Date Range Filter --}}
-                <x-date-range-filter startModel="startDate" endModel="endDate" :error="$dateError" :startValue="$startDate" />
+        {{-- ─── Dashboard Filters (Professional "Control Panel" Layout) ─────────────── --}}
+        <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 p-4 sm:p-0 bg-gray-50/50 sm:bg-transparent rounded-2xl border border-gray-100 sm:border-0">
+            
+            {{-- Row 1: Primary Controls (Date Range & Report) --}}
+            <div class="flex items-center gap-2 w-full sm:w-auto sm:order-2">
+                <div class="flex-1 sm:flex-none min-w-0 sm:w-[280px]">
+                    <x-date-range-filter startModel="startDate" endModel="endDate" :error="$dateError" :startValue="$startDate" :endValue="$endDate" class="w-full" />
+                </div>
+                <x-report-dropdown module="Dashboard" />
             </div>
 
-            {{-- Quick Select Dropdown --}}
-            <div class="flex items-center gap-2">
-                <x-quick-date-filter :activeFilter="$activeFilter" />
-                <x-report-dropdown module="Dashboard" />
+            {{-- Row 2/3: Secondary Controls (Branch & Quick Select) --}}
+            <div class="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto sm:order-1">
+                <div class="grid grid-cols-2 gap-2 w-full sm:flex sm:flex-row sm:items-center sm:gap-2 sm:w-auto">
+                    {{-- Branch Selection --}}
+                    <div class="col-span-1 w-full sm:w-[230px] min-w-0">
+                        @if($isSuperAdmin)
+                            <x-dropdown align="left" width="56" wire:key="dashboard-branch-filter" containerClasses="w-full">
+                                <x-slot name="trigger">
+                                    <x-secondary-button type="button" class="gap-2 w-full justify-between sm:justify-start h-10">
+                                        <div class="flex items-center gap-2 truncate">
+                                            <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                                            <span class="truncate text-[13px] sm:text-[14px]">{{ $branches->firstWhere('id', $selectedBranchId)?->branch_name ?? 'Enterprise Overview' }}</span>
+                                        </div>
+                                        <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                    </x-secondary-button>
+                                </x-slot>
+                                <x-slot name="content">
+                                    <x-dropdown-link href="#" wire:click.prevent="$set('selectedBranchId', null)">
+                                        <span class="font-bold text-indigo-600">All Locations (Global)</span>
+                                    </x-dropdown-link>
+                                    <div class="border-t border-gray-100 my-1"></div>
+                                    @foreach($branches as $branch)
+                                        <x-dropdown-link href="#" wire:click.prevent="$set('selectedBranchId', {{ $branch->id }})">
+                                            {{ $branch->branch_name }}
+                                        </x-dropdown-link>
+                                    @endforeach
+                                </x-slot>
+                            </x-dropdown>
+                        @else
+                            @php $adminBranch = auth()->user()->branch; @endphp
+                            @if($adminBranch)
+                            <div class="inline-flex items-center gap-2 px-4 py-1.5 text-[12px] font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-sm h-10 w-full sm:w-[230px]">
+                                <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                                <span class="truncate text-left text-[13px] sm:text-[14px]">{{ $adminBranch->branch_name }}</span>
+                            </div>
+                            @endif
+                        @endif
+                    </div>
+
+                    {{-- Quick Select --}}
+                    <div class="col-span-1 w-full sm:w-auto">
+                        <x-quick-date-filter :activeFilter="$activeFilter" class="w-full justify-between sm:justify-start h-10" />
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -132,85 +143,83 @@
     <div class="space-y-6">
 
         {{-- ─── Financial Intelligence Grid ────────────────────────────────── --}}
-        <div class="grid grid-cols-2 gap-6 lg:grid-cols-4 mb-8">
+        <div class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 mb-4 sm:mb-8">
             {{-- Revenue --}}
-            <div wire:click="openBreakdown('Revenue')" class="p-6 bg-gradient-to-br from-emerald-500 to-teal-700 rounded-3xl shadow-lg shadow-emerald-200/40 group hover:shadow-xl hover:shadow-emerald-300/40 hover:-translate-y-1 transition-all duration-500 relative overflow-hidden cursor-pointer border border-white/10">
+            <div wire:click="openBreakdown('Revenue')" class="p-3 sm:p-5 lg:p-6 bg-gradient-to-br from-emerald-500 to-teal-700 rounded-2xl sm:rounded-3xl shadow-lg shadow-emerald-200/40 group hover:shadow-xl hover:shadow-emerald-300/40 hover:-translate-y-1 transition-all duration-500 relative overflow-hidden cursor-pointer border border-white/10">
                 <div class="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-bl-[80px] -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
                 <div class="relative z-10 text-white">
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-white backdrop-blur-md transition-all duration-500 shadow-sm border border-white/20">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2-2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                    <div class="flex items-center justify-between mb-2 sm:mb-4">
+                        <div class="w-8 h-8 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white/20 flex items-center justify-center text-white backdrop-blur-md transition-all duration-500 shadow-sm border border-white/20">
+                            <svg class="w-4 h-4 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2-2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                         </div>
-                        <span class="text-[11px] font-black text-white/60 uppercase tracking-[0.2em]">Gross Revenue</span>
+                        <span class="text-[9px] sm:text-[11px] font-black text-white/60 uppercase tracking-[0.1em] sm:tracking-[0.2em]">Gross Revenue</span>
                     </div>
-                    <h3 class="text-3xl font-black text-white tracking-tight">₱ {{ number_format($kpi['revenue'], 2) }}</h3>
+                    <h3 class="text-lg sm:text-2xl lg:text-3xl font-black text-white tracking-tight">₱ {{ number_format($kpi['revenue'], 2) }}</h3>
                     <div class="flex items-center gap-2 mt-2">
                         <span class="flex h-2 w-2 rounded-full bg-emerald-300 animate-pulse"></span>
-                        <p class="text-[12px] font-bold text-white/80">{{ $kpi['order_count'] }} Completed Sales</p>
+                        <p class="text-[10px] sm:text-[12px] font-bold text-white/80">{{ $kpi['order_count'] }} Completed</p>
                     </div>
                 </div>
             </div>
 
+            {{-- Net Profit --}}
+            <div class="relative group h-full">
+                <div wire:click="openBreakdown('Profit')" class="p-3 sm:p-5 lg:p-6 bg-gradient-to-br from-amber-500 to-orange-700 rounded-2xl sm:rounded-3xl shadow-lg shadow-amber-200/40 group-hover:shadow-xl hover:shadow-amber-300/40 hover:-translate-y-1 transition-all duration-500 relative overflow-hidden cursor-pointer border border-white/10 h-full">
+                    <div class="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-bl-[80px] -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+                    <div class="relative z-10 text-white">
+                        <div class="flex items-center justify-between mb-2 sm:mb-4">
+                            <div class="w-8 h-8 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white/20 flex items-center justify-center text-white backdrop-blur-md transition-all duration-500 shadow-sm border border-white/20">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                            </div>
+                            <span class="text-[9px] sm:text-[11px] font-black text-white/60 uppercase tracking-[0.1em] sm:tracking-[0.2em]">Net Profit</span>
+                        </div>
+                        <h3 class="text-lg sm:text-2xl lg:text-3xl font-black text-white tracking-tight">₱ {{ number_format($kpi['gross_profit'], 2) }}</h3>
+                        <div class="flex items-center gap-2 mt-2">
+                            <span class="flex h-2 w-2 rounded-full bg-amber-300 animate-pulse"></span>
+                            <p class="text-[10px] sm:text-[12px] font-bold text-white/80 line-clamp-1">{{ $kpi['profit_margin_pct'] }}% Profit Margin</p>
+                        </div>
+                    </div>
+                </div>
+                <button wire:click="openBreakdown('Margin')" class="absolute bottom-4 right-4 z-20 w-8 h-8 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-all shadow-sm" title="View Margin Breakdown">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+            </div>
+
             {{-- AOV --}}
-            <div wire:click="openBreakdown('AOV')" class="p-6 bg-gradient-to-br from-indigo-500 to-violet-700 rounded-3xl shadow-lg shadow-indigo-200/40 group hover:shadow-xl hover:shadow-indigo-300/40 hover:-translate-y-1 transition-all duration-500 relative overflow-hidden cursor-pointer border border-white/10">
+            <div wire:click="openBreakdown('AOV')" class="p-3 sm:p-5 lg:p-6 bg-gradient-to-br from-indigo-500 to-violet-700 rounded-2xl sm:rounded-3xl shadow-lg shadow-indigo-200/40 group hover:shadow-xl hover:shadow-indigo-300/40 hover:-translate-y-1 transition-all duration-500 relative overflow-hidden cursor-pointer border border-white/10">
                 <div class="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-bl-[80px] -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
                 <div class="relative z-10 text-white">
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-white backdrop-blur-md transition-all duration-500 shadow-sm border border-white/20">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <div class="flex items-center justify-between mb-2 sm:mb-4">
+                        <div class="w-8 h-8 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white/20 flex items-center justify-center text-white backdrop-blur-md transition-all duration-500 shadow-sm border border-white/20">
+                            <svg class="w-4 h-4 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         </div>
-                        <span class="text-[11px] font-black text-white/60 uppercase tracking-[0.2em]">Avg. Order Value</span>
+                        <span class="text-[9px] sm:text-[11px] font-black text-white/60 uppercase tracking-[0.1em] sm:tracking-[0.2em]">Avg. Order Value</span>
                     </div>
-                    <h3 class="text-3xl font-black text-white tracking-tight">₱ {{ number_format($kpi['aov'], 2) }}</h3>
-                                        <div class="flex items-center gap-2 mt-2">
-                                            <span class="flex h-2 w-2 rounded-full bg-indigo-300 animate-pulse"></span>
-                                            <p class="text-[12px] font-bold text-white/80">Profit/Sales Intensity</p>
-                                        </div>
-                                    </div>
-                                </div>
-                
-                                {{-- COGS --}}
-                                <div wire:click="openBreakdown('COGS')" class="p-6 bg-gradient-to-br from-slate-600 to-slate-800 rounded-3xl shadow-lg shadow-slate-200/40 group hover:shadow-xl hover:shadow-slate-300/40 hover:-translate-y-1 transition-all duration-500 relative overflow-hidden cursor-pointer border border-white/10">
-                                    <div class="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-bl-[80px] -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
-                                    <div class="relative z-10 text-white">
-                                        <div class="flex items-center justify-between mb-4">
-                                            <div class="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-white backdrop-blur-md transition-all duration-500 shadow-sm border border-white/20">
-                                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                            </div>
-                                            <span class="text-[11px] font-black text-white/60 uppercase tracking-[0.2em]">Resource Costs</span>
-                                        </div>
-                                        <h3 class="text-3xl font-black text-white tracking-tight">₱ {{ number_format($kpi['total_cogs'], 2) }}</h3>
-                                        <div class="flex items-center gap-2 mt-2">
-                                            <span class="flex h-2 w-2 rounded-full bg-slate-300 animate-pulse"></span>
-                                            <p class="text-[12px] font-bold text-white/80">Inventory Consumption</p>
-                                        </div>
-                                    </div>
-                                </div>
-                
-                                {{-- Profit Insight --}}
-                                <div class="relative group h-full">
-                                    <div wire:click="openBreakdown('Profit')" class="p-6 bg-gradient-to-br from-amber-500 to-orange-700 rounded-3xl shadow-lg shadow-amber-200/40 group-hover:shadow-xl hover:shadow-amber-300/40 hover:-translate-y-1 transition-all duration-500 relative overflow-hidden cursor-pointer border border-white/10">
-                                        <div class="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-bl-[80px] -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
-                                        <div class="relative z-10 text-white">
-                                            <div class="flex items-center justify-between mb-4">
-                                                <div class="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-white backdrop-blur-md transition-all duration-500 shadow-sm border border-white/20">
-                                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
-                                                </div>
-                                                <span class="text-[11px] font-black text-white/60 uppercase tracking-[0.2em]">Net Profit</span>
-                                            </div>
-                                            <h3 class="text-3xl font-black text-white tracking-tight">₱ {{ number_format($kpi['gross_profit'], 2) }}</h3>
-                                            <div class="flex items-center gap-2 mt-2">
-                                                <span class="flex h-2 w-2 rounded-full bg-amber-300 animate-pulse"></span>
-                                                <p class="text-[12px] font-bold text-white/80">{{ $kpi['profit_margin_pct'] }}% Profit Margin</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                
-                                    {{-- Mini Margin Trigger --}}
-                                    <button wire:click="openBreakdown('Margin')" class="absolute bottom-4 right-4 z-20 w-8 h-8 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-all shadow-sm" title="View Margin Breakdown">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                    </button>
-                                </div>
+                    <h3 class="text-lg sm:text-2xl lg:text-3xl font-black text-white tracking-tight">₱ {{ number_format($kpi['aov'], 2) }}</h3>
+                    <div class="flex items-center gap-2 mt-2">
+                        <span class="flex h-2 w-2 rounded-full bg-indigo-300 animate-pulse shrink-0"></span>
+                        <p class="text-[10px] sm:text-[12px] font-bold text-white/80 truncate">Profit/Sales Intensity</p>
+                    </div>
+                </div>
+            </div>
+
+            {{-- COGS --}}
+            <div wire:click="openBreakdown('COGS')" class="p-3 sm:p-5 lg:p-6 bg-gradient-to-br from-slate-600 to-slate-800 rounded-2xl sm:rounded-3xl shadow-lg shadow-slate-200/40 group hover:shadow-xl hover:shadow-slate-300/40 hover:-translate-y-1 transition-all duration-500 relative overflow-hidden cursor-pointer border border-white/10">
+                <div class="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-bl-[80px] -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
+                <div class="relative z-10 text-white">
+                    <div class="flex items-center justify-between mb-2 sm:mb-4">
+                        <div class="w-8 h-8 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white/20 flex items-center justify-center text-white backdrop-blur-md transition-all duration-500 shadow-sm border border-white/20">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </div>
+                        <span class="text-[9px] sm:text-[11px] font-black text-white/60 uppercase tracking-[0.1em] sm:tracking-[0.2em]">Resource Costs</span>
+                    </div>
+                    <h3 class="text-lg sm:text-2xl lg:text-3xl font-black text-white tracking-tight">₱ {{ number_format($kpi['total_cogs'], 2) }}</h3>
+                    <div class="flex items-center gap-2 mt-2">
+                        <span class="flex h-2 w-2 rounded-full bg-slate-300 animate-pulse"></span>
+                        <p class="text-[10px] sm:text-[12px] font-bold text-white/80 line-clamp-1">Inventory Consumption</p>
+                    </div>
+                </div>
+            </div>
         </div>
 
         {{-- ─── Breakdown Side Panel ────────────────────────────────────────── --}}
@@ -227,7 +236,7 @@
                             <span class="text-[11px] text-indigo-600 font-bold uppercase tracking-wider mt-1 block">{{ $selectedMetric }} Analysis</span>
                         </div>
                     </div>
-                    <button @click="show = false" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all">
+                    <button @click="isPanelOpen = false" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
@@ -361,21 +370,21 @@
         </x-side-panel>
 
         {{-- ─── Main Analytical Layer ────────────────────────────────────────── --}}
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6" x-data="dashboardCharts()" @update-sales-chart.window="handleChartUpdate($event.detail)" wire:ignore.self wire:key="dashboard-charts-container">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6" x-data="dashboardCharts()" @update-sales-chart.window="handleChartUpdate($event.detail)" wire:ignore.self wire:key="dashboard-charts-container">
             {{-- 1: Financial Pulse (Line Chart) --}}
-            <div class="lg:col-span-8 rounded-xl bg-white border border-gray-200 shadow-sm p-6 overflow-hidden h-[400px]">
-                <div class="flex items-center justify-between mb-6">
-                    <h2 class="text-[14px] font-black text-gray-900 uppercase tracking-widest flex items-center gap-2">
+            <div class="lg:col-span-8 rounded-xl bg-white border border-gray-200 shadow-sm p-4 sm:p-6 overflow-hidden h-[380px] sm:h-[400px]">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+                    <h2 class="text-[13px] sm:text-[14px] font-black text-gray-900 uppercase tracking-widest text-center sm:text-left">
                         Financial Pulse
                     </h2>
 
-                    <div class="flex items-center p-1 bg-gray-50 rounded-xl border border-gray-100">
+                    <div class="flex items-center p-1 bg-gray-50 rounded-xl border border-gray-100 w-full sm:w-auto overflow-x-auto">
                         @foreach(['Sales', 'Volume', 'Profit'] as $m)
                             <button wire:click="setChartMetric('{{ $m }}')"
                                     @class([
-                                        'px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300',
+                                        'flex-1 sm:flex-none px-2 sm:px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300',
                                         $selectedChartMetric === $m 
-                                            ? 'bg-white text-gray-900 shadow-sm border border-gray-100 scale-105' 
+                                            ? 'bg-white text-gray-900 shadow-sm border border-gray-100 scale-[1.02] sm:scale-105' 
                                             : 'text-gray-400 hover:text-gray-600'
                                     ])>
                                 {{ $m }}
@@ -390,7 +399,7 @@
             </div>
 
             {{-- 2: Operations Index (2x2 Grid) --}}
-            <div class="lg:col-span-4 p-6 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col h-[400px]">
+            <div class="lg:col-span-4 p-4 sm:p-6 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col h-auto sm:h-[400px]">
                 <div class="flex items-center justify-between mb-8">
                     <h2 class="text-[14px] font-black text-gray-900 uppercase tracking-widest">Operations Index</h2>
                     <div class="w-8 h-8 rounded bg-gray-50 flex items-center justify-center text-gray-400 border border-gray-100">
@@ -436,7 +445,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
             {{-- 1: Revenue Channels (Dynamic from POS Config) --}}
-            <div class="lg:col-span-4 rounded-xl bg-white border border-gray-200 shadow-sm p-6 flex flex-col h-[320px]">
+            <div class="lg:col-span-4 rounded-xl bg-white border border-gray-200 shadow-sm p-6 flex flex-col h-[400px]">
                 <h2 class="text-[14px] font-black text-gray-900 uppercase tracking-widest mb-6">Revenue Channels</h2>
                 <div class="flex-1 flex flex-col justify-center space-y-6">
                     @php
@@ -480,7 +489,7 @@
             </div>
 
             {{-- 2: Usage Velocity (Linear Items) --}}
-            <div class="lg:col-span-4 p-6 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col">
+            <div class="lg:col-span-4 p-6 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col h-[400px]">
                 <div class="flex items-center justify-between mb-8">
                     <h2 class="text-[14px] font-black text-gray-900 uppercase tracking-widest">Usage Velocity</h2>
                 </div>
@@ -821,7 +830,11 @@
                             axisBorder: { show: false }, 
                             axisTicks: { show: false },
                             labels: { 
-                                style: { colors: '#9CA3AF', fontSize: '11px', fontWeight: 600 } 
+                                show: true,
+                                rotate: -45,
+                                rotateAlways: false,
+                                hideOverlappingLabels: true,
+                                style: { colors: '#9CA3AF', fontSize: '10px', fontWeight: 600 } 
                             }
                         },
                         yaxis: {
@@ -833,7 +846,12 @@
                         grid: { 
                             borderColor: '#f1f5f9', 
                             strokeDashArray: 4, 
-                            padding: { top: 0, right: 20, bottom: 0, left: 10 } 
+                            padding: { 
+                                top: 0, 
+                                right: 15, 
+                                bottom: 25, 
+                                left: 15 
+                            } 
                         },
                         legend: { 
                             position: 'top', 

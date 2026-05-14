@@ -48,7 +48,12 @@ window.addEventListener('print-page', () => {
 // Receipt Pop-up
 window.addEventListener('open-receipt', (e) => {
     const url = e.detail?.url || e.detail;
-    if (url) window.open(url, '_blank', 'width=450,height=650');
+    if (url) {
+        // Small delay to allow Livewire to finish DOM morphing/clearing state
+        setTimeout(() => {
+            window.open(url, '_blank', 'width=450,height=650');
+        }, 300);
+    }
 });
 
 /**

@@ -284,5 +284,11 @@
         <button class="btn" style="background-color: #4b5563;" onclick="window.close()">Close Window</button>
     </div>
 
+    <script>
+        // Auto-close window after printing (improves 'automatic' feel)
+        window.onafterprint = function() {
+            window.close();
+        };
+    </script>
 </body>
 </html>

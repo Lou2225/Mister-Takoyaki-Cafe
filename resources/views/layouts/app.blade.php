@@ -39,7 +39,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{ config('app.name', 'Mister Takoyaki') }}</title>
+    <title>{{ config('app.name', 'Mister Takoyaki Cafe') }}</title>
 
     {{-- Fonts --}}
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -103,7 +103,7 @@
     <div x-show="isMobile && sidebarOpen" 
          x-transition.opacity.duration.300ms
          @click="sidebarOpen = false"
-         class="fixed inset-0 bg-gray-900/60 z-40 backdrop-blur-sm lg:hidden"
+         class="fixed inset-0 bg-gray-900/60 z-[105] backdrop-blur-sm lg:hidden"
          x-cloak>
     </div>
 
@@ -113,7 +113,7 @@
     {{-- ═══════════════════════ MAIN AREA ═══════════════════════ --}}
     <div class="flex-1 flex flex-col h-full bg-[#F9FAFB] overflow-hidden transition-colors duration-300">
 
-<header id="top-bar" class="bg-white border-b border-gray-200 sticky top-0 z-[100] flex items-center justify-between px-4 sm:px-6 h-[65px] min-h-[65px]">
+<header id="top-bar" class="bg-white border-b border-gray-200 sticky top-0 z-[100] flex items-center justify-between px-3 sm:px-6 h-[58px] sm:h-[65px] min-h-[58px] sm:min-h-[65px]">
     <div class="flex items-center gap-4">
         {{-- Hamburger Menu for toggling sidebar --}}
         <button @click="sidebarOpen = !sidebarOpen"
@@ -125,22 +125,22 @@
             </svg>
         </button>
         
-        <div class="hidden md:flex items-center gap-2.5 px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl transition-all shadow-sm ml-2">
+        <div class="hidden md:flex items-center gap-2.5 px-3 py-1.5 bg-gray-50 border border-gray-100 rounded-xl transition-all shadow-sm ml-2">
             <svg class="w-4 h-4 {{ $iconColor }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
             </svg>
-            <span class="text-[13px] font-bold text-gray-500 uppercase tracking-tight">
+            <span class="text-[12px] font-bold text-gray-500 uppercase tracking-tight truncate max-w-[200px] lg:max-w-none">
                 {{ $contextLabel }}: <span class="text-gray-900 font-black tracking-normal">{{ $contextValue }}</span>
             </span>
         </div>
         
-        {{-- Page Title placeholder/brand --}}
-        <div class="flex items-center lg:hidden">
-            <span class="font-semibold text-gray-900">Mister Takoyaki</span>
+        {{-- Page Title placeholder/brand (mobile only) --}}
+        <div class="flex items-center md:hidden">
+            <span class="font-semibold text-[14px] text-gray-900">Mister Takoyaki Cafe</span>
         </div>
     </div>
 
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-1 sm:gap-3">
         {{-- Clock --}}
         <div x-data="{ 
                 time: '',
@@ -305,9 +305,9 @@
                 </div>
             </main>
         @else
-            <main class="flex-1 overflow-x-hidden overflow-y-auto p-6" style="min-height:0;">
+            <main class="flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-4 lg:p-6" style="min-height:0;">
                 <div class="max-w-[1400px] mx-auto min-h-full">
-                    <div class="bg-white rounded-2xl border border-gray-200 p-6 shadow-[0_4px_30px_rgba(0,0,0,0.02)]">
+                    <div class="bg-white rounded-xl sm:rounded-2xl border border-gray-200 p-3 sm:p-4 lg:p-6 shadow-[0_4px_30px_rgba(0,0,0,0.02)]">
                         {{ $slot ?? '' }}
                         @yield('content')
                     </div>

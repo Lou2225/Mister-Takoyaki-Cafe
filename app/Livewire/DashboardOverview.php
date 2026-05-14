@@ -268,6 +268,7 @@ class DashboardOverview extends Component
         // Set default date range to All Time (Empty)
         $this->startDate = '';
         $this->endDate = '';
+        $this->activeFilter = 'All Time';
 
         $this->updateHeader();
     }

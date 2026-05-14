@@ -15,8 +15,8 @@
             <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Order Info</th>
             <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-right">Amount</th>
             <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-center">Status</th>
-            <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-center">Type</th>
-            <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-center">Date & Time</th>
+            <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-center hidden sm:table-cell">Type</th>
+            <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-center hidden md:table-cell">Date & Time</th>
             <th class="py-3 px-4 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest">Actions</th>
         </x-slot>
 
@@ -63,10 +63,10 @@
                         {{ $displayStatus }}
                     </span>
                 </td>
-                <td class="py-3 px-4 text-center whitespace-nowrap">
+                <td class="py-3 px-4 text-center whitespace-nowrap hidden sm:table-cell">
                     <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-slate-50 text-slate-600 border border-slate-100">{{ $order->order_type }}</span>
                 </td>
-                <td class="py-3 px-4 text-center whitespace-nowrap">
+                <td class="py-3 px-4 text-center whitespace-nowrap hidden md:table-cell">
                     <div class="text-[12px]">
                         <div class="font-bold text-slate-900">{{ $order->created_at->format('M d, Y') }}</div>
                         <div class="text-slate-400 font-medium text-[11px]">{{ $order->created_at->format('h:i A') }}</div>
