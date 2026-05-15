@@ -1,4 +1,4 @@
-@props(['align' => 'right', 'width' => '48', 'contentClasses' => 'py-1 bg-white', 'containerClasses' => 'inline-block', 'wireKey' => null])
+@props(['align' => 'right', 'width' => '56', 'contentClasses' => 'py-1 bg-white', 'containerClasses' => 'inline-block', 'wireKey' => null])
 
 @php
 switch ($align) {
@@ -15,8 +15,8 @@ switch ($align) {
 }
 
 switch ($width) {
-    case '48':
-        $widthClass = 'w-48';
+    case '56':
+        $widthClass = 'w-56';
         break;
     case 'full':
         $widthClass = 'w-full';
@@ -34,19 +34,19 @@ switch ($width) {
      @click.away="dropdownOpen = false" 
      @close.stop="dropdownOpen = false" 
      data-has-alpine-state="true">
-    <div @click="dropdownOpen = !dropdownOpen" x-ref="trigger" class="relative z-0">
+    <div @click="dropdownOpen = !dropdownOpen" x-ref="trigger" class="relative z-0 w-full">
         {{ $trigger }}
     </div>
 
     <div x-show="dropdownOpen" 
-         x-transition:enter="transition ease-out duration-300" 
-         x-transition:enter-start="transform opacity-0 scale-95" 
-         x-transition:enter-end="transform opacity-100 scale-100" 
-         x-transition:leave="transition ease-in duration-200" 
-         x-transition:leave-start="transform opacity-100 scale-100" 
-         x-transition:leave-end="transform opacity-0 scale-95" 
-         class="absolute z-50 {{ $alignmentClasses }} {{ $widthClass }} rounded-md shadow-lg {{ $contentClasses }}" style="display: none;">
-        <div class="rounded-md ring-1 ring-black ring-opacity-5 py-1 bg-white" @click.stop>
+         x-transition:enter="transition ease-out duration-200" 
+         x-transition:enter-start="transform opacity-0 -translate-y-1" 
+         x-transition:enter-end="transform opacity-100 translate-y-0" 
+         x-transition:leave="transition ease-in duration-150" 
+         x-transition:leave-start="transform opacity-100 translate-y-0" 
+         x-transition:leave-end="transform opacity-0 -translate-y-1" 
+         class="absolute z-50 mt-2 {{ $alignmentClasses }} {{ $widthClass }} rounded-lg border border-slate-200 shadow-lg {{ $contentClasses }}" style="display: none;">
+        <div class="rounded-lg bg-white w-full" @click.stop>
             {{ $content }}
         </div>
     </div>

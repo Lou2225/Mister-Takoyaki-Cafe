@@ -116,7 +116,7 @@ class MenuManagement extends Component
     public int|string|null $categoryId = null;
     public string $description = '';
     public string $price = '';
-    public bool $isActive = true;
+    public $isActive = '1';
     /** @var TemporaryUploadedFile|null */
     public $image = null;
     public ?string $existingImage = null;
@@ -531,7 +531,7 @@ class MenuManagement extends Component
                     'category_id' => $this->categoryId ?: null,
                     'description' => $this->description,
                     'price'       => $this->price,
-                    'is_active'   => $this->isActive,
+                    'is_active'   => $this->isActive === '1' || $this->isActive === 1 || $this->isActive === true,
                     'sort_order'  => $this->sortOrder,
                     'image'       => $imagePath,
                     'scope'       => 'global',

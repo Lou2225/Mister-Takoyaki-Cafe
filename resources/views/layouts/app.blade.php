@@ -320,6 +320,9 @@
 
 <x-toast />
 
+{{-- Global helper scripts that must be available before Livewire/Alpine initialize. --}}
+@stack('beforeLivewireScripts')
+
 {{-- [FIX] @livewireScripts moved from <head> to end of <body> so it runs after the DOM is ready --}}
     {{-- Global Modals --}}
 

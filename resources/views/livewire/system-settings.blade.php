@@ -892,7 +892,7 @@
     </x-modal>
 </div>
 
-@push('scripts')
+@push('beforeLivewireScripts')
 <script>
 (function() {
     const registerSettingsData = () => {

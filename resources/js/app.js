@@ -208,14 +208,16 @@ window.sidePanel = function({ name, show }) {
     };
 };
 
-document.addEventListener('alpine:init', () => {
-    window.Alpine?.data('slidingTabs', slidingTabsLogic);
-    // Also register modal/sidePanel via Alpine.data for completeness
-    if (window.Alpine) {
-        window.Alpine.data('modal', ({ name, show }) => window.modal({ name, show }));
-        window.Alpine.data('sidePanel', ({ name, show }) => window.sidePanel({ name, show }));
-    }
-});
+const registerAlpineFactories = () => {
+    if (!window.Alpine) return;
+
+    window.Alpine.data('slidingTabs', slidingTabsLogic);
+    window.Alpine.data('modal', ({ name, show }) => window.modal({ name, show }));
+    window.Alpine.data('sidePanel', ({ name, show }) => window.sidePanel({ name, show }));
+};
+
+document.addEventListener('alpine:init', registerAlpineFactories);
+registerAlpineFactories();
 
 // Global alias for compatibility
 window.slidingTabs = slidingTabsLogic;

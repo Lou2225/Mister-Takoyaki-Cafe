@@ -726,7 +726,7 @@
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
     </style>
 
-@push('scripts')
+@push('beforeLivewireScripts')
     <script>
         function dashboardCharts() {
             return {

@@ -323,7 +323,7 @@
         .animate-growWidth { animation: growWidth 1s ease-out forwards; }
     </style>
 
-    @push('scripts')
+    @push('beforeLivewireScripts')
     <script>
         window.kdsDisplay = function(tab) {
             const tabs = window.slidingTabs({ activeTab: tab }, 'activeTab');

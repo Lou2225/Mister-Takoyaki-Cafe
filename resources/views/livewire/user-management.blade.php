@@ -1212,11 +1212,12 @@
     </x-modal>
 </div>
 
-@push('scripts')
+@push('beforeLivewireScripts')
 @once
 <script>
 (function() {
     const registerUserData = () => {
+        if (!window.Alpine) return;
         if (Alpine.data('userManagementData')) return;
         Alpine.data('userManagementData', (initialPanel, initialMode, initialView) => ({
             ...slidingTabs(@js($historyTab), 'historyTab', 'historyTabList'),

@@ -30,26 +30,42 @@
                 x-data="{ 
                     isEditMode: @entangle('isEditMode').live,
                     sortable: null,
+                    timeout: null,
                     setup() {
+                        if (this.timeout) clearTimeout(this.timeout);
                         if (!this.isEditMode) {
-                            if (this.sortable) { this.sortable.destroy(); this.sortable = null; }
+                            if (this.sortable) { 
+                                try { this.sortable.destroy(); } catch(e) {}
+                                this.sortable = null; 
+                            }
                             return;
                         }
-                        const el = document.getElementById('category-sortable-tabs');
-                        if (!el || this.sortable) return;
-                        
-                        this.sortable = new Sortable(el, {
-                            draggable: '.pos-category-tab',
-                            filter: '#pos_tab_all',
-                            animation: 150,
-                            ghostClass: 'bg-' + @js($primaryColor) + '-50',
-                            onEnd: (evt) => {
-                                const ids = Array.from(el.querySelectorAll('.pos-category-tab'))
-                                    .map(tab => tab.dataset.id)
-                                    .filter(id => id);
-                                @this.reorderCategories(ids);
-                            }
-                        });
+                        this.timeout = setTimeout(() => {
+                            const el = document.getElementById('category-sortable-tabs');
+                            if (!el || this.sortable) return;
+                            
+                            this.sortable = new Sortable(el, {
+                                draggable: '.pos-category-tab',
+                                filter: '#pos_tab_all',
+                                animation: 150,
+                                ghostClass: 'bg-' + @js($primaryColor) + '-50',
+                                onEnd: (evt) => {
+                                    const ids = Array.from(el.querySelectorAll('.pos-category-tab'))
+                                        .map(tab => tab.dataset.id)
+                                        .filter(id => id);
+                                    setTimeout(() => {
+                                        @this.reorderCategories(ids);
+                                    }, 100);
+                                }
+                            });
+                        }, 50);
+                    },
+                    destroy() {
+                        if (this.timeout) clearTimeout(this.timeout);
+                        if (this.sortable) {
+                            try { this.sortable.destroy(); } catch(e) {}
+                            this.sortable = null;
+                        }
                     }
                 }"
                 x-init="setup(); $watch('isEditMode', () => setup())"
@@ -145,26 +161,42 @@
                     x-data="{ 
                         isEditMode: @entangle('isEditMode').live,
                         sortable: null,
+                        timeout: null,
                         setup() {
+                            if (this.timeout) clearTimeout(this.timeout);
                             if (!this.isEditMode) {
-                                if (this.sortable) { this.sortable.destroy(); this.sortable = null; }
+                                if (this.sortable) { 
+                                    try { this.sortable.destroy(); } catch(e) {}
+                                    this.sortable = null; 
+                                }
                                 return;
                             }
-                            const el = document.getElementById('product-sortable-grid');
-                            if (!el || this.sortable) return;
-                            
-                            this.sortable = new Sortable(el, {
-                                draggable: '.product-card',
-                                handle: '.drag-handle',
-                                animation: 150,
-                                ghostClass: 'bg-' + @js($primaryColor) + '-50',
-                                chosenClass: 'shadow-2xl',
-                                dragClass: 'opacity-0',
-                                onEnd: (evt) => {
-                                    const ids = Array.from(el.querySelectorAll('.product-card')).map(card => card.dataset.id);
-                                    @this.reorderProducts(ids);
-                                }
-                            });
+                            this.timeout = setTimeout(() => {
+                                const el = document.getElementById('product-sortable-grid');
+                                if (!el || this.sortable) return;
+                                
+                                this.sortable = new Sortable(el, {
+                                    draggable: '.product-card',
+                                    handle: '.drag-handle',
+                                    animation: 150,
+                                    ghostClass: 'bg-' + @js($primaryColor) + '-50',
+                                    chosenClass: 'shadow-2xl',
+                                    dragClass: 'opacity-0',
+                                    onEnd: (evt) => {
+                                        const ids = Array.from(el.querySelectorAll('.product-card')).map(card => card.dataset.id);
+                                        setTimeout(() => {
+                                            @this.reorderProducts(ids);
+                                        }, 100);
+                                    }
+                                });
+                            }, 50);
+                        },
+                        destroy() {
+                            if (this.timeout) clearTimeout(this.timeout);
+                            if (this.sortable) {
+                                try { this.sortable.destroy(); } catch(e) {}
+                                this.sortable = null;
+                            }
                         }
                     }"
                     x-init="setup(); $watch('isEditMode', () => setup())"

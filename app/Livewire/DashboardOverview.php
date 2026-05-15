@@ -16,6 +16,7 @@ use App\Models\StockMovement;
 use App\Models\User;
 use App\Services\ConfigurationService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Collection;
 use Carbon\Carbon;
 
 use App\Traits\HandlesExports;
@@ -24,14 +25,14 @@ class DashboardOverview extends Component
 {
     use HandlesExports;
 
-    public $selectedBranchId = null;
-    public $isSuperAdmin = false;
+    public ?int $selectedBranchId = null;
+    public bool $isSuperAdmin = false;
     
     // Date filtering
-    public $startDate = '';
-    public $endDate = '';
-    public $activeFilter = 'All Time';
-    public $dateError = '';
+    public string $startDate = '';
+    public string $endDate = '';
+    public string $activeFilter = 'All Time';
+    public string $dateError = '';
 
     // Breakdown Sidebar
     public $showBreakdown = false;
@@ -41,13 +42,13 @@ class DashboardOverview extends Component
     public $stockTab = 'deficiency';
 
 
-    public function setChartMetric($metric)
+    public function setChartMetric(string $metric): void
     {
         $this->selectedChartMetric = $metric;
         $this->refreshChart();
     }
 
-    public function openBreakdown($metric)
+    public function openBreakdown(string $metric): void
     {
         $this->selectedMetric = $metric;
         $this->breakdownData = match($metric) {
@@ -133,7 +134,7 @@ class DashboardOverview extends Component
         return collect($categoryCogs)->map(fn($val, $key) => ['category' => $key, 'total' => $val])->values()->toArray();
     }
 
-    private function fetchBreakdownOrderItems($branchId)
+    private function fetchBreakdownOrderItems(?int $branchId): Collection
     {
         $start = $this->startDate ? $this->startDate . ' 00:00:00' : null;
         $end = $this->endDate ? $this->endDate . ' 23:59:59' : null;
@@ -273,13 +274,13 @@ class DashboardOverview extends Component
         $this->updateHeader();
     }
 
-    public function updatedSelectedBranchId($value)
+    public function updatedSelectedBranchId(?int $value): void
     {
         $this->refreshChart();
     }
 
 
-    public function updatedStartDate()
+    public function updatedStartDate(): void
     {
         $this->validateDateRange();
         if (!$this->dateError) {
@@ -356,7 +357,7 @@ class DashboardOverview extends Component
         }
     }
 
-    public function applyQuickDateFilter($range)
+    public function applyQuickDateFilter(string $range): void
     {
         switch ($range) {
             case 'today':
@@ -483,7 +484,7 @@ class DashboardOverview extends Component
         ];
     }
 
-    private function fetchFinancialOrders($branchId)
+    private function fetchFinancialOrders(?int $branchId): Collection
     {
         $start = $this->startDate ? $this->startDate . ' 00:00:00' : null;
         $end = $this->endDate ? $this->endDate . ' 23:59:59' : null;
@@ -592,12 +593,12 @@ class DashboardOverview extends Component
             ])->toArray();
     }
 
-    private function getBranches($isSuperAdmin)
+    private function getBranches(bool $isSuperAdmin): Collection
     {
         return $isSuperAdmin ? Branch::withCount('staff')->orderBy('branch_name')->get() : collect([]);
     }
 
-    private function getThemeAssets($roleName): array
+    private function getThemeAssets(string $roleName): array
     {
         return [
             'bannerGradient' => match($roleName) {
@@ -629,24 +630,43 @@ class DashboardOverview extends Component
         return $this->formatChartOutput($start, $end, $dailyData, $orders);
     }
 
-    private function prepareChartDateRange($branchId): array
+    private function prepareChartDateRange(?int $branchId): array
     {
-        if (!$this->startDate) {
+        $startDate = $this->parseDateInput($this->startDate);
+        $endDate = $this->parseDateInput($this->endDate);
+
+        if (!$startDate) {
             $earliestOrder = Order::query()
                 ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
                 ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
                 ->orderBy('created_at', 'asc')
                 ->first();
-            $start = $earliestOrder ? Carbon::parse($earliestOrder->created_at)->startOfDay() : now()->subDays(30);
+            $start = $earliestOrder ? Carbon::parse($earliestOrder->created_at)->startOfDay() : now()->subDays(30)->startOfDay();
         } else {
-            $start = Carbon::parse($this->startDate)->startOfDay();
+            $start = $startDate->startOfDay();
         }
-        $end = $this->endDate ? Carbon::parse($this->endDate)->endOfDay() : now()->endOfDay();
+
+        $end = $endDate ? $endDate->endOfDay() : now()->endOfDay();
         
         return [$start, $end];
     }
 
-    private function fetchChartOrders($start, $end, $branchId)
+    private function parseDateInput(?string $date): ?Carbon
+    {
+        if (!$date) {
+            return null;
+        }
+
+        try {
+            $parsed = Carbon::createFromFormat('Y-m-d', $date);
+        } catch (\Exception $e) {
+            return null;
+        }
+
+        return $parsed && $parsed->format('Y-m-d') === $date ? $parsed : null;
+    }
+
+    private function fetchChartOrders(Carbon $start, Carbon $end, ?int $branchId): Collection
     {
         return Order::where('status', Order::STATUS_COMPLETED)
             ->whereBetween('created_at', [$start, $end])
@@ -656,7 +676,7 @@ class DashboardOverview extends Component
             ->get();
     }
 
-    private function fetchChartStandardCosts($branchId)
+    private function fetchChartStandardCosts(?int $branchId): Collection
     {
         return IngredientCost::query()
             ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
@@ -664,7 +684,7 @@ class DashboardOverview extends Component
             ->get();
     }
 
-    private function aggregateDailyChartData($orders, $branchCostMap, $globalCostMap): array
+    private function aggregateDailyChartData(Collection $orders, Collection $branchCostMap, Collection $globalCostMap): array
     {
         $dailyData = [];
         $productCostMap = [];
@@ -689,7 +709,7 @@ class DashboardOverview extends Component
         return $dailyData;
     }
 
-    private function formatChartOutput($start, $end, $dailyData, $orders): array
+    private function formatChartOutput(Carbon $start, Carbon $end, array $dailyData, Collection $orders): array
     {
         $categories = [];
         $series = [];
@@ -866,13 +886,18 @@ class DashboardOverview extends Component
         ];
     }
 
-    private function resolveInventoryIntelDateWindow($branchId): array
+    private function resolveInventoryIntelDateWindow(?int $branchId): array
     {
         if ($this->startDate && $this->endDate && !$this->dateError) {
-            $start = Carbon::parse($this->startDate)->startOfDay();
-            $end = Carbon::parse($this->endDate)->endOfDay();
+            $startDate = $this->parseDateInput($this->startDate);
+            $endDate = $this->parseDateInput($this->endDate);
 
-            return [$start, $end, max(1, $start->diffInDays($end) + 1)];
+            if ($startDate && $endDate) {
+                $start = $startDate->startOfDay();
+                $end = $endDate->endOfDay();
+
+                return [$start, $end, max(1, $start->diffInDays($end) + 1)];
+            }
         }
 
         $earliest = StockMovement::where('type', 'order')
@@ -886,27 +911,27 @@ class DashboardOverview extends Component
         return [$start, $end, max(1, $start->diffInDays($end) + 1)];
     }
 
-    private function resolveInventoryIntelCostMaps($branchId): array
+    private function resolveInventoryIntelCostMaps(?int $branchId): array
     {
         $branchCosts = IngredientCost::query()
             ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
             ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
             ->get()
             ->groupBy('branch_id')
-            ->map(function ($costs) {
-                return $costs->mapWithKeys(function ($cost) {
+            ->map(function (Collection $costs) {
+                return $costs->mapWithKeys(function ($cost): array {
                     $resolvedCost = (float) ($cost->cost_per_base_unit ?: $cost->unit_cost ?: 0);
 
                     return [$cost->ingredient_id => $resolvedCost];
                 });
             });
 
-        $globalCosts = Ingredient::pluck('cost', 'id')->map(fn ($cost) => (float) $cost);
+        $globalCosts = Ingredient::pluck('cost', 'id')->map(fn ($cost): float => (float) $cost);
 
         return [$branchCosts, $globalCosts];
     }
 
-    private function resolveInventoryIntelUnitCost(int $branchId, int $ingredientId, $branchCostMap, $globalCostMap): float
+    private function resolveInventoryIntelUnitCost(int $branchId, int $ingredientId, Collection $branchCostMap, Collection $globalCostMap): float
     {
         return (float) (
             $branchCostMap->get($branchId)?->get($ingredientId)
@@ -915,7 +940,7 @@ class DashboardOverview extends Component
         );
     }
 
-    private function calculateItemCogs($item, $branchCostMap, $globalCostMap, &$productMap, &$optionMap, &$modifierMap): float
+    private function calculateItemCogs(OrderItem $item, Collection $branchCostMap, Collection $globalCostMap, array &$productMap, array &$optionMap, array &$modifierMap): float
     {
         $itemCost = 0;
 
@@ -968,7 +993,7 @@ class DashboardOverview extends Component
         return (float)$itemCost;
     }
 
-    private function trackIngredientUsage($item, $branchCostMap, $globalCostMap, $ingredients, &$usage)
+    private function trackIngredientUsage(OrderItem $item, Collection $branchCostMap, Collection $globalCostMap, array $ingredients, array &$usage): void
     {
         $recipes = collect();
         if ($item->product) $recipes = $recipes->concat($item->product->recipes->where('product_option_id', null)->where('modifier_id', null));

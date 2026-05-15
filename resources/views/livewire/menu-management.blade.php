@@ -666,76 +666,91 @@
         {{-- macOS Style Unified Toolbar --}}
         <div class="flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
             
-            {{-- Left: Search & View Switcher --}}
+            {{-- Left: Search Bar --}}
             <div class="w-full lg:w-auto flex-1">
                 <x-search-bar wireModel="search" placeholder="Find product..." width="w-full lg:w-80" />
             </div>
 
-            {{-- Right: Filters --}}
-            <div class="w-full lg:w-auto flex items-center gap-2">
-                <div class="grid grid-cols-2 lg:flex items-center gap-2 flex-1">
-                    <x-dropdown align="right" width="full">
-                        <x-slot name="trigger">
-                            <x-secondary-button type="button" class="w-full justify-between gap-1.5 h-10 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
-                                <div class="flex items-center gap-1.5 truncate">
-                                    <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 0 1 3 12V7a4 4 0 0 1 4-4z" /></svg>
-                                    <span class="text-[12px] truncate">{{ $selectedFilterCategoryName }}</span>
-                                </div>
-                                <svg class="w-3 h-3 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
-                            </x-secondary-button>
-                        </x-slot>
-                        <x-slot name="content">
-                            <div class="p-2">
-                                <div class="px-2 pb-2 mb-2 border-b border-slate-50">
-                                    <div class="relative">
-                                        <svg class="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                                        <input wire:model.live.debounce.300ms="categoryFilterSearch" type="text" placeholder="Search..." 
-                                               class="w-full pl-9 pr-4 py-2 bg-slate-50 border-none rounded-lg text-[12px] font-medium focus:ring-1 focus:ring-indigo-500 placeholder-slate-400">
-                                    </div>
-                                </div>
-                                <div class="max-h-60 overflow-y-auto custom-scrollbar">
-                                    @if(empty($categoryFilterSearch))
-                                        <x-dropdown-link href="#" wire:click.prevent="$set('selectedCategoryId', '')" class="{{ $selectedCategoryId === '' ? 'bg-indigo-50 text-indigo-600 font-bold' : '' }}">
-                                            All Categories
-                                        </x-dropdown-link>
-                                        <hr class="border-slate-50">
-                                    @endif
-                                    
-                                    @forelse($filterCategories as $cat)
-                                        <x-dropdown-link href="#" wire:click.prevent="$set('selectedCategoryId', {{ $cat->id }})" class="{{ $selectedCategoryId == $cat->id ? 'bg-indigo-50 text-indigo-600 font-bold' : '' }}">
-                                            {{ $cat->name }}
-                                        </x-dropdown-link>
-                                    @empty
-                                        <div class="px-4 py-2 text-[12px] text-slate-400 italic">No categories found</div>
-                                    @endforelse
+            {{-- Right: Filters & View Toggle --}}
+            <div class="flex flex-wrap items-center lg:justify-end gap-2">
+                <x-dropdown align="right" width="48" containerClasses="block w-full lg:w-auto">
+                    <x-slot name="trigger">
+                        <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
+                            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 0 1 3 12V7a4 4 0 0 1 4-4z" /></svg>
+                            <span class="text-[12px] whitespace-nowrap">{{ $selectedFilterCategoryName }}</span>
+                            <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
+                        </x-secondary-button>
+                    </x-slot>
+                    <x-slot name="content">
+                        <div class="p-2">
+                            <div class="px-2 pb-2 mb-2 border-b border-slate-50">
+                                <div class="relative">
+                                    <svg class="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                    <input wire:model.live.debounce.300ms="categoryFilterSearch" type="text" placeholder="Search..." 
+                                           class="w-full pl-9 pr-4 py-2 bg-slate-50 border-none rounded-lg text-[12px] font-medium focus:ring-1 focus:ring-indigo-500 placeholder-slate-400">
                                 </div>
                             </div>
-                        </x-slot>
-                    </x-dropdown>
+                            <div class="max-h-60 overflow-y-auto custom-scrollbar">
+                                @if(empty($categoryFilterSearch))
+                                    <x-dropdown-link href="#" wire:click.prevent="$set('selectedCategoryId', '')" class="{{ $selectedCategoryId === '' ? 'bg-indigo-50 text-indigo-600 font-bold' : '' }}">
+                                        All Categories
+                                    </x-dropdown-link>
+                                    <hr class="border-slate-50">
+                                @endif
+                                
+                                @forelse($filterCategories as $cat)
+                                    <x-dropdown-link href="#" wire:click.prevent="$set('selectedCategoryId', {{ $cat->id }})" class="{{ $selectedCategoryId == $cat->id ? 'bg-indigo-50 text-indigo-600 font-bold' : '' }}">
+                                        {{ $cat->name }}
+                                    </x-dropdown-link>
+                                @empty
+                                    <div class="px-4 py-2 text-[12px] text-slate-400 italic">No categories found</div>
+                                @endforelse
+                            </div>
+                        </div>
+                    </x-slot>
+                </x-dropdown>
 
-                    <x-dropdown align="right" width="full">
+                @if($this->isSuperAdmin())
+                    <x-dropdown align="right" width="48" containerClasses="block w-full lg:w-auto">
                         <x-slot name="trigger">
-                            <x-secondary-button type="button" class="w-full justify-between gap-1.5 h-10 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
-                                <div class="flex items-center gap-1.5 truncate">
-                                    <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                                    <span class="text-[12px] truncate">{{ $isActive === '1' ? 'Active' : ($isActive === '0' ? 'Hidden' : 'All Status') }}</span>
-                                </div>
-                                <svg class="w-3 h-3 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
+                            <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
+                                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                                <span class="text-[12px] whitespace-nowrap">{{ $selectedBranchId ? $branches->firstWhere('id', $selectedBranchId)?->branch_name : 'All Branches' }}</span>
+                                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                             </x-secondary-button>
                         </x-slot>
                         <x-slot name="content">
-                            <x-dropdown-link href="#" wire:click.prevent="$set('isActive', '')">All Status</x-dropdown-link>
+                            <x-dropdown-link href="#" wire:click.prevent="$set('selectedBranchId', '')">All Branches</x-dropdown-link>
                             <hr class="border-slate-50">
-                            <x-dropdown-link href="#" wire:click.prevent="$set('isActive', '1')">Active Only</x-dropdown-link>
-                            <x-dropdown-link href="#" wire:click.prevent="$set('isActive', '0')">Hidden Only</x-dropdown-link>
+                            @forelse($branches as $branch)
+                                <x-dropdown-link href="#" wire:click.prevent="$set('selectedBranchId', {{ $branch->id }})" class="{{ $selectedBranchId == $branch->id ? 'bg-indigo-50 text-indigo-600 font-bold' : '' }}">
+                                    {{ $branch->branch_name }}
+                                </x-dropdown-link>
+                            @empty
+                                <div class="px-4 py-2 text-[12px] text-slate-400 italic">No branches found</div>
+                            @endforelse
                         </x-slot>
                     </x-dropdown>
-                </div>
+                @endif
 
-                {{-- macOS Divider --}}
-                <div class="hidden lg:block w-px h-6 bg-slate-200 mx-1"></div>
+                <x-dropdown align="right" width="48" containerClasses="block w-full lg:w-auto">
+                    <x-slot name="trigger">
+                        <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
+                            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                            <span class="text-[12px] whitespace-nowrap">{{ $isActive === '1' ? 'Active Only' : ($isActive === '0' ? 'Hidden Only' : 'All Status') }}</span>
+                            <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
+                        </x-secondary-button>
+                    </x-slot>
+                    <x-slot name="content">
+                        <x-dropdown-link href="#" wire:click.prevent="$set('isActive', '')">All Status</x-dropdown-link>
+                        <hr class="border-slate-50">
+                        <x-dropdown-link href="#" wire:click.prevent="$set('isActive', '1')">Active Only</x-dropdown-link>
+                        <x-dropdown-link href="#" wire:click.prevent="$set('isActive', '0')">Hidden Only</x-dropdown-link>
+                    </x-slot>
+                </x-dropdown>
 
-                {{-- View Toggle --}}
+                <div class="hidden lg:block w-px h-6 bg-slate-200 mx-2"></div>
+
                 <button type="button" @click="tableView = (tableView === 'table' ? 'board' : 'table')"
                     class="w-9 h-9 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors focus:outline-none shrink-0"
                     :title="tableView === 'table' ? 'Board View' : 'Table View'">
@@ -1010,7 +1025,7 @@
     </x-modal>
 </div>
 
-@push('scripts')
+@push('beforeLivewireScripts')
 <script>
     (function() {
         window.menuManagement = function(initials) {
