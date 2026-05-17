@@ -103,8 +103,9 @@
             this.selectedModifierIds = [];
 
             // Initialize defaults
-            if (product.option_groups) {
-                product.option_groups.forEach(group => {
+            const productOptionGroups = product.option_groups || product.optionGroups || [];
+            if (productOptionGroups) {
+                productOptionGroups.forEach(group => {
                     const def = group.options.find(o => o.is_default);
                     if (def) {
                         this.selectedOptions[group.id] = group.price_mode === 'additive' ? [def.id] : def.id;
@@ -159,8 +160,9 @@
             // 2. Calculate Price (Replicate PHP logic)
             // Need to find the actual option/modifier objects from product data
             let allOptions = [];
-            if (product.option_groups) {
-                product.option_groups.forEach(g => {
+            const productOptionGroups = product.option_groups || product.optionGroups || [];
+            if (productOptionGroups) {
+                productOptionGroups.forEach(g => {
                     allOptions = allOptions.concat(g.options);
                 });
             }
@@ -170,24 +172,24 @@
 
             // Logic: Fixed price groups become base, else product base price. Add additive options and modifiers.
             const hasFixed = selectedOptions.some(o => {
-                const group = product.option_groups.find(g => g.id === o.product_option_group_id);
+                const group = productOptionGroups.find(g => g.id === o.group_id);
                 return group && group.price_mode === 'fixed';
             });
 
-            let basePrice = product.price; // fallback
+            let basePrice = parseFloat(product.price || 0); // fallback
             if (hasFixed) {
                 basePrice = selectedOptions.filter(o => {
-                    const group = product.option_groups.find(g => g.id === o.product_option_group_id);
+                    const group = productOptionGroups.find(g => g.id === o.group_id);
                     return group && group.price_mode === 'fixed';
-                }).reduce((sum, o) => sum + parseFloat(o.price), 0);
+                }).reduce((sum, o) => sum + parseFloat(o.price || 0), 0);
             }
 
             const additivePrice = selectedOptions.filter(o => {
-                const group = product.option_groups.find(g => g.id === o.product_option_group_id);
+                const group = productOptionGroups.find(g => g.id === o.group_id);
                 return group && group.price_mode === 'additive';
-            }).reduce((sum, o) => sum + parseFloat(o.price), 0);
+            }).reduce((sum, o) => sum + parseFloat(o.price || 0), 0);
 
-            const modifiersPrice = selectedModifiers.reduce((sum, m) => sum + parseFloat(m.price), 0);
+            const modifiersPrice = selectedModifiers.reduce((sum, m) => sum + parseFloat(m.price || 0), 0);
             
             const finalPrice = basePrice + additivePrice + modifiersPrice;
 
@@ -728,8 +730,8 @@
                 </div>
 
                 {{-- Option Groups --}}
-                <div class="space-y-8 mb-8" x-show="localProduct && localProduct.option_groups">
-                    <template x-for="group in localProduct ? localProduct.option_groups : []" :key="group.id">
+                <div class="space-y-8 mb-8" x-show="localProduct && (localProduct.option_groups || localProduct.optionGroups)">
+                    <template x-for="group in localProduct ? (localProduct.option_groups || localProduct.optionGroups || []) : []" :key="group.id">
                         <div>
                             <div class="flex items-center justify-between mb-4">
                                 <div>
