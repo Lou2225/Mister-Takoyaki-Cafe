@@ -35,7 +35,12 @@ class AppServiceProvider extends ServiceProvider
         // Dynamically override the base URL to support subdirectory deployments (like local XAMPP)
         // without hardcoding paths that would break root-domain production deployments (like Hostinger).
         if (!app()->runningInConsole()) {
-            \Illuminate\Support\Facades\URL::forceRootUrl(request()->getSchemeAndHttpHost() . request()->getBasePath());
+            app()->booted(function () {
+                if (app()->bound('request')) {
+                    $request = app('request');
+                    \Illuminate\Support\Facades\URL::forceRootUrl($request->getSchemeAndHttpHost() . $request->getBasePath());
+                }
+            });
         }
 
         Livewire::component('auth.forgot-password', ForgotPassword::class);
