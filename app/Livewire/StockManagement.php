@@ -92,7 +92,7 @@ class StockManagement extends Component
         }
 
         $this->availableUnits = StockHelper::UNITS;
-        $this->availableBulkUnits = StockHelper::BULK_UNITS;
+        $this->updateAvailableBulkUnits();
         if (auth()->user()->isSuperAdmin()) {
             $this->selectedBranchId = \App\Services\BranchContext::getActiveBranchId() ?: (Branch::first()?->id ?? '');
         } else {
@@ -215,6 +215,37 @@ class StockManagement extends Component
         $this->validateFieldLive('ingredientName', array_merge(ValidationHelper::rulesName(2, 255), [Rule::unique('ingredients', 'name')->ignore($this->editIngredientId)]), ValidationHelper::commonMessages());
     }
 
+    public function updatedIngredientUnit()
+    {
+        $this->updateAvailableBulkUnits();
+        
+        // Reset conversion rows when base unit changes to prevent invalid chain calculations
+        if (!empty($this->conversionRows)) {
+            $this->conversionRows = [];
+            $this->dispatch('notify', type: 'info', message: 'Bulk packaging reset due to Base Unit change.');
+        }
+    }
+
+    private function updateAvailableBulkUnits()
+    {
+        $allBulk = StockHelper::BULK_UNITS;
+        $base = $this->ingredientUnit;
+        
+        $filtered = [];
+        foreach ($allBulk as $key => $label) {
+            if ($base === 'ml') {
+                if (in_array($key, ['l', 'bottle', 'box', 'can', 'pack', 'bundle', 'tray'])) $filtered[$key] = $label;
+            } elseif ($base === 'g') {
+                if (in_array($key, ['kg', 'sack', 'pack', 'box', 'bundle', 'can'])) $filtered[$key] = $label;
+            } elseif ($base === 'pcs') {
+                if (in_array($key, ['box', 'pack', 'bundle', 'tray', 'sack'])) $filtered[$key] = $label;
+            } else {
+                $filtered[$key] = $label;
+            }
+        }
+        $this->availableBulkUnits = $filtered ?: $allBulk;
+    }
+
     public function updatedIngredientMinStock()
     {
         $this->validateFieldLive('ingredientMinStock', ValidationHelper::RULES_PRICE, ValidationHelper::commonMessages());
@@ -280,6 +311,7 @@ class StockManagement extends Component
                 'ingredient_id' => $batch->ingredient_id,
                 'type'          => 'waste',
                 'quantity'      => $qty,
+                'unit_cost'     => $batch->ingredient->cost ?? 0,
                 'user_id'       => auth()->id(),
                 'remarks'       => 'Expired batch disposed — Batch #' . $batch->id . ' (Expiry: ' . $batch->expiry_date . ')',
             ]);
@@ -315,6 +347,7 @@ class StockManagement extends Component
         $this->ingredientName = $ing->name;
         $this->ingredientCategoryId = $ing->category_id;
         $this->ingredientUnit = $ing->unit;
+        $this->updateAvailableBulkUnits();
         $this->ingredientMinStock = $ing->minimum_stock;
         $this->ingredientCost = $ing->cost;
         $this->ingredientScope = 'global';
@@ -381,13 +414,25 @@ class StockManagement extends Component
 
         if (!isset($this->conversionRows[$rowIndex])) return;
 
+        // Auto-fill standard metric conversions (Smart Formatting)
+        if ($field === 'unit_name') {
+            $unitName = $this->conversionRows[$rowIndex]['unit_name'] ?? '';
+            $base = $this->ingredientUnit;
+            
+            if (($unitName === 'l' && $base === 'ml') || ($unitName === 'kg' && $base === 'g')) {
+                $this->conversionRows[$rowIndex]['chain_multiplier'] = 1000;
+                $this->conversionRows[$rowIndex]['chain_from_index'] = 'base';
+                $this->dispatch('notify', type: 'info', message: 'Standard metric conversion auto-filled (1000 ' . strtoupper($base) . ').');
+            }
+        }
+
         // When chain fields change, auto-compute qty_in_base
-        if (in_array($field, ['chain_multiplier', 'chain_from_index'])) {
+        if (in_array($field, ['unit_name', 'chain_multiplier', 'chain_from_index'])) {
             $this->recomputeQtyInBase($rowIndex);
         }
 
         // When any row changes, cascade-recompute all rows after it
-        if ($field === 'qty_in_base' || $field === 'chain_multiplier' || $field === 'chain_from_index') {
+        if (in_array($field, ['unit_name', 'qty_in_base', 'chain_multiplier', 'chain_from_index'])) {
             $this->cascadeRecompute($rowIndex + 1);
         }
     }
@@ -647,6 +692,7 @@ class StockManagement extends Component
         $this->ingredientName = '';
         $this->ingredientCategoryId = '';
         $this->ingredientUnit = 'pcs';
+        $this->updateAvailableBulkUnits();
         $this->ingredientScope = 'global';
         $this->ingredientMinStock = '';
         $this->ingredientCost = 0;

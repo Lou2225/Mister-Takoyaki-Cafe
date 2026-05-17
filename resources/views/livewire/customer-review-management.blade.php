@@ -159,9 +159,10 @@
                             <div class="text-[11px] text-slate-400 font-medium italic">{{ $review->created_at->diffForHumans() }}</div>
                         </td>
                         <td class="py-3 px-4 whitespace-nowrap text-right">
-                            <button wire:click="viewReview({{ $review->id }})" class="inline-flex items-center px-2 py-1 border border-slate-200 text-[12px] font-semibold rounded-lg text-slate-500 bg-white hover:text-gray-700 hover:border-slate-300 transition-colors focus:outline-none shadow-sm">
+                            <x-secondary-button type="button" wire:click="viewReview({{ $review->id }})" class="h-9 px-3 whitespace-nowrap">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                                 View Details
-                            </button>
+                            </x-secondary-button>
                         </td>
                     </tr>
                 @empty

@@ -11,6 +11,7 @@ use App\Models\IngredientCost;
 use App\Models\Ingredient;
 use App\Models\StockMovement;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 use App\Traits\HandlesExports;
@@ -58,8 +59,16 @@ class BusinessIntelligence extends Component
             $this->endDate = Carbon::now()->format('Y-m-d');
         }
         
+        // Default all roles to their own branch; Super Admins default to their branch or first branch
         if ($user->role_id !== 1) {
-            $this->selectedBranchId = $user->branch_id;
+            $this->selectedBranchId = (string) $user->branch_id;
+        } else {
+            // Super Admin: default to their own branch if set, otherwise first branch
+            if (!$this->selectedBranchId || $this->selectedBranchId === 'all') {
+                $this->selectedBranchId = $user->branch_id
+                    ? (string) $user->branch_id
+                    : (string) (Branch::orderBy('id')->value('id') ?? 'all');
+            }
         }
 
         $this->updateHeader();
@@ -94,15 +103,22 @@ class BusinessIntelligence extends Component
 
     public function redirectToOrdering(int $ingredientId)
     {
-        return redirect()->route('stock.orders', ['ingredient' => $ingredientId]);
+        $mainBranchId = Branch::where('is_main', true)->first()?->id;
+
+        if ($this->selectedBranchId === 'all') {
+            return;
+        }
+
+        if ((string)$this->selectedBranchId === (string)$mainBranchId) {
+            return $this->redirectRoute('stock.adjustment', ['id' => $ingredientId], navigate: true);
+        }
+
+        return $this->redirectRoute('stock.orders', ['ingredient' => $ingredientId], navigate: true);
     }
 
     public function updated(string $propertyName)
     {
-        if (in_array($propertyName, ['startDate', 'endDate', 'selectedBranchId', 'search', 'perPage'])) {
-            if (in_array($propertyName, ['startDate', 'endDate'])) {
-                $this->activeFilter = 'All Time';
-            }
+        if (in_array($propertyName, ['selectedBranchId', 'search', 'perPage'])) {
             $this->resetPage();
             if ($propertyName === 'perPage') {
                 $this->resetPage('branchPage');
@@ -113,8 +129,7 @@ class BusinessIntelligence extends Component
     public function render()
     {
         $analytics = $this->getAnalytics();
-        $mainBranchId = Branch::where('is_main', true)->first()?->id;
-        $canOrder = $this->selectedBranchId !== 'all' && $this->selectedBranchId != $mainBranchId;
+        $isActionable = $this->selectedBranchId !== 'all';
         
         return view('livewire.business-intelligence', [
             'branches'       => Branch::all(),
@@ -124,7 +139,7 @@ class BusinessIntelligence extends Component
             'operations'     => $this->getOperationalData($analytics),
             'recentOrders'   => $this->getRecentOrders(),
             'salesData'      => $analytics,
-            'canOrder'       => $canOrder,
+            'isActionable'   => $isActionable,
         ])->layout('layouts.app');
     }
 
@@ -152,8 +167,7 @@ class BusinessIntelligence extends Component
         $totalCollected = $completedOrders->sum('total_amount');
         $totalDiscounts = $completedOrders->sum('discount_amount');
         $deliveryFees   = $completedOrders->sum('delivery_fee');
-        $taxCollected   = $completedOrders->sum('tax_amount');
-        $netSales       = $totalCollected - $deliveryFees - $taxCollected;
+        $netSales       = $totalCollected - $deliveryFees;
         $grossSales     = $netSales + $totalDiscounts;
         $orderCount     = $completedOrders->count();
         $avgOrderValue  = $orderCount > 0 ? $totalCollected / $orderCount : 0;
@@ -161,7 +175,17 @@ class BusinessIntelligence extends Component
 
         // 3. Delegate heavy sub-calculations to focused helpers
         $totalCogs   = $this->computeCogs($completedOrders, $branchId);
-        $grossProfit = $netSales - $totalCogs;
+        
+        // 4. Calculate Waste Cost from stock movements
+        $wasteCost = StockMovement::where('type', 'waste')
+            ->whereBetween('created_at', [$start, $end])
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->get()
+            ->sum(function($movement) {
+                return abs($movement->quantity) * ($movement->unit_cost ?? 0);
+            });
+
+        $grossProfit = $netSales - $totalCogs - $wasteCost;
         $trendData   = $this->buildTrendData($completedOrders, $start, $end);
         $breakdown   = $this->buildSalesBreakdown($completedOrders);
 
@@ -170,12 +194,12 @@ class BusinessIntelligence extends Component
             'net_sales'       => $netSales,
             'total_discounts' => $totalDiscounts,
             'delivery_fees'   => $deliveryFees,
-            'tax_collected'   => $taxCollected,
             'total_collected' => $totalCollected,
             'order_count'     => $orderCount,
             'avg_order_value' => $avgOrderValue,
             'refunds'         => $refunds,
             'total_cogs'      => $totalCogs,
+            'waste_cost'      => $wasteCost,
             'gross_profit'    => $grossProfit,
             'trend'           => $trendData,
             'performance' => [
@@ -185,8 +209,8 @@ class BusinessIntelligence extends Component
                 'avg_order_value' => $avgOrderValue,
                 'total_discounts' => $totalDiscounts,
                 'delivery_fees'   => $deliveryFees,
-                'tax_collected'   => $taxCollected,
                 'refunds'         => $refunds,
+                'waste_cost'      => $wasteCost,
                 'gross_profit'    => $grossProfit,
             ],
             'payment_methods'  => $breakdown['payment_methods'],
@@ -201,7 +225,7 @@ class BusinessIntelligence extends Component
      * Calculate total Cost of Goods Sold for a set of completed orders.
      * Uses a tiered pricing strategy: Branch Standard Cost → Latest Purchase Price → Global Ingredient Cost.
      */
-    private function computeCogs($completedOrders, ?string $branchId): float
+    private function computeCogs(Collection $completedOrders, ?string $branchId): float
     {
         $standardCosts = IngredientCost::when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->get()
@@ -256,7 +280,7 @@ class BusinessIntelligence extends Component
     /**
      * Build a day-by-day trend array for the given date range, filling gaps with 0.
      */
-    private function buildTrendData($completedOrders, Carbon $start, Carbon $end): array
+    private function buildTrendData(Collection $completedOrders, Carbon $start, Carbon $end): array
     {
         $daily = $completedOrders
             ->groupBy(fn($o) => $o->created_at->format('Y-m-d'))
@@ -277,7 +301,7 @@ class BusinessIntelligence extends Component
      * Build payment method breakdown, order source breakdown, and top-selling items
      * from an already-fetched collection of completed orders.
      */
-    private function buildSalesBreakdown($completedOrders): array
+    private function buildSalesBreakdown(Collection $completedOrders): array
     {
         $paymentMethods = $completedOrders->groupBy('payment_method')
             ->map(fn($g, $method) => (object)[
@@ -382,6 +406,8 @@ class BusinessIntelligence extends Component
             'trend' => $slope > ($type === 'daily' ? 50 : 1000) ? 'Upward' : ($slope < ($type === 'daily' ? -50 : -1000) ? 'Downward' : 'Stable'),
             'growth_rate' => round($slope, 2),
             'confidence' => ($type === 'daily' ? ($n >= 45 ? 'High' : ($n >= 20 ? 'Medium' : 'Low')) : ($n >= 8 ? 'High' : ($n >= 4 ? 'Medium' : 'Low'))),
+            'baseline_avg' => round($avgDailySales, 2),
+            'peak_day' => collect($forecast)->sortByDesc('predicted')->first()['day'] ?? 'N/A',
         ];
     }
 
@@ -658,6 +684,7 @@ class BusinessIntelligence extends Component
             ['Metric' => 'Total Discounts', 'Value' => number_format($analytics['total_discounts'], 2)],
             ['Metric' => 'Refunds', 'Value' => number_format($analytics['refunds'], 2)],
             ['Metric' => 'Gross Profit', 'Value' => number_format($analytics['gross_profit'], 2)],
+            ['Metric' => 'Waste Cost (Spoilage)', 'Value' => number_format($analytics['waste_cost'], 2)],
         ];
 
         return $this->generateCsvReport('BI_Report_' . now()->format('Y-m-d') . '.csv', $data);
@@ -702,7 +729,7 @@ class BusinessIntelligence extends Component
 
         return [
             'reportType'  => 'business_intelligence',
-            'title'       => 'Business Intelligence Report',
+            'title'       => 'Business Reports',
             'subtitle'    => 'Consolidated Sales & Financial Analysis',
             'period'      => "{$this->startDate}  to  {$this->endDate}",
             'branch'      => $branch,
@@ -711,12 +738,12 @@ class BusinessIntelligence extends Component
                 'Gross Sales'      => 'PHP ' . number_format($analytics['gross_sales'], 2),
                 'Net Sales'        => 'PHP ' . number_format($analytics['net_sales'], 2),
                 'Total Collected'  => 'PHP ' . number_format($analytics['total_collected'], 2),
+                'Waste Cost'       => 'PHP ' . number_format($analytics['waste_cost'], 2),
                 'Gross Profit'     => 'PHP ' . number_format($analytics['gross_profit'], 2),
                 'Avg. Order Value' => 'PHP ' . number_format($analytics['avg_order_value'], 2),
                 'Order Count'      => number_format($analytics['order_count']),
                 'Total Discounts'  => 'PHP ' . number_format($analytics['total_discounts'], 2),
                 'Delivery Fees'    => 'PHP ' . number_format($analytics['delivery_fees'], 2),
-                'Tax Collected'    => 'PHP ' . number_format($analytics['tax_collected'], 2),
                 'Total Refunds'    => 'PHP ' . number_format($analytics['refunds'], 2),
             ],
             'sections' => [

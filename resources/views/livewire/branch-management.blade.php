@@ -105,8 +105,31 @@
                 map: null,
                 marker: null,
                 initMap() {
+                    const updateMarker = () => {
+                        const lat = this.$wire.get('addr_lat');
+                        const lng = this.$wire.get('addr_lng');
+                        
+                        if (lat && lng) {
+                            if (this.marker) {
+                                this.marker.setLatLng([lat, lng]);
+                            } else {
+                                this.marker = L.marker([lat, lng]).addTo(this.map);
+                            }
+                            this.map.setView([lat, lng], 15);
+                        } else {
+                            if (this.marker) {
+                                this.map.removeLayer(this.marker);
+                                this.marker = null;
+                            }
+                            this.map.setView([14.2189, 121.1672], 11);
+                        }
+                    };
+
                     if (this.map) {
-                        setTimeout(() => this.map.invalidateSize(), 200);
+                        setTimeout(() => {
+                            this.map.invalidateSize();
+                            updateMarker();
+                        }, 200);
                         return;
                     }
                     setTimeout(() => {
@@ -137,13 +160,7 @@
                             this.reverseGeocode(e.latlng.lat, e.latlng.lng);
                         });
 
-                        // Set existing marker if any
-                        const lat = this.$wire.get('addr_lat');
-                        const lng = this.$wire.get('addr_lng');
-                        if (lat && lng) {
-                            this.marker = L.marker([lat, lng]).addTo(this.map);
-                            this.map.setView([lat, lng], 15);
-                        }
+                        updateMarker();
                     }, 300);
                 },
 
@@ -511,7 +528,7 @@
 
             {{-- Fleet Metrics Grid --}}
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                {{-- Total Nodes --}}
+                {{-- Total Branches --}}
                 <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
                     <div class="w-10 h-10 rounded-xl bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm transition-transform group-hover:scale-110">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
@@ -561,7 +578,7 @@
                 
                 {{-- Left: Search Bar --}}
                 <div class="flex flex-1 w-full lg:w-auto">
-                    <x-search-bar wireModel="search" placeholder="Find nodes..." width="w-full lg:w-72" />
+                    <x-search-bar wireModel="search" placeholder="Find branches..." width="w-full lg:w-72" />
                 </div>
 
                 {{-- Right: Filters & View Toggle --}}
@@ -622,15 +639,15 @@
             <div x-show="view === 'table'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
                 <x-data-table>
                     <x-slot name="header">
-                        <th class="py-3 px-4 text-[11px] font-black text-slate-500 uppercase tracking-widest">Branch Name</th>
-                        <th class="py-3 px-4 text-[11px] font-black text-slate-500 uppercase tracking-widest">Manager</th>
-                        <th class="py-3 px-4 text-[11px] font-black text-slate-500 uppercase tracking-widest">Status</th>
+                        <th class="py-3 px-4 border-r border-slate-100/50 text-[11px] font-black text-slate-500 uppercase tracking-widest">Branch Name</th>
+                        <th class="py-3 px-4 border-r border-slate-100/50 text-[11px] font-black text-slate-500 uppercase tracking-widest">Manager</th>
+                        <th class="py-3 px-4 border-r border-slate-100/50 text-[11px] font-black text-slate-500 uppercase tracking-widest">Status</th>
                         <th class="py-3 px-4 text-right text-[11px] font-black text-slate-500 uppercase tracking-widest">Actions</th>
                     </x-slot>
                     
                     @forelse($branches as $branch)
                         <tr wire:key="branch-row-{{ $branch->id }}" class="hover:bg-slate-50/50 transition-colors group">
-                            <td class="py-4 px-4">
+                            <td class="py-4 px-4 border-r border-slate-100/50">
                                 <div class="flex items-center gap-3">
                                     <div class="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-[13px] group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
                                         {{ strtoupper(substr($branch->branch_name, 0, 1)) }}
@@ -650,7 +667,7 @@
                                     </div>
                                 </div>
                             </td>
-                            <td class="py-4 px-4">
+                            <td class="py-4 px-4 border-r border-slate-100/50">
                                 @if($branch->manager)
                                     <div class="flex items-center gap-2.5">
                                         <div class="w-6 h-6 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-[10px] ring-1 ring-indigo-200">
@@ -662,7 +679,7 @@
                                     <span class="text-[12px] font-bold text-slate-300 italic tracking-wide">UNASSIGNED</span>
                                 @endif
                             </td>
-                            <td class="py-4 px-4">
+                            <td class="py-4 px-4 border-r border-slate-100/50">
                                 @if($this->isSuperAdmin())
                                     <button wire:click="toggleStatus({{ $branch->id }})"
                                         class="flex items-center gap-2 text-[12px] font-medium text-slate-600 hover:opacity-80 transition-opacity focus:outline-none">
@@ -786,14 +803,14 @@
                         @endif
 
                         <div class="flex flex-col gap-3">
-                            <x-date-range-filter startModel="startDate" endModel="endDate" :error="$dateError" :startValue="$startDate" />
+                            <x-date-range-filter startModel="startDate" endModel="endDate" :error="$dateError" :startValue="$startDate" class="w-full" />
                             <x-quick-date-filter :activeFilter="$activeFilter" class="w-full justify-between h-10 border-gray-200 shadow-sm font-bold" />
                         </div>
                     </div>
 
                     <div class="bg-white rounded-2xl border border-slate-200/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] flex flex-col" style="max-height: 500px;">
                         <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 rounded-t-2xl shrink-0">
-                            <h3 class="text-[13px] font-bold text-gray-900 uppercase tracking-widest">Target Nodes</h3>
+                            <h3 class="text-[13px] font-bold text-gray-900 uppercase tracking-widest">Target Branch</h3>
                             <button wire:click="{{ count($selectedBranchIds) === $allBranches->count() ? 'clearAllBranches' : 'selectAllBranches' }}" class="text-[10px] font-black text-indigo-600 hover:text-indigo-800 transition-colors uppercase tracking-widest">
                                 {{ count($selectedBranchIds) === $allBranches->count() ? 'Deselect All' : 'Select All' }}
                             </button>
@@ -825,7 +842,7 @@
                                 </div>
                                 <p class="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-100/80">Net Revenue</p>
                                 <h3 class="text-2xl font-black mt-1 tracking-tighter">₱{{ number_format($totals['net'], 2) }}</h3>
-                                <p class="text-[10px] font-bold text-indigo-200/60 mt-1">Excl. Fees & Tax</p>
+                                <p class="text-[10px] font-bold text-indigo-200/60 mt-1">Excl. Fees</p>
                             </div>
                         </div>
 
@@ -908,42 +925,50 @@
                     <div class="mt-4">
                         <x-data-table>
                             <x-slot name="header">
-                                <th class="py-3 px-4 text-[11px] font-black text-slate-500 uppercase tracking-widest">Rank</th>
-                                <th class="py-3 px-4 text-[11px] font-black text-slate-500 uppercase tracking-widest">Branch Node</th>
-                                <th class="py-3 px-4 text-[11px] font-black text-slate-500 uppercase tracking-widest text-right">Net Revenue</th>
-                                <th class="py-3 px-4 text-[11px] font-black text-slate-500 uppercase tracking-widest text-right">Gross Sales</th>
-                                <th class="py-3 px-4 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center">Volume</th>
-                                <th class="py-3 px-4 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center">Health Index</th>
+                                <th class="py-3 px-4 border-r border-slate-100/50 text-[11px] font-black text-slate-500 uppercase tracking-widest">Rank</th>
+                                <th class="py-3 px-4 border-r border-slate-100/50 text-[11px] font-black text-slate-500 uppercase tracking-widest">Branch Node</th>
+                                <th class="py-3 px-4 border-r border-slate-100/50 text-[11px] font-black text-slate-500 uppercase tracking-widest text-right">Net Revenue</th>
+                                <th class="py-3 px-4 border-r border-slate-100/50 text-[11px] font-black text-slate-500 uppercase tracking-widest text-right">Gross Sales</th>
+                                <th class="py-3 px-4 border-r border-slate-100/50 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center cursor-help group/tooltip relative" title="Total number of transactions">Volume
+                                    <span class="hidden group-hover/tooltip:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 text-white text-[10px] font-normal whitespace-nowrap rounded-lg shadow-lg z-50">Order count</span>
+                                </th>
+                                <th class="py-3 px-4 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center cursor-help group/tooltip relative" title="Average revenue efficiency per transaction">Revenue Score
+                                    <span class="hidden group-hover/tooltip:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 text-white text-[10px] font-normal whitespace-nowrap rounded-lg shadow-lg z-50 w-max">(Sales ÷ Orders × 500) × 100</span>
+                                </th>
                             </x-slot>
                             
                             @forelse($matrix as $row)
                                 <tr wire:key="analytics-row-{{ $row['id'] }}" class="hover:bg-slate-50/50 transition-colors group">
-                                    <td class="py-4 px-4">
+                                    <td class="py-4 px-4 border-r border-slate-100/50">
                                         <div class="w-7 h-7 rounded-lg flex items-center justify-center font-black text-[12px] {{ $loop->first ? 'bg-amber-100 text-amber-700 shadow-sm border border-amber-200' : 'bg-slate-50 text-slate-400 border border-slate-100' }}">
                                             {{ $loop->iteration }}
                                         </div>
                                     </td>
-                                    <td class="py-4 px-4 font-bold text-[13px] text-slate-900 group-hover:text-indigo-600 transition-colors">{{ $row['name'] }}</td>
-                                    <td class="py-4 px-4 text-right">
+                                    <td class="py-4 px-4 border-r border-slate-100/50 font-bold text-[13px] text-slate-900 group-hover:text-indigo-600 transition-colors">{{ $row['name'] }}</td>
+                                    <td class="py-4 px-4 border-r border-slate-100/50 text-right">
                                         <span class="font-black text-slate-900 text-[14px]">₱{{ number_format($row['net_sales'], 2) }}</span>
                                     </td>
-                                    <td class="py-4 px-4 text-right">
+                                    <td class="py-4 px-4 border-r border-slate-100/50 text-right">
                                         <span class="font-bold text-slate-500 text-[13px]">₱{{ number_format($row['gross_sales'], 2) }}</span>
                                     </td>
-                                    <td class="py-4 px-4 text-center font-black text-slate-700 text-[13px] tracking-tight">{{ number_format($row['order_count']) }} <span class="text-[10px] text-slate-400 font-bold ml-0.5">TX</span></td>
+                                    <td class="py-4 px-4 border-r border-slate-100/50 text-center font-black text-slate-700 text-[13px] tracking-tight group/vol relative cursor-help">
+                                        {{ number_format($row['order_count']) }}
+                                        <div class="hidden group-hover/vol:block absolute top-full left-1/2 -translate-x-1/2 mt-1 px-2 py-1 bg-slate-900 text-white text-[9px] font-normal rounded shadow-lg z-50 whitespace-nowrap">Total Transactions</div>
+                                    </td>
                                     <td class="py-4 px-4">
-                                        <div class="flex items-center justify-center gap-3">
-                                            <div class="w-20 bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200/50 p-0.5">
+                                        <div class="flex items-center justify-center gap-3 group/score relative">
+                                            <div class="w-20 bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200/50 p-0.5 cursor-help" title="Average revenue per order (Sales ÷ Orders × 500) × 100">
                                                 <div class="h-full rounded-full transition-all duration-1000 {{ $row['health_score'] > 80 ? 'bg-emerald-500' : ($row['health_score'] > 40 ? 'bg-amber-400' : 'bg-rose-500') }}" style="width: {{ $row['health_score'] }}%;"></div>
                                             </div>
-                                            <span class="text-[12px] font-black w-8 text-right {{ $row['health_score'] > 80 ? 'text-emerald-600' : ($row['health_score'] > 40 ? 'text-amber-600' : 'text-rose-600') }}">{{ $row['health_score'] }}%</span>
+                                            <span class="text-[12px] font-black w-8 text-right cursor-help {{ $row['health_score'] > 80 ? 'text-emerald-600' : ($row['health_score'] > 40 ? 'text-amber-600' : 'text-rose-600') }}">{{ $row['health_score'] }}%</span>
+                                            <div class="hidden group-hover/score:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 text-white text-[10px] font-normal rounded-lg shadow-lg z-50 w-max">Revenue Efficiency Score: (Sales ÷ Orders × 500) × 100</div>
                                         </div>
                                     </td>
                                 </tr>
                             @empty
                                 <tr>
                                     <td colspan="6" class="py-12">
-                                        <x-empty-state title="No branches selected" description="Select one or more target nodes from the sidebar to view comparison data." />
+                                        <x-empty-state title="No branches selected" description="Select one or more target branch from the sidebar to view comparison data." />
                                     </td>
                                 </tr>
                             @endforelse

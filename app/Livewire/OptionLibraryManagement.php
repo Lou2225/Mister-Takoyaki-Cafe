@@ -208,15 +208,13 @@ class OptionLibraryManagement extends Component
 
     public function render()
     {
-        $templates = OptionTemplate::query()
+        $allTemplates = OptionTemplate::query()
             ->with('items')
-            ->when($this->search, fn($q) => $q->where('name', 'like', "%{$this->search}%"))
-            ->when($this->priceModeFilter, fn($q) => $q->where('price_mode', $this->priceModeFilter))
             ->orderBy('name', 'asc')
-            ->paginate($this->perPage);
+            ->get();
 
         return view('livewire.option-library-management', [
-            'templates' => $templates
+            'allTemplates' => $allTemplates
         ])->layout('layouts.app');
     }
 }

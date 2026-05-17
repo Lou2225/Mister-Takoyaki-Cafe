@@ -26,6 +26,9 @@ Route::post('/auth/login', [AuthController::class, 'login']);
 Route::post('/auth/register', [AuthController::class, 'register']);
 Route::post('/check-email', [AuthController::class, 'checkEmailExists']);
 
+// PayMongo GCash Webhook — must be public & CSRF-exempt (POST from PayMongo servers)
+Route::post('/paymongo/webhook', [\App\Http\Controllers\PayMongoWebhookController::class, 'handle'])->name('paymongo.webhook');
+
 // Branches & menu are public (customers browse before logging in)
 Route::get('/branches', [BranchApiController::class, 'index']);
 Route::get('/branches/{id}', [BranchApiController::class, 'show']);
@@ -40,8 +43,6 @@ Route::get('/products/{id}/customizations', [ProductApiController::class, 'custo
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'user']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
-
-    // Products (Moved to public routes above)
 
     // Orders
     Route::get('/orders', [OrderApiController::class, 'index']);

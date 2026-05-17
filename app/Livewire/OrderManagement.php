@@ -53,7 +53,7 @@ class OrderManagement extends Component
         
         // Rehydrate selected order from URL if present
         if ($this->selectedOrderId) {
-            $this->selectedOrder = Order::with(['branch', 'user', 'items.product'])->find($this->selectedOrderId);
+            $this->selectedOrder = Order::with(['branch', 'user', 'items.product', 'customer', 'refundedBy', 'rider'])->find($this->selectedOrderId);
             if (!$this->selectedOrder) {
                 $this->backToList();
             } else {
@@ -155,12 +155,12 @@ class OrderManagement extends Component
         $this->resetPage();
     }
 
-    public function getOrdersProperty()
+    private function buildOrdersQuery($sourceTab)
     {
-        $query = Order::with(['branch', 'user', 'items.product', 'customer']);
+        $query = Order::with(['branch', 'user', 'items.product', 'customer', 'refundedBy', 'rider']);
 
         // Filter by source
-        if ($this->sourceFilter === 'History') {
+        if ($sourceTab === 'History') {
             $query->whereIn('status', [
                 Order::STATUS_COMPLETED,
                 Order::STATUS_CANCELLED,
@@ -169,9 +169,7 @@ class OrderManagement extends Component
                 Order::STATUS_PARTIALLY_REFUNDED
             ]);
         } else {
-            if (!empty($this->sourceFilter)) {
-                $query->where('source', $this->sourceFilter);
-            }
+            $query->where('source', $sourceTab);
             // Exclude history statuses from active tabs
             $query->whereNotIn('status', [
                 Order::STATUS_COMPLETED,
@@ -182,14 +180,25 @@ class OrderManagement extends Component
             ]);
         }
 
-        // Search by reference number or customer
+        // Search by reference number or customer details
         if (!empty($this->search)) {
             $query->byReference($this->search);
         }
 
         // Filter by status
         if (!empty($this->statusFilter)) {
-            $query->where('status', $this->statusFilter);
+            $validStatuses = [];
+            if ($sourceTab === 'POS') {
+                $validStatuses = [Order::STATUS_PENDING, Order::STATUS_DRAFTED];
+            } elseif ($sourceTab === 'App') {
+                $validStatuses = [Order::STATUS_PENDING, Order::STATUS_PREPARING, Order::STATUS_READY, Order::STATUS_HANDED_TO_RIDER, Order::STATUS_OUT_FOR_DELIVERY];
+            } elseif ($sourceTab === 'History') {
+                $validStatuses = [Order::STATUS_COMPLETED, Order::STATUS_CANCELLED, Order::STATUS_VOID, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED];
+            }
+
+            if (in_array($this->statusFilter, $validStatuses)) {
+                $query->where('status', $this->statusFilter);
+            }
         }
 
         // Filter by branch
@@ -203,8 +212,33 @@ class OrderManagement extends Component
             ]);
         }
 
-        return $query->orderBy('created_at', 'desc')
-                     ->paginate($this->perPage);
+        return $query->orderBy('created_at', 'desc');
+    }
+
+    public function getAppOrdersProperty()
+    {
+        return $this->buildOrdersQuery('App')->paginate($this->perPage, ['*'], 'app_page');
+    }
+
+    public function getPosOrdersProperty()
+    {
+        return $this->buildOrdersQuery('POS')->paginate($this->perPage, ['*'], 'pos_page');
+    }
+
+    public function getHistoryOrdersProperty()
+    {
+        return $this->buildOrdersQuery('History')->paginate($this->perPage, ['*'], 'history_page');
+    }
+
+    public function getOrdersProperty()
+    {
+        if ($this->sourceFilter === 'App') {
+            return $this->appOrders;
+        } elseif ($this->sourceFilter === 'POS') {
+            return $this->posOrders;
+        } else {
+            return $this->historyOrders;
+        }
     }
 
     public function openOrderDetail(Order $order)
@@ -568,8 +602,22 @@ class OrderManagement extends Component
             }
         }
 
+        $allLoadedOrders = collect($this->appOrders->items())
+            ->merge($this->posOrders->items())
+            ->merge($this->historyOrders->items());
+
+        if ($this->selectedOrder) {
+            $allLoadedOrders->push($this->selectedOrder);
+        }
+
+        $allLoadedOrders = $allLoadedOrders->unique('id');
+
         return view('livewire.order-management', [
             'orders' => $this->orders,
+            'appOrders' => $this->appOrders,
+            'posOrders' => $this->posOrders,
+            'historyOrders' => $this->historyOrders,
+            'allLoadedOrders' => $allLoadedOrders,
             'statuses' => $filteredStatuses,
         ])->layout('layouts.app');
     }

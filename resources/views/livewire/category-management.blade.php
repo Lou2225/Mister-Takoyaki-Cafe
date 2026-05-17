@@ -7,14 +7,14 @@
 @endphp
 
 <div
-    x-data="{ 
-        view: @entangle('view').live,
-        panel: @js($panel),
-        deleteTargetId: null,
-        deleteTargetName: ''
-    }"
+    x-data="window.categoryManagement($wire)"
     class="relative"
+    wire:ignore.self
+    wire:key="category-management-main-container"
     x-on:switch-panel.window="panel = $event.detail?.panel || $event.detail[0]?.panel || 'list'">
+
+    {{-- Hidden reactive updater to sync categories list under wire:ignore --}}
+    <div x-effect="updateCategoriesList(@js($allCategories))" class="hidden" wire:key="categories-sync-helper"></div>
 
     <div class="relative min-h-[600px]">
 
@@ -32,7 +32,7 @@
             <div class="mb-5 flex items-center justify-between">
                 <div>
                     <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Category Intelligence</h2>
-                    <p class="text-[12px] text-gray-500 font-medium">Unified Hub: <span class="text-indigo-600 font-bold">{{ $categories->total() }} segments</span></p>
+                    <p class="text-[12px] text-gray-500 font-medium">Unified Hub: <span class="text-indigo-600 font-bold"><span x-text="filteredCategories.length"></span> segments</span></p>
                 </div>
                 <div class="flex items-center gap-2">
                     <x-dropdown align="right" width="48">
@@ -93,7 +93,7 @@
                 
                 {{-- Left: Search Bar --}}
                 <div class="flex flex-1 w-full lg:w-auto">
-                    <x-search-bar wireModel="search" placeholder="Search across catalog..." width="w-full lg:w-72" />
+                    <x-search-bar x-model="searchQuery" placeholder="Search across catalog..." width="w-full lg:w-72" />
                 </div>
 
                 {{-- Right: Filters --}}
@@ -103,15 +103,15 @@
                         <x-slot name="trigger">
                             <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
                                 <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-                                <span class="text-[12px] font-semibold whitespace-nowrap">{{ $filterType === 'all' ? 'All Types' : ucfirst($filterType . 's') }}</span>
+                                <span class="text-[12px] font-semibold whitespace-nowrap" x-text="filterType === 'all' ? 'All Types' : (filterType === 'product' ? 'Product Categories' : 'Ingredient Categories')"></span>
                                 <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
                             </x-secondary-button>
                         </x-slot>
                         <x-slot name="content">
-                            <x-dropdown-link href="#" wire:click.prevent="$set('filterType', 'all')" class="{{ $filterType === 'all' ? 'bg-slate-50 font-bold text-indigo-600' : '' }}">All Types</x-dropdown-link>
+                            <x-dropdown-link href="#" @click.prevent="filterType = 'all'" ::class="filterType === 'all' ? 'bg-slate-50 font-bold text-indigo-600' : ''">All Types</x-dropdown-link>
                             <hr class="border-slate-50">
-                            <x-dropdown-link href="#" wire:click.prevent="$set('filterType', 'product')" class="{{ $filterType === 'product' ? 'bg-slate-50 font-bold text-indigo-600' : '' }}">Product Categories</x-dropdown-link>
-                            <x-dropdown-link href="#" wire:click.prevent="$set('filterType', 'ingredient')" class="{{ $filterType === 'ingredient' ? 'bg-slate-50 font-bold text-indigo-600' : '' }}">Ingredient Categories</x-dropdown-link>
+                            <x-dropdown-link href="#" @click.prevent="filterType = 'product'" ::class="filterType === 'product' ? 'bg-slate-50 font-bold text-indigo-600' : ''">Product Categories</x-dropdown-link>
+                            <x-dropdown-link href="#" @click.prevent="filterType = 'ingredient'" ::class="filterType === 'ingredient' ? 'bg-slate-50 font-bold text-indigo-600' : ''">Ingredient Categories</x-dropdown-link>
                         </x-slot>
                     </x-dropdown>
 
@@ -129,7 +129,7 @@
             </div>
 
             {{-- Panel Container --}}
-            <div class="relative min-h-[500px]" wire:key="container-{{ $filterType }}">
+            <div class="relative min-h-[500px]" wire:key="container-categories-main">
                 
                 {{-- ── Table View ── --}}
                 <div x-show="view === 'table'" class="animate-fadeIn">
@@ -141,12 +141,9 @@
                             <th class="py-3 px-6 text-right text-[11px] font-black text-slate-500 uppercase tracking-widest">Actions</th>
                         </x-slot>
                         
-                        <tbody class="divide-y divide-slate-100/80" 
-                            wire:key="table-body-{{ $filterType }}-{{ $categories->currentPage() }}"
-                            wire:loading.class="opacity-40" 
-                            wire:target="filterType, search, gotoPage, nextPage, previousPage">
-                            @forelse($categories as $category)
-                                <tr wire:key="cat-row-{{ $category->cat_type }}-{{ $category->id }}" class="hover:bg-slate-50/50 transition-colors group/row">
+                        <tbody class="divide-y divide-slate-100/80" wire:key="table-body-categories-list">
+                            @forelse($allCategories as $category)
+                                <tr wire:key="cat-row-{{ $category->cat_type }}-{{ $category->id }}" x-show="isItemVisible({{ $category->id }}, '{{ $category->cat_type }}')" x-cloak class="hover:bg-slate-50/50 transition-colors group/row">
                                     <td class="py-4 px-6 border-r border-slate-100/50 whitespace-nowrap">
                                         <div class="flex items-center gap-4">
                                             @php 
@@ -197,6 +194,15 @@
                                     </td>
                                 </tr>
                             @endforelse
+                            <tr x-show="filteredCategories.length === 0" x-cloak>
+                                <td colspan="4" class="py-12">
+                                    <x-empty-state 
+                                        title="No Categories Found"
+                                        description="Try changing your search terms or filters."
+                                        icon="M4 6h16M4 12h16M4 18h16"
+                                    />
+                                </td>
+                            </tr>
                         </tbody>
                     </x-data-table>
                 </div>
@@ -204,8 +210,10 @@
                 {{-- ── Board View ── --}}
                 <div x-show="view === 'board'" class="animate-fadeIn" x-cloak>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        @forelse($categories as $category)
+                        @forelse($allCategories as $category)
                             <div wire:key="cat-board-{{ $category->cat_type }}-{{ $category->id }}" 
+                                x-show="isItemVisible({{ $category->id }}, '{{ $category->cat_type }}')"
+                                x-cloak
                                 class="group relative bg-white border border-slate-100 rounded-[24px] p-6 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300 cursor-pointer overflow-hidden"
                                 wire:click="selectCategory({{ $category->id }}, '{{ $category->cat_type }}')">
                                 
@@ -254,10 +262,104 @@
                                 />
                             </div>
                         @endforelse
+                        <div x-show="filteredCategories.length === 0" x-cloak class="col-span-full py-12 bg-white rounded-3xl border border-dashed border-slate-200">
+                            <x-empty-state 
+                                title="No Categories Found"
+                                description="Try changing your search terms or filters."
+                                icon="M4 6h16M4 12h16M4 18h16"
+                            />
+                        </div>
                     </div>
                 </div>
+
+                {{-- Premium Alpine-driven Paginator --}}
                 <div class="mt-4">
-                    <x-pagination :paginator="$categories" />
+                    <template x-if="filteredCategories.length > 0">
+                        <div class="flex flex-col lg:flex-row items-center justify-between px-4 py-4 bg-white border border-gray-100 rounded-2xl lg:px-6 gap-6 shadow-sm">
+                            <div class="flex flex-col sm:flex-row items-center justify-between w-full lg:w-auto gap-4 sm:gap-8">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex flex-col sm:flex-row sm:items-center sm:gap-1.5 leading-[0.9] sm:leading-none">
+                                        <span class="text-[11px] sm:text-[12px] text-gray-400 font-black uppercase tracking-tighter sm:tracking-widest">Row</span>
+                                        <span class="text-[9px] sm:text-[12px] text-gray-400/70 font-black uppercase tracking-tighter sm:tracking-widest">per page</span>
+                                    </div>
+                                    <div>
+                                        <x-dropdown align="top" width="20" containerClasses="block">
+                                            <x-slot name="trigger">
+                                                <button type="button" class="inline-flex items-center justify-between min-w-[70px] px-3 py-1.5 text-[13px] font-black text-gray-900 bg-slate-50 border border-gray-200 rounded-xl hover:border-gray-300 focus:outline-none transition-all h-10 gap-2 shadow-sm font-sans">
+                                                    <span x-text="perPage"></span>
+                                                    <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </button>
+                                            </x-slot>
+                                            <x-slot name="content">
+                                                <template x-for="option in [5, 10, 15, 30, 50, 100]">
+                                                    <x-dropdown-link href="#" @click.prevent="perPage = option; currentPage = 1;">
+                                                        <span x-text="option"></span>
+                                                    </x-dropdown-link>
+                                                </template>
+                                            </x-slot>
+                                        </x-dropdown>
+                                    </div>
+                                </div>
+                                <div class="text-[11px] text-gray-400 font-bold uppercase tracking-widest whitespace-nowrap">
+                                    <span class="text-gray-900" x-text="Math.min(filteredCategories.length, (currentPage - 1) * perPage + 1)"></span>
+                                    <span class="mx-0.5 text-gray-300">-</span>
+                                    <span class="text-gray-900" x-text="Math.min(filteredCategories.length, currentPage * perPage)"></span>
+                                    <span class="mx-1 text-gray-300 lowercase italic font-medium">of</span>
+                                    <span class="text-indigo-600" x-text="filteredCategories.length"></span>
+                                    <span class="ml-1 text-gray-300 lowercase italic font-medium">results</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 w-full lg:w-auto justify-center lg:justify-end border-t border-gray-50 pt-4 lg:border-0 lg:pt-0">
+                                <x-secondary-button @click="currentPage = 1" ::disabled="currentPage === 1" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="currentPage === 1 ? 'opacity-30 pointer-events-none' : ''">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                                    </svg>
+                                </x-secondary-button>
+                                <x-secondary-button @click="currentPage = Math.max(1, currentPage - 1)" ::disabled="currentPage === 1" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="currentPage === 1 ? 'opacity-30 pointer-events-none' : ''">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                    </svg>
+                                </x-secondary-button>
+                                <div class="flex items-center gap-1.5 px-2">
+                                    <template x-for="page in pageNumbers">
+                                        <div class="flex items-center gap-1.5">
+                                            <template x-if="page === currentPage">
+                                                <x-primary-button class="!p-0 w-9 h-9 items-center justify-center !rounded-xl bg-gray-900 text-[13px] font-black shadow-none ring-0">
+                                                    <span x-text="page"></span>
+                                                </x-primary-button>
+                                            </template>
+                                            <template x-if="page !== currentPage">
+                                                <x-secondary-button @click="currentPage = page" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl text-[13px] font-bold">
+                                                    <span x-text="page"></span>
+                                                </x-secondary-button>
+                                            </template>
+                                        </div>
+                                    </template>
+                                    
+                                    <template x-if="Math.ceil(filteredCategories.length / perPage) > currentPage + 1">
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="text-gray-300 font-bold mx-1">...</span>
+                                            <x-secondary-button @click="currentPage = Math.ceil(filteredCategories.length / perPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl text-[13px] font-bold">
+                                                <span x-text="Math.ceil(filteredCategories.length / perPage)"></span>
+                                            </x-secondary-button>
+                                        </div>
+                                    </template>
+                                </div>
+                                <x-secondary-button @click="currentPage = Math.min(Math.ceil(filteredCategories.length / perPage), currentPage + 1)" ::disabled="currentPage >= Math.ceil(filteredCategories.length / perPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="currentPage >= Math.ceil(filteredCategories.length / perPage) ? 'opacity-30 pointer-events-none' : ''">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </x-secondary-button>
+                                <x-secondary-button @click="currentPage = Math.ceil(filteredCategories.length / perPage) || 1" ::disabled="currentPage >= Math.ceil(filteredCategories.length / perPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="currentPage >= Math.ceil(filteredCategories.length / perPage) ? 'opacity-30 pointer-events-none' : ''">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                                    </svg>
+                                </x-secondary-button>
+                            </div>
+                        </div>
+                    </template>
                 </div>
             </div>
 
@@ -469,4 +571,76 @@
             </div>
         </div>
     </x-modal>
+
+    <script>
+        (function() {
+            window.categoryManagement = function($wire) {
+                return {
+                    view: $wire.entangle('view').live,
+                    panel: $wire.entangle('panel').live,
+                    filterType: $wire.entangle('filterType').live,
+                    
+                    searchQuery: '',
+                    currentPage: 1,
+                    perPage: 5,
+                    categoriesList: [],
+
+                    get filteredCategories() {
+                        const query = this.searchQuery.toLowerCase().trim();
+                        const type = this.filterType;
+                        return this.categoriesList.filter(cat => {
+                            // Filter by search query
+                            const matchesSearch = !query || 
+                                cat.name.toLowerCase().includes(query) || 
+                                (cat.description && cat.description.toLowerCase().includes(query));
+                            
+                            // Filter by segment type
+                            const matchesType = type === 'all' || cat.cat_type === type;
+
+                            return matchesSearch && matchesType;
+                        });
+                    },
+
+                    get paginatedCategories() {
+                        const start = (this.currentPage - 1) * this.perPage;
+                        return this.filteredCategories.slice(start, start + this.perPage);
+                    },
+
+                    get pageNumbers() {
+                        const totalPages = Math.ceil(this.filteredCategories.length / this.perPage) || 1;
+                        const start = Math.max(1, this.currentPage - 1);
+                        const end = Math.min(totalPages, this.currentPage + 1);
+                        const pages = [];
+                        for (let i = start; i <= end; i++) {
+                            pages.push(i);
+                        }
+                        return pages;
+                    },
+
+                    isItemVisible(id, catType) {
+                        return this.paginatedCategories.some(c => c.id === id && c.cat_type === catType);
+                    },
+
+                    updateCategoriesList(newList) {
+                        const oldIds = this.categoriesList.map(c => `${c.cat_type}-${c.id}`).join(',');
+                        const newIds = newList.map(c => `${c.cat_type}-${c.id}`).join(',');
+                        if (oldIds !== newIds) {
+                            this.categoriesList = newList;
+                            this.currentPage = 1;
+                        }
+                    },
+
+                    init() {
+                        this.$watch('filterType', () => {
+                            this.currentPage = 1;
+                        });
+                        this.$watch('searchQuery', () => {
+                            this.currentPage = 1;
+                        });
+                    }
+                };
+            };
+        })();
+    </script>
 </div>
+

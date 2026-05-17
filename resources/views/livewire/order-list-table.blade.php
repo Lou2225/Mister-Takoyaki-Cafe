@@ -6,9 +6,9 @@
 @endphp
 
 {{-- Table Container --}}
-<div class="mt-2 relative"
+<div id="order-table-{{ $tabName ?? 'all' }}" class="mt-2 relative"
      wire:loading.class="opacity-50 pointer-events-none"
-     wire:target="search, sourceFilter, statusFilter, applyQuickDateFilter, startDate, endDate, previousPage, nextPage, gotoPage, setPage">
+     wire:target="statusFilter, applyQuickDateFilter, startDate, endDate, previousPage, nextPage, gotoPage, setPage">
     
     <x-data-table>
         <x-slot name="header">
@@ -19,9 +19,11 @@
             <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-center hidden md:table-cell">Date & Time</th>
             <th class="py-3 px-4 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest">Actions</th>
         </x-slot>
-
+ 
         @forelse($orders as $order)
-            <tr wire:key="order-row-{{ $order->id }}" class="hover:bg-slate-50/50 transition-colors cursor-pointer" wire:click="openOrderDetail({{ $order->id }})">
+            <tr wire:key="order-row-{{ $order->id }}" 
+                class="hover:bg-slate-50/50 transition-colors cursor-pointer" 
+                @click="selectedOrderId = {{ $order->id }}; $dispatch('open-modal', 'view-order-detail')">
                 <td class="py-3 px-4 whitespace-nowrap">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-xl bg-{{ $primaryColor }}-50 flex items-center justify-center {{ $primaryText }} font-bold text-[13px] flex-shrink-0 shadow-sm">
@@ -79,7 +81,7 @@
                                 Accept
                             </x-secondary-button>
                         @endif
-                        <x-secondary-button type="button" wire:click="openOrderDetail({{ $order->id }})" class="h-9 px-3 whitespace-nowrap">
+                        <x-secondary-button type="button" @click="selectedOrderId = {{ $order->id }}; $dispatch('open-modal', 'view-order-detail')" class="h-9 px-3 whitespace-nowrap">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                             View Details
                         </x-secondary-button>
@@ -97,6 +99,7 @@
                 </td>
             </tr>
         @endforelse
+ 
     </x-data-table>
 
     <div class="mt-4">

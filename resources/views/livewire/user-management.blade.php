@@ -1210,330 +1210,325 @@
             </div>
         </div>
     </x-modal>
-</div>
+    <script>
+    (function() {
+        const registerUserData = () => {
+            if (!window.Alpine) return;
+            if (Alpine.data('userManagementData')) return;
+            Alpine.data('userManagementData', (initialPanel, initialMode, initialView) => ({
+                ...slidingTabs(@js($historyTab), 'historyTab', 'historyTabList'),
+                panel: initialPanel || 'list',
+                mode: initialMode || 'list',
+                tableView: initialView || 'table',
+                deleteTargetId: null,
+                deleteTargetName: '',
 
-@push('beforeLivewireScripts')
-@once
-<script>
-(function() {
-    const registerUserData = () => {
-        if (!window.Alpine) return;
-        if (Alpine.data('userManagementData')) return;
-        Alpine.data('userManagementData', (initialPanel, initialMode, initialView) => ({
-            ...slidingTabs(@js($historyTab), 'historyTab', 'historyTabList'),
-            panel: initialPanel || 'list',
-            mode: initialMode || 'list',
-            tableView: initialView || 'table',
-            deleteTargetId: null,
-            deleteTargetName: '',
+                // ── Location state ───────────────────────────────────────
+                loc: {
+                    region:   { items: [], open: false, search: '', loading: false },
+                    province: { items: [], open: false, search: '', loading: false },
+                    city:     { items: [], open: false, search: '', loading: false },
+                    barangay: { items: [], open: false, search: '', loading: false }
+                },
 
-            // ── Location state ───────────────────────────────────────
-            loc: {
-                region:   { items: [], open: false, search: '', loading: false },
-                province: { items: [], open: false, search: '', loading: false },
-                city:     { items: [], open: false, search: '', loading: false },
-                barangay: { items: [], open: false, search: '', loading: false }
-            },
+                filtered(type) {
+                    const s = this.loc[type];
+                    const q = s.search.toLowerCase();
+                    return q ? s.items.filter(i => i.name.toLowerCase().includes(q)) : s.items;
+                },
 
-            filtered(type) {
-                const s = this.loc[type];
-                const q = s.search.toLowerCase();
-                return q ? s.items.filter(i => i.name.toLowerCase().includes(q)) : s.items;
-            },
+                // ── PSGC loaders ─────────────────────────────────────────
+                async fetchWithRetry(url, retries = 2, delay = 1000) {
+                    for (let i = 0; i <= retries; i++) {
+                        try {
+                            const res = await fetch(url);
+                            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                            return await res.json();
+                        } catch (e) {
+                            if (i === retries) throw e;
+                            console.warn(`Fetch failed for ${url}, retrying (${i + 1}/${retries})...`, e);
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                        }
+                    }
+                },
 
-            // ── PSGC loaders ─────────────────────────────────────────
-            async fetchWithRetry(url, retries = 2, delay = 1000) {
-                for (let i = 0; i <= retries; i++) {
+                async loadRegions() {
+                    if (this.loc.region.items.length > 0) return;
+                    this.loc.region.loading = true;
                     try {
-                        const res = await fetch(url);
-                        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-                        return await res.json();
-                    } catch (e) {
-                        if (i === retries) throw e;
-                        console.warn(`Fetch failed for ${url}, retrying (${i + 1}/${retries})...`, e);
-                        await new Promise(resolve => setTimeout(resolve, delay));
+                        const data = await this.fetchWithRetry('https://psgc.cloud/api/regions');
+                        this.loc.region.items = data.sort((a, b) => a.name.localeCompare(b.name));
+                    } catch (e) { 
+                        console.error('Regions fetch failed', e);
+                        this.dispatchNotification('error', 'Failed to load regions. Please check your connection.');
                     }
-                }
-            },
+                    finally { this.loc.region.loading = false; }
+                },
 
-            async loadRegions() {
-                if (this.loc.region.items.length > 0) return;
-                this.loc.region.loading = true;
-                try {
-                    const data = await this.fetchWithRetry('https://psgc.cloud/api/regions');
-                    this.loc.region.items = data.sort((a, b) => a.name.localeCompare(b.name));
-                } catch (e) { 
-                    console.error('Regions fetch failed', e);
-                    this.dispatchNotification('error', 'Failed to load regions. Please check your connection.');
-                }
-                finally { this.loc.region.loading = false; }
-            },
-
-            async loadProvinces(regionCode) {
-                this.loc.province.items = []; this.loc.city.items = []; this.loc.barangay.items = [];
-                if (!regionCode) return;
-                this.loc.province.loading = true;
-                try {
-                    const data = await this.fetchWithRetry(`https://psgc.cloud/api/regions/${regionCode}/provinces`);
-                    this.loc.province.items = data.sort((a, b) => a.name.localeCompare(b.name));
-                    
-                    if (this.loc.province.items.length === 0) {
-                        this.loc.province.loading = false;
-                        this.loc.city.loading = true;
-                        const data2 = await this.fetchWithRetry(`https://psgc.cloud/api/regions/${regionCode}/cities-municipalities`);
-                        this.loc.city.items = data2.sort((a, b) => a.name.localeCompare(b.name));
-                        this.loc.city.loading = false;
+                async loadProvinces(regionCode) {
+                    this.loc.province.items = []; this.loc.city.items = []; this.loc.barangay.items = [];
+                    if (!regionCode) return;
+                    this.loc.province.loading = true;
+                    try {
+                        const data = await this.fetchWithRetry(`https://psgc.cloud/api/regions/${regionCode}/provinces`);
+                        this.loc.province.items = data.sort((a, b) => a.name.localeCompare(b.name));
+                        
+                        if (this.loc.province.items.length === 0) {
+                            this.loc.province.loading = false;
+                            this.loc.city.loading = true;
+                            const data2 = await this.fetchWithRetry(`https://psgc.cloud/api/regions/${regionCode}/cities-municipalities`);
+                            this.loc.city.items = data2.sort((a, b) => a.name.localeCompare(b.name));
+                            this.loc.city.loading = false;
+                        }
+                    } catch (e) { 
+                        console.error('Provinces fetch failed', e);
+                        this.dispatchNotification('error', 'Failed to load provinces.');
                     }
-                } catch (e) { 
-                    console.error('Provinces fetch failed', e);
-                    this.dispatchNotification('error', 'Failed to load provinces.');
-                }
-                finally { this.loc.province.loading = false; }
-            },
+                    finally { this.loc.province.loading = false; }
+                },
 
-            async loadCities(provinceCode) {
-                this.loc.city.items = []; this.loc.barangay.items = [];
-                if (!provinceCode) return;
-                this.loc.city.loading = true;
-                try {
-                    const data = await this.fetchWithRetry(`https://psgc.cloud/api/provinces/${provinceCode}/cities-municipalities`);
-                    this.loc.city.items = data.sort((a, b) => a.name.localeCompare(b.name));
-                } catch (e) { 
-                    console.error('Cities fetch failed', e);
-                    this.dispatchNotification('error', 'Failed to load cities.');
-                }
-                finally { this.loc.city.loading = false; }
-            },
-
-            async loadBarangays(cityCode) {
-                this.loc.barangay.items = [];
-                if (!cityCode) return;
-                this.loc.barangay.loading = true;
-                try {
-                    const data = await this.fetchWithRetry(`https://psgc.cloud/api/cities-municipalities/${cityCode}/barangays`);
-                    this.loc.barangay.items = data.sort((a, b) => a.name.localeCompare(b.name));
-                } catch (e) { 
-                    console.error('Barangays fetch failed', e);
-                    this.dispatchNotification('error', 'Failed to load barangays.');
-                }
-                finally { this.loc.barangay.loading = false; }
-            },
-
-            dispatchNotification(type, message) {
-                window.dispatchEvent(new CustomEvent('notify', {
-                    detail: { type, message }
-                }));
-            },
-
-            // ── Cascade handlers ─────────────────────────────────────
-            async selectRegion(region) {
-                const lw = Livewire.find('{{ $this->id() }}');
-                lw.set('addr_region', region.name);
-                lw.set('addr_province', ''); lw.set('addr_city', ''); lw.set('addr_barangay', '');
-                this.loc.region.search = ''; this.loc.region.open = false;
-                this.loc.province.search = ''; this.loc.city.search = ''; this.loc.barangay.search = '';
-                await this.loadProvinces(region.code);
-            },
-            async selectProvince(province) {
-                const lw = Livewire.find('{{ $this->id() }}');
-                lw.set('addr_province', province.name);
-                lw.set('addr_city', ''); lw.set('addr_barangay', '');
-                this.loc.province.search = ''; this.loc.province.open = false;
-                this.loc.city.search = ''; this.loc.barangay.search = '';
-                await this.loadCities(province.code);
-            },
-            async selectCity(city) {
-                const lw = Livewire.find('{{ $this->id() }}');
-                lw.set('addr_city', city.name);
-                lw.set('addr_barangay', '');
-                this.loc.city.search = ''; this.loc.city.open = false;
-                this.loc.barangay.search = '';
-                await this.loadBarangays(city.code);
-            },
-            selectBarangay(brgy) {
-                Livewire.find('{{ $this->id() }}').set('addr_barangay', brgy.name);
-                this.loc.barangay.search = ''; this.loc.barangay.open = false;
-            },
-
-            async autoMatchLocation(addr) {
-                const clean = (str) => {
-                    if (!str) return '';
-                    return str.toLowerCase()
-                        .replace(/city of|province of|region|district|barangay|brgy\.?|municipality of/g, '')
-                        .replace(/[^a-z0-9]/g, '')
-                        .trim();
-                };
-
-                let rName = addr.region || '';
-                let pName = addr.state || addr.province || addr.county || '';
-                let cName = addr.city || addr.town || addr.municipality || '';
-                let bName = addr.quarter || addr.village || addr.suburb || addr.neighbourhood || '';
-
-                if (this.loc.region.items.length === 0) await this.loadRegions();
-
-                let crName = clean(rName);
-                let cpName = clean(pName);
-                let matchedR = this.loc.region.items.find(r => {
-                    const target = clean(r.name);
-                    return target === crName || 
-                           (crName.includes('manila') && target.includes('ncr')) ||
-                           (cpName.includes('manila') && target.includes('ncr'));
-                });
-
-                if (!matchedR && crName) {
-                    matchedR = this.loc.region.items.find(r => clean(r.name).includes(crName) || crName.includes(clean(r.name)));
-                }
-
-                if (!matchedR) return;
-                await this.selectRegion(matchedR);
-
-                if (pName && this.loc.province.items.length > 0) {
-                    let cppName = clean(pName);
-                    let matchedP = this.loc.province.items.find(p => clean(p.name) === cppName);
-                    if (!matchedP) {
-                        matchedP = this.loc.province.items.find(p => {
-                            const target = clean(p.name).replace('province', '');
-                            const search = cppName.replace('province', '');
-                            return target && search && (target === search || target.includes(search) || search.includes(target));
-                        });
+                async loadCities(provinceCode) {
+                    this.loc.city.items = []; this.loc.barangay.items = [];
+                    if (!provinceCode) return;
+                    this.loc.city.loading = true;
+                    try {
+                        const data = await this.fetchWithRetry(`https://psgc.cloud/api/provinces/${provinceCode}/cities-municipalities`);
+                        this.loc.city.items = data.sort((a, b) => a.name.localeCompare(b.name));
+                    } catch (e) { 
+                        console.error('Cities fetch failed', e);
+                        this.dispatchNotification('error', 'Failed to load cities.');
                     }
-                    if (matchedP) await this.selectProvince(matchedP);
-                }
+                    finally { this.loc.city.loading = false; }
+                },
 
-                if (cName && this.loc.city.items.length > 0) {
-                    let ccName = clean(cName);
-                    let matchedC = this.loc.city.items.find(c => clean(c.name) === ccName);
-                    if (!matchedC) {
-                        matchedC = this.loc.city.items.find(c => {
-                            const target = clean(c.name).replace('city', '').replace('municipality', '').replace('city of', '');
-                            const search = ccName.replace('city', '').replace('municipality', '').replace('city of', '');
-                            return target && search && (target === search || target.includes(search) || search.includes(target));
-                        });
+                async loadBarangays(cityCode) {
+                    this.loc.barangay.items = [];
+                    if (!cityCode) return;
+                    this.loc.barangay.loading = true;
+                    try {
+                        const data = await this.fetchWithRetry(`https://psgc.cloud/api/cities-municipalities/${cityCode}/barangays`);
+                        this.loc.barangay.items = data.sort((a, b) => a.name.localeCompare(b.name));
+                    } catch (e) { 
+                        console.error('Barangays fetch failed', e);
+                        this.dispatchNotification('error', 'Failed to load barangays.');
                     }
-                    if (matchedC) await this.selectCity(matchedC);
-                }
+                    finally { this.loc.barangay.loading = false; }
+                },
 
-                if (bName && this.loc.barangay.items.length > 0) {
-                    let cbName = clean(bName);
-                    let matchedB = this.loc.barangay.items.find(b => clean(b.name) === cbName);
-                    if (!matchedB) {
-                        matchedB = this.loc.barangay.items.find(b => {
-                            const target = clean(b.name).replace('barangay', '').replace('brgy', '').replace('poblacion', '').replace('pob', '');
-                            const search = cbName.replace('barangay', '').replace('brgy', '').replace('poblacion', '').replace('pob', '');
-                            return target && search && (target === search || target.includes(search) || search.includes(target));
-                        });
+                dispatchNotification(type, message) {
+                    window.dispatchEvent(new CustomEvent('notify', {
+                        detail: { type, message }
+                    }));
+                },
+
+                // ── Cascade handlers ─────────────────────────────────────
+                async selectRegion(region) {
+                    const lw = Livewire.find('{{ $this->id() }}');
+                    lw.set('addr_region', region.name);
+                    lw.set('addr_province', ''); lw.set('addr_city', ''); lw.set('addr_barangay', '');
+                    this.loc.region.search = ''; this.loc.region.open = false;
+                    this.loc.province.search = ''; this.loc.city.search = ''; this.loc.barangay.search = '';
+                    await this.loadProvinces(region.code);
+                },
+                async selectProvince(province) {
+                    const lw = Livewire.find('{{ $this->id() }}');
+                    lw.set('addr_province', province.name);
+                    lw.set('addr_city', ''); lw.set('addr_barangay', '');
+                    this.loc.province.search = ''; this.loc.province.open = false;
+                    this.loc.city.search = ''; this.loc.barangay.search = '';
+                    await this.loadCities(province.code);
+                },
+                async selectCity(city) {
+                    const lw = Livewire.find('{{ $this->id() }}');
+                    lw.set('addr_city', city.name);
+                    lw.set('addr_barangay', '');
+                    this.loc.city.search = ''; this.loc.city.open = false;
+                    this.loc.barangay.search = '';
+                    await this.loadBarangays(city.code);
+                },
+                selectBarangay(brgy) {
+                    Livewire.find('{{ $this->id() }}').set('addr_barangay', brgy.name);
+                    this.loc.barangay.search = ''; this.loc.barangay.open = false;
+                },
+
+                async autoMatchLocation(addr) {
+                    const clean = (str) => {
+                        if (!str) return '';
+                        return str.toLowerCase()
+                            .replace(/city of|province of|region|district|barangay|brgy\.?|municipality of/g, '')
+                            .replace(/[^a-z0-9]/g, '')
+                            .trim();
+                    };
+
+                    let rName = addr.region || '';
+                    let pName = addr.state || addr.province || addr.county || '';
+                    let cName = addr.city || addr.town || addr.municipality || '';
+                    let bName = addr.quarter || addr.village || addr.suburb || addr.neighbourhood || '';
+
+                    if (this.loc.region.items.length === 0) await this.loadRegions();
+
+                    let crName = clean(rName);
+                    let cpName = clean(pName);
+                    let matchedR = this.loc.region.items.find(r => {
+                        const target = clean(r.name);
+                        return target === crName || 
+                               (crName.includes('manila') && target.includes('ncr')) ||
+                               (cpName.includes('manila') && target.includes('ncr'));
+                    });
+
+                    if (!matchedR && crName) {
+                        matchedR = this.loc.region.items.find(r => clean(r.name).includes(crName) || crName.includes(clean(r.name)));
                     }
-                    if (matchedB) this.selectBarangay(matchedB);
-                }
-            },
 
-            map: null,
-            marker: null,
-            initMap() {
-                if (this.map) {
+                    if (!matchedR) return;
+                    await this.selectRegion(matchedR);
+
+                    if (pName && this.loc.province.items.length > 0) {
+                        let cppName = clean(pName);
+                        let matchedP = this.loc.province.items.find(p => clean(p.name) === cppName);
+                        if (!matchedP) {
+                            matchedP = this.loc.province.items.find(p => {
+                                const target = clean(p.name).replace('province', '');
+                                const search = cppName.replace('province', '');
+                                return target && search && (target === search || target.includes(search) || search.includes(target));
+                            });
+                        }
+                        if (matchedP) await this.selectProvince(matchedP);
+                    }
+
+                    if (cName && this.loc.city.items.length > 0) {
+                        let ccName = clean(cName);
+                        let matchedC = this.loc.city.items.find(c => clean(c.name) === ccName);
+                        if (!matchedC) {
+                            matchedC = this.loc.city.items.find(c => {
+                                const target = clean(c.name).replace('city', '').replace('municipality', '').replace('city of', '');
+                                const search = ccName.replace('city', '').replace('municipality', '').replace('city of', '');
+                                return target && search && (target === search || target.includes(search) || search.includes(target));
+                            });
+                        }
+                        if (matchedC) await this.selectCity(matchedC);
+                    }
+
+                    if (bName && this.loc.barangay.items.length > 0) {
+                        let cbName = clean(bName);
+                        let matchedB = this.loc.barangay.items.find(b => clean(b.name) === cbName);
+                        if (!matchedB) {
+                            matchedB = this.loc.barangay.items.find(b => {
+                                const target = clean(b.name).replace('barangay', '').replace('brgy', '').replace('poblacion', '').replace('pob', '');
+                                const search = cbName.replace('barangay', '').replace('brgy', '').replace('poblacion', '').replace('pob', '');
+                                return target && search && (target === search || target.includes(search) || search.includes(target));
+                            });
+                        }
+                        if (matchedB) this.selectBarangay(matchedB);
+                    }
+                },
+
+                map: null,
+                marker: null,
+                initMap() {
+                    if (this.map) {
+                        setTimeout(async () => {
+                            const container = document.getElementById('userMap');
+                            if (!container) return;
+                            this.map.invalidateSize(); 
+                            let lat = await Livewire.find('{{ $this->id() }}').get('addr_lat');
+                            let lng = await Livewire.find('{{ $this->id() }}').get('addr_lng');
+                            if (lat && lng) {
+                                this.map.setView([lat, lng], 16);
+                                if (this.marker) this.marker.setLatLng([lat, lng]);
+                            }
+                        }, 250);
+                        return;
+                    }
                     setTimeout(async () => {
                         const container = document.getElementById('userMap');
                         if (!container) return;
-                        this.map.invalidateSize(); 
+
                         let lat = await Livewire.find('{{ $this->id() }}').get('addr_lat');
                         let lng = await Livewire.find('{{ $this->id() }}').get('addr_lng');
-                        if (lat && lng) {
-                            this.map.setView([lat, lng], 16);
-                            if (this.marker) this.marker.setLatLng([lat, lng]);
-                        }
-                    }, 250);
-                    return;
-                }
-                setTimeout(async () => {
-                    const container = document.getElementById('userMap');
-                    if (!container) return;
-
-                    let lat = await Livewire.find('{{ $this->id() }}').get('addr_lat');
-                    let lng = await Livewire.find('{{ $this->id() }}').get('addr_lng');
-                    let startLat = lat || 14.2189;
-                    let startLng = lng || 121.1672;
-                    let startZoom = lat ? 15 : 11;
-                    
-                    const street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        maxZoom: 19,
-                        minZoom: 10,
-                        attribution: '© OpenStreetMap'
-                    });
-                    const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                        attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-                    });
-
-                    const lagunaBounds = L.latLngBounds([13.9, 120.9], [14.5, 121.6]);
-
-                    this.map = L.map('userMap', {
-                        maxBounds: lagunaBounds,
-                        maxBoundsViscosity: 1.0,
-                        layers: [street]
-                    }).setView([startLat, startLng], startZoom);
-
-                    L.control.layers({ "Street": street, "Satellite": satellite }).addTo(this.map);
-                    
-                    if (lat && lng) {
-                        this.marker = L.marker([lat, lng]).addTo(this.map);
-                    }
-
-                    this.map.on('click', async (e) => {
-                        const lat = e.latlng.lat;
-                        const lng = e.latlng.lng;
-                        if (this.marker) this.marker.setLatLng(e.latlng);
-                        else this.marker = L.marker(e.latlng).addTo(this.map);
+                        let startLat = lat || 14.2189;
+                        let startLng = lng || 121.1672;
+                        let startZoom = lat ? 15 : 11;
                         
-                        Livewire.find('{{ $this->id() }}').set('addr_lat', lat);
-                        Livewire.find('{{ $this->id() }}').set('addr_lng', lng);
-                        
-                        try {
-                            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&countrycodes=ph`);
-                            const data = await response.json();
-                            if (data && data.address) {
-                                let st = data.address.road || data.address.pedestrian || '';
-                                let num = data.address.house_number || '';
-                                let fst = (num + ' ' + st).trim();
-                                if(fst) Livewire.find('{{ $this->id() }}').set('addr_street', fst);
-                                
-                                await this.autoMatchLocation(data.address);
-                            }
-                        } catch (error) { console.error(error); }
-                    });
-                }, 350);
-            },
-
-            init() {
-                this.loadRegions();
-                this.$watch('panel', (val) => {
-                    if (this.$wire && this.$wire.get('panel') !== val) {
-                        this.$wire.set('panel', val);
-                    }
-                    if (val === 'form') {
-                        this.$nextTick(() => {
-                            if (typeof this.recalculateHistoryTab === 'function') {
-                                this.recalculateHistoryTab();
-                            }
+                        const street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            maxZoom: 19,
+                            minZoom: 10,
+                            attribution: '© OpenStreetMap'
                         });
-                    }
-                });
+                        const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                        });
 
-                this.$watch('mode', (val) => {
-                    if (this.$wire && this.$wire.get('mode') !== val) {
-                        this.$wire.set('mode', val);
-                    }
-                });
+                        const lagunaBounds = L.latLngBounds([13.9, 120.9], [14.5, 121.6]);
 
-                this.$watch('tableView', (val) => {
-                    if (this.$wire && this.$wire.get('view') !== val) {
-                        this.$wire.set('view', val);
-                    }
-                });
-            }
-        }));
-    };
-    if (window.Alpine) registerUserData();
-    else document.addEventListener('alpine:init', registerUserData);
-})();
-</script>
-@endonce
-@endpush
+                        this.map = L.map('userMap', {
+                            maxBounds: lagunaBounds,
+                            maxBoundsViscosity: 1.0,
+                            layers: [street]
+                        }).setView([startLat, startLng], startZoom);
+
+                        L.control.layers({ "Street": street, "Satellite": satellite }).addTo(this.map);
+                        
+                        if (lat && lng) {
+                            this.marker = L.marker([lat, lng]).addTo(this.map);
+                        }
+
+                        this.map.on('click', async (e) => {
+                            const lat = e.latlng.lat;
+                            const lng = e.latlng.lng;
+                            if (this.marker) this.marker.setLatLng(e.latlng);
+                            else this.marker = L.marker(e.latlng).addTo(this.map);
+                            
+                            Livewire.find('{{ $this->id() }}').set('addr_lat', lat);
+                            Livewire.find('{{ $this->id() }}').set('addr_lng', lng);
+                            
+                            try {
+                                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&countrycodes=ph`);
+                                const data = await response.json();
+                                if (data && data.address) {
+                                    let st = data.address.road || data.address.pedestrian || '';
+                                    let num = data.address.house_number || '';
+                                    let fst = (num + ' ' + st).trim();
+                                    if(fst) Livewire.find('{{ $this->id() }}').set('addr_street', fst);
+                                    
+                                    await this.autoMatchLocation(data.address);
+                                }
+                            } catch (error) { console.error(error); }
+                        });
+                    }, 350);
+                },
+
+                init() {
+                    this.loadRegions();
+                    this.$watch('panel', (val) => {
+                        if (this.$wire && this.$wire.get('panel') !== val) {
+                            this.$wire.set('panel', val);
+                        }
+                        if (val === 'form') {
+                            this.$nextTick(() => {
+                                if (typeof this.recalculateHistoryTab === 'function') {
+                                    this.recalculateHistoryTab();
+                                }
+                            });
+                        }
+                    });
+
+                    this.$watch('mode', (val) => {
+                        if (this.$wire && this.$wire.get('mode') !== val) {
+                            this.$wire.set('mode', val);
+                        }
+                    });
+
+                    this.$watch('tableView', (val) => {
+                        if (this.$wire && this.$wire.get('view') !== val) {
+                            this.$wire.set('view', val);
+                        }
+                    });
+                }
+            }));
+        };
+        if (window.Alpine) registerUserData();
+        else document.addEventListener('alpine:init', registerUserData);
+    })();
+    </script>
+</div>

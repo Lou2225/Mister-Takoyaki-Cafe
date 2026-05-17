@@ -12,10 +12,10 @@
     x-on:keydown.escape.window="closePanel()"
     x-show="isPanelOpen"
     x-cloak
-    class="fixed inset-0 z-[100] overflow-hidden"
+    class="fixed inset-0 z-[9999] overflow-hidden"
 >
     {{-- Outer wrapper --}}
-    <div class="absolute inset-0 overflow-hidden">
+    <div class="fixed inset-0 overflow-hidden">
 
         {{-- Backdrop overlay --}}
         <div
@@ -27,7 +27,7 @@
             x-transition:leave-start="opacity-100"
             x-transition:leave-end="opacity-0"
             @click="closePanel()"
-            class="absolute inset-0 bg-gray-900/20 backdrop-blur-md transition-opacity"
+            class="fixed inset-0 bg-gray-900/40 backdrop-blur-md transition-opacity"
         ></div>
 
         {{-- Panel container --}}

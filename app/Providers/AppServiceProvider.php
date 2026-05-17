@@ -32,6 +32,12 @@ class AppServiceProvider extends ServiceProvider
             fn ($src, $url, $chunk, $manifest) => str_ends_with($url, '.css') ? false : []
         );
 
+        // Dynamically override the base URL to support subdirectory deployments (like local XAMPP)
+        // without hardcoding paths that would break root-domain production deployments (like Hostinger).
+        if (!app()->runningInConsole()) {
+            \Illuminate\Support\Facades\URL::forceRootUrl(request()->getSchemeAndHttpHost() . request()->getBasePath());
+        }
+
         Livewire::component('auth.forgot-password', ForgotPassword::class);
     }
 }

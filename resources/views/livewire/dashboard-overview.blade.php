@@ -23,13 +23,16 @@
     >
         {{-- Welcome Banner --}}
         <div
-            class="mb-6 transition-all duration-500 overflow-hidden"
+            x-show="show"
+            x-transition:enter="transition ease-out duration-500"
+            x-transition:enter-start="opacity-0 -translate-y-4 scale-[0.98]"
+            x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+            x-transition:leave="transition ease-in duration-300"
+            x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+            x-transition:leave-end="opacity-0 -translate-y-4 scale-[0.98]"
+            class="mb-4 transition-all duration-500 overflow-hidden"
         >
             <div
-                x-show="show"
-                x-transition:enter="transition ease-out duration-500"
-                x-transition:enter-start="opacity-0 -translate-y-4 scale-[0.98]"
-                x-transition:enter-end="opacity-100 translate-y-0 scale-100"
                 class="relative overflow-hidden rounded-2xl ring-1 {{ $bannerConfig['ring'] }} shadow-xl bg-gradient-to-br {{ $bannerConfig['gradient'] }}"
             >
                 {{-- Decorative Background Glow --}}
@@ -73,7 +76,7 @@
         </div>
 
         {{-- ─── Dashboard Filters (Professional "Control Panel" Layout) ─────────────── --}}
-        <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 p-4 sm:p-0 bg-gray-50/50 sm:bg-transparent rounded-2xl border border-gray-100 sm:border-0">
+        <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 p-4 sm:p-0 bg-gray-50/50 sm:bg-transparent rounded-2xl border border-gray-100 sm:border-0">
             
             {{-- Row 1: Primary Controls (Date Range & Report) --}}
             <div class="flex items-center gap-2 w-full sm:w-auto sm:order-2">
@@ -154,35 +157,32 @@
                         </div>
                         <span class="text-[9px] sm:text-[11px] font-black text-white/60 uppercase tracking-[0.1em] sm:tracking-[0.2em]">Gross Revenue</span>
                     </div>
-                    <h3 class="text-lg sm:text-2xl lg:text-3xl font-black text-white tracking-tight">₱ {{ number_format($kpi['revenue'], 2) }}</h3>
+                    <h3 class="text-lg sm:text-2xl lg:text-3xl font-black text-white tracking-tight">₱ {{ number_format($kpi['gross_sales'], 2) }}</h3>
                     <div class="flex items-center gap-2 mt-2">
                         <span class="flex h-2 w-2 rounded-full bg-emerald-300 animate-pulse"></span>
-                        <p class="text-[10px] sm:text-[12px] font-bold text-white/80">{{ $kpi['order_count'] }} Completed</p>
+                        <p class="text-[10px] sm:text-[12px] font-bold text-white/80">₱{{ number_format($kpi['total_discounts'], 2) }} Discounts Applied</p>
                     </div>
                 </div>
             </div>
 
-            {{-- Net Profit --}}
+            {{-- Net Sales --}}
             <div class="relative group h-full">
-                <div wire:click="openBreakdown('Profit')" class="p-3 sm:p-5 lg:p-6 bg-gradient-to-br from-amber-500 to-orange-700 rounded-2xl sm:rounded-3xl shadow-lg shadow-amber-200/40 group-hover:shadow-xl hover:shadow-amber-300/40 hover:-translate-y-1 transition-all duration-500 relative overflow-hidden cursor-pointer border border-white/10 h-full">
+                <div wire:click="openBreakdown('Revenue')" class="p-3 sm:p-5 lg:p-6 bg-gradient-to-br from-amber-500 to-orange-700 rounded-2xl sm:rounded-3xl shadow-lg shadow-amber-200/40 group-hover:shadow-xl hover:shadow-amber-300/40 hover:-translate-y-1 transition-all duration-500 relative overflow-hidden cursor-pointer border border-white/10 h-full">
                     <div class="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-bl-[80px] -mr-8 -mt-8 transition-transform group-hover:scale-110"></div>
                     <div class="relative z-10 text-white">
                         <div class="flex items-center justify-between mb-2 sm:mb-4">
                             <div class="w-8 h-8 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-white/20 flex items-center justify-center text-white backdrop-blur-md transition-all duration-500 shadow-sm border border-white/20">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                             </div>
-                            <span class="text-[9px] sm:text-[11px] font-black text-white/60 uppercase tracking-[0.1em] sm:tracking-[0.2em]">Net Profit</span>
+                            <span class="text-[9px] sm:text-[11px] font-black text-white/60 uppercase tracking-[0.1em] sm:tracking-[0.2em]">Net Sales</span>
                         </div>
-                        <h3 class="text-lg sm:text-2xl lg:text-3xl font-black text-white tracking-tight">₱ {{ number_format($kpi['gross_profit'], 2) }}</h3>
+                        <h3 class="text-lg sm:text-2xl lg:text-3xl font-black text-white tracking-tight">₱ {{ number_format($kpi['net_sales'], 2) }}</h3>
                         <div class="flex items-center gap-2 mt-2">
                             <span class="flex h-2 w-2 rounded-full bg-amber-300 animate-pulse"></span>
-                            <p class="text-[10px] sm:text-[12px] font-bold text-white/80 line-clamp-1">{{ $kpi['profit_margin_pct'] }}% Profit Margin</p>
+                            <p class="text-[10px] sm:text-[12px] font-bold text-white/80 line-clamp-1">Excl. ₱{{ number_format($kpi['delivery_fees'], 2) }} Delivery Fees</p>
                         </div>
                     </div>
                 </div>
-                <button wire:click="openBreakdown('Margin')" class="absolute bottom-4 right-4 z-20 w-8 h-8 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-all shadow-sm" title="View Margin Breakdown">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </button>
             </div>
 
             {{-- AOV --}}
@@ -303,6 +303,13 @@
                                     <span class="text-[10px] font-bold text-slate-400">Total Costs</span>
                                 </div>
                             </div>
+                            <div class="p-5 rounded-2xl bg-white border border-slate-100 shadow-sm">
+                                <span class="text-[10px] font-black text-amber-600 uppercase tracking-widest block mb-1">Variance & Spoilage</span>
+                                <div class="flex items-baseline gap-2">
+                                    <p class="text-2xl font-black text-slate-900">- ₱ {{ number_format($kpi['waste_cost'] ?? 0, 2) }}</p>
+                                    <span class="text-[10px] font-bold text-slate-400">Loss</span>
+                                </div>
+                            </div>
                             <div class="mt-6 pt-6 border-t border-dashed border-slate-200">
                                 <div class="flex justify-between items-end bg-slate-900 p-6 rounded-2xl shadow-xl shadow-slate-200 overflow-hidden relative">
                                     <div class="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full -mr-16 -mt-16"></div>
@@ -343,6 +350,8 @@
                                             <p class="text-[14px] font-black text-slate-900">
                                                 @if(isset($item['is_percentage']) && $item['is_percentage'])
                                                     {{ number_format($item['total'], 2) }}%
+                                                @elseif($selectedMetric === 'Volume')
+                                                    {{ number_format($item['total'], 0) }}
                                                 @elseif(isset($item['total']))
                                                     ₱ {{ number_format($item['total'], 2) }}
                                                 @else
@@ -371,22 +380,27 @@
 
         {{-- ─── Main Analytical Layer ────────────────────────────────────────── --}}
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6" x-data="dashboardCharts()" @update-sales-chart.window="handleChartUpdate($event.detail)" wire:ignore.self wire:key="dashboard-charts-container">
-            {{-- 1: Financial Pulse (Line Chart) --}}
-            <div class="lg:col-span-8 rounded-xl bg-white border border-gray-200 shadow-sm p-4 sm:p-6 overflow-hidden h-[380px] sm:h-[400px]">
+            {{-- 1: Financial Overview (Line Chart) --}}
+            <div class="lg:col-span-8 rounded-xl bg-white border border-gray-200 shadow-sm p-4 sm:p-6 overflow-hidden h-[380px] sm:h-[400px] relative">
+                {{-- Premium Glassmorphism Loading Overlay --}}
+                <div wire:loading wire:target="startDate, endDate, selectedBranchId, applyQuickDateFilter, resetDates" 
+                     class="absolute inset-0 bg-white/40 backdrop-blur-[2px] flex items-center justify-center z-30 transition-all duration-300 rounded-xl">
+                    <div class="flex flex-col items-center gap-2">
+                        <div class="w-8 h-8 rounded-full border-2 border-slate-200 border-t-slate-800 animate-spin"></div>
+                        <span class="text-[10px] font-black text-slate-600 uppercase tracking-widest">Recomputing...</span>
+                    </div>
+                </div>
+
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
                     <h2 class="text-[13px] sm:text-[14px] font-black text-gray-900 uppercase tracking-widest text-center sm:text-left">
-                        Financial Pulse
+                        Financial Overview
                     </h2>
 
                     <div class="flex items-center p-1 bg-gray-50 rounded-xl border border-gray-100 w-full sm:w-auto overflow-x-auto">
                         @foreach(['Sales', 'Volume', 'Profit'] as $m)
-                            <button wire:click="setChartMetric('{{ $m }}')"
-                                    @class([
-                                        'flex-1 sm:flex-none px-2 sm:px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300',
-                                        $selectedChartMetric === $m 
-                                            ? 'bg-white text-gray-900 shadow-sm border border-gray-100 scale-[1.02] sm:scale-105' 
-                                            : 'text-gray-400 hover:text-gray-600'
-                                    ])>
+                            <button @click="updateMetricLocal('{{ $m }}')"
+                                    :class="selectedMetric === '{{ $m }}' ? 'bg-white text-gray-900 shadow-sm border border-gray-100 scale-[1.02] sm:scale-105' : 'text-gray-400 hover:text-gray-600'"
+                                    class="flex-1 sm:flex-none px-2 sm:px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300">
                                 {{ $m }}
                             </button>
                         @endforeach
@@ -485,6 +499,33 @@
                             <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">No Active Channels</p>
                         </div>
                     @endforelse
+                    {{-- Payment Methods Breakdown --}}
+                    <div class="pt-4 border-t border-gray-100">
+                        @php
+                            $paymentLabels = $chart['payment']['labels'] ?? [];
+                            $paymentSeries = $chart['payment']['series'] ?? [];
+                        @endphp
+                        <h4 class="text-[12px] font-black text-gray-700 mb-3 uppercase tracking-wider">Payment Methods</h4>
+                        <div class="space-y-3">
+                            @foreach($paymentLabels as $i => $pm)
+                                    @php
+                                        $count = (int)($paymentSeries[$i] ?? 0);
+                                        $amount = (float)($chart['payment']['totals'][$i] ?? 0);
+                                        $currency = $financialConfig['currency_symbol'] ?? '₱';
+                                    @endphp
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-8 h-8 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-600 font-bold text-xs">{{ substr($pm, 0, 2) }}</div>
+                                            <div>
+                                                <p class="text-[13px] font-bold text-gray-900">{{ $pm }}</p>
+                                                <p class="text-[10px] text-gray-400">{{ $count }} orders</p>
+                                            </div>
+                                        </div>
+                                        <div class="text-[12px] font-black text-gray-900">{{ $currency }} {{ number_format($amount, 2) }}</div>
+                                    </div>
+                                @endforeach
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -517,14 +558,39 @@
 
             {{-- 3: Efficiency Audit (New Level Indicator Design) --}}
             <div class="lg:col-span-4 p-6 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col h-[320px]">
-                <div class="flex items-center justify-between mb-8">
+                <div class="flex items-center justify-between mb-6">
                     <h2 class="text-[14px] font-black text-gray-900 uppercase tracking-widest">Health Index</h2>
                 </div>
                 <div class="flex-1 flex gap-10 items-center px-4">
-                    {{-- Vertical Level Indicator (No Circle) --}}
-                    <div class="h-40 w-12 bg-gray-50 border-2 border-gray-100 rounded-xl relative overflow-hidden flex flex-col justify-end">
-                        <div class="absolute inset-0 opacity-10" style="background-image: repeating-linear-gradient(0deg, #9ca3af, #9ca3af 1px, transparent 1px, transparent 10px);"></div>
-                        <div class="w-full transition-all duration-1000 shadow-[0_0_15px_rgba(16,185,129,0.3)] {{ $inventoryIntel['health_score'] > 80 ? 'bg-emerald-500' : ($inventoryIntel['health_score'] > 50 ? 'bg-amber-500' : 'bg-red-500') }}" style="height: {{ $inventoryIntel['health_score'] }}%"></div>
+                    {{-- Premium High-Tech Segmented Battery Indicator --}}
+                    <div class="relative w-16 h-36 flex flex-col items-center shrink-0">
+                        {{-- Battery Cap --}}
+                        <div class="w-6 h-2 bg-slate-800 rounded-t-md shadow-sm z-10"></div>
+                        
+                        {{-- Battery Body --}}
+                        <div class="w-full flex-1 bg-slate-50 border-[3.5px] border-slate-800 rounded-2xl p-1 relative overflow-hidden flex flex-col justify-end shadow-[inset_0_2px_4px_rgba(0,0,0,0.06)]">
+                            
+                            {{-- Segment lines overlay (creating battery bar segments) --}}
+                            <div class="absolute inset-0 z-20 pointer-events-none" 
+                                 style="background-image: repeating-linear-gradient(0deg, transparent, transparent 16px, #ffffff 16px, #ffffff 19px);">
+                            </div>
+
+                            {{-- Dynamic Battery Juice --}}
+                            @php
+                                $health = $inventoryIntel['health_score'];
+                                $juiceColor = $health > 80 
+                                    ? 'bg-gradient-to-t from-emerald-500 to-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.4)] border border-emerald-400/30' 
+                                    : ($health > 50 
+                                        ? 'bg-gradient-to-t from-amber-500 to-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.4)] border border-amber-400/30' 
+                                        : 'bg-gradient-to-t from-rose-600 to-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)] border border-rose-500/30');
+                            @endphp
+                            <div class="w-full transition-all duration-1000 ease-out rounded-xl {{ $juiceColor }}" 
+                                 style="height: {{ $health }}%">
+                            </div>
+
+                            {{-- Glass Reflection shine effect --}}
+                            <div class="absolute top-0 left-0 w-1/2 h-full bg-white/10 z-10 rounded-l-md pointer-events-none"></div>
+                        </div>
                     </div>
                     <div class="flex-1 space-y-6">
                         <div>
@@ -615,11 +681,19 @@
                     </x-sliding-tabs>
                 </div>
 
-                <div class="flex-1 p-5 pt-0 space-y-3 overflow-y-auto custom-scrollbar">
+                <div class="flex-1 p-4 pt-0 space-y-3 overflow-y-auto custom-scrollbar">
                     {{-- Deficiency Tab --}}
-                    <div x-show="stockTab === 'deficiency'" class="space-y-2">
+                    <div x-show="stockTab === 'deficiency'"
+                        x-cloak
+                        x-transition:enter="transition ease-out duration-200"
+                        x-transition:enter-start="opacity-0 -translate-y-1"
+                        x-transition:enter-end="opacity-100 translate-y-0"
+                        x-transition:leave="transition ease-in duration-150"
+                        x-transition:leave-start="opacity-100 translate-y-0"
+                        x-transition:leave-end="opacity-0 -translate-y-1"
+                        class="space-y-0">
                         @forelse($lowStockAlerts as $alert)
-                            <div class="p-3 rounded-2xl bg-red-50/30 border border-red-50 flex items-center justify-between group hover:border-red-200 transition-all">
+                            <div class="p-3 rounded-2xl bg-red-50/30 border border-red-50 flex items-center justify-between group hover:border-red-200 transition-all mb-2">
                                 <div>
                                     <h3 class="text-[13px] font-black text-gray-900">{{ $alert['ingredient'] }}</h3>
                                     <p class="text-[10px] font-bold text-gray-400 mt-1">{{ $alert['branch'] }}</p>
@@ -642,16 +716,24 @@
                     </div>
 
                     {{-- Expiration Tab --}}
-                    <div x-show="stockTab === 'expiration'" class="space-y-2" x-cloak>
+                    <div x-show="stockTab === 'expiration'"
+                        x-cloak
+                        x-transition:enter="transition ease-out duration-200"
+                        x-transition:enter-start="opacity-0 -translate-y-1"
+                        x-transition:enter-end="opacity-100 translate-y-0"
+                        x-transition:leave="transition ease-in duration-150"
+                        x-transition:leave-start="opacity-100 translate-y-0"
+                        x-transition:leave-end="opacity-0 -translate-y-1"
+                        class="space-y-0">
                         @forelse($expirationAlerts as $exp)
-                            <div class="p-3 rounded-2xl bg-amber-50/30 border border-amber-50 flex items-center justify-between group hover:border-amber-200 transition-all">
+                            <div class="p-3 rounded-2xl bg-amber-50/30 border border-amber-50 flex items-center justify-between group hover:border-amber-200 transition-all mb-2">
                                 <div>
                                     <h3 class="text-[13px] font-black text-gray-900">{{ $exp['ingredient'] }}</h3>
-                                    <p class="text-[10px] font-bold text-amber-600 mt-1 uppercase">{{ $exp['expiry'] }}</p>
+                                    <p class="text-[10px] font-bold text-gray-400 mt-1">{{ $exp['expiry'] }}</p>
                                 </div>
                                 <div class="text-right">
                                     <span @class([
-                                        'px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider',
+                                        'px-2.5 py-1 rounded-lg text-[12px] font-black',
                                         $exp['days_left'] < 0 ? 'bg-red-500 text-white' : 'bg-amber-100/50 text-amber-700'
                                     ])>
                                         {{ $exp['days_left'] < 0 ? 'EXPIRED' : $exp['days_left'] . 'd' }}
@@ -726,12 +808,14 @@
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
     </style>
 
-@push('beforeLivewireScripts')
     <script>
         function dashboardCharts() {
             return {
                 salesChart: null,
-                paymentChart: null,
+                selectedMetric: '{{ $selectedChartMetric ?? "Sales" }}',
+                metrics: @json($chart['metrics']['series'] ?? []),
+                metricForecasts: @json($chart['metrics']['forecast'] ?? []),
+                metricsCategories: @json($chart['categories'] ?? []),
                 
                 init() {
                     this.initSales();
@@ -742,33 +826,56 @@
                                 try { this.salesChart.destroy(); } catch(e) {}
                                 this.salesChart = null;
                             }
-                            if (this.paymentChart) {
-                                try { this.paymentChart.destroy(); } catch(e) {}
-                                this.paymentChart = null;
-                            }
                         });
                     }
                 },
 
                 handleChartUpdate(detail) {
                     const data = detail?.chart ?? detail?.[0] ?? detail;
-                    if (!this.salesChart || !data || !this.$refs.salesChart) return;
+                    if (!data) return;
 
                     try {
-                        this.salesChart.updateOptions({
-                            xaxis: { categories: data.categories ?? [] }
-                        });
+                        if (data.metrics) {
+                            this.metrics = data.metrics.series ?? {};
+                            this.metricForecasts = data.metrics.forecast ?? {};
+                        }
+                        this.metricsCategories = data.categories ?? [];
 
-                        this.salesChart.updateSeries([{
-                            name: data.metric === 'Volume' ? "Order Volume" : (data.metric === 'Profit' ? "Net Profit" : "Gross Revenue"),
-                            data: data.history ?? []
-                        }, {
-                            name: "Predictive Forecast",
-                            data: data.forecast ?? []
-                        }]);
+                        this.updateMetricLocal(this.selectedMetric);
                     } catch (e) {
                         console.warn("Chart update failed, re-initializing...", e);
                         this.initSales();
+                    }
+                },
+
+                updateMetricLocal(metric) {
+                    if (!this.salesChart || !this.metrics || !this.metrics[metric]) return;
+                    try {
+                        this.selectedMetric = metric;
+
+                        // Silent background sync to Livewire without triggering redrawing lag
+                        this.$wire.set('selectedChartMetric', metric, false);
+
+                        const main = this.metrics[metric];
+                        const forecast = this.metricForecasts[metric] ?? [];
+
+                        this.salesChart.updateOptions({ 
+                            xaxis: { categories: this.metricsCategories },
+                            yaxis: {
+                                title: {
+                                    text: metric === 'Volume' ? 'Volume (Units)' : (metric === 'Profit' ? 'Profit (₱)' : 'Revenue (₱)'),
+                                }
+                            },
+                            series: [{
+                                name: metric === 'Volume' ? "Order Volume" : (metric === 'Profit' ? "Net Profit" : "Gross Revenue"),
+                                data: main
+                            }, {
+                                name: "Predictive Forecast",
+                                data: forecast
+                            }]
+                        }, false, true);
+                    } catch (e) {
+                        console.warn('Local metric update failed', e);
                     }
                 },
 
@@ -783,8 +890,14 @@
 
                     var options = {
                         series: [
-                            { name: "Gross Revenue", data: @json($chart['history']) },
-                            { name: "Predictive Forecast", data: @json($chart['forecast']) }
+                            { 
+                                name: this.selectedMetric === 'Volume' ? "Order Volume" : (this.selectedMetric === 'Profit' ? "Net Profit" : "Gross Revenue"), 
+                                data: this.metrics[this.selectedMetric] ?? [] 
+                            },
+                            { 
+                                name: "Predictive Forecast", 
+                                data: this.metricForecasts[this.selectedMetric] ?? [] 
+                            }
                         ],
                         chart: { 
                             height: 320, 
@@ -804,11 +917,11 @@
                                 top: 10,
                                 left: 0,
                                 blur: 10,
-                                color: '#10B981',
+                                color: '{{ $hexMain }}',
                                 opacity: 0.15
                             }
                         },
-                        colors: ['#10B981', '#6366F1'],
+                        colors: ['{{ $hexMain }}', '{{ $hexLight }}'],
                         dataLabels: { enabled: false },
                         stroke: { 
                             width: [3, 2], 
@@ -825,7 +938,7 @@
                             }
                         },
                         xaxis: {
-                            categories: @json($chart['categories']),
+                            categories: this.metricsCategories,
                             tooltip: { enabled: false },
                             axisBorder: { show: false }, 
                             axisTicks: { show: false },
@@ -838,9 +951,18 @@
                             }
                         },
                         yaxis: {
+                            title: {
+                                text: this.selectedMetric === 'Volume' ? 'Volume (Units)' : (this.selectedMetric === 'Profit' ? 'Profit (₱)' : 'Revenue (₱)'),
+                                style: { fontSize: '11px', fontWeight: 600, color: '#6B7280' }
+                            },
                             labels: {
                                 style: { colors: '#9CA3AF', fontSize: '11px', fontWeight: 600 },
-                                formatter: function (val) { return val >= 1000 ? "₱" + (val/1000).toFixed(1) + "k" : "₱" + val; }
+                                formatter: (val) => { 
+                                    if (this.selectedMetric === 'Volume') {
+                                        return val >= 1000 ? (val/1000).toFixed(1) + "k" : val;
+                                    }
+                                    return val >= 1000 ? "₱" + (val/1000).toFixed(1) + "k" : "₱" + val; 
+                                }
                             }
                         },
                         grid: { 
@@ -864,11 +986,10 @@
                             theme: 'dark',
                             x: { show: true },
                             y: { 
-                                formatter: function(val, { series, seriesIndex, dataPointIndex, w }) { 
-                                    const metric = @json($selectedChartMetric);
-                                    if (metric === 'Volume') return val.toLocaleString() + " units";
+                                formatter: (val) => { 
+                                    if (this.selectedMetric === 'Volume') return val.toLocaleString() + " units";
                                     return "₱ " + val.toLocaleString(); 
-                                } 
+                                }
                             },
                             style: { fontSize: '12px', fontFamily: 'Outfit' },
                             onDatasetHover: { highlightDataSeries: true },
@@ -883,6 +1004,4 @@
             }
         }
     </script>
-@endpush
-
 </div>

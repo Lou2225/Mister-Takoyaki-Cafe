@@ -223,7 +223,7 @@ class Order extends Model
 
     public function canBeVoided(): bool
     {
-        return !in_array($this->status, [self::STATUS_COMPLETED, self::STATUS_VOID, self::STATUS_REFUNDED, self::STATUS_PARTIALLY_REFUNDED]) 
+        return !in_array($this->status, [self::STATUS_COMPLETED, self::STATUS_VOID, self::STATUS_REFUNDED, self::STATUS_PARTIALLY_REFUNDED, self::STATUS_DRAFTED]) 
             && $this->created_at->diffInHours(now()) <= 24;
     }
 

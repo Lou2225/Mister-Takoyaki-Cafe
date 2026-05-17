@@ -221,15 +221,8 @@
             <div class="totals-section">
                 <div class="row">
                     <span>Subtotal</span>
-                    <span>{{ $settings['currency_symbol'] ?? '₱' }}{{ number_format($order->total_amount - $order->tax_amount + $order->discount_amount, 2) }}</span>
+                    <span>{{ $settings['currency_symbol'] ?? '₱' }}{{ number_format($order->total_amount + $order->discount_amount, 2) }}</span>
                 </div>
-                
-                @if($settings['receipt_show_vat'] && $order->tax_amount > 0)
-                    <div class="row">
-                        <span>VAT (12%)</span>
-                        <span>{{ $settings['currency_symbol'] ?? '₱' }}{{ number_format($order->tax_amount, 2) }}</span>
-                    </div>
-                @endif
 
                 @if($order->discount_amount > 0)
                     <div class="row">

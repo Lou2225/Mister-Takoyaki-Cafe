@@ -1,14 +1,11 @@
 <div 
-    x-data="window.menuManagement({ 
-        panel: @entangle('panel').live, 
-        tableView: @entangle('view').live, 
-        mode: @entangle('mode').live, 
-        activeTab: @entangle('activeTab').live
-    })"
+    x-data="window.menuManagement($wire)"
     x-on:switch-panel.window="panel = $event.detail.panel"
     class="relative min-h-full flex flex-col p-2 md:p-4"
     wire:ignore.self
     wire:key="menu-management-main-container">
+    {{-- Hidden reactive updater to sync products list under wire:ignore --}}
+    <div x-effect="updateProductsList(@js($products->map(fn($p) => ['id' => $p->id, 'name' => $p->name])))" class="hidden" wire:key="products-sync-helper"></div>
     {{-- Panel: Form --}}
     <div x-show="panel === 'form'" 
          x-transition:enter="transition ease-out duration-200" 
@@ -23,7 +20,7 @@
                     <h2 class="text-[17px] font-black text-gray-900 tracking-tight" x-text="mode === 'edit' ? 'Update Product' : 'Add New Product'"></h2>
                     <p class="text-[12px] text-gray-500 font-medium truncate max-w-[200px] sm:max-w-none" x-text="mode === 'edit' ? 'Configure product details and pricing' : 'Add a new item to the menu'"></p>
                 </div>
-                <x-secondary-button wire:click="backToList" class="h-10 text-[11px] font-black uppercase tracking-widest">
+                <x-secondary-button @click="panel = 'list'; mode = 'list'; $wire.discardDraft();" class="h-10 text-[11px] font-black uppercase tracking-widest">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
                     <span class="hidden sm:inline">Back to Products</span>
                     <span class="sm:hidden">Back</span>
@@ -500,7 +497,7 @@
                         <x-primary-button type="button" wire:click="validateBeforeSave" class="w-full justify-center h-12 text-[12px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">
                             <span x-text="mode === 'edit' ? 'Update Catalog' : 'Register Product'"></span>
                         </x-primary-button>
-                        <x-secondary-button wire:click="backToList" class="w-full justify-center h-11 text-[12px] font-black uppercase tracking-widest border-slate-200 text-slate-500">
+                        <x-secondary-button @click="panel = 'list'; mode = 'list'; $wire.discardDraft();" class="w-full justify-center h-11 text-[12px] font-black uppercase tracking-widest border-slate-200 text-slate-500">
                             Discard Draft
                         </x-secondary-button>
                     </div>
@@ -526,7 +523,7 @@
             <x-primary-button type="button" wire:click="validateBeforeSave" class="w-full justify-center h-12 text-[12px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">
                 <span x-text="mode === 'edit' ? 'Update Catalog' : 'Register Product'"></span>
             </x-primary-button>
-            <x-secondary-button wire:click="backToList" class="w-full justify-center h-11 text-[11px] font-black uppercase tracking-widest border-slate-100 text-slate-400">
+            <x-secondary-button @click="panel = 'list'; mode = 'list'; $wire.discardDraft();" class="w-full justify-center h-11 text-[11px] font-black uppercase tracking-widest border-slate-100 text-slate-400">
                 Discard Draft
             </x-secondary-button>
         </div>
@@ -602,11 +599,11 @@
             <div class="flex items-center justify-between">
                 <div>
                     <h2 class="text-[17px] font-black text-gray-900 tracking-tight">Menu Management</h2>
-                    <p class="text-[12px] text-gray-500 font-medium">Managing <span class="text-indigo-600 font-bold">{{ $products->total() }} catalog assets</span></p>
+                    <p class="text-[12px] text-gray-500 font-medium">Managing <span class="text-indigo-600 font-bold">{{ $totalProducts }} catalog assets</span></p>
                 </div>
                 <div class="flex items-center gap-3">
                     @if($this->isSuperAdmin() || $this->isAdmin())
-                        <x-primary-button wire:click="showCreate" class="h-10 text-[11px] font-black uppercase tracking-widest">
+                        <x-primary-button @click="panel = 'form'; mode = 'create'; activeTab = 'basic'; $wire.showCreate();" class="h-10 text-[11px] font-black uppercase tracking-widest">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
                             Add Product
                         </x-primary-button>
@@ -668,7 +665,7 @@
             
             {{-- Left: Search Bar --}}
             <div class="w-full lg:w-auto flex-1">
-                <x-search-bar wireModel="search" placeholder="Find product..." width="w-full lg:w-80" />
+                <x-search-bar x-model.debounce.50ms="searchQuery" placeholder="Find product..." width="w-full lg:w-80" />
             </div>
 
             {{-- Right: Filters & View Toggle --}}
@@ -776,9 +773,9 @@
                         <th class="py-3 px-6 text-right text-[11px] font-bold text-slate-400 uppercase tracking-widest">Actions</th>
                     </x-slot>
 
-                    <tbody class="divide-y divide-slate-100/80" wire:loading.class="opacity-40" wire:target="search, selectedCategoryId, isActive, perPage">
+                    <tbody class="divide-y divide-slate-100/80">
                         @forelse($products as $product)
-                            <tr wire:key="prod-row-{{ $product->id }}" class="hover:bg-slate-50/50 transition-colors group/row">
+                            <tr wire:key="prod-row-{{ $product->id }}" x-show="isItemVisible({{ $product->id }})" x-cloak class="hover:bg-slate-50/50 transition-colors group/row">
                                 <td class="py-4 px-6 border-r border-slate-100/50 whitespace-nowrap">
                                     <div class="flex items-center gap-3">
                                         <div class="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 overflow-hidden shadow-sm transition-transform group-hover/row:scale-105">
@@ -822,10 +819,100 @@
                                 </td>
                             </tr>
                         @endforelse
+                        <tr x-show="filteredProductIds.length === 0" x-cloak>
+                            <td colspan="4" class="py-12">
+                                <x-empty-state title="No products match your search" description="Try typing a different name or checking your filters." />
+                            </td>
+                        </tr>
                     </tbody>
                 </x-data-table>
                 <div class="mt-4 px-1">
-                    <x-pagination :paginator="$products" keyPrefix="menu-table" />
+                    <template x-if="filteredProductIds.length > 0">
+                        <div class="flex flex-col lg:flex-row items-center justify-between px-4 py-4 bg-white border-t border-gray-100 lg:px-6 gap-6">
+                            <div class="flex flex-col sm:flex-row items-center justify-between w-full lg:w-auto gap-4 sm:gap-8">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex flex-col sm:flex-row sm:items-center sm:gap-1.5 leading-[0.9] sm:leading-none">
+                                        <span class="text-[11px] sm:text-[12px] text-gray-400 font-black uppercase tracking-tighter sm:tracking-widest">Row</span>
+                                        <span class="text-[9px] sm:text-[12px] text-gray-400/70 font-black uppercase tracking-tighter sm:tracking-widest">per page</span>
+                                    </div>
+                                    <div>
+                                        <x-dropdown align="top" width="20" containerClasses="block">
+                                            <x-slot name="trigger">
+                                                <button type="button" class="inline-flex items-center justify-between min-w-[70px] px-3 py-1.5 text-[13px] font-black text-gray-900 bg-slate-50 border border-gray-200 rounded-xl hover:border-gray-300 focus:outline-none transition-all h-10 gap-2 shadow-sm">
+                                                    <span x-text="perPage"></span>
+                                                    <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </button>
+                                            </x-slot>
+                                            <x-slot name="content">
+                                                <template x-for="option in [5, 10, 15, 30, 50, 100]">
+                                                    <x-dropdown-link href="#" @click.prevent="perPage = option; currentPage = 1;">
+                                                        <span x-text="option"></span>
+                                                    </x-dropdown-link>
+                                                </template>
+                                            </x-slot>
+                                        </x-dropdown>
+                                    </div>
+                                </div>
+                                <div class="text-[11px] text-gray-400 font-bold uppercase tracking-widest whitespace-nowrap">
+                                    <span class="text-gray-900" x-text="Math.min(filteredProductIds.length, (currentPage - 1) * perPage + 1)"></span>
+                                    <span class="mx-0.5 text-gray-300">-</span>
+                                    <span class="text-gray-900" x-text="Math.min(filteredProductIds.length, currentPage * perPage)"></span>
+                                    <span class="mx-1 text-gray-300 lowercase italic font-medium">of</span>
+                                    <span class="text-indigo-600" x-text="filteredProductIds.length"></span>
+                                    <span class="ml-1 text-gray-300 lowercase italic font-medium">results</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 w-full lg:w-auto justify-center lg:justify-end border-t border-gray-50 pt-4 lg:border-0 lg:pt-0">
+                                <x-secondary-button @click="currentPage = 1" ::disabled="currentPage === 1" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="currentPage === 1 ? 'opacity-30 pointer-events-none' : ''">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                                    </svg>
+                                </x-secondary-button>
+                                <x-secondary-button @click="currentPage = Math.max(1, currentPage - 1)" ::disabled="currentPage === 1" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="currentPage === 1 ? 'opacity-30 pointer-events-none' : ''">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                    </svg>
+                                </x-secondary-button>
+                                <div class="flex items-center gap-1.5 px-2">
+                                    <template x-for="page in pageNumbers">
+                                        <div class="flex items-center gap-1.5">
+                                            <template x-if="page === currentPage">
+                                                <x-primary-button class="!p-0 w-9 h-9 items-center justify-center !rounded-xl bg-gray-900 text-[13px] font-black shadow-none ring-0">
+                                                    <span x-text="page"></span>
+                                                </x-primary-button>
+                                            </template>
+                                            <template x-if="page !== currentPage">
+                                                <x-secondary-button @click="currentPage = page" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl text-[13px] font-bold">
+                                                    <span x-text="page"></span>
+                                                </x-secondary-button>
+                                            </template>
+                                        </div>
+                                    </template>
+                                    
+                                    <template x-if="Math.ceil(filteredProductIds.length / perPage) > currentPage + 1">
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="text-gray-300 font-bold mx-1">...</span>
+                                            <x-secondary-button @click="currentPage = Math.ceil(filteredProductIds.length / perPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl text-[13px] font-bold">
+                                                <span x-text="Math.ceil(filteredProductIds.length / perPage)"></span>
+                                            </x-secondary-button>
+                                        </div>
+                                    </template>
+                                </div>
+                                <x-secondary-button @click="currentPage = Math.min(Math.ceil(filteredProductIds.length / perPage), currentPage + 1)" ::disabled="currentPage >= Math.ceil(filteredProductIds.length / perPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="currentPage >= Math.ceil(filteredProductIds.length / perPage) ? 'opacity-30 pointer-events-none' : ''">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </x-secondary-button>
+                                <x-secondary-button @click="currentPage = Math.ceil(filteredProductIds.length / perPage) || 1" ::disabled="currentPage >= Math.ceil(filteredProductIds.length / perPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="currentPage >= Math.ceil(filteredProductIds.length / perPage) ? 'opacity-30 pointer-events-none' : ''">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                                    </svg>
+                                </x-secondary-button>
+                            </div>
+                        </div>
+                    </template>
                 </div>
             </div>
 
@@ -835,11 +922,9 @@
                  x-transition:enter-start="opacity-0 translate-y-4"
                  x-transition:enter-end="opacity-100 translate-y-0"
                  x-cloak>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
-                    wire:loading.class="opacity-40 pointer-events-none"
-                    wire:target="search, selectedCategoryId, isActive, perPage">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     @forelse($products as $product)
-                        <div wire:key="prod-card-{{ $product->id }}" class="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm hover:shadow-md transition-all group/card relative cursor-pointer" wire:click="showEdit({{ $product->id }})">
+                        <div wire:key="prod-card-{{ $product->id }}" x-show="isItemVisible({{ $product->id }})" x-cloak class="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm hover:shadow-md transition-all group/card relative cursor-pointer" wire:click="showEdit({{ $product->id }})">
                             <div class="aspect-[4/3] rounded-xl bg-slate-50 border border-slate-100 overflow-hidden mb-4 relative shadow-inner">
                                 @if($product->image)
                                     <img src="{{ Storage::url($product->image) }}" class="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-110">
@@ -870,9 +955,97 @@
                             <x-empty-state title="Catalog is empty" description="Try changing your filters or adding a new item." />
                         </div>
                     @endforelse
+                    <div x-show="filteredProductIds.length === 0" x-cloak class="col-span-full py-24 text-center bg-white rounded-2xl border border-slate-100 shadow-sm">
+                        <x-empty-state title="No products match your search" description="Try changing your filters or search terms." />
+                    </div>
                 </div>
                 <div class="mt-6">
-                    <x-pagination :paginator="$products" keyPrefix="menu-board" />
+                    <template x-if="filteredProductIds.length > 0">
+                        <div class="flex flex-col lg:flex-row items-center justify-between px-4 py-4 bg-white border border-gray-100 rounded-2xl lg:px-6 gap-6">
+                            <div class="flex flex-col sm:flex-row items-center justify-between w-full lg:w-auto gap-4 sm:gap-8">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex flex-col sm:flex-row sm:items-center sm:gap-1.5 leading-[0.9] sm:leading-none">
+                                        <span class="text-[11px] sm:text-[12px] text-gray-400 font-black uppercase tracking-tighter sm:tracking-widest">Row</span>
+                                        <span class="text-[9px] sm:text-[12px] text-gray-400/70 font-black uppercase tracking-tighter sm:tracking-widest">per page</span>
+                                    </div>
+                                    <div>
+                                        <x-dropdown align="top" width="20" containerClasses="block">
+                                            <x-slot name="trigger">
+                                                <button type="button" class="inline-flex items-center justify-between min-w-[70px] px-3 py-1.5 text-[13px] font-black text-gray-900 bg-slate-50 border border-gray-200 rounded-xl hover:border-gray-300 focus:outline-none transition-all h-10 gap-2 shadow-sm">
+                                                    <span x-text="perPage"></span>
+                                                    <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </button>
+                                            </x-slot>
+                                            <x-slot name="content">
+                                                <template x-for="option in [5, 10, 15, 30, 50, 100]">
+                                                    <x-dropdown-link href="#" @click.prevent="perPage = option; currentPage = 1;">
+                                                        <span x-text="option"></span>
+                                                    </x-dropdown-link>
+                                                </template>
+                                            </x-slot>
+                                        </x-dropdown>
+                                    </div>
+                                </div>
+                                <div class="text-[11px] text-gray-400 font-bold uppercase tracking-widest whitespace-nowrap">
+                                    <span class="text-gray-900" x-text="Math.min(filteredProductIds.length, (currentPage - 1) * perPage + 1)"></span>
+                                    <span class="mx-0.5 text-gray-300">-</span>
+                                    <span class="text-gray-900" x-text="Math.min(filteredProductIds.length, currentPage * perPage)"></span>
+                                    <span class="mx-1 text-gray-300 lowercase italic font-medium">of</span>
+                                    <span class="text-indigo-600" x-text="filteredProductIds.length"></span>
+                                    <span class="ml-1 text-gray-300 lowercase italic font-medium">results</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 w-full lg:w-auto justify-center lg:justify-end border-t border-gray-50 pt-4 lg:border-0 lg:pt-0">
+                                <x-secondary-button @click="currentPage = 1" ::disabled="currentPage === 1" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="currentPage === 1 ? 'opacity-30 pointer-events-none' : ''">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                                    </svg>
+                                </x-secondary-button>
+                                <x-secondary-button @click="currentPage = Math.max(1, currentPage - 1)" ::disabled="currentPage === 1" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="currentPage === 1 ? 'opacity-30 pointer-events-none' : ''">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                    </svg>
+                                </x-secondary-button>
+                                <div class="flex items-center gap-1.5 px-2">
+                                    <template x-for="page in pageNumbers">
+                                        <div class="flex items-center gap-1.5">
+                                            <template x-if="page === currentPage">
+                                                <x-primary-button class="!p-0 w-9 h-9 items-center justify-center !rounded-xl bg-gray-900 text-[13px] font-black shadow-none ring-0">
+                                                    <span x-text="page"></span>
+                                                </x-primary-button>
+                                            </template>
+                                            <template x-if="page !== currentPage">
+                                                <x-secondary-button @click="currentPage = page" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl text-[13px] font-bold">
+                                                    <span x-text="page"></span>
+                                                </x-secondary-button>
+                                            </template>
+                                        </div>
+                                    </template>
+                                    
+                                    <template x-if="Math.ceil(filteredProductIds.length / perPage) > currentPage + 1">
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="text-gray-300 font-bold mx-1">...</span>
+                                            <x-secondary-button @click="currentPage = Math.ceil(filteredProductIds.length / perPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl text-[13px] font-bold">
+                                                <span x-text="Math.ceil(filteredProductIds.length / perPage)"></span>
+                                            </x-secondary-button>
+                                        </div>
+                                    </template>
+                                </div>
+                                <x-secondary-button @click="currentPage = Math.min(Math.ceil(filteredProductIds.length / perPage), currentPage + 1)" ::disabled="currentPage >= Math.ceil(filteredProductIds.length / perPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="currentPage >= Math.ceil(filteredProductIds.length / perPage) ? 'opacity-30 pointer-events-none' : ''">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </x-secondary-button>
+                                <x-secondary-button @click="currentPage = Math.ceil(filteredProductIds.length / perPage) || 1" ::disabled="currentPage >= Math.ceil(filteredProductIds.length / perPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="currentPage >= Math.ceil(filteredProductIds.length / perPage) ? 'opacity-30 pointer-events-none' : ''">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                                    </svg>
+                                </x-secondary-button>
+                            </div>
+                        </div>
+                    </template>
                 </div>
             </div>
             </div>
@@ -1023,32 +1196,74 @@
             </div>
         </div>
     </x-modal>
+
+    <script>
+        (function() {
+            window.menuManagement = function($wire) {
+                return {
+                    panel: $wire.entangle('panel').live,
+                    tableView: $wire.entangle('view').live,
+                    mode: $wire.entangle('mode').live,
+                    ...window.slidingTabs($wire.entangle('activeTab').live, 'activeTab'),
+                    
+                    // Client-side search and pagination
+                    searchQuery: '',
+                    currentPage: 1,
+                    perPage: 5,
+                    productsList: [],
+
+                    get filteredProductIds() {
+                        const query = this.searchQuery.toLowerCase().trim();
+                        return this.productsList
+                            .filter(p => !query || p.name.toLowerCase().includes(query))
+                            .map(p => p.id);
+                    },
+                    get paginatedProductIds() {
+                        const start = (this.currentPage - 1) * this.perPage;
+                        return this.filteredProductIds.slice(start, start + this.perPage);
+                    },
+                    get pageNumbers() {
+                        const totalPages = Math.ceil(this.filteredProductIds.length / this.perPage) || 1;
+                        const start = Math.max(1, this.currentPage - 1);
+                        const end = Math.min(totalPages, this.currentPage + 1);
+                        const pages = [];
+                        for (let i = start; i <= end; i++) {
+                            pages.push(i);
+                        }
+                        return pages;
+                    },
+                    isItemVisible(id) {
+                        return this.paginatedProductIds.includes(id);
+                    },
+                    updateProductsList(newList) {
+                        const oldIds = this.productsList.map(p => p.id).join(',');
+                        const newIds = newList.map(p => p.id).join(',');
+                        if (oldIds !== newIds) {
+                            this.productsList = newList;
+                            this.currentPage = 1;
+                        }
+                    },
+
+                    init() {
+                        const base = window.slidingTabs($wire.entangle('activeTab').live, 'activeTab');
+                        if (base.init) base.init.call(this);
+
+                        // Sync tabs when panel changes to form
+                        this.$watch('panel', value => {
+                            if (value === 'form') {
+                                setTimeout(() => this.updateIndicator('activeTab'), 50);
+                                setTimeout(() => this.updateIndicator('activeTab'), 300);
+                            }
+                        });
+
+                        // Reset page on search
+                        this.$watch('searchQuery', () => {
+                            this.currentPage = 1;
+                        });
+                    }
+                };
+            };
+        })();
+    </script>
 </div>
 
-@push('beforeLivewireScripts')
-<script>
-    (function() {
-        window.menuManagement = function(initials) {
-            return {
-                panel: initials.panel,
-                tableView: initials.tableView,
-                mode: initials.mode,
-                ...window.slidingTabs(initials.activeTab, 'activeTab'),
-                
-                init() {
-                    const base = window.slidingTabs(initials.activeTab, 'activeTab');
-                    if (base.init) base.init.call(this);
-
-                    // Sync tabs when panel changes to form
-                    this.$watch('panel', value => {
-                        if (value === 'form') {
-                            setTimeout(() => this.updateIndicator('activeTab'), 50);
-                            setTimeout(() => this.updateIndicator('activeTab'), 300);
-                        }
-                    });
-                }
-            };
-        };
-    })();
-</script>
-@endpush

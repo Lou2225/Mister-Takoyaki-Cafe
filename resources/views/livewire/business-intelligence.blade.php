@@ -12,11 +12,13 @@
         {{-- Page title + actions --}}
         <div class="mb-4 flex items-center justify-between">
             <div>
-                <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Business Intelligence</h2>
+                <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Business Reports</h2>
                 <p class="text-[12px] text-gray-500 font-medium whitespace-nowrap overflow-hidden text-ellipsis">Consolidated analytics and <span class="{{ $primaryText }} font-bold">predictive forecasting</span></p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-                <x-quick-date-filter :activeFilter="$activeFilter" />
+                <div class="w-full sm:w-auto">
+                    <x-quick-date-filter :activeFilter="$activeFilter" class="w-full justify-between sm:justify-start h-10" />
+                </div>
                 <x-date-range-filter startModel="startDate" endModel="endDate" :startValue="$startDate" />
                 <x-report-dropdown module="BI Report" />
 
@@ -26,15 +28,12 @@
                         <x-slot name="trigger">
                             <button type="button" class="inline-flex items-center gap-2 px-4 py-1.5 text-[12px] font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:border-gray-300 focus:outline-none shadow-sm transition-colors h-10">
                                 <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                                <span>{{ $selectedBranchId === 'all' ? 'All Branches' : $branches->firstWhere('id', $selectedBranchId)?->branch_name }}</span>
+                                <span>{{ $branches->firstWhere('id', $selectedBranchId)?->branch_name ?? 'Select Branch' }}</span>
                                 <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                             </button>
                         </x-slot>
                         <x-slot name="content">
-                            <x-dropdown-link href="#" wire:click.prevent="$set('selectedBranchId', 'all')">
-                                <span class="font-bold">All Branches</span>
-                            </x-dropdown-link>
-                            <hr class="my-1 border-gray-100">
+
                             @foreach($branches as $branch)
                                 <x-dropdown-link href="#" wire:click.prevent="$set('selectedBranchId', {{ $branch->id }})">
                                     {{ $branch->branch_name }}
@@ -104,7 +103,7 @@
             </div>
 
             {{-- Operational Insights & Deductions --}}
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 px-1">
+            <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 px-1">
                 {{-- Discounts --}}
                 <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:border-rose-200 transition-all">
                     <div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
@@ -134,7 +133,18 @@
                     </div>
                     <div>
                         <span class="block text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Refunds</span>
-                        <span class="block text-[15px] font-black text-rose-600 leading-none">₱{{ number_format($performance['refunds'], 2) }}</span>
+                        <span class="block text-[15px] font-black text-rose-600 leading-none">-₱{{ number_format($performance['refunds'], 2) }}</span>
+                    </div>
+                </div>
+
+                {{-- Waste / Spoilage --}}
+                <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:border-rose-200 transition-all">
+                    <div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </div>
+                    <div>
+                        <span class="block text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Spoilage</span>
+                        <span class="block text-[15px] font-black text-rose-600 leading-none">-₱{{ number_format($performance['waste_cost'] ?? 0, 2) }}</span>
                     </div>
                 </div>
 
@@ -152,7 +162,7 @@
         </div>
 
         {{-- Sales Ledger Table --}}
-        <div class="mx-1">
+        <div class="mx-1 overflow-x-auto">
             <div class="flex flex-col md:flex-row md:items-center justify-between mb-4 border-b border-gray-200 pb-4 gap-4">
                 <div class="flex items-center gap-1.5">
                     <x-search-bar wireModel="search" placeholder="Search reference..." />
@@ -172,7 +182,7 @@
                 <tr class="hover:bg-gray-50/50 transition-colors">
                     <td class="py-3 px-4 border-r border-gray-100 font-bold text-[13px] text-gray-900 whitespace-nowrap">{{ $order->reference_no }}</td>
                     <td class="py-3 px-4 border-r border-gray-100 text-[12px] font-semibold text-gray-600 whitespace-nowrap">{{ $order->branch->branch_name }}</td>
-                    <td class="py-3 px-4 border-r border-gray-100 text-[12px] font-bold text-gray-700 whitespace-nowrap">{{ $order->customer_name ?: ($order->user->name ?? 'Walk-in') }}</td>
+                    <td class="py-3 px-4 border-r border-gray-100 text-[12px] font-bold text-gray-700 whitespace-nowrap">{{ $order->customer_name ?: 'Walk-in' }}</td>
                     <td class="py-3 px-4 border-r border-gray-100 text-right font-black text-[13px] text-gray-900 font-mono whitespace-nowrap">₱{{ number_format($order->total_amount, 2) }}</td>
                     <td class="py-3 px-4 border-r border-gray-100 text-center whitespace-nowrap">
                         @php
@@ -203,196 +213,149 @@
         </div>
     </div>
 
-    <div x-cloak x-show="activeTab === 'forecasting'" class="space-y-8 animate-fadeIn">
-        {{-- 1. Demand Prediction (Next 7 Days) --}}
+    <div x-cloak x-show="activeTab === 'forecasting'" class="space-y-6 animate-fadeIn">
+
+        {{-- Combined Dual-Line Forecast Chart (ApexCharts) --}}
         <div class="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm mx-1">
-            <div class="flex items-start justify-between mb-8">
+            @php
+                $st = $forecasting['short_term'];
+                $lt = $forecasting['long_term'];
+
+                // Build combined X-axis labels: 7 day labels + 6 month labels
+                $stLabels = collect($st['forecast'])->map(fn($p) => ($p['day'] ?? '') . ' ' . ($p['date'] ?? ''))->values()->toArray();
+                $ltLabels = collect($lt['forecast'])->map(fn($p) => $p['date'] ?? '')->values()->toArray();
+                $allLabels = array_merge($stLabels, $ltLabels);
+                $totalCount = count($allLabels);
+
+                // Short-term series: values for first 7 slots, null for remaining 6
+                $stSeries = array_merge(
+                    collect($st['forecast'])->map(fn($p) => round($p['predicted'], 2))->toArray(),
+                    array_fill(0, count($ltLabels), null)
+                );
+
+                // Long-term series: null for first 7 slots, values for remaining 6
+                $ltSeries = array_merge(
+                    array_fill(0, count($stLabels), null),
+                    collect($lt['forecast'])->map(fn($p) => round($p['predicted'], 2))->toArray()
+                );
+            @endphp
+
+            {{-- Header --}}
+            <div class="flex flex-wrap items-start justify-between gap-4 mb-4">
                 <div>
-                    <h3 class="text-[15px] font-bold text-gray-900 tracking-tight">Demand Prediction (Next 7 Days)</h3>
-                    <p class="text-[12px] text-gray-500 font-medium italic">Short-term volume analysis for immediate restocking needs</p>
+                    <h3 class="text-[15px] font-bold text-gray-900 tracking-tight">Revenue Forecast</h3>
+                    <p class="text-[12px] text-gray-500 font-medium italic">Linear regression model — 7-day demand + 6-month growth trajectory</p>
                 </div>
-                <div class="px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600 text-[10px] font-black uppercase tracking-widest italic">
-                    Confidence: {{ $forecasting['short_term']['confidence'] }}
-                </div>
-            </div>
-
-            @if(count($forecasting['short_term']['forecast']) > 0)
-            <div class="flex gap-3">
-                @php 
-                    $st = $forecasting['short_term'];
-                    $maxValST = collect($st['forecast'])->max('predicted') ?: 1;
-                    $yStepsST = 4;
-                    $stepSizeST = ceil($maxValST / $yStepsST) ?: 1;
-                    $yMaxST = $stepSizeST * $yStepsST;
-                @endphp
-                <div class="flex flex-col justify-between items-end h-64 pb-8 text-[9px] font-bold text-gray-400 select-none" style="min-width:40px">
-                    @for($s = $yStepsST; $s >= 0; $s--)
-                        <span>₱{{ number_format($stepSizeST * $s) }}</span>
-                    @endfor
-                </div>
-                <div class="flex-1 flex flex-col">
-                    <div class="relative h-64 w-full flex items-end gap-3 px-4 border-b border-l border-gray-100 pb-2 bg-gray-50/30 rounded-br-xl">
-                        {{-- Background Grid Lines --}}
-                        <div class="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-5 pr-4">
-                            @for($s = $yStepsST; $s >= 1; $s--)
-                                <div class="border-t border-gray-900 w-full"></div>
-                            @endfor
-                            <div></div>
-                        </div>
-
-                        @foreach($st['forecast'] as $item)
-                        @php 
-                            $hPct = $yMaxST > 0 ? ($item['predicted'] / $yMaxST) * 100 : 0;
-                            $hStr = number_format($hPct, 2, '.', '');
-                        @endphp
-                        <div class="flex-1 flex flex-col items-center group relative z-10 h-full justify-end">
-                            <div class="w-full bg-{{ $primaryColor }}-500 rounded-t-lg transition-all shadow-sm relative hover:bg-{{ $primaryColor }}-600" 
-                                 style="height: {{ $hStr }}%">
-                                <div class="opacity-0 group-hover:opacity-100 absolute -top-12 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-gray-900 text-white text-[11px] font-black rounded-xl transition-all z-20 pointer-events-none whitespace-nowrap shadow-2xl scale-95 group-hover:scale-100">
-                                    ₱{{ number_format($item['predicted'], 0) }}
-                                </div>
-                            </div>
-                            <div class="absolute -bottom-10 flex flex-col items-center">
-                                <span class="text-[9px] font-black text-gray-900 uppercase tracking-widest">{{ $item['day'] }}</span>
-                                <span class="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">{{ $item['date'] }}</span>
-                            </div>
-                        </div>
-                        @endforeach
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="flex items-center gap-2">
+                        <span class="w-6 border-t-2 border-indigo-500 inline-block"></span>
+                        <span class="text-[11px] font-bold text-gray-600">Short-Term (7 Days)</span>
+                        <span class="px-2 py-0.5 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 text-[9px] font-black uppercase tracking-widest">{{ $st['confidence'] }}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="w-6 border-t-2 border-dashed border-emerald-500 inline-block"></span>
+                        <span class="text-[11px] font-bold text-gray-600">Long-Term (6 Months)</span>
+                        <span class="px-2 py-0.5 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-600 text-[9px] font-black uppercase tracking-widest">{{ $lt['confidence'] }}</span>
                     </div>
                 </div>
             </div>
+
+            @if(count($st['forecast']) > 0 || count($lt['forecast']) > 0)
+                <div wire:ignore>
+                    <div id="bi-forecast-chart"></div>
+                </div>
             @else
-            <x-empty-state title="Insufficient Data" description="Not enough sales history to generate a predictive demand model." />
+                <x-empty-state title="Insufficient Data" description="Not enough sales history to generate a forecast model." />
             @endif
         </div>
 
-        {{-- 2. Strategic Growth (6 Months) --}}
-        <div class="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm mx-1">
-            <div class="flex items-start justify-between mb-8">
-                <div>
-                    <h3 class="text-[15px] font-bold text-gray-900 tracking-tight">Growth Forecasting (Next 6 Months)</h3>
-                    <p class="text-[12px] text-gray-500 font-medium italic">Long-term monthly trajectory based on historical growth velocity</p>
-                </div>
-                <div class="px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-600 text-[10px] font-black uppercase tracking-widest italic">
-                    Confidence: {{ $forecasting['long_term']['confidence'] }}
-                </div>
-            </div>
-
-            @if(count($forecasting['long_term']['forecast']) > 0)
-            <div class="flex gap-3">
-                @php 
-                    $lt = $forecasting['long_term'];
-                    $maxValLT = collect($lt['forecast'])->max('predicted') ?: 1;
-                    $yStepsLT = 4;
-                    $stepSizeLT = ceil($maxValLT / $yStepsLT) ?: 1;
-                    $yMaxLT = $stepSizeLT * $yStepsLT;
-                @endphp
-                <div class="flex flex-col justify-between items-end h-64 pb-8 text-[9px] font-bold text-gray-400 select-none" style="min-width:40px">
-                    @for($s = $yStepsLT; $s >= 0; $s--)
-                        <span>₱{{ number_format($stepSizeLT * $s) }}</span>
-                    @endfor
-                </div>
-                <div class="flex-1 flex flex-col">
-                    <div class="relative h-64 w-full flex items-end gap-6 px-8 border-b border-l border-gray-100 pb-2">
-                        {{-- Background Grid Lines --}}
-                        <div class="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-5 pr-4">
-                            @for($s = $yStepsLT; $s >= 1; $s--)
-                                <div class="border-t border-gray-900 w-full"></div>
-                            @endfor
-                            <div></div>
-                        </div>
-
-                        @foreach($lt['forecast'] as $item)
-                        @php 
-                            $hPct = $yMaxLT > 0 ? ($item['predicted'] / $yMaxLT) * 100 : 0;
-                            $hStr = number_format($hPct, 2, '.', '');
-                        @endphp
-                        <div class="flex-1 flex flex-col items-center group relative z-10 h-full justify-end">
-                            <div class="w-full bg-gray-800 rounded-t-lg transition-all shadow-sm relative hover:bg-gray-900" 
-                                 style="height: {{ $hStr }}%">
-                                <div class="opacity-0 group-hover:opacity-100 absolute -top-12 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-gray-900 text-white text-[11px] font-black rounded-xl transition-all z-20 pointer-events-none whitespace-nowrap shadow-2xl scale-95 group-hover:scale-100">
-                                    ₱{{ number_format($item['predicted'], 0) }}
-                                </div>
-                            </div>
-                            <div class="absolute -bottom-8 flex flex-col items-center">
-                                <span class="text-[9px] font-black text-gray-900 uppercase tracking-widest whitespace-nowrap">{{ $item['date'] }}</span>
-                            </div>
-                        </div>
-                        @endforeach
-                    </div>
-                </div>
-            </div>
-            @else
-            <x-empty-state title="Insufficient Data" description="Not enough monthly history to generate a long-term growth forecast." />
-            @endif
-        </div>
 
         {{-- 3. Insights Row --}}
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 px-1">
             {{-- Predicted Restock Insights --}}
-            <div class="bg-gray-950 rounded-3xl p-6 text-white shadow-2xl relative overflow-hidden group">
-                <div class="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+            <div class="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm relative overflow-hidden group">
+                <div class="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity text-emerald-500">
                     <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-14L4 7m8 4v10M4 7v10l8 4"/></svg>
                 </div>
                 
-                <div class="flex items-center justify-between mb-6">
-                    <h4 class="text-[11px] font-black uppercase tracking-widest text-emerald-500">Restock Insights (7d)</h4>
-                    <span class="text-[9px] font-bold text-gray-500 italic">Ingredient Demand Prediction</span>
+                <div class="flex items-center justify-between mb-6 relative z-10">
+                    <h4 class="text-[13px] font-black uppercase tracking-widest text-gray-900">Restock Insights (7d)</h4>
+                    <span class="text-[9px] font-bold text-gray-500 italic">Demand Prediction</span>
                 </div>
 
-                <div class="space-y-4">
+                <div class="space-y-3 relative z-10">
                     @forelse($forecasting['restock_insights'] as $ri)
-                    <div class="flex items-center justify-between p-3 rounded-2xl bg-white/5 border border-white/10 {{ $canOrder ? 'hover:bg-white/10 hover:border-emerald-500/30 cursor-pointer' : 'cursor-not-allowed opacity-60' }} transition-all"
-                         @if($canOrder) wire:click="redirectToOrdering({{ $ri['id'] }})" @endif
-                         @if(!$canOrder) title="Stock ordering not available for main branch" @endif>
+                    <div class="flex items-center justify-between p-3 rounded-2xl bg-gray-50 border border-gray-100 {{ $isActionable ? 'hover:bg-emerald-50 hover:border-emerald-200 cursor-pointer' : 'cursor-not-allowed opacity-60' }} transition-all"
+                         @if($isActionable) wire:click="redirectToOrdering({{ $ri['id'] }})" @endif
+                         @if(!$isActionable) title="Action not available when viewing 'All Branches'" @endif>
                         <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-500">
+                            <div class="w-9 h-9 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-emerald-600 shadow-sm">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
                             </div>
                             <div>
-                                <p class="text-[12px] font-bold text-white">{{ $ri['name'] }}</p>
-                                <p class="text-[10px] text-gray-500 font-medium">Predicted need: {{ number_format($ri['amount'], 1) }} {{ $ri['unit'] }}</p>
+                                <p class="text-[12px] font-bold text-gray-900">{{ $ri['name'] }}</p>
+                                <p class="text-[10px] text-gray-500 font-medium">Need: <span class="text-gray-900 font-bold">{{ number_format($ri['amount'], 1) }} {{ $ri['unit'] }}</span></p>
                             </div>
                         </div>
-                        <span class="px-2 py-0.5 rounded-md bg-{{ $ri['priority'] === 'High' ? 'rose' : 'emerald' }}-500/20 text-{{ $ri['priority'] === 'High' ? 'rose' : 'emerald' }}-500 text-[8px] font-black uppercase tracking-widest">
+                        <span class="px-2.5 py-1 rounded-md bg-{{ $ri['priority'] === 'High' ? 'rose' : 'emerald' }}-50 text-{{ $ri['priority'] === 'High' ? 'rose' : 'emerald' }}-600 border border-{{ $ri['priority'] === 'High' ? 'rose' : 'emerald' }}-200 text-[9px] font-black uppercase tracking-widest shadow-sm">
                             {{ $ri['priority'] }}
                         </span>
                     </div>
                     @empty
-                    <p class="text-[11px] text-gray-500 italic">No restocking data available for the next cycle.</p>
+                    <div class="p-6 text-center bg-gray-50 rounded-2xl border border-gray-100">
+                        <p class="text-[12px] font-bold text-gray-500">No Restock Data</p>
+                        <p class="text-[10px] text-gray-400 mt-1">Not enough data to predict restocking needs.</p>
+                    </div>
                     @endforelse
                 </div>
 
-                <div class="mt-6 pt-6 border-t border-white/5">
+                <div class="mt-5 pt-4 border-t border-gray-100 relative z-10">
                     <p class="text-[10px] text-gray-400 leading-relaxed italic">
-                        * Estimates are based on predicted sales of Top 5 products multiplied by recipe quantities.
+                        * Estimates based on predicted sales of Top 5 products and recipe quantities.
                     </p>
                 </div>
             </div>
 
             {{-- Growth Momentum --}}
-            <div class="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex flex-col">
-                <h4 class="text-[11px] font-black uppercase tracking-widest text-gray-400 mb-8">Performance Velocity</h4>
+            <div class="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex flex-col relative overflow-hidden group">
+                <div class="absolute -right-10 -bottom-10 opacity-5 group-hover:opacity-10 transition-opacity text-{{ $primaryColor }}-500">
+                    <svg class="w-64 h-64" fill="currentColor" viewBox="0 0 24 24"><path d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                </div>
                 
-                <div class="flex-1 flex flex-col items-center justify-center">
-                    <div class="flex items-baseline gap-2 mb-2">
-                        <span class="text-[32px] font-black text-gray-900 tracking-tighter">₱{{ number_format(abs($forecasting['short_term']['growth_rate']), 2) }}</span>
-                        <span class="text-[11px] font-black text-gray-400 uppercase tracking-widest">/ day</span>
-                    </div>
-                    <div class="px-3 py-1 rounded-full bg-{{ $forecasting['short_term']['trend'] === 'Upward' ? 'emerald' : 'rose' }}-50 text-{{ $forecasting['short_term']['trend'] === 'Upward' ? 'emerald' : 'rose' }}-600 border border-current text-[10px] font-black uppercase tracking-widest mb-6">
+                <div class="flex items-center justify-between mb-6 relative z-10">
+                    <h4 class="text-[13px] font-black uppercase tracking-widest text-gray-900">Performance Velocity</h4>
+                    <div class="px-3 py-1 rounded-full bg-{{ $forecasting['short_term']['trend'] === 'Upward' ? 'emerald' : 'rose' }}-50 text-{{ $forecasting['short_term']['trend'] === 'Upward' ? 'emerald' : 'rose' }}-600 border border-current text-[9px] font-black uppercase tracking-widest">
                         {{ $forecasting['short_term']['trend'] }} Momentum
                     </div>
+                </div>
+                
+                <div class="flex-1 flex flex-col justify-center relative z-10">
+                    <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Average Daily Change</span>
+                    <div class="flex items-baseline gap-2 mb-8">
+                        <span class="text-[40px] font-black text-gray-900 tracking-tighter leading-none">₱{{ number_format(abs($forecasting['short_term']['growth_rate']), 2) }}</span>
+                        <span class="text-[12px] font-black text-gray-400 uppercase tracking-widest">/ day</span>
+                    </div>
 
-                    <div class="grid grid-cols-2 gap-4 w-full">
-                        <div class="p-4 rounded-2xl bg-gray-50 border border-gray-100">
+                    <div class="grid grid-cols-2 gap-4 mt-auto">
+                        <div class="p-4 rounded-2xl bg-gray-50 border border-gray-100 hover:border-gray-200 transition-colors flex flex-col justify-center">
+                            <span class="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Baseline Avg</span>
+                            <span class="text-[14px] font-black text-gray-900">₱{{ number_format($forecasting['short_term']['baseline_avg'] ?? 0, 0) }}</span>
+                            <span class="text-[9px] text-gray-500 font-bold block mt-0.5">Last 7 active days</span>
+                        </div>
+                        <div class="p-4 rounded-2xl bg-gray-50 border border-gray-100 hover:border-gray-200 transition-colors flex flex-col justify-center">
+                            <span class="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Peak Prediction</span>
+                            <span class="text-[14px] font-black text-emerald-600">{{ $forecasting['short_term']['peak_day'] ?? 'N/A' }}</span>
+                            <span class="text-[9px] text-gray-500 font-bold block mt-0.5">Next highest day</span>
+                        </div>
+                        <div class="p-4 rounded-2xl bg-gray-50 border border-gray-100 hover:border-gray-200 transition-colors flex flex-col justify-center">
                             <span class="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Monthly Outlook</span>
                             <span class="text-[14px] font-black text-gray-900">₱{{ number_format($forecasting['long_term']['growth_rate'], 0) }}</span>
-                            <span class="text-[9px] text-gray-500 font-bold block">Avg change/mo</span>
+                            <span class="text-[9px] text-gray-500 font-bold block mt-0.5">Avg change/mo</span>
                         </div>
-                        <div class="p-4 rounded-2xl bg-gray-50 border border-gray-100">
+                        <div class="p-4 rounded-2xl bg-gray-50 border border-gray-100 hover:border-gray-200 transition-colors flex flex-col justify-center">
                             <span class="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Strategic Score</span>
                             <span class="text-[14px] font-black text-gray-900">{{ $forecasting['long_term']['confidence'] }}</span>
-                            <span class="text-[9px] text-gray-500 font-bold block">Model reliability</span>
+                            <span class="text-[9px] text-gray-500 font-bold block mt-0.5">Model reliability</span>
                         </div>
                     </div>
                 </div>
@@ -650,7 +613,7 @@
 
         {{-- Branch Comparison (Admin Only) --}}
         @if(auth()->user()->role_id === 1)
-        <div class="mx-1">
+        <div class="mx-1 overflow-x-auto">
             <div class="flex items-center justify-between mb-3 px-1">
                 <div class="flex items-center gap-2">
                     <h4 class="text-[14px] font-bold text-gray-900 tracking-tight">Network Performance</h4>
@@ -710,11 +673,9 @@
 
     {{-- ── Sales Report Tab ── --}}
     <div x-cloak x-show="activeTab === 'sales'" class="space-y-6 animate-fadeIn">
-
-        {{-- Summary Metric Cards --}}
         {{-- Sales Performance Trend --}}
         <div class="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm mx-1">
-            <div class="flex items-center justify-between mb-8">
+            <div class="flex items-center justify-between mb-6">
                 <div>
                     <h4 class="text-[14px] font-bold text-gray-900 tracking-tight">Sales Performance Trend</h4>
                     <p class="text-[11px] text-gray-400 font-medium">Daily revenue over the selected period</p>
@@ -730,7 +691,7 @@
                     $yMaxT = $stepSizeT * $yStepsT;
                 @endphp
                 {{-- Y-Axis --}}
-                <div class="flex flex-col justify-between items-end h-48 pb-6 text-[9px] font-bold text-gray-400 select-none" style="min-width:40px">
+                <div class="flex flex-col justify-between items-end pb-6 text-[9px] font-bold text-gray-400 select-none" style="min-width:44px; height:192px">
                     @for($s = $yStepsT; $s >= 0; $s--)
                         <span>₱{{ number_format($stepSizeT * $s) }}</span>
                     @endfor
@@ -738,7 +699,7 @@
 
                 {{-- Chart Area --}}
                 <div class="flex-1 flex flex-col min-w-0">
-                    <div class="relative h-48 flex items-end gap-1 px-2 border-l border-b border-gray-200 overflow-x-auto pb-0">
+                    <div class="relative h-48 flex items-end border-l border-b border-gray-200 overflow-hidden pb-0">
                         {{-- Grid lines --}}
                         <div class="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-5 pr-4">
                             @for($s = $yStepsT; $s >= 1; $s--)
@@ -747,32 +708,33 @@
                             <div></div>
                         </div>
 
-                        @foreach($trend as $day)
-                            @php $tPct = $yMaxT > 0 ? ($day['value'] / $yMaxT) * 100 : 0; @endphp
-                            <div class="flex-1 min-w-[30px] group relative flex flex-col items-center justify-end h-full z-10">
-                                <div class="w-full bg-gradient-to-t from-emerald-600 to-emerald-400 rounded-t-sm transition-all group-hover:brightness-110 shadow-sm"
-                                     style="height: {{ $tPct }}%">
-                                    <div class="opacity-0 group-hover:opacity-100 absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1.5 bg-gray-900 text-white text-[10px] font-black rounded-lg transition-all z-20 pointer-events-none shadow-xl whitespace-nowrap">
-                                        {{ $day['label'] }}: ₱{{ number_format($day['value'], 0) }}
+                        {{-- Bars — flex-1 so each takes equal share of full width --}}
+                        <div class="absolute inset-0 flex items-end px-1 gap-px">
+                            @foreach($trend as $day)
+                                @php $tPct = $yMaxT > 0 ? ($day['value'] / $yMaxT) * 100 : 0; @endphp
+                                <div class="flex-1 group relative flex flex-col items-center justify-end h-full z-10">
+                                    <div class="w-full bg-gradient-to-t from-emerald-600 to-emerald-400 rounded-t-sm transition-all group-hover:brightness-110 shadow-sm"
+                                         style="height: {{ $tPct }}%">
+                                        <div class="opacity-0 group-hover:opacity-100 absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1.5 bg-gray-900 text-white text-[10px] font-black rounded-lg transition-all z-20 pointer-events-none shadow-xl whitespace-nowrap">
+                                            {{ $day['label'] }}: ₱{{ number_format($day['value'], 0) }}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        @endforeach
+                            @endforeach
+                        </div>
                     </div>
-                    
-                    {{-- X-Axis Labels (Sampled to avoid overlap) --}}
-                    <div class="flex gap-1 px-2 mt-2">
-                        @php $skip = count($trend) > 10 ? ceil(count($trend) / 10) : 1; @endphp
+
+                    {{-- X-Axis Labels (sampled to avoid overlap) --}}
+                    <div class="flex px-1 gap-px mt-2">
+                        @php $skip = count($trend) > 14 ? ceil(count($trend) / 14) : 1; @endphp
                         @foreach($trend as $idx => $day)
-                            @if($idx % $skip == 0)
-                                <div class="flex-1 text-center">
+                            <div class="flex-1 text-center">
+                                @if($idx % $skip == 0)
                                     <span class="text-[8px] font-black text-gray-500 uppercase tracking-tight leading-none whitespace-nowrap">
                                         {{ $day['label'] }}
                                     </span>
-                                </div>
-                            @else
-                                <div class="flex-1"></div>
-                            @endif
+                                @endif
+                            </div>
                         @endforeach
                     </div>
                 </div>
@@ -858,11 +820,138 @@
         </div>
     </div>
 
-    <style>
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fadeIn { animation: fadeIn 0.4s ease-out forwards; }
-        
-        @keyframes growWidth { from { width: 0; } }
-        .animate-growWidth { animation: growWidth 1s ease-out forwards; }
-    </style>
+    <script>
+    (function() {
+        var stSeries = @json($stSeries ?? []);
+        var ltSeries = @json($ltSeries ?? []);
+        var labels   = @json($allLabels ?? []);
+        var stCount  = {{ count($stLabels ?? []) }};
+
+        function initBiForecastChart() {
+            var el = document.getElementById('bi-forecast-chart');
+            if (!el || typeof window.ApexCharts === 'undefined') return;
+            if (el._apexChart) { try { el._apexChart.destroy(); } catch(e) {} }
+
+            var options = {
+                series: [
+                    { name: 'Demand (7 Days)',    data: stSeries },
+                    { name: 'Growth (6 Months)', data: ltSeries },
+                ],
+                chart: {
+                    height: 340,
+                    type: 'area',
+                    toolbar: { show: false },
+                    fontFamily: 'Outfit, Inter, sans-serif',
+                    zoom: { enabled: false },
+                    animations: {
+                        enabled: true,
+                        easing: 'easeinout',
+                        speed: 800,
+                        animateGradually: { enabled: true, delay: 150 },
+                        dynamicAnimation: { enabled: true, speed: 350 }
+                    },
+                    dropShadow: {
+                        enabled: true,
+                        top: 10, left: 0, blur: 10,
+                        color: '#6366f1',
+                        opacity: 0.12
+                    }
+                },
+                colors: ['#6366f1', '#10b981'],
+                dataLabels: { enabled: false },
+                stroke: {
+                    width: [3, 2],
+                    curve: 'smooth',
+                    dashArray: [0, 8]
+                },
+                fill: {
+                    type: 'gradient',
+                    gradient: {
+                        shadeIntensity: 1,
+                        opacityFrom: 0.40,
+                        opacityTo: 0.01,
+                        stops: [0, 90, 100]
+                    }
+                },
+                markers: {
+                    size: [4, 4],
+                    strokeWidth: 2,
+                    strokeColors: '#ffffff',
+                    hover: { size: 6 }
+                },
+                xaxis: {
+                    categories: labels,
+                    tooltip: { enabled: false },
+                    axisBorder: { show: false },
+                    axisTicks: { show: false },
+                    labels: {
+                        rotate: -35,
+                        rotateAlways: false,
+                        hideOverlappingLabels: true,
+                        style: { colors: '#9CA3AF', fontSize: '10px', fontWeight: 600 }
+                    }
+                },
+                yaxis: {
+                    title: {
+                        text: 'Revenue (₱)',
+                        style: { fontSize: '11px', fontWeight: 600, color: '#6B7280' }
+                    },
+                    labels: {
+                        style: { colors: '#9CA3AF', fontSize: '11px', fontWeight: 600 },
+                        formatter: function(val) {
+                            if (val === null || val === undefined) return '';
+                            return val >= 1000 ? '₱' + (val/1000).toFixed(1) + 'k' : '₱' + Math.round(val);
+                        }
+                    }
+                },
+                grid: {
+                    borderColor: '#f1f5f9',
+                    strokeDashArray: 4,
+                    padding: { top: 0, right: 15, bottom: 20, left: 15 }
+                },
+                annotations: {
+                    xaxis: stCount > 0 ? [{
+                        x: labels[stCount - 1],
+                        borderColor: '#d1d5db',
+                        borderWidth: 1.5,
+                        strokeDashArray: 5,
+                        label: {
+                            text: '7D / 6M',
+                            style: { color: '#9ca3af', fontSize: '10px', fontWeight: 700, background: 'transparent' },
+                            position: 'top',
+                            orientation: 'horizontal'
+                        }
+                    }] : []
+                },
+                legend: {
+                    position: 'top',
+                    horizontalAlign: 'right',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    markers: { radius: 12, width: 10, height: 10 }
+                },
+                tooltip: {
+                    theme: 'dark',
+                    x: { show: true },
+                    y: {
+                        formatter: function(val) {
+                            if (val === null || val === undefined) return 'N/A';
+                            return '₱ ' + val.toLocaleString();
+                        }
+                    },
+                    style: { fontSize: '12px', fontFamily: 'Outfit' },
+                    onDatasetHover: { highlightDataSeries: true },
+                }
+            };
+
+            el._apexChart = new ApexCharts(el, options);
+            el._apexChart.render();
+        }
+
+        // Init on load and re-init on Livewire navigation
+        document.addEventListener('DOMContentLoaded', initBiForecastChart);
+        document.addEventListener('livewire:navigated', initBiForecastChart);
+        setTimeout(initBiForecastChart, 300); // fallback
+    })();
+    </script>
 </div>

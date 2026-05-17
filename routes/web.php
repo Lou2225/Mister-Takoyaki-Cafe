@@ -38,6 +38,8 @@ Route::middleware('auth')->group(function () {
 
         // POS Terminal
         Route::get('/pos', \App\Livewire\PosTerminal::class)->name('pos.index');
+        // GCash return URL — where GCash redirects the user after payment
+        Route::get('/paymongo/return', [\App\Http\Controllers\PayMongoWebhookController::class, 'returnCallback'])->name('paymongo.return');
         
         // Receipt Printing
         Route::get('/receipts/{order}/thermal', [\App\Http\Controllers\ReceiptController::class, 'thermal'])->name('receipts.thermal');
@@ -54,7 +56,7 @@ Route::middleware('auth')->group(function () {
         
         // Stock Management (Modular)
         Route::get('/stock', \App\Livewire\StockManagement::class)->name('stock.index');
-        Route::get('/stock/adjustment', \App\Livewire\StockAdjustment::class)->name('stock.adjustment');
+        Route::get('/stock/adjustment/{id?}', \App\Livewire\StockAdjustment::class)->name('stock.adjustment');
         Route::get('/stock/expiry', \App\Livewire\StockExpiry::class)->name('stock.expiry');
         
         Route::get('/branches', \App\Livewire\BranchManagement::class)->name('branches.index');

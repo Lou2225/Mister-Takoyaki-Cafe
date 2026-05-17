@@ -53,21 +53,22 @@
     @vite(['resources/js/app.js'])
 
     {{-- ApexCharts --}}
-    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts" data-navigate-once></script>
 
     {{-- Form validation --}}
-    <script src="{{ asset('js/form-validation.js') }}"></script>
+    <script src="{{ asset('js/form-validation.js') }}" data-navigate-once></script>
 
-    {{-- Leaflet: only on branches + users pages --}}
-    @if(request()->routeIs('branches.index') || request()->routeIs('users.index') || request()->routeIs('settings.index'))
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-        <style>
-            .leaflet-pane,
-            .leaflet-top,
-            .leaflet-bottom { z-index: 10 !important; }
-        </style>
-    @endif
+    {{-- Alpine Components --}}
+    <script src="{{ asset('js/alpine-components.js') }}" data-navigate-once></script>
+
+    {{-- Leaflet --}}
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" data-navigate-once></script>
+    <style>
+        .leaflet-pane,
+        .leaflet-top,
+        .leaflet-bottom { z-index: 10 !important; }
+    </style>
 </head>
 
 <body class="font-sans antialiased text-gray-900 bg-gray-100 transition-colors duration-300 {{ $roleClass }}">

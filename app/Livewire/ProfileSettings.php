@@ -70,9 +70,18 @@ class ProfileSettings extends Component
     }
 
     // ── Real-time validation hooks ───────────────────────────────
-    public function updatedFirstName() { $this->validateFieldLive('firstName', ValidationHelper::rulesName(), ValidationHelper::nameMessages()); }
-    public function updatedMiddleName() { $this->validateFieldLive('middleName', ValidationHelper::rulesOptionalName(), ValidationHelper::nameMessages()); }
-    public function updatedLastName() { $this->validateFieldLive('lastName', ValidationHelper::rulesName(), ValidationHelper::nameMessages()); }
+    public function updatedFirstName() { 
+        $this->firstName = ucwords($this->firstName);
+        $this->validateFieldLive('firstName', ValidationHelper::rulesName(), ValidationHelper::nameMessages()); 
+    }
+    public function updatedMiddleName() { 
+        $this->middleName = ucwords($this->middleName);
+        $this->validateFieldLive('middleName', ValidationHelper::rulesOptionalName(), ValidationHelper::nameMessages()); 
+    }
+    public function updatedLastName() { 
+        $this->lastName = ucwords($this->lastName);
+        $this->validateFieldLive('lastName', ValidationHelper::rulesName(), ValidationHelper::nameMessages()); 
+    }
     
     public function updatedEmail()
     {
@@ -120,9 +129,9 @@ class ProfileSettings extends Component
 
     public function updateProfile()
     {
-        $this->firstName = $this->normalizeString($this->firstName);
-        $this->middleName = $this->normalizeString($this->middleName);
-        $this->lastName = $this->normalizeString($this->lastName);
+        $this->firstName = ucwords($this->normalizeString($this->firstName));
+        $this->middleName = ucwords($this->normalizeString($this->middleName));
+        $this->lastName = ucwords($this->normalizeString($this->lastName));
         $this->email = trim(strtolower($this->email));
         $this->phone = trim($this->phone);
 

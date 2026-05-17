@@ -8,8 +8,18 @@
 @php
     $theme = auth()->user()?->getRoleTheme() ?? ['primary' => 'indigo'];
     $primaryColor = $theme['primary'];
-    $wireModelName = $wireModel ?? (($attributes->has('x-model') || $attributes->has('wire:model.live')) ? null : 'search');
-    $searchId = $id ?? 'search_' . ($wireModelName ? str_replace(['.', '$'], '_', $wireModelName) : ($attributes->get('x-model') ?? 'input'));
+    $hasXModel = false;
+    $hasWireModel = false;
+    foreach (array_keys($attributes->getAttributes()) as $key) {
+        if (str_starts_with($key, 'x-model')) {
+            $hasXModel = true;
+        }
+        if (str_starts_with($key, 'wire:model')) {
+            $hasWireModel = true;
+        }
+    }
+    $wireModelName = $wireModel ?? (($hasXModel || $hasWireModel) ? null : 'search');
+    $searchId = $id ?? 'search_' . ($wireModelName ? str_replace(['.', '$'], '_', $wireModelName) : 'input');
 @endphp
 
 <div class="relative group" wire:key="container_{{ $searchId }}">

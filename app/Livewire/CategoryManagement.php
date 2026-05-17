@@ -262,58 +262,37 @@ class CategoryManagement extends Component
     {
         $this->updateHeader();
         
-        if ($this->filterType === 'product') {
-            $categories = ProductCategory::query()
-                ->select('id', 'name', 'description', 'icon', 'production_station', 'created_at', DB::raw("'product' as cat_type"))
-                ->withCount('products as associated_count')
-                ->where('name', 'like', "%{$this->search}%")
-                ->orderBy('name', 'asc')
-                ->paginate($this->perPage);
-        } elseif ($this->filterType === 'ingredient') {
-            $categories = IngredientCategory::query()
-                ->select('id', 'name', 'description', 'icon', DB::raw("NULL as production_station"), 'created_at', DB::raw("'ingredient' as cat_type"))
-                ->withCount('ingredients as associated_count')
-                ->where('name', 'like', "%{$this->search}%")
-                ->orderBy('name', 'asc')
-                ->paginate($this->perPage);
-        } else {
-            // Merge both for 'all' with counts
-            $productQuery = ProductCategory::query()
-                ->select([
-                    'id',
-                    'name',
-                    'description',
-                    'icon',
-                    'production_station',
-                    'created_at',
-                    DB::raw("'product' as cat_type"),
-                    DB::raw('(select count(*) from products where products.category_id = product_categories.id) as associated_count')
-                ])
-                ->where('name', 'like', "%{$this->search}%");
+        // Fetch all product categories with their product counts
+        $productCats = ProductCategory::query()
+            ->select([
+                'id',
+                'name',
+                'description',
+                'icon',
+                'production_station',
+                'created_at',
+                DB::raw("'product' as cat_type"),
+                DB::raw('(select count(*) from products where products.category_id = product_categories.id) as associated_count')
+            ])
+            ->get();
 
-            $ingredientQuery = IngredientCategory::query()
-                ->select([
-                    'id',
-                    'name',
-                    'description',
-                    'icon',
-                    DB::raw("NULL as production_station"),
-                    'created_at',
-                    DB::raw("'ingredient' as cat_type"),
-                    DB::raw('(select count(*) from ingredients where ingredients.category_id = ingredient_categories.id) as associated_count')
-                ])
-                ->where('name', 'like', "%{$this->search}%");
+        // Fetch all ingredient categories with their ingredient counts
+        $ingredientCats = IngredientCategory::query()
+            ->select([
+                'id',
+                'name',
+                'description',
+                'icon',
+                DB::raw("NULL as production_station"),
+                'created_at',
+                DB::raw("'ingredient' as cat_type"),
+                DB::raw('(select count(*) from ingredients where ingredients.category_id = ingredient_categories.id) as associated_count')
+            ])
+            ->get();
 
-            $unifiedQuery = $productQuery->union($ingredientQuery);
-            
-            $categories = DB::table(DB::raw("({$unifiedQuery->toSql()}) as unified"))
-                ->mergeBindings($unifiedQuery->getQuery())
-                ->orderBy('name', 'asc')
-                ->paginate($this->perPage);
-        }
+        // Combine both product and ingredient categories and sort alphabetically by name
+        $allCategories = $productCats->concat($ingredientCats)->sortBy('name')->values();
 
-        return view('livewire.category-management', [
-            'categories' => $categories
-        ])->layout('layouts.app');
+        return view('livewire.category-management', compact('allCategories'))->layout('layouts.app');
     }
 }

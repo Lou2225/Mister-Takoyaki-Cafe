@@ -17,10 +17,12 @@ use App\Models\SystemSetting;
 use App\Models\FinancialLedger;
 use App\Models\BranchCategorySort;
 use App\Services\StockDeductionService;
+use App\Services\PayMongoService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Component;
+use Livewire\Attributes\Computed;
 use App\Traits\HandlesValidations;
 use App\Helpers\ValidationHelper;
 
@@ -73,16 +75,22 @@ class PosTerminal extends Component
     public ?int $showingOptionsId = null;
     public array $selectedOptions = []; // [groupId => [optionId, optionId, ...]] for additive; [groupId => [optionId]] for fixed
     public array $selectedModifierIds = [];
-    public ?Product $currentProduct = null;
+    protected ?Product $currentProduct = null;
     public array $optionAvailability = [];
     public array $modifierAvailability = []; // [modifierId => quantity_available]
     public bool $isVerifyingGCash = false;
     public bool $gcashVerified = false;
     public array $gcashTransactionDetails = [];
+    // PayMongo GCash payment state
+    public ?string $gcashPaymentUrl = null;
+    public ?string $gcashPaymentIntentId = null;
+    public bool $gcashPolling = false;
+    public bool $isManualGcash = false; // To distinguish verification types
 
     public function updatedPaymentMethod()
     {
         $this->gcashVerified = false;
+        $this->isManualGcash = false;
         $this->paymentReference = '';
         $this->gcashTransactionDetails = [];
     }
@@ -94,7 +102,7 @@ class PosTerminal extends Component
         $this->branchId = \App\Services\BranchContext::getActiveBranchId() ?: $user->branch_id;
 
         // Load settings from database
-        $this->taxRate           = (float) SystemSetting::get('vat_rate', 0);
+        $this->taxRate           = 0;
         $this->serviceChargeRate = (float) SystemSetting::get('service_charge', 0);
         $this->discountPercent   = (float) SystemSetting::get('discount_rate', 0);
         $this->seniorDiscountRate = (float) SystemSetting::get('senior_discount_rate', 0.20);
@@ -137,10 +145,6 @@ class PosTerminal extends Component
         $this->validateFieldLive('editCartItemNotes', ['nullable', 'string', 'max:255', 'regex:' . ValidationHelper::REGEX_NAME_BASIC], ValidationHelper::commonMessages());
     }
 
-    public function updatedPaymentReference()
-    {
-        $this->validateFieldLive('paymentReference', ['nullable', 'string', 'max:50', 'regex:' . ValidationHelper::REGEX_NAME_BASIC], ValidationHelper::commonMessages());
-    }
 
     public function updatedTableNumber()
     {
@@ -165,21 +169,23 @@ class PosTerminal extends Component
         return $roleId === 1 || $roleId === 2;
     }
 
-    public function reorderProducts(array $orderedIds): void
+    public function saveLayout(?array $orderedIds = null): void
     {
         if (!$this->canEditLayout()) return;
-        if (!$this->branchId) return;
 
-        DB::transaction(function() use ($orderedIds) {
-            foreach ($orderedIds as $index => $id) {
-                DB::table('branch_product')->updateOrInsert(
-                    ['branch_id' => $this->branchId, 'product_id' => $id],
-                    ['sort_order' => $index]
-                );
-            }
-        });
+        if ($orderedIds && $this->branchId) {
+            DB::transaction(function() use ($orderedIds) {
+                foreach ($orderedIds as $index => $id) {
+                    DB::table('branch_product')->updateOrInsert(
+                        ['branch_id' => $this->branchId, 'product_id' => $id],
+                        ['sort_order' => $index]
+                    );
+                }
+            });
+            $this->dispatch('notify', type: 'success', message: 'Branch menu layout saved.');
+        }
 
-        $this->dispatch('notify', type: 'success', message: 'Branch menu layout updated.');
+        $this->isEditMode = false;
     }
 
     public function reorderCategories(array $orderedIds): void
@@ -205,7 +211,7 @@ class PosTerminal extends Component
     {
         if ($this->productsCache !== null) return $this->productsCache;
 
-        $query = Product::with(['category', 'recipes', 'optionGroups.options'])
+        $query = Product::with(['category', 'recipes', 'optionGroups.options', 'modifiers'])
             ->where('is_active', true);
 
         // Scope to branch
@@ -214,32 +220,39 @@ class PosTerminal extends Component
                 $q->where('scope', 'global')
                     ->orWhereHas('branches', fn($bq) => $bq->where('branches.id', $this->branchId));
             });
+        }
 
+        // Joint-based sorting requires manual selects to avoid ID collisions
+        $query->select('products.*');
+
+        if ($this->branchId) {
             $query->leftJoin('branch_product', function($join) {
                 $join->on('products.id', '=', 'branch_product.product_id')
-                     ->where('branch_product.branch_id', '=', $this->branchId);
-            })
-            ->select('products.*', DB::raw('products.id as id'), 'branch_product.sort_order as branch_sort_order');
+                     ->where('branch_product.branch_id', '=', (int)$this->branchId);
+            })->addSelect('branch_product.sort_order as branch_sort_order');
         }
+
+        $query->leftJoin('product_categories', 'products.category_id', '=', 'product_categories.id')
+              ->addSelect('product_categories.sort_order as category_sort_order');
 
         if ($this->selectedCategoryId) {
-            $query->where('category_id', $this->selectedCategoryId);
+            $query->where('products.category_id', $this->selectedCategoryId);
         }
 
-        if ($this->search) {
-            $query->where('name', 'like', '%' . $this->search . '%');
+
+
+        // Sorting
+        $query->orderBy('category_sort_order', 'asc');
+        
+        if ($this->branchId) {
+            $query->orderByRaw('COALESCE(branch_product.sort_order, products.sort_order) asc');
+        } else {
+            $query->orderBy('products.sort_order', 'asc');
         }
 
-        $query->leftJoin('product_categories', 'products.category_id', '=', 'product_categories.id');
+        $query->orderBy('products.name', 'asc');
 
-        $orderBy = $this->branchId 
-            ? DB::raw('COALESCE(branch_product.sort_order, products.sort_order)') 
-            : 'products.sort_order';
-
-        $products = $query->orderBy('product_categories.sort_order', 'asc')
-            ->orderBy($orderBy, 'asc')
-            ->orderBy('products.name', 'asc')
-            ->get();
+        $products = $query->get();
 
         // Performance Optimization: Bulk fetch stocks for all products in this view
         if ($this->branchId && $products->isNotEmpty()) {
@@ -252,12 +265,13 @@ class PosTerminal extends Component
                 ->pluck('stock_quantity', 'ingredient_id');
 
             foreach ($products as $product) {
-                // We'll use a dynamic property to carry the stocks to the view loop
+                // Pre-calculate availability for the instant modal
+                $product->option_availability = $product->getOptionAvailability((int)$this->branchId, $stocks);
+                $product->modifier_availability = $product->getModifierAvailability((int)$this->branchId, $stocks);
                 $product->prefetched_stocks = $stocks;
             }
 
             // SORT: Available items first, then Out of Stock
-            // We use sortBy and return an array of keys to maintain existing sort order within groups
             $products = $products->sortBy(function($product) {
                 $isAvailable = $product->getMaxAvailableQuantity((int)$this->branchId, $product->prefetched_stocks) > 0;
                 return [
@@ -279,19 +293,6 @@ class PosTerminal extends Component
             ->with(['items'])
             ->latest()
             ->get();
-    }
-
-    public function openDraftsModal(): void
-    {
-        $this->showDraftsModal = true;
-        // Standard payload for modal component
-        $this->dispatch('open-modal', name: 'pos-drafts-list');
-    }
-
-    public function closeDraftsModal(): void
-    {
-        $this->showDraftsModal = false;
-        $this->dispatch('close-modal', 'pos-drafts-list');
     }
 
     // ─── Computed: Categories ──────────────────────────────────────────────
@@ -324,17 +325,20 @@ class PosTerminal extends Component
     }
 
     // ─── Computed: Totals ──────────────────────────────────────────────────
-    public function getSubtotalProperty(): float
+    #[Computed]
+    public function subtotal(): float
     {
-        return array_sum(array_map(fn($item) => $item['price'] * $item['qty'], $this->cart));
+        return array_sum(array_map(fn($item) => ($item['price'] ?? 0) * ($item['qty'] ?? 0), array_filter($this->cart ?: [])));
     }
 
-    public function getTaxAmountProperty(): float
+    #[Computed]
+    public function taxAmount(): float
     {
-        return round($this->subtotal * $this->taxRate, 2);
+        return 0;
     }
 
-    public function getServiceChargeAmountProperty(): float
+    #[Computed]
+    public function serviceChargeAmount(): float
     {
         if ($this->orderType === 'Dine-in') {
             return round($this->subtotal * $this->serviceChargeRate, 2);
@@ -342,16 +346,17 @@ class PosTerminal extends Component
         return 0;
     }
 
-    public function getDiscountAmountProperty(): float
+    #[Computed]
+    public function discountAmount(): float
     {
         $totalDiscount = 0;
-        foreach ($this->cart as $item) {
+        foreach (array_filter($this->cart ?: []) as $item) {
             $isSenior = $item['apply_senior_discount'] ?? false;
             $isRegular = $item['apply_regular_discount'] ?? false;
 
             if (!$isSenior && !$isRegular) continue;
 
-            $itemTotal = $item['price'] * $item['qty'];
+            $itemTotal = ($item['price'] ?? 0) * ($item['qty'] ?? 0);
             
             // Base for discount is now simply the item total (tax-free)
             $baseForDiscount = $itemTotal;
@@ -366,14 +371,15 @@ class PosTerminal extends Component
         return round($totalDiscount, 2);
     }
 
-    public function getTotalProperty(): float
+    #[Computed]
+    public function total(): float
     {
         $total = 0;
-        foreach ($this->cart as $item) {
+        foreach (array_filter($this->cart ?: []) as $item) {
             $isSenior = $item['apply_senior_discount'] ?? false;
             $isRegular = $item['apply_regular_discount'] ?? false;
             
-            $itemTotal = $item['price'] * $item['qty'];
+            $itemTotal = ($item['price'] ?? 0) * ($item['qty'] ?? 0);
             
             if ($isSenior || $isRegular) {
                 $baseAmount = $itemTotal;
@@ -391,7 +397,8 @@ class PosTerminal extends Component
         return round($total + $this->serviceChargeAmount, 2);
     }
 
-    public function getChangeProperty(): float
+    #[Computed]
+    public function change(): float
     {
         return max(0, $this->amountTendered - $this->total);
     }
@@ -427,248 +434,6 @@ class PosTerminal extends Component
     }
 
     // ─── Cart Actions ──────────────────────────────────────────────────────
-    public function addToCart(int $productId): void
-    {
-        $product = Product::with(['optionGroups.options', 'modifiers', 'recipes'])->find($productId);
-        if (!$product || !$product->is_active) return;
-
-        // Optimization: Fetch all stocks once for the entire availability check
-        $stocks = null;
-        if ($this->branchId) {
-            $ingredientIds = $product->recipes->pluck('ingredient_id')->unique();
-            $stocks = BranchIngredientStock::where('branch_id', $this->branchId)
-                ->whereIn('ingredient_id', $ingredientIds)
-                ->pluck('stock_quantity', 'ingredient_id');
-        }
-
-        $available = $this->branchId
-            ? $product->getMaxAvailableQuantity((int)$this->branchId, $stocks) > 0
-            : true;
-
-        if (!$available) {
-            $this->dispatch('notify', type: 'warning', message: 'This item is currently unavailable (Out of Stock).');
-            return;
-        }
-
-        // If product has option groups or modifiers, open options modal
-        if (count($product->optionGroups) > 0 || count($product->modifiers) > 0) {
-            $this->showingOptionsId = $productId;
-            $this->currentProduct = $product;
-            $this->optionAvailability = $product->getOptionAvailability((int)$this->branchId, $stocks);
-            $this->modifierAvailability = $product->getModifierAvailability((int)$this->branchId, $stocks);
-            
-            // Initialize selections: only pick if required or an explicit default exists
-            $this->selectedOptions = [];
-            foreach ($product->optionGroups as $group) {
-                $default = $group->options->where('is_default', true)->first();
-                
-                if ($default) {
-                    $this->selectedOptions[$group->id] = $default->id;
-                } elseif ($group->is_required) {
-                    // Only fall back to first if it's required
-                    $first = $group->options->first();
-                    $this->selectedOptions[$group->id] = $first ? $first->id : null;
-                } else {
-                    $this->selectedOptions[$group->id] = null;
-                }
-            }
-            
-            $this->selectedModifierIds = [];
-            $this->dispatch('open-modal', 'pos-options');
-            return;
-        }
-
-        $this->confirmAdd($productId);
-    }
-
-    public function toggleOption(int $groupId, int $optionId): void
-    {
-        if (!$this->currentProduct) return;
-        
-        $group = $this->currentProduct->optionGroups->where('id', $groupId)->first();
-        if (!$group) return;
-
-        // Initialize as array if not exists
-        if (!isset($this->selectedOptions[$groupId])) {
-            $this->selectedOptions[$groupId] = [];
-        } else if (!is_array($this->selectedOptions[$groupId])) {
-            $this->selectedOptions[$groupId] = [$this->selectedOptions[$groupId]];
-        }
-
-        if ($group->price_mode === 'additive') {
-            // Additive: allow multiple selections (toggle)
-            $key = array_search($optionId, $this->selectedOptions[$groupId]);
-            if ($key !== false) {
-                unset($this->selectedOptions[$groupId][$key]);
-                $this->selectedOptions[$groupId] = array_values($this->selectedOptions[$groupId]);
-            } else {
-                $this->selectedOptions[$groupId][] = $optionId;
-            }
-        } else {
-            // Fixed: single selection (replace)
-            if (in_array($optionId, $this->selectedOptions[$groupId]) && !$group->is_required) {
-                $this->selectedOptions[$groupId] = [];
-            } else {
-                $this->selectedOptions[$groupId] = [$optionId];
-            }
-        }
-    }
-
-    public function confirmAddWithOptions(): void
-    {
-        if (!$this->showingOptionsId) return;
-        
-        // Validate required options are selected
-        foreach ($this->currentProduct->optionGroups as $group) {
-            if ($group->is_required && empty($this->selectedOptions[$group->id])) {
-                $this->dispatch('notify', 
-                    type: 'error', 
-                    message: "Please select {$group->name} to continue."
-                );
-                return;
-            }
-        }
-
-        // Optimization: Fetch all stocks once
-        $this->currentProduct->loadMissing('recipes');
-        $ingredientIds = $this->currentProduct->recipes->pluck('ingredient_id')->unique();
-        $stocks = BranchIngredientStock::where('branch_id', $this->branchId)
-            ->whereIn('ingredient_id', $ingredientIds)
-            ->pluck('stock_quantity', 'ingredient_id');
-
-        // Validate stock availability for selected options
-        $optionAvail = $this->currentProduct->getOptionAvailability($this->branchId, $stocks);
-        foreach ($this->selectedOptions as $groupId => $optionIds) {
-            if (!$optionIds) continue; 
-
-            $ids = is_array($optionIds) ? $optionIds : [$optionIds];
-            
-            foreach ($ids as $optionId) {
-                if (($optionAvail[$optionId] ?? 0) <= 0) {
-                    $option = ProductOption::find($optionId);
-                    $this->dispatch('notify', 
-                        type: 'error',
-                        message: "The selected option '" . ($option->name ?? 'Unknown') . "' is out of stock."
-                    );
-                    return;
-                }
-            }
-        }
-
-        // Validate stock availability for selected modifiers
-        $modifierAvail = $this->currentProduct->getModifierAvailability($this->branchId, $stocks);
-        foreach ($this->selectedModifierIds as $modId) {
-            if (($modifierAvail[$modId] ?? 0) <= 0) {
-                $modifier = Modifier::find($modId);
-                $this->dispatch('notify', 
-                    type: 'error',
-                    message: "The selected add-on '{$modifier->name}' is out of stock."
-                );
-                return;
-            }
-        }
-
-
-        // Flatten selected options: convert arrays of IDs to flat array of IDs
-        $flattenedOptions = [];
-        foreach ($this->selectedOptions as $groupId => $options) {
-            if (is_array($options)) {
-                $flattenedOptions = array_merge($flattenedOptions, $options);
-            } elseif ($options) {
-                $flattenedOptions[] = $options;
-            }
-        }
-        
-        $this->confirmAdd($this->showingOptionsId, $flattenedOptions, $this->selectedModifierIds);
-        $this->closeOptionsModal();
-    }
-
-    public function closeOptionsModal(): void
-    {
-        $this->showingOptionsId = null;
-        $this->selectedOptions = [];
-        $this->selectedModifierIds = [];
-        $this->currentProduct = null;
-        $this->dispatch('close-modal', 'pos-options');
-    }
-
-    public function closePaymentModal(): void
-    {
-        $this->paymentReference = '';
-        $this->dispatch('close-modal', 'pos-payment');
-    }
-
-    public function closeEditItemModal(): void
-    {
-        $this->editCartItemId = null;
-        $this->editCartItemQty = 1;
-        $this->dispatch('close-modal', 'edit-cart-item');
-    }
-
-    protected function confirmAdd(int $productId, array $optionIds = [], array $modifierIds = [])
-    {
-        $product = Product::find($productId);
-        if (!$product) {
-            $this->dispatch('notify', type: 'error', message: 'Product no longer available.');
-            return;
-        }
-
-        $modifiers = !empty($modifierIds) ? Modifier::whereIn('id', $modifierIds)->get() : collect([]);
-        $selectedOptions = !empty($optionIds) ? ProductOption::with('group')->whereIn('id', array_values($optionIds))->get() : collect([]);
-
-        // Price Logic:
-        // 1. Check if any "Fixed" price mode groups are selected. If so, their option prices become the base.
-        // 2. If no fixed groups, use Product Base Price.
-        // 3. Add prices of all "Additive" options.
-        // 4. Add prices of all modifiers.
-        
-        $fixedOptions = $selectedOptions->filter(fn($o) => $o->group->price_mode === 'fixed');
-        $additiveOptions = $selectedOptions->filter(fn($o) => $o->group->price_mode === 'additive');
-
-        $basePrice = $fixedOptions->isNotEmpty() ? $fixedOptions->sum('price') : (float)$product->getPriceAt($this->branchId);
-        $additiveTotal = $additiveOptions->isNotEmpty() ? (float)$additiveOptions->sum('price') : 0;
-        $modifierTotal = $modifiers->isNotEmpty() ? (float)$modifiers->sum('price') : 0;
-        
-        $finalPrice = $basePrice + $additiveTotal + $modifierTotal;
-
-        // Create a unique key for the cart
-        $optKey = !empty($optionIds) ? '-' . implode(',', collect($optionIds)->sort()->toArray()) : '';
-        $modKey = !empty($modifierIds) ? '-' . implode(',', collect($modifierIds)->sort()->toArray()) : '';
-        $key = $productId . $optKey . $modKey;
-
-        $oldCart = $this->cart;
-
-        if (isset($this->cart[$key])) {
-            $this->cart[$key]['qty']++;
-        } else {
-            $this->cart[$key] = [
-                'id'            => $productId,
-                'key'           => $key,
-                'name'          => $product->name,
-                'options'       => $selectedOptions->isNotEmpty() ? $selectedOptions->map(fn($o) => ['id' => $o->id, 'name' => $o->name, 'price' => (float)$o->price])->toArray() : [],
-                'modifiers'     => $modifiers->isNotEmpty() ? $modifiers->map(fn($m) => ['id' => $m->id, 'name' => $m->name, 'price' => (float)$m->price])->toArray() : [],
-                'price'         => $finalPrice,
-                'qty'           => 1,
-                'instructions'  => '',
-                'image'         => $product->image,
-                'category'      => $product->category?->name ?? '',
-                'apply_regular_discount'=> false,
-                'apply_senior_discount' => false,
-            ];
-        }
-
-        $stockValidation = $this->validateStockAvailability();
-        if (!$stockValidation['available']) {
-            $this->cart = $oldCart;
-            $this->dispatch('notify', 
-                type: 'error',
-                message: 'Cannot add item. ' . $stockValidation['message']
-            );
-            return;
-        }
-
-        $this->dispatch('cart-expanded');
-    }
 
     public function decrementCart(string $key): void
     {
@@ -679,29 +444,12 @@ class PosTerminal extends Component
         } else {
             unset($this->cart[$key]);
         }
-
-        $this->cart = array_merge($this->cart, []);
     }
 
     public function incrementCart(string $key): void
     {
         if (!isset($this->cart[$key])) return;
-
-        $oldCart = $this->cart;
         $this->cart[$key]['qty']++;
-
-        $stockValidation = $this->validateStockAvailability();
-        if (!$stockValidation['available']) {
-            $this->cart = $oldCart;
-            $this->dispatch('notify', 
-                type: 'error',
-                message: 'Cannot add item. ' . $stockValidation['message']
-            );
-            return;
-        }
-
-        $this->cart = array_merge($this->cart, []);
-        $this->dispatch('cart-expanded');
     }
 
     public function removeFromCart(string $key): void
@@ -709,16 +457,6 @@ class PosTerminal extends Component
         unset($this->cart[$key]);
     }
 
-    public function openEditItem(string $key): void
-    {
-        if (!isset($this->cart[$key])) return;
-        $this->editCartItemId = $key;
-        $this->editCartItemQty = $this->cart[$key]['qty'];
-        $this->editCartItemNotes = $this->cart[$key]['instructions'] ?? '';
-        $this->applyRegularDiscount = $this->cart[$key]['apply_regular_discount'] ?? false;
-        $this->applySeniorDiscount = $this->cart[$key]['apply_senior_discount'] ?? false;
-        $this->dispatch('open-modal', 'edit-cart-item');
-    }
 
     public function saveEditItem(): void
     {
@@ -785,7 +523,7 @@ class PosTerminal extends Component
                 ]);
 
                 // Create Order Items (without stock deduction)
-                foreach ($this->cart as $key => $item) {
+                foreach (array_filter($this->cart ?: []) as $key => $item) {
                     $productId = $item['id'];
 
                     $orderItem = OrderItem::create([
@@ -952,29 +690,78 @@ class PosTerminal extends Component
             );
         }
     }
-    public function verifyGCashPayment(): void
+    public function initiateGCashPayment(): void
     {
-        $this->isVerifyingGCash = true;
-        
-        // Remove sleep(2) to prevent session locking and improve responsiveness
-        // For a mock, setting state instantly is better
+        if (empty($this->cart) || $this->total <= 0) {
+            $this->dispatch('notify', type: 'error', message: 'Cart is empty or total is invalid.');
+            return;
+        }
 
-        // Mock legitimate transaction data
-        $this->paymentReference = 'GC' . strtoupper(Str::random(10));
+        if (empty(config('services.paymongo.secret_key'))) {
+            $this->dispatch('notify', type: 'error', message: 'PayMongo is not configured. Please add API keys to .env');
+            return;
+        }
+
+        $this->gcashPolling = true;
+        $this->gcashPaymentUrl = null;
+        $this->gcashPaymentIntentId = null;
+
+        try {
+            $service = app(PayMongoService::class);
+            $result = $service->createGCashPaymentLink(
+                amount: $this->total,
+                referenceNo: $this->referenceNo,
+                description: 'Mister Takoyaki Order #' . $this->referenceNo,
+            );
+
+            $this->gcashPaymentUrl = $result['checkout_url'];
+            $this->gcashPaymentIntentId = $result['payment_intent_id'];
+            $this->dispatch('gcash-url-ready', url: $this->gcashPaymentUrl);
+        } catch (\Exception $e) {
+            $this->gcashPolling = false;
+            $this->dispatch('notify', type: 'error', message: 'GCash payment initiation failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Called by Alpine polling every 4 seconds while the GCash QR is displayed.
+     * Checks PayMongo's API directly — works without a webhook (localhost-friendly).
+     */
+    public function pollGCashStatus(): void
+    {
+        if (!$this->gcashPaymentIntentId || $this->gcashVerified) {
+            return;
+        }
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::withBasicAuth(
+                config('services.paymongo.secret_key'), ''
+            )->get("https://api.paymongo.com/v1/payment_intents/{$this->gcashPaymentIntentId}");
+
+            if ($response->failed()) return;
+
+            $status = $response->json('data.attributes.status');
+
+            if ($status === 'succeeded') {
+                $this->gcashVerified = true;
+                $this->gcashPolling = false;
+                $this->paymentReference = $this->gcashPaymentIntentId;
+                $this->dispatch('notify', type: 'success', message: 'GCash payment received! You may now confirm the order.');
+            }
+        } catch (\Exception $e) {
+            // Silent fail — just try again next poll
+        }
+    }
+
+    /**
+     * Manually verifies a static GCash payment.
+     * Used when the cashier shows their own QR and checks their phone.
+     */
+    public function verifyStaticPayment(): void
+    {
         $this->gcashVerified = true;
-        $this->isVerifyingGCash = false;
-        $this->gcashTransactionDetails = [
-            'status' => 'SUCCESS',
-            'amount' => $this->total,
-            'timestamp' => now()->format('M d, Y h:i A'),
-            'channel' => 'GCash App',
-            'reference' => $this->paymentReference
-        ];
-
-        $this->dispatch('notify', 
-            type: 'success',
-            message: 'GCash Payment Verified Legitimate!'
-        );
+        $this->isManualGcash = true;
+        $this->dispatch('notify', type: 'success', message: 'GCash payment manually verified!');
     }
 
     protected function validateStockAvailability(): array
@@ -987,7 +774,7 @@ class PosTerminal extends Component
         $optionIds = [];
         $modifierIds = [];
 
-        foreach ($this->cart as $item) {
+        foreach (array_filter($this->cart ?: []) as $item) {
             $productIds[] = $item['id'];
             if (!empty($item['options'])) {
                 foreach ($item['options'] as $opt) $optionIds[] = $opt['id'];
@@ -1004,7 +791,7 @@ class PosTerminal extends Component
 
         $ingredientRequirements = [];
 
-        foreach ($this->cart as $item) {
+        foreach (array_filter($this->cart ?: []) as $item) {
             $productId = $item['id'];
             $itemOptionIds = collect($item['options'] ?? [])->pluck('id')->toArray();
             $itemModifierIds = collect($item['modifiers'] ?? [])->pluck('id')->toArray();
@@ -1061,13 +848,6 @@ class PosTerminal extends Component
         return ['available' => true];
     }
 
-    public function openPayment(): void
-    {
-        if (empty($this->cart)) return;
-        $this->amountTendered = $this->total;
-        $this->paymentReference = '';
-        $this->dispatch('open-modal', 'pos-payment');
-    }
 
     public function confirmPayment(): void
     {
@@ -1087,14 +867,11 @@ class PosTerminal extends Component
         }
 
         if ($this->paymentMethod === 'GCash') {
-            if (!$this->gcashVerified) {
-                $this->addError('gcashVerified', 'Please verify the GCash transaction first before submitting the order.');
+            // Allows either PayMongo automated confirmation OR manual reference entry (for Static QR mode)
+            if (!$this->gcashVerified && empty($this->paymentReference)) {
+                $this->addError('gcashVerified', 'Please wait for GCash confirmation or enter a reference number.');
                 return;
             }
-
-            $this->validate([
-                'paymentReference' => ['required', 'string', 'max:50', 'regex:' . ValidationHelper::REGEX_NAME_BASIC]
-            ], ValidationHelper::commonMessages());
         }
 
         $this->validate([
@@ -1134,7 +911,7 @@ class PosTerminal extends Component
             ]);
 
             // Create Order Items + deduct stock
-            foreach ($this->cart as $key => $item) {
+            foreach (array_filter($this->cart ?: []) as $key => $item) {
                 // Item details
                 $productId = $item['id'];
                 $optionIds = collect($item['options'] ?? [])->pluck('id')->toArray();
@@ -1240,17 +1017,15 @@ class PosTerminal extends Component
     public function render()
     {
         return view('livewire.pos-terminal', [
-            'products'         => $this->products,
-            'categories'       => $this->categories,
-            'branchId'         => $this->branchId,
-            'currencySymbol'   => $this->currencySymbol,
-            'subtotal'         => $this->subtotal,
-            'taxAmount'        => $this->taxAmount,
-            'discountAmount'   => $this->discountAmount,
+            'products'            => $this->products,
+            'categories'          => $this->categories,
+            'branchId'            => $this->branchId,
+            'subtotal'            => $this->subtotal,
+            'total'               => $this->total,
+            'discountAmount'      => $this->discountAmount,
             'serviceChargeAmount' => $this->serviceChargeAmount,
-            'total'            => $this->total,
-            'change'           => $this->change,
-            'cartCount'        => $this->cartCount,
+            'taxAmount'           => $this->taxAmount,
+            'change'              => $this->change,
         ])->layout('layouts.app', ['noPadding' => true]);
     }
 }

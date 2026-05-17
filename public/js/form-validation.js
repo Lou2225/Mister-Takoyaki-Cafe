@@ -168,22 +168,7 @@
     observer.observe(document.documentElement, { childList: true, subtree: true });
 
     
-    // Safety check for Livewire
-    const setupLivewire = () => {
-        if (window.Livewire) {
-            Livewire.hook('request', ({ respond }) => {
-                respond(() => {
-                    init();
-                });
-            });
-        }
-    };
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', setupLivewire);
-    } else {
-        setupLivewire();
-    }
 
     window.addEventListener('scroll-to-error', () => {
         setTimeout(() => {

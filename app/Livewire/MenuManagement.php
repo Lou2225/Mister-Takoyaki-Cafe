@@ -112,10 +112,10 @@ class MenuManagement extends Component
 
     // ── Form: Product (Create/Edit) ───────────────────────────────
     public ?int $editProductId = null;
-    public string $name = '';
+    public ?string $name = '';
     public int|string|null $categoryId = null;
-    public string $description = '';
-    public string $price = '';
+    public ?string $description = '';
+    public ?string $price = '';
     public $isActive = '1';
     /** @var TemporaryUploadedFile|null */
     public $image = null;
@@ -245,10 +245,13 @@ class MenuManagement extends Component
     {
         if (!$this->isSuperAdmin() && !$this->isAdmin()) return;
         $this->resetProductForm();
-        $this->panel = 'form';
-        $this->mode = 'create';
         $this->updateGlobalHeader('create');
-        $this->dispatch('switch-panel', panel: 'form');
+    }
+
+    public function discardDraft()
+    {
+        $this->resetProductForm();
+        $this->updateGlobalHeader('list');
     }
 
     public function showEdit(int $id)
@@ -497,17 +500,43 @@ class MenuManagement extends Component
         $this->price       = $this->cleanPrice($this->price);
     }
 
+    private function switchToFailedTab(array $errorFields)
+    {
+        foreach ($errorFields as $field) {
+            // Basic tab fields
+            if (in_array($field, ['name', 'price', 'description', 'categoryId'])) {
+                $this->activeTab = 'basic';
+                return;
+            }
+            // Variants/options tab
+            if (str_starts_with($field, 'optionGroups')) {
+                $this->activeTab = 'variants';
+                return;
+            }
+            // Recipe tab
+            if (str_starts_with($field, 'recipeIngredients')) {
+                $this->activeTab = 'recipe';
+                return;
+            }
+        }
+    }
+
     public function validateBeforeSave()
     {
         if (!$this->isSuperAdmin() && !$this->isAdmin()) return;
         
         $this->prepareData();
 
-        $this->validateBeforeModal(
-            $this->getProductValidationRules(), 
-            ValidationHelper::commonMessages(), 
-            'confirm-save-product'
-        );
+        try {
+            $this->validateBeforeModal(
+                $this->getProductValidationRules(), 
+                ValidationHelper::commonMessages(), 
+                'confirm-save-product'
+            );
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->switchToFailedTab($e->validator->errors()->keys());
+            throw $e;
+        }
     }
 
     public function saveProduct()
@@ -516,7 +545,12 @@ class MenuManagement extends Component
 
         $this->prepareData();
 
-        $this->validateSecure($this->getProductValidationRules(), ValidationHelper::commonMessages());
+        try {
+            $this->validateSecure($this->getProductValidationRules(), ValidationHelper::commonMessages());
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->switchToFailedTab($e->validator->errors()->keys());
+            throw $e;
+        }
 
         try {
             DB::transaction(function () {
@@ -727,9 +761,6 @@ class MenuManagement extends Component
     {
         $query = $this->getBaseProductQuery()->with(['category', 'branches']);
 
-        if ($this->search) {
-            $query->where('products.name', 'like', "%{$this->search}%");
-        }
         if ($this->selectedCategoryId) {
             $query->where('category_id', $this->selectedCategoryId);
         }
@@ -741,8 +772,8 @@ class MenuManagement extends Component
             ->select('products.*')
             ->orderBy('product_categories.sort_order', 'asc')
             ->orderBy('products.name', 'asc')
-            ->paginate($this->perPage);
-        $totalProducts = $this->getBaseProductQuery()->count();
+            ->get();
+        $totalProducts = $products->count();
         $totalCategories = ProductCategory::count();
 
         // ── Dropdown Data with Filtering ──

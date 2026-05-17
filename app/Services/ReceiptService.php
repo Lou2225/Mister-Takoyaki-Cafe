@@ -73,6 +73,6 @@ class ReceiptService
      */
     public static function calculateSubtotal(Order $order): float
     {
-        return $order->total_amount + $order->discount_amount - $order->tax_amount;
+        return $order->total_amount + $order->discount_amount;
     }
 }

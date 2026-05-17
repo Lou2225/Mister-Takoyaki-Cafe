@@ -76,7 +76,6 @@ class DashboardOverview extends Component
         $categories = [];
         $untrackedRevenue = 0;
         
-        $taxes = $orders->sum('tax_amount');
         $service = $orders->sum('service_charge');
         $delivery = $orders->sum('delivery_fee');
         $discounts = $orders->sum('discount_amount');
@@ -95,9 +94,8 @@ class DashboardOverview extends Component
 
         $breakdown = collect($categories)->map(fn($val, $key) => ['category' => $key, 'total' => (float)$val])->values()->toArray();
         
-        if ($taxes > 0) $breakdown[] = ['category' => 'Government Taxes', 'total' => (float)$taxes];
         if ($service > 0) $breakdown[] = ['category' => 'Service Charges', 'total' => (float)$service];
-        if ($delivery > 0) $breakdown[] = ['category' => 'Delivery Fees', 'total' => (float)$delivery];
+        if ($delivery > 0) $breakdown[] = ['category' => 'Delivery Deductions', 'total' => (float)-$delivery];
         if ($discounts > 0) $breakdown[] = ['category' => 'Discounts Applied', 'total' => (float)-$discounts];
         if ($untrackedRevenue > 0) $breakdown[] = ['category' => 'Untracked Sales', 'total' => (float)$untrackedRevenue];
 
@@ -110,24 +108,30 @@ class DashboardOverview extends Component
         $branchId = $this->selectedBranchId;
         $orderItems = $this->fetchBreakdownOrderItems($branchId);
         
-        $standardCosts = $this->fetchChartStandardCosts($branchId);
-        $branchCostMap = $standardCosts->pluck('cost_per_base_unit', 'ingredient_id')->union($standardCosts->pluck('unit_cost', 'ingredient_id'));
-        $globalCostMap = Ingredient::pluck('cost', 'id');
+        $branchCosts = IngredientCost::query()
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->get()
+            ->groupBy('branch_id')
+            ->map(fn($g) => $g->pluck('unit_cost', 'ingredient_id'));
+
+        $purchaseCosts = $this->fetchPurchasePrices($branchId);
+        $globalCosts = Ingredient::pluck('cost', 'id');
 
         $ingredients = Ingredient::pluck('name', 'id');
         $usage = [];
         $categoryCogs = [];
 
         foreach ($orderItems as $item) {
+            $bid = $item->order->branch_id;
             $productCostMap = []; $optionCostMap = []; $modifierCostMap = [];
-            $itemCost = $this->calculateItemCogs($item, $branchCostMap, $globalCostMap, $productCostMap, $optionCostMap, $modifierCostMap);
+            $itemCost = $this->calculateItemCogs($item, $branchCosts, $globalCosts, $purchaseCosts, $productCostMap, $optionCostMap, $modifierCostMap, $bid);
             $totalItemCogs = $itemCost * $item->quantity;
 
             // Group by category for visual consistency
             $categoryName = $item->product->category->name ?? 'Uncategorized';
             $categoryCogs[$categoryName] = ($categoryCogs[$categoryName] ?? 0) + $totalItemCogs;
 
-            $this->trackIngredientUsage($item, $branchCostMap, $globalCostMap, $ingredients, $usage);
+            $this->trackIngredientUsage($item, $branchCosts, $globalCosts, $purchaseCosts, $ingredients, $usage, $bid);
         }
 
         arsort($categoryCogs);
@@ -178,18 +182,24 @@ class DashboardOverview extends Component
         $branchId = $this->selectedBranchId;
         $orders = $this->fetchFinancialOrders($branchId);
         
-        $standardCosts = $this->fetchChartStandardCosts($branchId);
-        $branchCostMap = $standardCosts->pluck('cost_per_base_unit', 'ingredient_id')->union($standardCosts->pluck('unit_cost', 'ingredient_id'));
-        $globalCostMap = Ingredient::pluck('cost', 'id');
+        $branchCosts = IngredientCost::query()
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->get()
+            ->groupBy('branch_id')
+            ->map(fn($g) => $g->pluck('unit_cost', 'ingredient_id'));
+
+        $purchaseCosts = $this->fetchPurchasePrices($branchId);
+        $globalCosts = Ingredient::pluck('cost', 'id');
 
         $categoryProfit = [];
         $untrackedProfit = 0;
 
         foreach ($orders as $order) {
+            $bid = $order->branch_id;
             if ($order->items->count() > 0) {
                 foreach ($order->items as $item) {
                     $productCostMap = []; $optionCostMap = []; $modifierCostMap = [];
-                    $itemCost = $this->calculateItemCogs($item, $branchCostMap, $globalCostMap, $productCostMap, $optionCostMap, $modifierCostMap);
+                    $itemCost = $this->calculateItemCogs($item, $branchCosts, $globalCosts, $purchaseCosts, $productCostMap, $optionCostMap, $modifierCostMap, $bid);
                     $itemProfit = ($item->price - $itemCost) * $item->quantity;
 
                     $categoryName = $item->product->category->name ?? 'Uncategorized';
@@ -218,18 +228,24 @@ class DashboardOverview extends Component
         $branchId = $this->selectedBranchId;
         $orders = $this->fetchFinancialOrders($branchId);
         
-        $standardCosts = $this->fetchChartStandardCosts($branchId);
-        $branchCostMap = $standardCosts->pluck('cost_per_base_unit', 'ingredient_id')->union($standardCosts->pluck('unit_cost', 'ingredient_id'));
-        $globalCostMap = Ingredient::pluck('cost', 'id');
+        $branchCosts = IngredientCost::query()
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->get()
+            ->groupBy('branch_id')
+            ->map(fn($g) => $g->pluck('unit_cost', 'ingredient_id'));
 
+        $purchaseCosts = $this->fetchPurchasePrices($branchId);
+        $globalCosts = Ingredient::pluck('cost', 'id');
+
+        $margins = [];
         $categoryRevenue = [];
         $categoryProfit = [];
-        $totalRevenue = $orders->sum('total_amount');
 
         foreach ($orders as $order) {
+            $bid = $order->branch_id;
             foreach ($order->items as $item) {
                 $productCostMap = []; $optionCostMap = []; $modifierCostMap = [];
-                $itemCost = $this->calculateItemCogs($item, $branchCostMap, $globalCostMap, $productCostMap, $optionCostMap, $modifierCostMap);
+                $itemCost = $this->calculateItemCogs($item, $branchCosts, $globalCosts, $purchaseCosts, $productCostMap, $optionCostMap, $modifierCostMap, $bid);
                 $itemProfit = ($item->price - $itemCost) * $item->quantity;
 
                 $categoryName = $item->product->category->name ?? 'Uncategorized';
@@ -308,17 +324,6 @@ class DashboardOverview extends Component
 
         if ($this->endDate && !\DateTime::createFromFormat('Y-m-d', $this->endDate)) {
             $this->dateError = 'Invalid end date format.';
-            return;
-        }
-
-        // Both dates must be provided
-        if ($this->startDate && !$this->endDate) {
-            $this->dateError = 'Please provide an end date.';
-            return;
-        }
-
-        if ($this->endDate && !$this->startDate) {
-            $this->dateError = 'Please provide a start date.';
             return;
         }
 
@@ -450,12 +455,19 @@ class DashboardOverview extends Component
     {
         $branchId = $this->selectedBranchId;
         $orders = $this->fetchFinancialOrders($branchId);
-        $standardCosts = $this->fetchChartStandardCosts($branchId);
         
-        $branchCostMap = $standardCosts->pluck('cost_per_base_unit', 'ingredient_id')->union($standardCosts->pluck('unit_cost', 'ingredient_id'));
-        $globalCostMap = Ingredient::pluck('cost', 'id');
+        $branchCosts = IngredientCost::query()
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->get()
+            ->groupBy('branch_id')
+            ->map(fn($g) => $g->pluck('unit_cost', 'ingredient_id'));
+
+        $purchaseCosts = $this->fetchPurchasePrices($branchId);
+        $globalCosts = Ingredient::pluck('cost', 'id');
 
         $totalRevenue = $orders->sum('total_amount');
+        $deliveryFees = $orders->sum('delivery_fee');
+        $totalDiscounts = $orders->sum('discount_amount');
         $orderCount = $orders->count();
         $totalCogs = 0;
 
@@ -464,24 +476,60 @@ class DashboardOverview extends Component
         $modifierCostMap = [];
 
         foreach ($orders as $order) {
+            $bid = $order->branch_id;
             foreach ($order->items as $item) {
-                $itemCost = $this->calculateItemCogs($item, $branchCostMap, $globalCostMap, $productCostMap, $optionCostMap, $modifierCostMap);
+                $itemCost = $this->calculateItemCogs($item, $branchCosts, $globalCosts, $purchaseCosts, $productCostMap, $optionCostMap, $modifierCostMap, $bid);
                 $totalCogs += ($itemCost * $item->quantity);
             }
         }
 
+        // Calculate Waste Cost
+        $start = $this->startDate ? Carbon::parse($this->startDate)->startOfDay() : null;
+        $end = $this->endDate ? Carbon::parse($this->endDate)->endOfDay() : null;
+
+        $wasteCost = StockMovement::whereIn('type', ['waste', 'waste_expired', 'out', 'return_to_supplier'])
+            ->when($start, fn($q) => $q->where('created_at', '>=', $start))
+            ->when($end, fn($q) => $q->where('created_at', '<=', $end))
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->get()
+            ->sum(function($movement) {
+                return abs($movement->quantity) * ($movement->unit_cost ?? 0);
+            });
+
         $aov = $orderCount > 0 ? ($totalRevenue / $orderCount) : 0;
-        $grossProfit = $totalRevenue - $totalCogs;
-        $margin = $totalRevenue > 0 ? ($grossProfit / $totalRevenue) * 100 : 0;
+        
+        // Profit = (Revenue - Delivery) - COGS - Waste
+        $grossProfit = ($totalRevenue - $deliveryFees) - $totalCogs - $wasteCost;
+        $margin = ($totalRevenue - $deliveryFees) > 0 ? ($grossProfit / ($totalRevenue - $deliveryFees)) * 100 : 0;
+
+        $netSales = $totalRevenue - $deliveryFees;
+        $grossSales = $netSales + $totalDiscounts;
 
         return [
             'revenue' => $totalRevenue,
+            'net_sales' => $netSales,
+            'gross_sales' => $grossSales,
+            'delivery_fees' => $deliveryFees,
+            'total_discounts' => $totalDiscounts,
             'order_count' => $orderCount,
             'aov' => $aov,
             'total_cogs' => $totalCogs,
+            'waste_cost' => $wasteCost,
             'gross_profit' => $grossProfit,
             'profit_margin_pct' => round($margin, 2),
         ];
+    }
+
+    private function fetchPurchasePrices(?int $branchId): Collection
+    {
+        return StockMovement::where('type', 'in')
+            ->whereNotNull('unit_cost')
+            ->where('unit_cost', '>', 0)
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->groupBy('branch_id')
+            ->map(fn($g) => $g->unique('ingredient_id')->pluck('unit_cost', 'ingredient_id'));
     }
 
     private function fetchFinancialOrders(?int $branchId): Collection
@@ -620,12 +668,17 @@ class DashboardOverview extends Component
         [$start, $end] = $this->prepareChartDateRange($branchId);
         
         $orders = $this->fetchChartOrders($start, $end, $branchId);
-        $standardCosts = $this->fetchChartStandardCosts($branchId);
         
-        $branchCostMap = $standardCosts->pluck('cost_per_base_unit', 'ingredient_id')->union($standardCosts->pluck('unit_cost', 'ingredient_id'));
-        $globalCostMap = Ingredient::pluck('cost', 'id');
+        $branchCosts = IngredientCost::query()
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->get()
+            ->groupBy('branch_id')
+            ->map(fn($g) => $g->pluck('unit_cost', 'ingredient_id'));
 
-        $dailyData = $this->aggregateDailyChartData($orders, $branchCostMap, $globalCostMap);
+        $purchaseCosts = $this->fetchPurchasePrices($branchId);
+        $globalCosts = Ingredient::pluck('cost', 'id');
+
+        $dailyData = $this->aggregateDailyChartData($orders, $branchCosts, $globalCosts, $purchaseCosts);
         
         return $this->formatChartOutput($start, $end, $dailyData, $orders);
     }
@@ -684,7 +737,7 @@ class DashboardOverview extends Component
             ->get();
     }
 
-    private function aggregateDailyChartData(Collection $orders, Collection $branchCostMap, Collection $globalCostMap): array
+    private function aggregateDailyChartData(Collection $orders, Collection $branchCostMap, Collection $globalCostMap, Collection $purchaseCostMap): array
     {
         $dailyData = [];
         $productCostMap = [];
@@ -693,6 +746,7 @@ class DashboardOverview extends Component
 
         foreach ($orders as $order) {
             $date = Carbon::parse($order->created_at)->toDateString();
+            $bid = $order->branch_id;
             if (!isset($dailyData[$date])) $dailyData[$date] = ['sales' => 0, 'volume' => 0, 'profit' => 0];
             
             $dailyData[$date]['sales'] += $order->total_amount;
@@ -700,10 +754,11 @@ class DashboardOverview extends Component
 
             $orderCogs = 0;
             foreach ($order->items as $item) {
-                $itemCost = $this->calculateItemCogs($item, $branchCostMap, $globalCostMap, $productCostMap, $optionCostMap, $modifierCostMap);
+                $itemCost = $this->calculateItemCogs($item, $branchCostMap, $globalCostMap, $purchaseCostMap, $productCostMap, $optionCostMap, $modifierCostMap, $bid);
                 $orderCogs += ($itemCost * $item->quantity);
             }
-            $dailyData[$date]['profit'] += ($order->total_amount - $orderCogs);
+            // Profit = (Total Amount - Delivery Fee) - COGS
+            $dailyData[$date]['profit'] += ($order->total_amount - $order->delivery_fee - $orderCogs);
         }
         
         return $dailyData;
@@ -712,34 +767,55 @@ class DashboardOverview extends Component
     private function formatChartOutput(Carbon $start, Carbon $end, array $dailyData, Collection $orders): array
     {
         $categories = [];
-        $series = [];
+        $salesSeries = [];
+        $volumeSeries = [];
+        $profitSeries = [];
         $curr = clone $start;
         while ($curr <= $end) {
             $dateStr = $curr->toDateString();
             $categories[] = $curr->format('M d');
-            
-            $val = 0;
-            if (isset($dailyData[$dateStr])) {
-                $val = match($this->selectedChartMetric) {
-                    'Volume' => $dailyData[$dateStr]['volume'],
-                    'Profit' => round($dailyData[$dateStr]['profit'], 2),
-                    default  => round($dailyData[$dateStr]['sales'], 2),
-                };
-            }
-            $series[] = $val;
+
+            $sales = isset($dailyData[$dateStr]) ? round($dailyData[$dateStr]['sales'], 2) : 0;
+            $volume = isset($dailyData[$dateStr]) ? (int)$dailyData[$dateStr]['volume'] : 0;
+            $profit = isset($dailyData[$dateStr]) ? round($dailyData[$dateStr]['profit'], 2) : 0;
+
+            $salesSeries[] = $sales;
+            $volumeSeries[] = $volume;
+            $profitSeries[] = $profit;
+
             $curr->addDay();
         }
 
-        // Forecast
-        $totalVal = array_sum($series);
-        $avgVal = ($totalVal > 0 && count($series) > 0) ? $totalVal / count($series) : 0;
-        $forecast = array_map(fn($v) => $v > 0 ? $v : round($avgVal * 0.8, 2), $series);
+        // Forecast helper
+        $computeForecast = function(array $arr) {
+            $totalVal = array_sum($arr);
+            $avgVal = ($totalVal > 0 && count($arr) > 0) ? $totalVal / count($arr) : 0;
+            return array_map(fn($v) => $v > 0 ? $v : round($avgVal * 0.8, 2), $arr);
+        };
+
+        $salesForecast = $computeForecast($salesSeries);
+        $volumeForecast = $computeForecast($volumeSeries);
+        $profitForecast = $computeForecast($profitSeries);
+
+        // Choose series based on selected metric for backward compatibility
+        $series = match($this->selectedChartMetric) {
+            'Volume' => $volumeSeries,
+            'Profit' => $profitSeries,
+            default  => $salesSeries,
+        };
+
+        $forecast = match($this->selectedChartMetric) {
+            'Volume' => $volumeForecast,
+            'Profit' => $profitForecast,
+            default  => $salesForecast,
+        };
 
         // Dynamic Configuration from POS Platform
         $posConfig = ConfigurationService::getPosConfig();
         
         // Payment Distribution
         $paymentRaw = $orders->groupBy('payment_method')->map->count();
+        $paymentTotalsRaw = $orders->groupBy('payment_method')->map(fn($g) => round($g->sum('total_amount'), 2));
         $paymentLabels = $posConfig['payment_methods'] ?? ['Cash', 'GCash'];
         $paymentSeries = [];
         foreach ($paymentLabels as $label) {
@@ -758,9 +834,22 @@ class DashboardOverview extends Component
             'categories' => $categories,
             'history'    => $series,
             'forecast'   => $forecast,
+            'metrics'    => [
+                'series' => [
+                    'Sales'  => $salesSeries,
+                    'Volume' => $volumeSeries,
+                    'Profit' => $profitSeries,
+                ],
+                'forecast' => [
+                    'Sales'  => $salesForecast,
+                    'Volume' => $volumeForecast,
+                    'Profit' => $profitForecast,
+                ]
+            ],
             'payment'    => [
                 'series' => $paymentSeries,
-                'labels' => $paymentLabels
+                'labels' => $paymentLabels,
+                'totals' => array_map(fn($label) => $paymentTotalsRaw[$label] ?? 0, $paymentLabels),
             ],
             'channels'   => [
                 'series' => $channelSeries,
@@ -940,9 +1029,14 @@ class DashboardOverview extends Component
         );
     }
 
-    private function calculateItemCogs(OrderItem $item, Collection $branchCostMap, Collection $globalCostMap, array &$productMap, array &$optionMap, array &$modifierMap): float
+    private function calculateItemCogs(OrderItem $item, Collection $branchCosts, Collection $globalCosts, Collection $purchaseCosts, array &$productMap, array &$optionMap, array &$modifierMap, ?int $bid): float
     {
         $itemCost = 0;
+
+        $resolveCost = fn($ingId) => 
+            ($bid ? ($branchCosts[$bid][$ingId] ?? $purchaseCosts[$bid][$ingId] ?? null) : null) 
+            ?? $globalCosts[$ingId] 
+            ?? 0;
 
         // Base Product
         if ($item->product_id) {
@@ -950,7 +1044,7 @@ class DashboardOverview extends Component
                 $cost = 0;
                 if ($item->product) {
                     foreach ($item->product->recipes->where('product_option_id', null)->where('modifier_id', null) as $r) {
-                        $cost += ($r->quantity * ($branchCostMap[$r->ingredient_id] ?? $globalCostMap[$r->ingredient_id] ?? 0));
+                        $cost += ($r->quantity * $resolveCost($r->ingredient_id));
                     }
                 }
                 $productMap[$item->product_id] = (float)$cost;
@@ -965,7 +1059,7 @@ class DashboardOverview extends Component
                     $cost = 0;
                     if ($o->option) {
                         foreach ($o->option->recipes as $r) {
-                            $cost += ($r->quantity * ($branchCostMap[$r->ingredient_id] ?? $globalCostMap[$r->ingredient_id] ?? 0));
+                            $cost += ($r->quantity * $resolveCost($r->ingredient_id));
                         }
                     }
                     $optionMap[$o->product_option_id] = (float)$cost;
@@ -981,7 +1075,7 @@ class DashboardOverview extends Component
                     $cost = 0;
                     if ($m->modifier) {
                         foreach ($m->modifier->recipes as $r) {
-                            $cost += ($r->quantity * ($branchCostMap[$r->ingredient_id] ?? $globalCostMap[$r->ingredient_id] ?? 0));
+                            $cost += ($r->quantity * $resolveCost($r->ingredient_id));
                         }
                     }
                     $modifierMap[$m->modifier_id] = (float)$cost;
@@ -993,15 +1087,20 @@ class DashboardOverview extends Component
         return (float)$itemCost;
     }
 
-    private function trackIngredientUsage(OrderItem $item, Collection $branchCostMap, Collection $globalCostMap, array $ingredients, array &$usage): void
+    private function trackIngredientUsage(OrderItem $item, Collection $branchCosts, Collection $globalCosts, Collection $purchaseCosts, Collection $ingredients, array &$usage, ?int $bid): void
     {
         $recipes = collect();
         if ($item->product) $recipes = $recipes->concat($item->product->recipes->where('product_option_id', null)->where('modifier_id', null));
         foreach ($item->options as $o) if ($o->option) $recipes = $recipes->concat($o->option->recipes);
         foreach ($item->modifiers as $m) if ($m->modifier) $recipes = $recipes->concat($m->modifier->recipes);
 
+        $resolveCost = fn($ingId) => 
+            ($bid ? ($branchCosts[$bid][$ingId] ?? $purchaseCosts[$bid][$ingId] ?? null) : null) 
+            ?? $globalCosts[$ingId] 
+            ?? 0;
+
         foreach ($recipes as $r) {
-            $unitPrice = $branchCostMap[$r->ingredient_id] ?? $globalCostMap[$r->ingredient_id] ?? 0;
+            $unitPrice = $resolveCost($r->ingredient_id);
             $name = $ingredients[$r->ingredient_id] ?? 'Unknown';
             $usage[$name] = ($usage[$name] ?? 0) + ($r->quantity * $unitPrice * $item->quantity);
         }
@@ -1049,9 +1148,11 @@ class DashboardOverview extends Component
             'branch'      => $branch,
             'generatedAt' => now()->format('F d, Y h:i A'),
             'kpis'        => [
-                'Gross Revenue'    => 'PHP ' . number_format($kpi['revenue'], 2),
+                'Gross Revenue'    => 'PHP ' . number_format($kpi['gross_sales'], 2),
+                'Net Sales'        => 'PHP ' . number_format($kpi['net_sales'], 2),
                 'Avg. Order Value' => 'PHP ' . number_format($kpi['aov'], 2),
                 'Total COGS'       => 'PHP ' . number_format($kpi['total_cogs'], 2),
+                'Waste'            => 'PHP ' . number_format($kpi['waste_cost'] ?? 0, 2),
                 'Net Profit'       => 'PHP ' . number_format($kpi['gross_profit'], 2),
                 'Profit Margin'    => number_format($kpi['profit_margin_pct'], 2) . '%',
                 'Completed Orders' => number_format($kpi['order_count']),

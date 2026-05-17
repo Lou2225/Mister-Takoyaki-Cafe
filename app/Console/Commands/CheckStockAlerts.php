@@ -36,19 +36,19 @@ class CheckStockAlerts extends Command
     {
         $this->info("Running enterprise stock checks...");
 
-        $lowStocks = [];
-        $expiringBatches = [];
-        $expiredBatches = [];
+        $branchData = []; // [branch_id => ['name' => ..., 'low' => [], 'expiring' => [], 'expired' => []]]
 
         // 1. Gather Low Stocks
         $stocks = BranchIngredientStock::with(['branch', 'ingredient'])->get();
         foreach ($stocks as $stock) {
             $min = (float) $stock->ingredient->minimum_stock;
             if ($min > 0 && $stock->stock_quantity < $min) {
-                $bn = $stock->branch->branch_name;
+                $bid = $stock->branch_id;
+                if (!isset($branchData[$bid])) {
+                    $branchData[$bid] = ['name' => $stock->branch->branch_name, 'low' => [], 'expiring' => [], 'expired' => []];
+                }
                 
-                if (!isset($lowStocks[$bn])) $lowStocks[$bn] = [];
-                $lowStocks[$bn][] = [
+                $branchData[$bid]['low'][] = [
                     'ingredient' => $stock->ingredient->name,
                     'current' => StockHelper::formatForDisplay($stock->stock_quantity, $stock->ingredient->unit),
                     'minimum' => StockHelper::formatForDisplay($min, $stock->ingredient->unit),
@@ -67,21 +67,20 @@ class CheckStockAlerts extends Command
 
         foreach ($batches as $batch) {
             $expiry = Carbon::parse($batch->expiry_date)->startOfDay();
-            $bn = $batch->branch->branch_name;
+            $bid = $batch->branch_id;
+            if (!isset($branchData[$bid])) {
+                $branchData[$bid] = ['name' => $batch->branch->branch_name, 'low' => [], 'expiring' => [], 'expired' => []];
+            }
 
             if ($expiry->lt($today)) {
-                // Expired
-                if (!isset($expiredBatches[$bn])) $expiredBatches[$bn] = [];
-                $expiredBatches[$bn][] = [
+                $branchData[$bid]['expired'][] = [
                     'ingredient' => $batch->ingredient->name,
                     'quantity' => StockHelper::formatForDisplay($batch->current_quantity, $batch->ingredient->unit),
                     'expiry_date' => $batch->expiry_date,
                     'batch_id' => $batch->id,
                 ];
             } elseif ($expiry->lte($nextWeek)) {
-                // Expiring Soon
-                if (!isset($expiringBatches[$bn])) $expiringBatches[$bn] = [];
-                $expiringBatches[$bn][] = [
+                $branchData[$bid]['expiring'][] = [
                     'ingredient' => $batch->ingredient->name,
                     'quantity' => StockHelper::formatForDisplay($batch->current_quantity, $batch->ingredient->unit),
                     'expiry_date' => $batch->expiry_date,
@@ -90,7 +89,7 @@ class CheckStockAlerts extends Command
             }
         }
 
-        if (empty($lowStocks) && empty($expiringBatches) && empty($expiredBatches)) {
+        if (empty($branchData)) {
             $this->info("All good. No alerts generated.");
             return 0;
         }
@@ -103,15 +102,31 @@ class CheckStockAlerts extends Command
             return 0;
         }
 
-        $reportData = [
-            'lowStocks' => $lowStocks,
-            'expiringBatches' => $expiringBatches,
-            'expiredBatches' => $expiredBatches,
-        ];
-
         foreach ($admins as $admin) {
-            Mail::to($admin->email)->send(new StockAlertMail($reportData));
-            $this->line("Sent alert to: " . $admin->email);
+            $userLow = [];
+            $userExpiring = [];
+            $userExpired = [];
+
+            foreach ($branchData as $bid => $data) {
+                // Super Admin gets everything, Branch Admin gets only their branch
+                if ($admin->role_id == 1 || $admin->branch_id == $bid) {
+                    if (!empty($data['low'])) $userLow[$data['name']] = $data['low'];
+                    if (!empty($data['expiring'])) $userExpiring[$data['name']] = $data['expiring'];
+                    if (!empty($data['expired'])) $userExpired[$data['name']] = $data['expired'];
+                }
+            }
+
+            // Only send if there is data for this specific user
+            if (!empty($userLow) || !empty($userExpiring) || !empty($userExpired)) {
+                $reportData = [
+                    'lowStocks' => $userLow,
+                    'expiringBatches' => $userExpiring,
+                    'expiredBatches' => $userExpired,
+                ];
+
+                Mail::to($admin->email)->send(new StockAlertMail($reportData));
+                $this->line("Sent alert to: " . $admin->email . ($admin->role_id == 1 ? " (Enterprise)" : " (Branch: " . $admin->branch_id . ")"));
+            }
         }
 
         $this->info("Stock check complete. Emails dispatched.");

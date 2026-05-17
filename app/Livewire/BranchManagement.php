@@ -674,10 +674,9 @@ class BranchManagement extends Component
                 
                 $totalCollected = $completedOrders->sum('total_amount');
                 $deliveryFees   = $completedOrders->sum('delivery_fee');
-                $taxCollected   = $completedOrders->sum('tax_amount');
                 $totalDiscounts = $completedOrders->sum('discount_amount');
                 
-                $netSales = $totalCollected - $deliveryFees - $taxCollected;
+                $netSales = $totalCollected - $deliveryFees;
                 $grossSales = $netSales + $totalDiscounts;
                 
                 $orderCount = $completedOrders->count();
@@ -710,10 +709,9 @@ class BranchManagement extends Component
         
         $totalCollected = $completedOrders->sum('total_amount');
         $deliveryFees   = $completedOrders->sum('delivery_fee');
-        $taxCollected   = $completedOrders->sum('tax_amount');
         $totalDiscounts = $completedOrders->sum('discount_amount');
         
-        $netSales = $totalCollected - $deliveryFees - $taxCollected;
+        $netSales = $totalCollected - $deliveryFees;
         $grossSales = $netSales + $totalDiscounts;
         
         $orderCount = $completedOrders->count();
