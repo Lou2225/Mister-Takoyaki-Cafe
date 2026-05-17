@@ -186,7 +186,7 @@
                                             </div>
                                             <div class="max-h-48 overflow-y-auto">
                                                 <template x-for="r in filtered('region')" :key="r.code">
-                                                    <button type="button" @click="selectRegion(r)" class="w-full text-left px-4 py-2 text-[12px] hover:bg-indigo-50 transition-colors" x-text="r.name"></button>
+                                                    <button type="button" @click.stop="selectRegion(r)" class="w-full text-left px-4 py-2 text-[12px] hover:bg-indigo-50 transition-colors" x-text="r.name"></button>
                                                 </template>
                                             </div>
                                         </div>
@@ -210,7 +210,7 @@
                                             </div>
                                             <div class="max-h-48 overflow-y-auto">
                                                 <template x-for="p in filtered('province')" :key="p.code">
-                                                    <button type="button" @click="selectProvince(p)" class="w-full text-left px-4 py-2 text-[12px] hover:bg-indigo-50 transition-colors" x-text="p.name"></button>
+                                                    <button type="button" @click.stop="selectProvince(p)" class="w-full text-left px-4 py-2 text-[12px] hover:bg-indigo-50 transition-colors" x-text="p.name"></button>
                                                 </template>
                                             </div>
                                         </div>
@@ -224,7 +224,7 @@
                                 <div class="flex-1 w-full">
                                     <x-input-label value="City / Municipality" />
                                     <div class="relative mt-1" @click.outside="loc.city.open = false">
-                                        <button type="button" @click="loc.city.open = !loc.city.open" :disabled="!addr_region" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 h-10">
+                                        <button type="button" @click="loc.city.open = !loc.city.open" :disabled="!addr_region || (!addr_province && !loc.noProvince)" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 h-10">
                                             <span class="truncate" :class="addr_city ? 'text-gray-900 font-medium' : 'text-gray-400'" x-text="addr_city || 'Select City...'"></span>
                                             <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                         </button>
@@ -234,7 +234,7 @@
                                             </div>
                                             <div class="max-h-48 overflow-y-auto">
                                                 <template x-for="c in filtered('city')" :key="c.code">
-                                                    <button type="button" @click="selectCity(c)" class="w-full text-left px-4 py-2 text-[12px] hover:bg-indigo-50 transition-colors" x-text="c.name"></button>
+                                                    <button type="button" @click.stop="selectCity(c)" class="w-full text-left px-4 py-2 text-[12px] hover:bg-indigo-50 transition-colors" x-text="c.name"></button>
                                                 </template>
                                             </div>
                                         </div>
@@ -255,7 +255,7 @@
                                             </div>
                                             <div class="max-h-48 overflow-y-auto">
                                                 <template x-for="b in filtered('barangay')" :key="b.code">
-                                                    <button type="button" @click="selectBarangay(b)" class="w-full text-left px-4 py-2 text-[12px] hover:bg-indigo-50 transition-colors" x-text="b.name"></button>
+                                                    <button type="button" @click.stop="selectBarangay(b)" class="w-full text-left px-4 py-2 text-[12px] hover:bg-indigo-50 transition-colors" x-text="b.name"></button>
                                                 </template>
                                             </div>
                                         </div>
@@ -1332,29 +1332,33 @@
 
                 // ── Cascade handlers ─────────────────────────────────────
                 async selectRegion(region) {
+                    this.loc.region.open = false;
                     this.addr_region = region.name;
                     this.addr_province = ''; this.addr_city = ''; this.addr_barangay = '';
-                    this.loc.region.search = ''; this.loc.region.open = false;
+                    this.loc.region.search = '';
                     this.loc.province.search = ''; this.loc.city.search = ''; this.loc.barangay.search = '';
                     await this.loadProvinces(region.code);
                 },
                 async selectProvince(province) {
+                    this.loc.province.open = false;
                     this.addr_province = province.name;
                     this.addr_city = ''; this.addr_barangay = '';
-                    this.loc.province.search = ''; this.loc.province.open = false;
+                    this.loc.province.search = '';
                     this.loc.city.search = ''; this.loc.barangay.search = '';
                     await this.loadCities(province.code);
                 },
                 async selectCity(city) {
+                    this.loc.city.open = false;
                     this.addr_city = city.name;
                     this.addr_barangay = '';
-                    this.loc.city.search = ''; this.loc.city.open = false;
+                    this.loc.city.search = '';
                     this.loc.barangay.search = '';
                     await this.loadBarangays(city.code);
                 },
                 selectBarangay(brgy) {
+                    this.loc.barangay.open = false;
                     this.addr_barangay = brgy.name;
-                    this.loc.barangay.search = ''; this.loc.barangay.open = false;
+                    this.loc.barangay.search = '';
                 },
 
                 async autoMatchLocation(addr) {
