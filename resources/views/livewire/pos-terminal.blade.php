@@ -384,12 +384,10 @@
                 @php
                     $gradients = ['from-amber-400 to-orange-500','from-emerald-400 to-teal-500','from-rose-400 to-pink-500','from-indigo-400 to-blue-500','from-purple-400 to-violet-500'];
                 @endphp
-                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 transition-opacity duration-300"
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"
                     id="product-sortable-grid"
                     wire:key="pos-grid-{{ $selectedCategoryId ?? 'all' }}"
-                    x-init="setupProductSortable()"
-                    wire:loading.class="opacity-60 pointer-events-none"
-                    wire:target="selectedCategoryId">
+                    x-init="setupProductSortable()">
                     @foreach($products as $product)
                         @php
                             $pid      = $product->id;
