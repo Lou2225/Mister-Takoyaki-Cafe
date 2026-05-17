@@ -380,7 +380,8 @@
 
                         <div wire:key="pos-product-{{ $pid }}"
                             data-id="{{ $pid }}"
-                            x-show="!searchQuery || '{{ strtolower(addslashes($product->name)) }}'.includes(searchQuery.toLowerCase().trim())"
+                            x-data="{ productName: '{{ strtolower(addslashes($product->name)) }}' }"
+                            x-show="!searchQuery || productName.includes(searchQuery.toLowerCase().trim())"
                             class="product-card group relative bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex flex-col transition-all duration-300 hover:shadow-md {{ !$isAvailable ? 'opacity-75' : '' }}"
                             :class="isEditMode ? 'opacity-90 grayscale-[0.2] scale-[0.98]' : ''">
 
