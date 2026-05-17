@@ -15,7 +15,7 @@
     @send-email-bg.window="$wire.sendUserEmail($event.detail.userId, $event.detail.password)"
     @trigger-edit.window="$wire.showEdit($event.detail.id, $event.detail.mode || 'edit')"
     @trigger-set-formrole.window="$wire.setFormRoleId($event.detail)"
-    @trigger-set-formbranch.window="$wire.set('formBranchId', $event.detail)"
+    @trigger-set-formbranch.window="$wire.setFormBranchId($event.detail)"
     @trigger-set-position.window="$wire.set('position', $event.detail)"
     class="relative">
 
@@ -1323,31 +1323,28 @@
 
                 // ── Cascade handlers ─────────────────────────────────────
                 async selectRegion(region) {
-                    const lw = Livewire.find('{{ $this->id() }}');
-                    lw.set('addr_region', region.name);
-                    lw.set('addr_province', ''); lw.set('addr_city', ''); lw.set('addr_barangay', '');
+                    this.$wire.set('addr_region', region.name);
+                    this.$wire.set('addr_province', ''); this.$wire.set('addr_city', ''); this.$wire.set('addr_barangay', '');
                     this.loc.region.search = ''; this.loc.region.open = false;
                     this.loc.province.search = ''; this.loc.city.search = ''; this.loc.barangay.search = '';
                     await this.loadProvinces(region.code);
                 },
                 async selectProvince(province) {
-                    const lw = Livewire.find('{{ $this->id() }}');
-                    lw.set('addr_province', province.name);
-                    lw.set('addr_city', ''); lw.set('addr_barangay', '');
+                    this.$wire.set('addr_province', province.name);
+                    this.$wire.set('addr_city', ''); this.$wire.set('addr_barangay', '');
                     this.loc.province.search = ''; this.loc.province.open = false;
                     this.loc.city.search = ''; this.loc.barangay.search = '';
                     await this.loadCities(province.code);
                 },
                 async selectCity(city) {
-                    const lw = Livewire.find('{{ $this->id() }}');
-                    lw.set('addr_city', city.name);
-                    lw.set('addr_barangay', '');
+                    this.$wire.set('addr_city', city.name);
+                    this.$wire.set('addr_barangay', '');
                     this.loc.city.search = ''; this.loc.city.open = false;
                     this.loc.barangay.search = '';
                     await this.loadBarangays(city.code);
                 },
                 selectBarangay(brgy) {
-                    Livewire.find('{{ $this->id() }}').set('addr_barangay', brgy.name);
+                    this.$wire.set('addr_barangay', brgy.name);
                     this.loc.barangay.search = ''; this.loc.barangay.open = false;
                 },
 
@@ -1431,8 +1428,8 @@
                             const container = document.getElementById('userMap');
                             if (!container) return;
                             this.map.invalidateSize(); 
-                            let lat = await Livewire.find('{{ $this->id() }}').get('addr_lat');
-                            let lng = await Livewire.find('{{ $this->id() }}').get('addr_lng');
+                            let lat = await this.$wire.get('addr_lat');
+                            let lng = await this.$wire.get('addr_lng');
                             if (lat && lng) {
                                 this.map.setView([lat, lng], 16);
                                 if (this.marker) this.marker.setLatLng([lat, lng]);
@@ -1444,8 +1441,8 @@
                         const container = document.getElementById('userMap');
                         if (!container) return;
 
-                        let lat = await Livewire.find('{{ $this->id() }}').get('addr_lat');
-                        let lng = await Livewire.find('{{ $this->id() }}').get('addr_lng');
+                        let lat = await this.$wire.get('addr_lat');
+                        let lng = await this.$wire.get('addr_lng');
                         let startLat = lat || 14.2189;
                         let startLng = lng || 121.1672;
                         let startZoom = lat ? 15 : 11;
@@ -1479,8 +1476,8 @@
                             if (this.marker) this.marker.setLatLng(e.latlng);
                             else this.marker = L.marker(e.latlng).addTo(this.map);
                             
-                            Livewire.find('{{ $this->id() }}').set('addr_lat', lat);
-                            Livewire.find('{{ $this->id() }}').set('addr_lng', lng);
+                            this.$wire.set('addr_lat', lat);
+                            this.$wire.set('addr_lng', lng);
                             
                             try {
                                 const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&countrycodes=ph`);
@@ -1489,7 +1486,7 @@
                                     let st = data.address.road || data.address.pedestrian || '';
                                     let num = data.address.house_number || '';
                                     let fst = (num + ' ' + st).trim();
-                                    if(fst) Livewire.find('{{ $this->id() }}').set('addr_street', fst);
+                                    if(fst) this.$wire.set('addr_street', fst);
                                     
                                     await this.autoMatchLocation(data.address);
                                 }

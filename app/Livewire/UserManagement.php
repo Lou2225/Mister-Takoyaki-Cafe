@@ -166,6 +166,15 @@ class UserManagement extends Component
         $this->resetValidation('formRoleId');
     }
 
+    /**
+     * Set formBranchId and clear validation errors for this field.
+     */
+    public function setFormBranchId($branchId)
+    {
+        $this->formBranchId = $branchId;
+        $this->resetValidation('formBranchId');
+    }
+
     // ── Show create form ──────────────────────────────────────────
     public function showCreate()
     {
