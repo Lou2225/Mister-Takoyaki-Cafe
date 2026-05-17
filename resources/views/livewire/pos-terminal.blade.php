@@ -303,9 +303,9 @@
                     @click="activeCategoryId = null"
                     id="pos_tab_all" 
                     class="pos-category-tab inline-flex items-center justify-center px-4 py-2 border rounded-md font-semibold text-xs uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-offset-2 transition ease-in-out duration-150 gap-1.5 whitespace-nowrap shrink-0"
-                    :class="activeCategoryId === null ? 'bg-gray-800 text-white border-transparent hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:ring-indigo-500' : 'bg-white text-gray-700 border-gray-300 shadow-sm hover:bg-gray-50 focus:ring-indigo-500 disabled:opacity-25'">
+                    :class="activeCategoryId === null ? 'bg-{{ $primaryColor }}-600 text-white border-transparent hover:bg-{{ $primaryColor }}-700 focus:bg-{{ $primaryColor }}-700 active:bg-{{ $primaryColor }}-800 focus:ring-{{ $primaryColor }}-500' : 'bg-white text-gray-700 border-gray-300 shadow-sm hover:bg-gray-50 focus:ring-{{ $primaryColor }}-500 disabled:opacity-25'">
                     All
-                    <span class="text-[10px] font-bold" :class="activeCategoryId === null ? 'text-gray-100' : 'text-gray-400'">{{ $products->count() }}</span>
+                    <span class="text-[10px] font-bold" :class="activeCategoryId === null ? 'text-white' : 'text-gray-400'">{{ $products->count() }}</span>
                 </button>
 
                 @foreach($categories as $cat)
@@ -314,9 +314,9 @@
                         id="pos_tab_cat_{{ $cat->id }}" 
                         class="pos-category-tab inline-flex items-center justify-center px-4 py-2 border rounded-md font-semibold text-xs uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-offset-2 transition ease-in-out duration-150 gap-1.5 whitespace-nowrap shrink-0 {{ $isEditMode ? 'border-dashed border-gray-300 cursor-move' : '' }}" 
                         data-id="{{ $cat->id }}"
-                        :class="activeCategoryId === {{ $cat->id }} ? 'bg-gray-800 text-white border-transparent hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:ring-indigo-500' : 'bg-white text-gray-700 border-gray-300 shadow-sm hover:bg-gray-50 focus:ring-indigo-500 disabled:opacity-25'">
+                        :class="activeCategoryId === {{ $cat->id }} ? 'bg-{{ $primaryColor }}-600 text-white border-transparent hover:bg-{{ $primaryColor }}-700 focus:bg-{{ $primaryColor }}-700 active:bg-{{ $primaryColor }}-800 focus:ring-{{ $primaryColor }}-500' : 'bg-white text-gray-700 border-gray-300 shadow-sm hover:bg-gray-50 focus:ring-{{ $primaryColor }}-500 disabled:opacity-25'">
                         {{ $cat->name }}
-                        <span class="text-[10px] font-bold" :class="activeCategoryId === {{ $cat->id }} ? 'text-gray-100' : 'text-gray-400'">{{ $cat->products_count }}</span>
+                        <span class="text-[10px] font-bold" :class="activeCategoryId === {{ $cat->id }} ? 'text-white' : 'text-gray-400'">{{ $cat->products_count }}</span>
                     </button>
                 @endforeach
             </div>
