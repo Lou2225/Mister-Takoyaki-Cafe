@@ -1358,27 +1358,68 @@
                 },
 
                 // ── Cascade handlers ─────────────────────────────────────
-                async selectRegion(region) {
-                    this.loc.region.open = false;
+                // ── Cascade handlers ─────────────────────────────────────
+                async selectRegion(region, fromMap = false) {
                     this.addr_region = region.name;
                     this.addr_province = ''; this.addr_city = ''; this.addr_barangay = '';
+                    if (!fromMap) this.geocodeAddress();
                     await this.loadProvinces(region.code);
                 },
-                async selectProvince(province) {
-                    this.loc.province.open = false;
+                async selectProvince(province, fromMap = false) {
                     this.addr_province = province.name;
                     this.addr_city = ''; this.addr_barangay = '';
+                    if (!fromMap) this.geocodeAddress();
                     await this.loadCities(province.code);
                 },
-                async selectCity(city) {
-                    this.loc.city.open = false;
+                async selectCity(city, fromMap = false) {
                     this.addr_city = city.name;
                     this.addr_barangay = '';
+                    if (!fromMap) this.geocodeAddress();
                     await this.loadBarangays(city.code);
                 },
-                selectBarangay(brgy) {
-                    this.loc.barangay.open = false;
+                selectBarangay(brgy, fromMap = false) {
                     this.addr_barangay = brgy.name;
+                    if (!fromMap) this.geocodeAddress();
+                },
+
+                async geocodeAddress() {
+                    const parts = [];
+                    if (this.addr_barangay) parts.push(this.addr_barangay);
+                    if (this.addr_city) parts.push(this.addr_city);
+                    if (this.addr_province) parts.push(this.addr_province);
+                    if (this.addr_region) parts.push(this.addr_region);
+                    
+                    if (parts.length === 0) return;
+                    
+                    const query = parts.join(', ') + ', Philippines';
+                    try {
+                        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=ph`);
+                        const data = await response.json();
+                        
+                        if (data && data.length > 0) {
+                            const lat = parseFloat(data[0].lat);
+                            const lng = parseFloat(data[0].lon);
+                            
+                            this.$wire.set('addr_lat', lat);
+                            this.$wire.set('addr_lng', lng);
+                            
+                            if (this.map) {
+                                let zoom = 11;
+                                if (this.addr_barangay) zoom = 16;
+                                else if (this.addr_city) zoom = 14;
+                                else if (this.addr_province) zoom = 12;
+                                
+                                this.map.setView([lat, lng], zoom);
+                                if (this.marker) {
+                                    this.marker.setLatLng([lat, lng]);
+                                } else {
+                                    this.marker = L.marker([lat, lng]).addTo(this.map);
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Forward geocoding failed:', e);
+                    }
                 },
 
                 async autoMatchLocation(addr) {
@@ -1411,7 +1452,7 @@
                     }
 
                     if (!matchedR) return;
-                    await this.selectRegion(matchedR);
+                    await this.selectRegion(matchedR, true);
 
                     if (pName && this.loc.province.items.length > 0) {
                         let cppName = clean(pName);
@@ -1423,7 +1464,7 @@
                                 return target && search && (target === search || target.includes(search) || search.includes(target));
                             });
                         }
-                        if (matchedP) await this.selectProvince(matchedP);
+                        if (matchedP) await this.selectProvince(matchedP, true);
                     }
 
                     if (cName && this.loc.city.items.length > 0) {
@@ -1436,7 +1477,7 @@
                                 return target && search && (target === search || target.includes(search) || search.includes(target));
                             });
                         }
-                        if (matchedC) await this.selectCity(matchedC);
+                        if (matchedC) await this.selectCity(matchedC, true);
                     }
 
                     if (bName && this.loc.barangay.items.length > 0) {
@@ -1449,7 +1490,7 @@
                                 return target && search && (target === search || target.includes(search) || search.includes(target));
                             });
                         }
-                        if (matchedB) this.selectBarangay(matchedB);
+                        if (matchedB) this.selectBarangay(matchedB, true);
                     }
                 },
 
