@@ -170,6 +170,22 @@
                     this.cartExpanded = false; 
                 }
             });
+
+            const syncProducts = () => {
+                const el = document.getElementById('hidden-products-data');
+                if (el) {
+                    try {
+                        this.productsData = JSON.parse(el.getAttribute('data-products'));
+                    } catch (e) {
+                        console.error('Failed to parse products data', e);
+                    }
+                }
+            };
+
+            syncProducts();
+
+            document.addEventListener('livewire:update', syncProducts);
+            document.addEventListener('livewire:navigated', syncProducts);
         }
     }"
     @cart-expanded.window="cartExpanded = true"
@@ -178,6 +194,7 @@
     @cart-reset.window="cartExpanded = false"
 >
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
+    <div id="hidden-products-data" class="hidden" data-products="{{ $products->keyBy('id')->toJson() }}"></div>
 
     {{-- ══════════════════════════════════════════════
          FULL-WIDTH CATEGORY TAB CARD
