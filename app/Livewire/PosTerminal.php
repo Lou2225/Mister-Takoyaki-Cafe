@@ -235,9 +235,7 @@ class PosTerminal extends Component
         $query->leftJoin('product_categories', 'products.category_id', '=', 'product_categories.id')
               ->addSelect('product_categories.sort_order as category_sort_order');
 
-        if ($this->selectedCategoryId) {
-            $query->where('products.category_id', $this->selectedCategoryId);
-        }
+        // Client-side filtering is used for 0ms category switching.
 
 
 

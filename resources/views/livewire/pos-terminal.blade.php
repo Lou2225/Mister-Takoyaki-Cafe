@@ -2,10 +2,14 @@
     wire:key="pos-terminal-root"
     x-data="{ 
         searchQuery: '',
+        activeCategoryId: null,
         get filteredProductsCount() {
-            if (!this.searchQuery) return Object.keys(this.productsData).length;
-            const query = this.searchQuery.toLowerCase().trim();
-            return Object.values(this.productsData).filter(p => p.name.toLowerCase().includes(query)).length;
+            const query = this.searchQuery ? this.searchQuery.toLowerCase().trim() : '';
+            return Object.values(this.productsData).filter(p => {
+                const matchesCategory = this.activeCategoryId === null || p.category_id == this.activeCategoryId;
+                const matchesSearch = !query || p.name.toLowerCase().includes(query);
+                return matchesCategory && matchesSearch;
+            }).length;
         },
         isSavingDraft: false,
         cartExpanded: false,
@@ -233,16 +237,18 @@
             const applySearchFilter = () => {
                 const query = this.searchQuery ? this.searchQuery.toLowerCase().trim() : '';
                 document.querySelectorAll('.product-card').forEach(card => {
-                    if (!query) {
-                        card.style.display = '';
-                        return;
-                    }
                     const name = card.dataset.searchName || '';
-                    card.style.display = name.includes(query) ? '' : 'none';
+                    const catId = card.dataset.categoryId;
+                    
+                    const matchesCategory = this.activeCategoryId === null || catId == this.activeCategoryId;
+                    const matchesSearch = !query || name.includes(query);
+                    
+                    card.style.display = (matchesCategory && matchesSearch) ? '' : 'none';
                 });
             };
 
             this.$watch('searchQuery', applySearchFilter);
+            this.$watch('activeCategoryId', applySearchFilter);
 
             const syncProducts = () => {
                 const el = document.getElementById('hidden-products-data');
@@ -292,30 +298,26 @@
             >
 
                 {{-- All Tab --}}
-                @if($selectedCategoryId === null)
-                    <x-primary-button type="button" wire:key="pos-tab-all" wire:click.prevent="$set('selectedCategoryId', null)" wire:loading.attr="disabled" wire:target="$set('selectedCategoryId', null)" id="pos_tab_all" class="pos-category-tab inline-flex gap-1.5 whitespace-nowrap shrink-0">
-                        All
-                        <span class="text-[10px] font-bold text-gray-100">{{ $products->count() }}</span>
-                    </x-primary-button>
-                @else
-                    <x-secondary-button type="button" wire:key="pos-tab-all" wire:click.prevent="$set('selectedCategoryId', null)" wire:loading.attr="disabled" wire:target="$set('selectedCategoryId', null)" id="pos_tab_all" class="pos-category-tab inline-flex gap-1.5 whitespace-nowrap shrink-0">
-                        All
-                        <span class="text-[10px] font-bold text-gray-400">{{ $products->count() }}</span>
-                    </x-secondary-button>
-                @endif
+                {{-- All Tab --}}
+                <button type="button" 
+                    @click="activeCategoryId = null"
+                    id="pos_tab_all" 
+                    class="pos-category-tab inline-flex items-center justify-center px-4 py-2 border rounded-md font-semibold text-xs uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-offset-2 transition ease-in-out duration-150 gap-1.5 whitespace-nowrap shrink-0"
+                    :class="activeCategoryId === null ? 'bg-gray-800 text-white border-transparent hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:ring-indigo-500' : 'bg-white text-gray-700 border-gray-300 shadow-sm hover:bg-gray-50 focus:ring-indigo-500 disabled:opacity-25'">
+                    All
+                    <span class="text-[10px] font-bold" :class="activeCategoryId === null ? 'text-gray-100' : 'text-gray-400'">{{ $products->count() }}</span>
+                </button>
 
                 @foreach($categories as $cat)
-                    @if($selectedCategoryId == $cat->id)
-                        <x-primary-button type="button" wire:key="pos-tab-{{ $cat->id }}" wire:click.prevent="$set('selectedCategoryId', {{ $cat->id }})" wire:loading.attr="disabled" wire:target="$set('selectedCategoryId', {{ $cat->id }})" id="pos_tab_cat_{{ $cat->id }}" class="pos-category-tab inline-flex gap-1.5 whitespace-nowrap shrink-0 transition-all {{ $isEditMode ? 'border border-dashed border-gray-300 cursor-move' : '' }}" data-id="{{ $cat->id }}">
-                            {{ $cat->name }}
-                            <span class="text-[10px] font-bold text-gray-100">{{ $cat->products_count }}</span>
-                        </x-primary-button>
-                    @else
-                        <x-secondary-button type="button" wire:key="pos-tab-{{ $cat->id }}" wire:click.prevent="$set('selectedCategoryId', {{ $cat->id }})" wire:loading.attr="disabled" wire:target="$set('selectedCategoryId', {{ $cat->id }})" id="pos_tab_cat_{{ $cat->id }}" class="pos-category-tab inline-flex gap-1.5 whitespace-nowrap shrink-0 transition-all {{ $isEditMode ? 'border border-dashed border-gray-300 cursor-move' : '' }}" data-id="{{ $cat->id }}">
-                            {{ $cat->name }}
-                            <span class="text-[10px] font-bold text-gray-400">{{ $cat->products_count }}</span>
-                        </x-secondary-button>
-                    @endif
+                    <button type="button" 
+                        @click="activeCategoryId = {{ $cat->id }}"
+                        id="pos_tab_cat_{{ $cat->id }}" 
+                        class="pos-category-tab inline-flex items-center justify-center px-4 py-2 border rounded-md font-semibold text-xs uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-offset-2 transition ease-in-out duration-150 gap-1.5 whitespace-nowrap shrink-0 {{ $isEditMode ? 'border-dashed border-gray-300 cursor-move' : '' }}" 
+                        data-id="{{ $cat->id }}"
+                        :class="activeCategoryId === {{ $cat->id }} ? 'bg-gray-800 text-white border-transparent hover:bg-gray-700 focus:bg-gray-700 active:bg-gray-900 focus:ring-indigo-500' : 'bg-white text-gray-700 border-gray-300 shadow-sm hover:bg-gray-50 focus:ring-indigo-500 disabled:opacity-25'">
+                        {{ $cat->name }}
+                        <span class="text-[10px] font-bold" :class="activeCategoryId === {{ $cat->id }} ? 'text-gray-100' : 'text-gray-400'">{{ $cat->products_count }}</span>
+                    </button>
                 @endforeach
             </div>
 
@@ -401,6 +403,7 @@
 
                         <div wire:key="pos-product-{{ $pid }}"
                             data-id="{{ $pid }}"
+                            data-category-id="{{ $product->category_id }}"
                             data-search-name="{{ strtolower(addslashes($product->name)) }}"
                             class="product-card group relative bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex flex-col transition-all duration-300 hover:shadow-md {{ !$isAvailable ? 'opacity-75' : '' }}"
                             :class="isEditMode ? 'opacity-90 grayscale-[0.2] scale-[0.98]' : ''">
