@@ -1044,7 +1044,7 @@
                                     </template>
                                 </div>
 
-                                <p class="text-[12px] font-bold text-blue-900">{{ $currencySymbol }}{{ number_format($total, 2) }} due</p>
+                                <p class="text-[12px] font-bold text-blue-900">{{ $currencySymbol }}<span x-text="total.toFixed(2)">{{ number_format($this->total, 2) }}</span> due</p>
                                 <p class="text-[10px] text-blue-500 mt-0.5">Order #{{ $referenceNo }}</p>
 
                                 <a :href="gcashUrl" target="_blank"
@@ -1083,7 +1083,7 @@
                 {{-- Total Due Display --}}
                 <div class="border-t border-gray-100 px-4 py-4 bg-gray-900 text-white text-center">
                     <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Total Due</p>
-                    <p class="text-[24px] font-black font-mono">{{ $currencySymbol }}{{ number_format($total, 2) }}</p>
+                    <p class="text-[24px] font-black font-mono">{{ $currencySymbol }}<span x-text="total.toFixed(2)">{{ number_format($this->total, 2) }}</span></p>
                 </div>
             </div>
         </div>
