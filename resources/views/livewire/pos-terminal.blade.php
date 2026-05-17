@@ -258,8 +258,16 @@
 
             syncProducts();
 
-            document.addEventListener('livewire:update', syncProducts);
             document.addEventListener('livewire:navigated', syncProducts);
+            
+            const setupHook = () => {
+                Livewire.hook('commit', ({ succeed }) => {
+                    succeed(() => setTimeout(syncProducts, 50));
+                });
+            };
+            
+            if (window.Livewire) setupHook();
+            else document.addEventListener('livewire:initialized', setupHook);
         }
     }"
     @cart-expanded.window="cartExpanded = true"
