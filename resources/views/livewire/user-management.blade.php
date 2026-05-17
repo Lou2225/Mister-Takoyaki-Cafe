@@ -177,7 +177,7 @@
                                     <x-input-label value="Region" />
                                     <div class="relative mt-1" @click.outside="loc.region.open = false">
                                         <button type="button" @click="loc.region.open = !loc.region.open; loadRegions();" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm hover:border-indigo-300 focus:outline-none transition-all h-10">
-                                            <span class="truncate" :class="'{{ $addr_region }}' ? 'text-gray-900 font-medium' : 'text-gray-400'">{{ $addr_region ?: 'Select Region...' }}</span>
+                                            <span class="truncate" :class="addr_region ? 'text-gray-900 font-medium' : 'text-gray-400'" x-text="addr_region || 'Select Region...'"></span>
                                             <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                         </button>
                                         <div x-show="loc.region.open" class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden" x-cloak>
@@ -197,10 +197,10 @@
                                 <div class="flex-1 w-full">
                                     <x-input-label value="Province" />
                                     <div class="relative mt-1" @click.outside="loc.province.open = false">
-                                        <button type="button" @click="loc.province.open = !loc.province.open" :disabled="!'{{ $addr_region }}' || loc.noProvince" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 h-10">
-                                            <span class="truncate" :class="'{{ $addr_province }}' ? 'text-gray-900 font-medium' : 'text-gray-400'">
+                                        <button type="button" @click="loc.province.open = !loc.province.open" :disabled="!addr_region || loc.noProvince" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 h-10">
+                                            <span class="truncate" :class="addr_province ? 'text-gray-900 font-medium' : 'text-gray-400'">
                                                 <template x-if="loc.noProvince"><span>N/A (Direct to City)</span></template>
-                                                <template x-if="!loc.noProvince"><span x-text="'{{ $addr_province }}' || 'Select Province...'"></span></template>
+                                                <template x-if="!loc.noProvince"><span x-text="addr_province || 'Select Province...'"></span></template>
                                             </span>
                                             <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                         </button>
@@ -224,8 +224,8 @@
                                 <div class="flex-1 w-full">
                                     <x-input-label value="City / Municipality" />
                                     <div class="relative mt-1" @click.outside="loc.city.open = false">
-                                        <button type="button" @click="loc.city.open = !loc.city.open" :disabled="!'{{ $addr_region }}'" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 h-10">
-                                            <span class="truncate" :class="'{{ $addr_city }}' ? 'text-gray-900 font-medium' : 'text-gray-400'">{{ $addr_city ?: 'Select City...' }}</span>
+                                        <button type="button" @click="loc.city.open = !loc.city.open" :disabled="!addr_region" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 h-10">
+                                            <span class="truncate" :class="addr_city ? 'text-gray-900 font-medium' : 'text-gray-400'" x-text="addr_city || 'Select City...'"></span>
                                             <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                         </button>
                                         <div x-show="loc.city.open" class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden" x-cloak>
@@ -245,8 +245,8 @@
                                 <div class="flex-1 w-full">
                                     <x-input-label value="Barangay" />
                                     <div class="relative mt-1" @click.outside="loc.barangay.open = false">
-                                        <button type="button" @click="loc.barangay.open = !loc.barangay.open" :disabled="!'{{ $addr_city }}'" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 h-10">
-                                            <span class="truncate" :class="'{{ $addr_barangay }}' ? 'text-gray-900 font-medium' : 'text-gray-400'">{{ $addr_barangay ?: 'Select Barangay...' }}</span>
+                                        <button type="button" @click="loc.barangay.open = !loc.barangay.open" :disabled="!addr_city" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 h-10">
+                                            <span class="truncate" :class="addr_barangay ? 'text-gray-900 font-medium' : 'text-gray-400'" x-text="addr_barangay || 'Select Barangay...'"></span>
                                             <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                         </button>
                                         <div x-show="loc.barangay.open" class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden" x-cloak>
@@ -1223,8 +1223,15 @@
                 deleteTargetId: null,
                 deleteTargetName: '',
 
+                // ── Entangled Form State ─────────────────────────────────
+                addr_region: @entangle('addr_region'),
+                addr_province: @entangle('addr_province'),
+                addr_city: @entangle('addr_city'),
+                addr_barangay: @entangle('addr_barangay'),
+
                 // ── Location state ───────────────────────────────────────
                 loc: {
+                    noProvince: false,
                     region:   { items: [], open: false, search: '', loading: false },
                     province: { items: [], open: false, search: '', loading: false },
                     city:     { items: [], open: false, search: '', loading: false },
@@ -1273,7 +1280,9 @@
                         const data = await this.fetchWithRetry(`https://psgc.cloud/api/regions/${regionCode}/provinces`);
                         this.loc.province.items = data.sort((a, b) => a.name.localeCompare(b.name));
                         
-                        if (this.loc.province.items.length === 0) {
+                        this.loc.noProvince = this.loc.province.items.length === 0;
+
+                        if (this.loc.noProvince) {
                             this.loc.province.loading = false;
                             this.loc.city.loading = true;
                             const data2 = await this.fetchWithRetry(`https://psgc.cloud/api/regions/${regionCode}/cities-municipalities`);
@@ -1323,28 +1332,28 @@
 
                 // ── Cascade handlers ─────────────────────────────────────
                 async selectRegion(region) {
-                    this.$wire.set('addr_region', region.name);
-                    this.$wire.set('addr_province', ''); this.$wire.set('addr_city', ''); this.$wire.set('addr_barangay', '');
+                    this.addr_region = region.name;
+                    this.addr_province = ''; this.addr_city = ''; this.addr_barangay = '';
                     this.loc.region.search = ''; this.loc.region.open = false;
                     this.loc.province.search = ''; this.loc.city.search = ''; this.loc.barangay.search = '';
                     await this.loadProvinces(region.code);
                 },
                 async selectProvince(province) {
-                    this.$wire.set('addr_province', province.name);
-                    this.$wire.set('addr_city', ''); this.$wire.set('addr_barangay', '');
+                    this.addr_province = province.name;
+                    this.addr_city = ''; this.addr_barangay = '';
                     this.loc.province.search = ''; this.loc.province.open = false;
                     this.loc.city.search = ''; this.loc.barangay.search = '';
                     await this.loadCities(province.code);
                 },
                 async selectCity(city) {
-                    this.$wire.set('addr_city', city.name);
-                    this.$wire.set('addr_barangay', '');
+                    this.addr_city = city.name;
+                    this.addr_barangay = '';
                     this.loc.city.search = ''; this.loc.city.open = false;
                     this.loc.barangay.search = '';
                     await this.loadBarangays(city.code);
                 },
                 selectBarangay(brgy) {
-                    this.$wire.set('addr_barangay', brgy.name);
+                    this.addr_barangay = brgy.name;
                     this.loc.barangay.search = ''; this.loc.barangay.open = false;
                 },
 
