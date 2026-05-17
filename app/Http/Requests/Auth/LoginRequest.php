@@ -41,28 +41,42 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        $user = \App\Models\User::where('email', $this->email)->first();
+        $users = \App\Models\User::where('email', $this->email)->get();
 
-        if (!$user) {
+        if ($users->isEmpty()) {
             RateLimiter::hit($this->throttleKey());
             throw ValidationException::withMessages([
                 'email' => 'We could not find an account registered with that email address.',
             ]);
         }
 
-        if (!$user->is_active) {
+        $authenticatedUser = null;
+
+        foreach ($users as $user) {
+            if (\Illuminate\Support\Facades\Hash::check($this->password, $user->password)) {
+                $authenticatedUser = $user;
+                // If they have multiple accounts with the EXACT same password, prioritize the Staff/Admin account
+                if ($user->role_id != 4) {
+                    break;
+                }
+            }
+        }
+
+        if (!$authenticatedUser) {
+            RateLimiter::hit($this->throttleKey());
+            throw ValidationException::withMessages([
+                'password' => 'The password you entered is incorrect. Please try again.',
+            ]);
+        }
+
+        if (!$authenticatedUser->is_active) {
             RateLimiter::hit($this->throttleKey());
             throw ValidationException::withMessages([
                 'email' => 'Your account has been deactivated. Please contact the system administrator.',
             ]);
         }
 
-        if (!Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
-            RateLimiter::hit($this->throttleKey());
-            throw ValidationException::withMessages([
-                'password' => 'The password you entered is incorrect. Please try again.',
-            ]);
-        }
+        Auth::login($authenticatedUser, $this->boolean('remember'));
 
         RateLimiter::clear($this->throttleKey());
     }

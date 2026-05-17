@@ -547,27 +547,21 @@ class UserManagement extends Component
             }
         }
 
-        $message = 'User created successfully.';
+        $message = 'User created successfully. Credentials are being emailed.';
         $this->dispatch('notify', type: 'success', message: $message);
-        $this->dispatch('send-email-bg', userId: $user->id, password: $plainPassword);
+        
+        // Dispatch email after response to prevent blocking the UI
+        dispatch(function () use ($user, $plainPassword) {
+            try {
+                \Illuminate\Support\Facades\Mail::to($user->email)
+                    ->send(new \App\Mail\UserCredentialsMail($user, $plainPassword));
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Failed to send credential email: ' . $e->getMessage());
+            }
+        })->afterResponse();
         
         // Modal will be closed by toast component after displaying the notification
         $this->backToList();
-    }
-
-    public function sendUserEmail($userId, $password)
-    {
-        $user = User::find($userId);
-        if (!$user) return;
-
-        try {
-            \Illuminate\Support\Facades\Mail::to($user->email)
-                ->send(new \App\Mail\UserCredentialsMail($user, $password));
-            $this->dispatch('notify', type: 'success', message: 'Credentials emailed to ' . $user->email);
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Failed to send credential email: ' . $e->getMessage());
-            $this->dispatch('notify', type: 'error', message: 'Failed to send credentials. Please check logs.');
-        }
     }
 
     // ── Update (edit) ─────────────────────────────────────────────

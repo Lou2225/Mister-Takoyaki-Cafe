@@ -147,22 +147,22 @@ class BranchManagement extends Component
 
     public function updatedAddrBarangay()
     {
-        $this->validateFieldLive('addr_barangay', ['required', 'string'], ValidationHelper::commonMessages());
+        $this->validateFieldLive('addr_barangay', ['nullable', 'string'], ValidationHelper::commonMessages());
     }
 
     public function updatedAddrCity()
     {
-        $this->validateFieldLive('addr_city', ['required', 'string'], ValidationHelper::commonMessages());
+        $this->validateFieldLive('addr_city', ['nullable', 'string'], ValidationHelper::commonMessages());
     }
 
     public function updatedAddrProvince()
     {
-        $this->validateFieldLive('addr_province', ['required', 'string'], ValidationHelper::commonMessages());
+        $this->validateFieldLive('addr_province', ['nullable', 'string'], ValidationHelper::commonMessages());
     }
 
     public function updatedAddrRegion()
     {
-        $this->validateFieldLive('addr_region', ['required', 'string'], ValidationHelper::commonMessages());
+        $this->validateFieldLive('addr_region', ['nullable', 'string'], ValidationHelper::commonMessages());
     }
 
     public function selectAllBranches()

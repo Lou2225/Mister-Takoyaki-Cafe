@@ -1038,9 +1038,19 @@
                 </div>
                 <div class="flex items-center justify-end gap-2">
                     <x-secondary-button @click="$dispatch('close-modal', 'confirm-manager-replace')">Cancel</x-secondary-button>
-                    <x-primary-button @click="$wire.replaceManager(); $dispatch('close-modal', 'confirm-manager-replace')"
-                        class="bg-amber-600 hover:bg-amber-700">
-                        Replace & Save
+                    <x-primary-button 
+                        wire:click="replaceManager"
+                        wire:loading.attr="disabled"
+                        wire:target="replaceManager"
+                        class="bg-amber-600 hover:bg-amber-700 min-w-[140px] flex justify-center">
+                        <span wire:loading.remove wire:target="replaceManager">Replace & Save</span>
+                        <span wire:loading wire:target="replaceManager">
+                            <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Saving...
+                        </span>
                     </x-primary-button>
                 </div>
             </div>
@@ -1065,10 +1075,18 @@
             <div class="flex items-center justify-end gap-2 mt-6">
                 <x-secondary-button @click="$dispatch('close-modal', 'confirm-save-user')" class="h-10">Cancel</x-secondary-button>
                 <x-primary-button 
-                    @click="$dispatch('close-modal', 'confirm-save-user')"
                     wire:click="{{ $editUserId ? 'updateUser' : 'saveUser' }}" 
-                    class="h-10">
-                    Confirm & Save
+                    wire:loading.attr="disabled"
+                    wire:target="updateUser, saveUser"
+                    class="h-10 min-w-[150px] flex justify-center">
+                    <span wire:loading.remove wire:target="updateUser, saveUser">Confirm & Save</span>
+                    <span wire:loading wire:target="updateUser, saveUser">
+                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Saving...
+                    </span>
                 </x-primary-button>
             </div>
         </div>

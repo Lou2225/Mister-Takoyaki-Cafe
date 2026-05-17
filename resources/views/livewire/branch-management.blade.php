@@ -27,10 +27,10 @@
                 
                 // ── Location ──
                 loc: {
-                    region: { open: false, items: [], search: '', loading: false },
-                    province: { open: false, items: [], search: '', loading: false },
-                    city: { open: false, items: [], search: '', loading: false },
-                    barangay: { open: false, items: [], search: '', loading: false },
+                    region: { items: [], search: '', loading: false },
+                    province: { items: [], search: '', loading: false },
+                    city: { items: [], search: '', loading: false },
+                    barangay: { items: [], search: '', loading: false },
                     noProvince: false
                 },
 
@@ -39,66 +39,198 @@
                     return q ? this.loc[type].items.filter(i => i.name.toLowerCase().includes(q)) : this.loc[type].items;
                 },
 
+                async fetchWithRetry(url, retries = 2, delay = 1000) {
+                    for (let i = 0; i <= retries; i++) {
+                        try {
+                            const res = await fetch(url);
+                            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                            return await res.json();
+                        } catch (e) {
+                            if (i === retries) throw e;
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                        }
+                    }
+                },
+
                 async loadRegions() {
                     if (this.loc.region.items.length > 0) return;
                     this.loc.region.loading = true;
                     try {
-                        const res = await fetch('https://psgc.cloud/api/regions');
-                        this.loc.region.items = (await res.json()).sort((a, b) => a.name.localeCompare(b.name));
+                        const data = await this.fetchWithRetry('https://psgc.cloud/api/regions');
+                        this.loc.region.items = data.sort((a, b) => a.name.localeCompare(b.name));
                     } catch (e) { console.error(e); }
                     finally { this.loc.region.loading = false; }
                 },
 
-                async selectRegion(region) {
+                async selectRegion(region, fromMap = false) {
                     this.$wire.set('addr_region', region.name);
                     this.$wire.set('addr_province', ''); this.$wire.set('addr_city', ''); this.$wire.set('addr_barangay', '');
-                    this.loc.region.open = false;
                     this.loc.province.items = []; this.loc.city.items = []; this.loc.barangay.items = [];
                     this.loc.noProvince = false;
                     
+                    if (!fromMap) this.geocodeAddress();
+                    
                     this.loc.province.loading = true;
                     try {
-                        const res = await fetch(`https://psgc.cloud/api/regions/${region.code}/provinces`);
-                        const data = await res.json();
+                        const data = await this.fetchWithRetry(`https://psgc.cloud/api/regions/${region.code}/provinces`);
                         this.loc.province.items = data.sort((a, b) => a.name.localeCompare(b.name));
                         if (this.loc.province.items.length === 0) {
                             this.loc.noProvince = true;
-                            const res2 = await fetch(`https://psgc.cloud/api/regions/${region.code}/cities-municipalities`);
-                            this.loc.city.items = (await res2.json()).sort((a, b) => a.name.localeCompare(b.name));
+                            const data2 = await this.fetchWithRetry(`https://psgc.cloud/api/regions/${region.code}/cities-municipalities`);
+                            this.loc.city.items = data2.sort((a, b) => a.name.localeCompare(b.name));
                         }
                     } catch (e) { console.error(e); }
                     finally { this.loc.province.loading = false; }
                 },
 
-                async selectProvince(province) {
+                async selectProvince(province, fromMap = false) {
                     this.$wire.set('addr_province', province.name);
                     this.$wire.set('addr_city', ''); this.$wire.set('addr_barangay', '');
-                    this.loc.province.open = false;
+                    
+                    if (!fromMap) this.geocodeAddress();
                     
                     this.loc.city.loading = true;
                     try {
-                        const res = await fetch(`https://psgc.cloud/api/provinces/${province.code}/cities-municipalities`);
-                        this.loc.city.items = (await res.json()).sort((a, b) => a.name.localeCompare(b.name));
+                        const data = await this.fetchWithRetry(`https://psgc.cloud/api/provinces/${province.code}/cities-municipalities`);
+                        this.loc.city.items = data.sort((a, b) => a.name.localeCompare(b.name));
                     } catch (e) { console.error(e); }
                     finally { this.loc.city.loading = false; }
                 },
 
-                async selectCity(city) {
+                async selectCity(city, fromMap = false) {
                     this.$wire.set('addr_city', city.name);
                     this.$wire.set('addr_barangay', '');
-                    this.loc.city.open = false;
+                    
+                    if (!fromMap) this.geocodeAddress();
                     
                     this.loc.barangay.loading = true;
                     try {
-                        const res = await fetch(`https://psgc.cloud/api/cities-municipalities/${city.code}/barangays`);
-                        this.loc.barangay.items = (await res.json()).sort((a, b) => a.name.localeCompare(b.name));
+                        const data = await this.fetchWithRetry(`https://psgc.cloud/api/cities-municipalities/${city.code}/barangays`);
+                        this.loc.barangay.items = data.sort((a, b) => a.name.localeCompare(b.name));
                     } catch (e) { console.error(e); }
                     finally { this.loc.barangay.loading = false; }
                 },
 
-                selectBarangay(brgy) {
+                selectBarangay(brgy, fromMap = false) {
                     this.$wire.set('addr_barangay', brgy.name);
-                    this.loc.barangay.open = false;
+                    if (!fromMap) this.geocodeAddress();
+                },
+
+                async geocodeAddress() {
+                    const parts = [];
+                    const barangay = await this.$wire.get('addr_barangay');
+                    const city = await this.$wire.get('addr_city');
+                    const province = await this.$wire.get('addr_province');
+                    const region = await this.$wire.get('addr_region');
+                    
+                    if (barangay) parts.push(barangay);
+                    if (city) parts.push(city);
+                    if (province) parts.push(province);
+                    if (region) parts.push(region);
+                    
+                    if (parts.length === 0) return;
+                    
+                    const query = parts.join(', ') + ', Philippines';
+                    try {
+                        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=ph`);
+                        const data = await response.json();
+                        
+                        if (data && data.length > 0) {
+                            const lat = parseFloat(data[0].lat);
+                            const lng = parseFloat(data[0].lon);
+                            
+                            this.$wire.set('addr_lat', lat);
+                            this.$wire.set('addr_lng', lng);
+                            
+                            if (this.map) {
+                                let zoom = 11;
+                                if (barangay) zoom = 16;
+                                else if (city) zoom = 14;
+                                else if (province) zoom = 12;
+                                
+                                this.map.setView([lat, lng], zoom);
+                                if (this.marker) {
+                                    this.marker.setLatLng([lat, lng]);
+                                } else {
+                                    this.marker = L.marker([lat, lng]).addTo(this.map);
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Forward geocoding failed:', e);
+                    }
+                },
+
+                async autoMatchLocation(addr) {
+                    const clean = (str) => {
+                        if (!str) return '';
+                        return str.toLowerCase()
+                            .replace(/city of|province of|region|district|barangay|brgy\.?|municipality of/g, '')
+                            .replace(/[^a-z0-9]/g, '')
+                            .trim();
+                    };
+
+                    let rName = addr.region || '';
+                    let pName = addr.state || addr.province || addr.county || '';
+                    let cName = addr.city || addr.town || addr.municipality || '';
+                    let bName = addr.quarter || addr.village || addr.suburb || addr.neighbourhood || '';
+
+                    if (this.loc.region.items.length === 0) await this.loadRegions();
+
+                    let crName = clean(rName);
+                    let cpName = clean(pName);
+                    let matchedR = this.loc.region.items.find(r => {
+                        const target = clean(r.name);
+                        return target === crName || 
+                               (crName.includes('manila') && target.includes('ncr')) ||
+                               (cpName.includes('manila') && target.includes('ncr'));
+                    });
+
+                    if (!matchedR && crName) {
+                        matchedR = this.loc.region.items.find(r => clean(r.name).includes(crName) || crName.includes(clean(r.name)));
+                    }
+
+                    if (!matchedR) return;
+                    await this.selectRegion(matchedR, true);
+
+                    if (pName && this.loc.province.items.length > 0) {
+                        let cppName = clean(pName);
+                        let matchedP = this.loc.province.items.find(p => clean(p.name) === cppName);
+                        if (!matchedP) {
+                            matchedP = this.loc.province.items.find(p => {
+                                const target = clean(p.name).replace('province', '');
+                                const search = cppName.replace('province', '');
+                                return target && search && (target === search || target.includes(search) || search.includes(target));
+                            });
+                        }
+                        if (matchedP) await this.selectProvince(matchedP, true);
+                    }
+
+                    if (cName && this.loc.city.items.length > 0) {
+                        let ccName = clean(cName);
+                        let matchedC = this.loc.city.items.find(c => clean(c.name) === ccName);
+                        if (!matchedC) {
+                            matchedC = this.loc.city.items.find(c => {
+                                const target = clean(c.name).replace('city', '').replace('municipality', '').replace('city of', '');
+                                const search = ccName.replace('city', '').replace('municipality', '').replace('city of', '');
+                                return target && search && (target === search || target.includes(search) || search.includes(target));
+                            });
+                        }
+                        if (matchedC) await this.selectCity(matchedC, true);
+                    }
+
+                    if (bName && this.loc.barangay.items.length > 0) {
+                        let cbName = clean(bName);
+                        let matchedB = this.loc.barangay.items.find(b => clean(b.name) === cbName);
+                        if (!matchedB) {
+                            matchedB = this.loc.barangay.items.find(b => {
+                                const target = clean(b.name).replace('barangay', '').replace('brgy', '').replace('poblacion', '').replace('pob', '');
+                                const search = cbName.replace('barangay', '').replace('brgy', '').replace('poblacion', '').replace('pob', '');
+                                return target && search && (target === search || target.includes(search) || search.includes(target));
+                            });
+                        }
+                        if (matchedB) this.selectBarangay(matchedB, true);
+                    }
                 },
 
                 // ── Map ──
@@ -152,28 +284,28 @@
 
                         L.control.layers({ "Street": street, "Satellite": satellite }).addTo(this.map);
 
-                        this.map.on('click', (e) => {
+                        this.map.on('click', async (e) => {
                             if (this.marker) this.marker.setLatLng(e.latlng);
                             else this.marker = L.marker(e.latlng).addTo(this.map);
                             this.$wire.set('addr_lat', e.latlng.lat);
                             this.$wire.set('addr_lng', e.latlng.lng);
-                            this.reverseGeocode(e.latlng.lat, e.latlng.lng);
+                            
+                            try {
+                                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${e.latlng.lat}&lon=${e.latlng.lng}`);
+                                const data = await response.json();
+                                if (data && data.address) {
+                                    let st = data.address.road || data.address.pedestrian || '';
+                                    let num = data.address.house_number || '';
+                                    let fst = (num + ' ' + st).trim();
+                                    if(fst) this.$wire.set('addr_street', fst);
+                                    
+                                    await this.autoMatchLocation(data.address);
+                                }
+                            } catch (error) { console.error(error); }
                         });
 
                         updateMarker();
                     }, 300);
-                },
-
-                async reverseGeocode(lat, lng) {
-                    try {
-                        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
-                        const data = await res.json();
-                        if (data.address) {
-                            const street = data.address.road || data.address.pedestrian || '';
-                            const num = data.address.house_number || '';
-                            this.$wire.set('addr_street', (num + ' ' + street).trim());
-                        }
-                    } catch (e) { console.error(e); }
                 },
 
                 // ── Global Map ──
@@ -326,91 +458,99 @@
                             {{-- Region --}}
                             <div>
                                 <x-input-label value="Region *" />
-                                <div class="relative mt-1" @click.outside="loc.region.open = false">
-                                    <button type="button" @click="loc.region.open = !loc.region.open; loadRegions();" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm hover:border-indigo-300 focus:outline-none transition-all h-10">
-                                        <span class="truncate" :class="'{{ $addr_region }}' ? 'text-gray-900 font-medium' : 'text-gray-400'">{{ $addr_region ?: 'Select Region...' }}</span>
-                                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                    </button>
-                                    <div x-show="loc.region.open" class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden" x-cloak>
-                                        <div class="p-2 border-b border-gray-100 bg-gray-50/50">
+                                <x-dropdown align="left" width="full" containerClasses="block w-full mt-1">
+                                    <x-slot name="trigger">
+                                        <button type="button" @click.capture="loadRegions()" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm hover:border-indigo-300 focus:outline-none transition-all h-10">
+                                            <span class="truncate" :class="'{{ $addr_region }}' ? 'text-gray-900 font-medium' : 'text-gray-400'">{{ $addr_region ?: 'Select Region...' }}</span>
+                                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                        </button>
+                                    </x-slot>
+                                    <x-slot name="content">
+                                        <div class="p-2 border-b border-gray-100 bg-gray-50/50" @click.stop>
                                             <input x-model="loc.region.search" type="text" placeholder="Search..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
                                         </div>
                                         <div class="max-h-48 overflow-y-auto">
                                             <template x-for="r in filtered('region')" :key="r.code">
-                                                <button type="button" @click="selectRegion(r)" class="w-full text-left px-4 py-2 text-[12px] hover:bg-indigo-50 transition-colors" x-text="r.name"></button>
+                                                <x-dropdown-link href="#" @click.prevent="selectRegion(r); $dispatch('close-dropdown')" class="text-[12px]" x-text="r.name"></x-dropdown-link>
                                             </template>
                                         </div>
-                                    </div>
-                                </div>
+                                    </x-slot>
+                                </x-dropdown>
                                 <x-input-error :messages="$errors->get('addr_region')" class="mt-1" />
                             </div>
 
                             {{-- Province --}}
                             <div>
                                 <x-input-label value="Province *" />
-                                <div class="relative mt-1" @click.outside="loc.province.open = false">
-                                    <button type="button" @click="loc.province.open = !loc.province.open" :disabled="!'{{ $addr_region }}' || loc.noProvince" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 h-10">
-                                        <span class="truncate" :class="'{{ $addr_province }}' ? 'text-gray-900 font-medium' : 'text-gray-400'">
-                                            <template x-if="loc.noProvince"><span>N/A (Direct to City)</span></template>
-                                            <template x-if="!loc.noProvince"><span x-text="'{{ $addr_province }}' || 'Select Province...'"></span></template>
-                                        </span>
-                                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                    </button>
-                                    <div x-show="loc.province.open" class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden" x-cloak>
-                                        <div class="p-2 border-b border-gray-100 bg-gray-50/50">
+                                <x-dropdown align="left" width="full" containerClasses="block w-full mt-1">
+                                    <x-slot name="trigger">
+                                        <button type="button" :disabled="!'{{ $addr_region }}' || loc.noProvince" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 h-10">
+                                            <span class="truncate" :class="'{{ $addr_province }}' ? 'text-gray-900 font-medium' : 'text-gray-400'">
+                                                <template x-if="loc.noProvince"><span>N/A (Direct to City)</span></template>
+                                                <template x-if="!loc.noProvince"><span x-text="'{{ $addr_province }}' || 'Select Province...'"></span></template>
+                                            </span>
+                                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                        </button>
+                                    </x-slot>
+                                    <x-slot name="content">
+                                        <div class="p-2 border-b border-gray-100 bg-gray-50/50" @click.stop>
                                             <input x-model="loc.province.search" type="text" placeholder="Search..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
                                         </div>
                                         <div class="max-h-48 overflow-y-auto">
                                             <template x-for="p in filtered('province')" :key="p.code">
-                                                <button type="button" @click="selectProvince(p)" class="w-full text-left px-4 py-2 text-[12px] hover:bg-indigo-50 transition-colors" x-text="p.name"></button>
+                                                <x-dropdown-link href="#" @click.prevent="selectProvince(p); $dispatch('close-dropdown')" class="text-[12px]" x-text="p.name"></x-dropdown-link>
                                             </template>
                                         </div>
-                                    </div>
-                                </div>
+                                    </x-slot>
+                                </x-dropdown>
                                 <x-input-error :messages="$errors->get('addr_province')" class="mt-1" />
                             </div>
 
                             {{-- City --}}
                             <div>
                                 <x-input-label value="City / Municipality *" />
-                                <div class="relative mt-1" @click.outside="loc.city.open = false">
-                                    <button type="button" @click="loc.city.open = !loc.city.open" :disabled="!'{{ $addr_region }}'" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 h-10">
-                                        <span class="truncate" :class="'{{ $addr_city }}' ? 'text-gray-900 font-medium' : 'text-gray-400'">{{ $addr_city ?: 'Select City...' }}</span>
-                                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                    </button>
-                                    <div x-show="loc.city.open" class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden" x-cloak>
-                                        <div class="p-2 border-b border-gray-100 bg-gray-50/50">
+                                <x-dropdown align="left" width="full" containerClasses="block w-full mt-1">
+                                    <x-slot name="trigger">
+                                        <button type="button" :disabled="!'{{ $addr_region }}'" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 h-10">
+                                            <span class="truncate" :class="'{{ $addr_city }}' ? 'text-gray-900 font-medium' : 'text-gray-400'">{{ $addr_city ?: 'Select City...' }}</span>
+                                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                        </button>
+                                    </x-slot>
+                                    <x-slot name="content">
+                                        <div class="p-2 border-b border-gray-100 bg-gray-50/50" @click.stop>
                                             <input x-model="loc.city.search" type="text" placeholder="Search..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
                                         </div>
                                         <div class="max-h-48 overflow-y-auto">
                                             <template x-for="c in filtered('city')" :key="c.code">
-                                                <button type="button" @click="selectCity(c)" class="w-full text-left px-4 py-2 text-[12px] hover:bg-indigo-50 transition-colors" x-text="c.name"></button>
+                                                <x-dropdown-link href="#" @click.prevent="selectCity(c); $dispatch('close-dropdown')" class="text-[12px]" x-text="c.name"></x-dropdown-link>
                                             </template>
                                         </div>
-                                    </div>
-                                </div>
+                                    </x-slot>
+                                </x-dropdown>
                                 <x-input-error :messages="$errors->get('addr_city')" class="mt-1" />
                             </div>
 
                             {{-- Barangay --}}
                             <div>
                                 <x-input-label value="Barangay *" />
-                                <div class="relative mt-1" @click.outside="loc.barangay.open = false">
-                                    <button type="button" @click="loc.barangay.open = !loc.barangay.open" :disabled="!'{{ $addr_city }}'" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 h-10">
-                                        <span class="truncate" :class="'{{ $addr_barangay }}' ? 'text-gray-900 font-medium' : 'text-gray-400'">{{ $addr_barangay ?: 'Select Barangay...' }}</span>
-                                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                    </button>
-                                    <div x-show="loc.barangay.open" class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden" x-cloak>
-                                        <div class="p-2 border-b border-gray-100 bg-gray-50/50">
+                                <x-dropdown align="left" width="full" containerClasses="block w-full mt-1">
+                                    <x-slot name="trigger">
+                                        <button type="button" :disabled="!'{{ $addr_city }}'" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 h-10">
+                                            <span class="truncate" :class="'{{ $addr_barangay }}' ? 'text-gray-900 font-medium' : 'text-gray-400'">{{ $addr_barangay ?: 'Select Barangay...' }}</span>
+                                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                        </button>
+                                    </x-slot>
+                                    <x-slot name="content">
+                                        <div class="p-2 border-b border-gray-100 bg-gray-50/50" @click.stop>
                                             <input x-model="loc.barangay.search" type="text" placeholder="Search..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
                                         </div>
                                         <div class="max-h-48 overflow-y-auto">
                                             <template x-for="b in filtered('barangay')" :key="b.code">
-                                                <button type="button" @click="selectBarangay(b)" class="w-full text-left px-4 py-2 text-[12px] hover:bg-indigo-50 transition-colors" x-text="b.name"></button>
+                                                <x-dropdown-link href="#" @click.prevent="selectBarangay(b); $dispatch('close-dropdown')" class="text-[12px]" x-text="b.name"></x-dropdown-link>
                                             </template>
                                         </div>
-                                    </div>
-                                </div>
+                                    </x-slot>
+                                </x-dropdown>
                                 <x-input-error :messages="$errors->get('addr_barangay')" class="mt-1" />
                             </div>
                         </div>
