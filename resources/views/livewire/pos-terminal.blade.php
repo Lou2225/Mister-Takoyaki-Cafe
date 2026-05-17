@@ -230,6 +230,20 @@
                 this.setupCategorySortable();
             });
 
+            const applySearchFilter = () => {
+                const query = this.searchQuery ? this.searchQuery.toLowerCase().trim() : '';
+                document.querySelectorAll('.product-card').forEach(card => {
+                    if (!query) {
+                        card.style.display = '';
+                        return;
+                    }
+                    const name = card.dataset.searchName || '';
+                    card.style.display = name.includes(query) ? '' : 'none';
+                });
+            };
+
+            this.$watch('searchQuery', applySearchFilter);
+
             const syncProducts = () => {
                 const el = document.getElementById('hidden-products-data');
                 if (el) {
@@ -239,6 +253,7 @@
                         console.error('Failed to parse products data', e);
                     }
                 }
+                setTimeout(applySearchFilter, 50);
             };
 
             syncProducts();
@@ -380,8 +395,7 @@
 
                         <div wire:key="pos-product-{{ $pid }}"
                             data-id="{{ $pid }}"
-                            x-data="{ productName: '{{ strtolower(addslashes($product->name)) }}' }"
-                            x-show="!searchQuery || productName.includes(searchQuery.toLowerCase().trim())"
+                            data-search-name="{{ strtolower(addslashes($product->name)) }}"
                             class="product-card group relative bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex flex-col transition-all duration-300 hover:shadow-md {{ !$isAvailable ? 'opacity-75' : '' }}"
                             :class="isEditMode ? 'opacity-90 grayscale-[0.2] scale-[0.98]' : ''">
 
