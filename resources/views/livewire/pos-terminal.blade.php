@@ -298,7 +298,7 @@
 
             {{-- Search + Held Orders --}}
             <div class="flex items-center gap-2 shrink-0">
-                <div class="relative">
+                <div class="relative" wire:ignore>
                     <div class="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none">
                         <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
