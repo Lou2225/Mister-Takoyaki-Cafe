@@ -32,7 +32,7 @@
                     <h2 class="text-[17px] font-bold text-gray-900 tracking-tight" x-text="mode === 'create' ? 'Register New User' : (mode === 'edit' ? 'Update Profile' : 'View Profile')"></h2>
                     <p class="text-[12px] text-gray-500 font-medium" x-text="mode === 'create' ? 'New team member entry' : (mode === 'edit' ? 'Employee reference configuration' : 'Read-only profile view')"></p>
                 </div>
-                <x-secondary-button @click="panel = 'list'; mode = 'list'; $wire.backToList()" class="h-10">
+                <x-secondary-button wire:click="backToList" wire:loading.attr="disabled" class="h-10">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
@@ -362,7 +362,7 @@
                     <div class="flex flex-col gap-2">
                         <x-primary-button type="button" wire:click="validateBeforeSaveUser"
                             class="w-full justify-center" x-text="mode === 'edit' ? 'Save Changes' : 'Register User'"></x-primary-button>
-                        <x-secondary-button @click="mode === 'edit' ? $wire.showEdit($wire.get('editUserId'), 'view') : (panel = 'list', mode = 'list', $wire.backToList())" class="w-full justify-center">
+                        <x-secondary-button @click="mode === 'edit' ? $wire.showEdit($wire.get('editUserId'), 'view') : $wire.backToList()" wire:loading.attr="disabled" class="w-full justify-center">
                             <span>Cancel</span>
                         </x-secondary-button>
 
@@ -450,7 +450,7 @@
                                     
                                     {{-- Profile Actions --}}
                                     <div class="pt-6 mt-6 border-t border-slate-100 flex flex-col gap-2">
-                                        <button wire:click.prevent="showEdit({{ $editUserId }})"
+                                        <button wire:click.prevent="showEdit({{ $editUserId }})" wire:loading.attr="disabled"
                                             class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl transition-colors focus:outline-none">
                                             <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
@@ -625,7 +625,7 @@
                     <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">User Management</h2>
                     <p class="text-[12px] text-gray-500 font-medium">System Overview: <span class="text-indigo-600 font-bold">{{ $totalUsers }} members</span></p>
                 </div>
-                <x-primary-button @click="panel = 'form'; mode = 'create'; $wire.showCreate()" class="h-10">
+                <x-primary-button wire:click="showCreate" wire:loading.attr="disabled" class="h-10">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
