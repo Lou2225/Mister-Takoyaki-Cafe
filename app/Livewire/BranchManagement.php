@@ -201,14 +201,15 @@ class BranchManagement extends Component
     public function showCreate()
     {
         if (!$this->isSuperAdmin()) return;
+        $this->panel = 'form';
         $this->mode = 'create';
         $this->resetForm();
         $this->updateGlobalHeader('create');
-        $this->dispatch('switch-panel', panel: 'form', mode: 'create');
     }
 
     public function showEdit(int $id)
     {
+        $this->panel = 'form';
         $this->mode = 'edit';
         $branch = Branch::findOrFail($id);
         $this->branch_id   = $branch->id;
@@ -236,14 +237,12 @@ class BranchManagement extends Component
 
         $this->resetValidation();
         $this->updateGlobalHeader('edit');
-        $this->dispatch('switch-panel', panel: 'form', mode: 'edit');
     }
 
     public function showInsights()
     {
         $this->panel = 'insights';
         $this->updateGlobalHeader('insights');
-        $this->dispatch('switch-panel', panel: 'insights', mode: 'insights');
     }
 
     // ── Deletion Workflow ──────────────────────────────────────────
@@ -486,7 +485,6 @@ class BranchManagement extends Component
         $this->panel = 'list';
         $this->resetForm();
         $this->updateGlobalHeader('list');
-        $this->dispatch('switch-panel', panel: 'list', mode: 'list');
     }
 
     public function toggleStatus(int $id)

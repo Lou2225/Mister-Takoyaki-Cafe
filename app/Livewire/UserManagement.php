@@ -187,7 +187,6 @@ class UserManagement extends Component
         $this->mode = 'create';
         $this->resetForm();
         $this->updateGlobalHeader('create');
-        $this->dispatch('switch-panel', panel: 'form', mode: 'create');
     }
 
     // ── Show view form ────────────────────────────────────────────
@@ -247,9 +246,7 @@ class UserManagement extends Component
         }
 
         $this->resetValidation();
-
         $this->updateGlobalHeader($mode);
-        $this->dispatch('switch-panel', panel: 'form', mode: $mode);
     }
 
     // ── History Computed Properties ───────────────────────────────
@@ -397,7 +394,6 @@ class UserManagement extends Component
         $this->mode = 'list';
         $this->resetForm();
         $this->updateGlobalHeader('list');
-        $this->dispatch('switch-panel', panel: 'list', mode: 'list');
     }
 
     public function validateBeforeSaveUser()
