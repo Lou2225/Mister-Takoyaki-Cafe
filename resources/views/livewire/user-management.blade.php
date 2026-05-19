@@ -5,6 +5,7 @@
         mode = $event.detail?.mode || $event.detail[0]?.mode || 'list';
         if (panel === 'form') {
             initMap();
+            initLagunaDefault();
         } else {
             if (this.marker && mode === 'create') {
                 this.map.removeLayer(this.marker);
@@ -174,61 +175,23 @@
                             {{-- Row 1: Region + Province --}}
                             <div class="flex flex-col sm:flex-row gap-5">
                                 <div class="flex-1 w-full">
-                                    <x-input-label value="Region" />
-                                    <div x-on:click.capture="loc.region.search = ''; loadRegions();">
-                                        <x-dropdown align="left" width="full" containerClasses="block w-full mt-1">
-                                            <x-slot name="trigger">
-                                                <button type="button" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm hover:border-indigo-300 focus:outline-none transition-all h-10">
-                                                    <span class="truncate" :class="addr_region ? 'text-gray-900 font-medium' : 'text-gray-400'" x-text="addr_region || 'Select Region...'"></span>
-                                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                                </button>
-                                            </x-slot>
-                                            <x-slot name="content">
-                                                <div class="p-2 border-b border-gray-100 bg-gray-50/50">
-                                                    <input x-model="loc.region.search" type="text" placeholder="Search region..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
-                                                </div>
-                                                <div class="max-h-48 overflow-y-auto">
-                                                    <template x-for="r in filtered('region')" :key="r.code">
-                                                        <x-dropdown-link href="#" @click.prevent="dropdownOpen = false; selectRegion(r)">
-                                                            <span x-text="r.name"></span>
-                                                        </x-dropdown-link>
-                                                    </template>
-                                                    <template x-if="filtered('region').length === 0">
-                                                        <div class="px-4 py-2 text-[12px] text-gray-400 italic font-medium">No regions found...</div>
-                                                    </template>
-                                                </div>
-                                            </x-slot>
-                                        </x-dropdown>
+                                    <x-input-label value="Region *" />
+                                    <div class="mt-1">
+                                        <button type="button" disabled class="w-full flex items-center justify-between px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[13px] shadow-sm cursor-not-allowed h-10">
+                                            <span class="truncate text-gray-700 font-medium" x-text="addr_region || 'Region IV-A (CALABARZON)'"></span>
+                                            <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                                        </button>
                                     </div>
                                     <x-input-error :messages="$errors->get('addr_region')" class="mt-1" />
                                 </div>
 
                                 <div class="flex-1 w-full">
-                                    <x-input-label value="Province" />
-                                    <div x-on:click.capture="if(!addr_region || loc.noProvince) { $event.stopPropagation(); } else { loc.province.search = ''; }">
-                                        <x-dropdown align="left" width="full" containerClasses="block w-full mt-1">
-                                            <x-slot name="trigger">
-                                                <button type="button" :disabled="!addr_region || loc.noProvince" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 disabled:opacity-75 disabled:cursor-not-allowed h-10">
-                                                    <span class="truncate" :class="addr_province ? 'text-gray-900 font-medium' : 'text-gray-400'">
-                                                        <template x-if="loc.noProvince"><span>N/A (Direct to City)</span></template>
-                                                        <template x-if="!loc.noProvince"><span x-text="addr_province || 'Select Province...'"></span></template>
-                                                    </span>
-                                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                                </button>
-                                            </x-slot>
-                                            <x-slot name="content">
-                                                <div class="p-2 border-b border-gray-100 bg-gray-50/50">
-                                                    <input x-model="loc.province.search" type="text" placeholder="Search province..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
-                                                </div>
-                                                <div class="max-h-48 overflow-y-auto">
-                                                    <template x-for="p in filtered('province')" :key="p.code">
-                                                        <x-dropdown-link href="#" @click.prevent="dropdownOpen = false; selectProvince(p)">
-                                                            <span x-text="p.name"></span>
-                                                        </x-dropdown-link>
-                                                    </template>
-                                                </div>
-                                            </x-slot>
-                                        </x-dropdown>
+                                    <x-input-label value="Province *" />
+                                    <div class="mt-1">
+                                        <button type="button" disabled class="w-full flex items-center justify-between px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[13px] shadow-sm cursor-not-allowed h-10">
+                                            <span class="truncate text-gray-700 font-medium" x-text="addr_province || 'Laguna'"></span>
+                                            <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                                        </button>
                                     </div>
                                     <x-input-error :messages="$errors->get('addr_province')" class="mt-1" />
                                 </div>
@@ -1276,6 +1239,37 @@
                 addr_province: @entangle('addr_province'),
                 addr_city: @entangle('addr_city'),
                 addr_barangay: @entangle('addr_barangay'),
+
+                async initLagunaDefault() {
+                    // Set defaults for Region & Province if empty
+                    if (!this.addr_region || !this.addr_province) {
+                        this.addr_region = 'Region IV-A (CALABARZON)';
+                        this.addr_province = 'Laguna';
+                    }
+                    
+                    // Preload Laguna cities (0403400000)
+                    if (this.loc.city.items.length === 0) {
+                        this.loc.city.loading = true;
+                        try {
+                            const data = await this.fetchWithRetry('https://psgc.cloud/api/provinces/0403400000/cities-municipalities');
+                            this.loc.city.items = data.sort((a, b) => a.name.localeCompare(b.name));
+                        } catch (e) { console.error('Failed to load Laguna cities:', e); }
+                        finally { this.loc.city.loading = false; }
+                    }
+
+                    // If a city is already selected (e.g. edit/view mode), pre-load barangays for it
+                    if (this.addr_city && this.loc.barangay.items.length === 0) {
+                        const matchedCity = this.loc.city.items.find(c => c.name.toLowerCase() === this.addr_city.toLowerCase());
+                        if (matchedCity) {
+                            this.loc.barangay.loading = true;
+                            try {
+                                const data = await this.fetchWithRetry(`https://psgc.cloud/api/cities-municipalities/${matchedCity.code}/barangays`);
+                                this.loc.barangay.items = data.sort((a, b) => a.name.localeCompare(b.name));
+                            } catch (e) { console.error('Failed to load barangays:', e); }
+                            finally { this.loc.barangay.loading = false; }
+                        }
+                    }
+                },
                 addr_lat: @entangle('addr_lat'),
                 addr_lng: @entangle('addr_lng'),
 
