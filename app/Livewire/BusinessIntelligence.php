@@ -30,6 +30,10 @@ class BusinessIntelligence extends Component
     public string $seasonalityMode = 'weekly'; // weekly | monthly
     public string $activeFilter = 'All Time';
 
+    public bool $showBreakdown = false;
+    public string $selectedMetric = 'Gross Revenue';
+    public array $breakdownData = [];
+
     protected $queryString = [
         'activeTab' => ['except' => 'performance'],
         'selectedBranchId' => ['except' => 'all'],
@@ -694,6 +698,83 @@ class BusinessIntelligence extends Component
     public function exportExcel()
     {
         return $this->exportCsv();
+    }
+
+    public function openBreakdown(string $metric): void
+    {
+        $this->selectedMetric = $metric;
+        $analytics = $this->getAnalytics();
+        
+        $this->breakdownData = match($metric) {
+            'Gross Revenue' => $this->getGrossRevenueBreakdown($analytics),
+            'Net Sales'     => $this->getNetSalesBreakdown($analytics),
+            'Gross Profit'  => $this->getGrossProfitBreakdown($analytics),
+            default         => [],
+        };
+        $this->showBreakdown = true;
+        $this->dispatch('open-modal', name: 'kpi-breakdown');
+    }
+
+    public function closeBreakdown()
+    {
+        $this->showBreakdown = false;
+        $this->dispatch('close-modal', name: 'kpi-breakdown');
+    }
+
+    private function getGrossRevenueBreakdown(array $analytics): array
+    {
+        $productInsights = $this->getProductInsights($analytics);
+        $categorySales = $productInsights['category_sales'] ?? collect();
+        
+        $breakdown = [];
+        foreach ($categorySales as $row) {
+            $breakdown[] = [
+                'category' => $row->name ?: 'Uncategorized',
+                'total'    => (float)$row->revenue,
+            ];
+        }
+        
+        usort($breakdown, fn($a, $b) => $b['total'] <=> $a['total']);
+        return $breakdown;
+    }
+
+    private function getNetSalesBreakdown(array $analytics): array
+    {
+        $paymentMethods = $analytics['payment_methods'] ?? [];
+        $orderSources = $analytics['order_sources'] ?? [];
+        
+        $breakdown = [];
+        foreach ($paymentMethods as $row) {
+            $breakdown[] = [
+                'category' => 'Payment: ' . ucfirst($row->payment_method),
+                'count'    => $row->count,
+                'total'    => (float)$row->total,
+            ];
+        }
+        foreach ($orderSources as $row) {
+            $breakdown[] = [
+                'category' => 'Source: ' . ucfirst($row->source),
+                'count'    => $row->count,
+                'total'    => (float)$row->total,
+            ];
+        }
+        
+        return $breakdown;
+    }
+
+    private function getGrossProfitBreakdown(array $analytics): array
+    {
+        $netSales = $analytics['net_sales'];
+        $grossProfit = $analytics['gross_profit'];
+        $pct = $netSales > 0 ? round(($grossProfit / $netSales) * 100, 1) : 0.0;
+        
+        return [
+            'net_sales'         => (float)$netSales,
+            'total_cogs'        => (float)$analytics['total_cogs'],
+            'waste_cost'        => (float)$analytics['waste_cost'],
+            'gross_profit'      => (float)$grossProfit,
+            'profit_margin_pct' => (float)$pct,
+        ];
     }
 
     private function getExportDataForReport(): array

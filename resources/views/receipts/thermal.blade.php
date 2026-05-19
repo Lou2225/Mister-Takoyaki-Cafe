@@ -182,7 +182,12 @@
                 @endif
                 <div class="business-name">{{ $receipt['title'] }}</div>
                 <div class="header-info">{{ $settings['business_address'] }}</div>
-                <div class="header-info">Tel: {{ $settings['business_phone'] }}</div>
+                @if(!empty($settings['business_phone']))
+                    <div class="header-info">Tel: +63 {{ ltrim(trim($settings['business_phone']), '+63') }}</div>
+                @endif
+                @if(!empty($settings['business_email']))
+                    <div class="header-info">{{ $settings['business_email'] }}</div>
+                @endif
             @else
                 <div class="business-name" style="font-size: 18px; border: 2px solid #000; padding: 5px; display: inline-block;">{{ $receipt['title'] }}</div>
                 <div class="header-info" style="margin-top: 5px; font-weight: bold;">Order #{{ $order->reference_no }}</div>
@@ -254,6 +259,11 @@
         @if($receipt['type'] === 'customer')
             <div class="footer">
                 <p class="footer-msg">{{ $settings['receipt_footer_message'] }}</p>
+                
+                @if(!empty($settings['receipt_return_policy']))
+                    <div class="divider"></div>
+                    <p style="font-size: 8px; color: #555; text-align: center;">{{ $settings['receipt_return_policy'] }}</p>
+                @endif
                 
                 @if($settings['qr_code'])
                     <div class="divider"></div>

@@ -605,9 +605,9 @@ class BranchManagement extends Component
     public function isAdmin()      { return auth()->user()?->isAdmin();      }
     public function isStaff()      { return auth()->user()?->isStaff();      }
 
-    public function __call($method, $parameters)
+    public function updating($name, $value)
     {
-        if (str_starts_with($method, 'updating') && !str_ends_with($method, 'Page')) {
+        if ($name !== 'page') {
             $this->resetPage();
         }
     }
@@ -662,7 +662,7 @@ class BranchManagement extends Component
 
         $range = $this->getDateRange();
 
-        return Branch::whereIn('id', $this->selectedBranchIds)
+        $matrix = Branch::whereIn('id', $this->selectedBranchIds)
             ->get()
             ->map(function ($branch) use ($range) {
                 $orders = Order::where('branch_id', $branch->id)
@@ -689,10 +689,15 @@ class BranchManagement extends Component
                     'gross_sales' => $grossSales,
                     'net_sales' => $netSales,
                     'atv' => $atv,
-                    'health_score' => $this->calculateHealthScore($orderCount, $netSales),
                 ];
-            })
-            ->sortByDesc('net_sales');
+            });
+
+        $totalNetSales = $matrix->sum('net_sales');
+
+        return $matrix->map(function ($b) use ($totalNetSales) {
+            $b['share_pct'] = $totalNetSales > 0 ? round(($b['net_sales'] / $totalNetSales) * 100, 2) : 0;
+            return $b;
+        })->sortByDesc('net_sales');
     }
 
     private function getComparisonTotals()
@@ -781,7 +786,9 @@ class BranchManagement extends Component
 
     private function buildPlottableBranches($collection = null): string
     {
-        $branches = $collection ?: Branch::all();
+        $branches = $collection 
+            ? ($collection instanceof \Illuminate\Pagination\LengthAwarePaginator ? $collection->getCollection() : collect($collection))
+            : Branch::all();
 
         return $branches->map(function ($b) {
             $addr = is_array($b->address) ? $b->address : json_decode($b->address, true);
@@ -808,12 +815,12 @@ class BranchManagement extends Component
     {
         $matrix = $this->getComparisonMatrix();
         $data = $matrix->map(fn($b) => [
-            'Branch'       => $b['name'],
-            'Orders'       => $b['order_count'],
-            'Gross Sales'  => number_format($b['gross_sales'], 2),
-            'Net Sales'    => number_format($b['net_sales'], 2),
-            'ATV'          => number_format($b['atv'], 2),
-            'Health Score' => $b['health_score'] . '%',
+            'Branch'      => $b['name'],
+            'Orders'      => $b['order_count'],
+            'Gross Sales' => number_format($b['gross_sales'], 2),
+            'Net Sales'   => number_format($b['net_sales'], 2),
+            'ATV'         => number_format($b['atv'], 2),
+            'Share'       => number_format($b['share_pct'], 1) . '%',
         ])->toArray();
 
         return $this->generateCsvReport('Branch_Comparison_' . now()->format('Y-m-d') . '.csv', $data);
@@ -853,7 +860,7 @@ class BranchManagement extends Component
             'PHP ' . number_format($b['gross_sales'], 2),
             'PHP ' . number_format($b['net_sales'], 2),
             'PHP ' . number_format($b['atv'], 2),
-            $b['health_score'] . ' / 100',
+            number_format($b['share_pct'], 1) . '%',
         ])->toArray();
 
         // Pull branch operational info
@@ -885,7 +892,7 @@ class BranchManagement extends Component
             'sections' => [
                 [
                     'title'   => 'Performance Comparison',
-                    'headers' => ['Branch', 'Orders', 'Gross Sales', 'Net Sales', 'Avg. Ticket', 'Health Score'],
+                    'headers' => ['Branch', 'Orders', 'Gross Sales', 'Net Sales', 'Avg. Ticket', 'Share'],
                     'rows'    => $branchRows,
                     'empty'   => 'No branch data available.',
                 ],

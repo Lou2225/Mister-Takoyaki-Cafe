@@ -151,8 +151,7 @@ class NotificationHistory extends Component
         }
 
         // ── Expiry Panel Rewrite ───────────────────────────────────────────────
-        // Old: /stock?panel=expiry&expirySearch=Ingredient+Name
-        // New: /stock/expiry?search=Ingredient+Name&statusFilter=expiring|expired
+        // Routes notifications directly to the unified Stock & Ingredients dashboard
         if (str_contains($link, 'panel=expiry')) {
             $parsedQuery = [];
             parse_str(parse_url($link, PHP_URL_QUERY), $parsedQuery);
@@ -162,9 +161,10 @@ class NotificationHistory extends Component
                 ? (str_contains(strtolower($notification->title), 'expired') ? 'expired' : 'expiring')
                 : 'all';
 
-            $link = route('stock.expiry', array_filter([
-                'search'       => $ingredientName,
-                'statusFilter' => $statusFilter !== 'all' ? $statusFilter : null,
+            $link = route('stock.index', array_filter([
+                'panel'              => 'expiry',
+                'expirySearch'       => $ingredientName,
+                'expiryStatusFilter' => $statusFilter !== 'all' ? $statusFilter : null,
             ]));
         }
 

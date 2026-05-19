@@ -24,6 +24,12 @@
                 mode: 'list',
                 view: initialView || 'table',
                 status: @entangle('status').live,
+                addr_lat: @entangle('addr_lat'),
+                addr_lng: @entangle('addr_lng'),
+                addr_region: @entangle('addr_region'),
+                addr_province: @entangle('addr_province'),
+                addr_city: @entangle('addr_city'),
+                addr_barangay: @entangle('addr_barangay'),
                 
                 // ── Location ──
                 loc: {
@@ -34,20 +40,47 @@
                     noProvince: false
                 },
 
+                getCustomPinIcon() {
+                    return L.divIcon({
+                        html: `
+                            \x3cdiv class="relative flex flex-col items-center justify-end w-10 h-10"\x3e
+                                \x3cspan class="absolute w-4 h-2 bg-indigo-500/40 rounded-full blur-[2px] animate-ping bottom-[-2px] left-1/2 -translate-x-1/2"\x3e\x3c/span\x3e
+                                \x3cdiv class="relative w-8 h-8 bg-indigo-600 rounded-t-full rounded-bl-full rotate-45 border-2 border-white shadow-lg flex items-center justify-center transition-all duration-300"\x3e
+                                    \x3cdiv class="w-3.5 h-3.5 bg-white rounded-full -rotate-45 flex items-center justify-center shadow-inner"\x3e
+                                        \x3cdiv class="w-1.5 h-1.5 bg-indigo-600 rounded-full"\x3e\x3c/div\x3e
+                                    \x3c/div\x3e
+                                \x3c/div\x3e
+                            \x3c/div\x3e
+                        `,
+                        className: 'custom-leaflet-icon',
+                        iconSize: [40, 40],
+                        iconAnchor: [20, 40]
+                    });
+                },
+
                 filtered(type) {
                     const q = this.loc[type].search.toLowerCase();
                     return q ? this.loc[type].items.filter(i => i.name.toLowerCase().includes(q)) : this.loc[type].items;
                 },
 
                 async fetchWithRetry(url, retries = 2, delay = 1000) {
+                    try {
+                        const cached = sessionStorage.getItem(url);
+                        if (cached) return JSON.parse(cached);
+                    } catch (e) { console.error('Cache read failed:', e); }
+
                     for (let i = 0; i <= retries; i++) {
                         try {
                             const res = await fetch(url);
                             if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-                            return await res.json();
+                            const data = await res.json();
+                            try {
+                                sessionStorage.setItem(url, JSON.stringify(data));
+                            } catch (e) { console.error('Cache write failed:', e); }
+                            return data;
                         } catch (e) {
                             if (i === retries) throw e;
-                            await new Promise(resolve => setTimeout(resolve, delay));
+                            await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
                         }
                     }
                 },
@@ -63,8 +96,8 @@
                 },
 
                 async selectRegion(region, fromMap = false) {
-                    this.$wire.set('addr_region', region.name);
-                    this.$wire.set('addr_province', ''); this.$wire.set('addr_city', ''); this.$wire.set('addr_barangay', '');
+                    this.addr_region = region.name;
+                    this.addr_province = ''; this.addr_city = ''; this.addr_barangay = '';
                     this.loc.province.items = []; this.loc.city.items = []; this.loc.barangay.items = [];
                     this.loc.noProvince = false;
                     
@@ -84,8 +117,8 @@
                 },
 
                 async selectProvince(province, fromMap = false) {
-                    this.$wire.set('addr_province', province.name);
-                    this.$wire.set('addr_city', ''); this.$wire.set('addr_barangay', '');
+                    this.addr_province = province.name;
+                    this.addr_city = ''; this.addr_barangay = '';
                     
                     if (!fromMap) this.geocodeAddress();
                     
@@ -98,8 +131,8 @@
                 },
 
                 async selectCity(city, fromMap = false) {
-                    this.$wire.set('addr_city', city.name);
-                    this.$wire.set('addr_barangay', '');
+                    this.addr_city = city.name;
+                    this.addr_barangay = '';
                     
                     if (!fromMap) this.geocodeAddress();
                     
@@ -112,16 +145,16 @@
                 },
 
                 selectBarangay(brgy, fromMap = false) {
-                    this.$wire.set('addr_barangay', brgy.name);
+                    this.addr_barangay = brgy.name;
                     if (!fromMap) this.geocodeAddress();
                 },
 
                 async geocodeAddress() {
                     const parts = [];
-                    const barangay = await this.$wire.get('addr_barangay');
-                    const city = await this.$wire.get('addr_city');
-                    const province = await this.$wire.get('addr_province');
-                    const region = await this.$wire.get('addr_region');
+                    const barangay = this.addr_barangay;
+                    const city = this.addr_city;
+                    const province = this.addr_province;
+                    const region = this.addr_region;
                     
                     if (barangay) parts.push(barangay);
                     if (city) parts.push(city);
@@ -139,8 +172,8 @@
                             const lat = parseFloat(data[0].lat);
                             const lng = parseFloat(data[0].lon);
                             
-                            this.$wire.set('addr_lat', lat);
-                            this.$wire.set('addr_lng', lng);
+                            this.addr_lat = lat;
+                            this.addr_lng = lng;
                             
                             if (this.map) {
                                 let zoom = 11;
@@ -152,7 +185,7 @@
                                 if (this.marker) {
                                     this.marker.setLatLng([lat, lng]);
                                 } else {
-                                    this.marker = L.marker([lat, lng]).addTo(this.map);
+                                    this.marker = L.marker([lat, lng], { icon: this.getCustomPinIcon() }).addTo(this.map);
                                 }
                             }
                         }
@@ -236,16 +269,59 @@
                 // ── Map ──
                 map: null,
                 marker: null,
+                
+                patchLeaflet() {
+                    if (typeof L === 'undefined' || L._patched) return;
+                    L._patched = true;
+                    
+                    const originalResetGrid = L.GridLayer.prototype._resetGrid;
+                    if (originalResetGrid) {
+                        L.GridLayer.prototype._resetGrid = function() {
+                            if (!this._map) return;
+                            return originalResetGrid.apply(this, arguments);
+                        };
+                    }
+                    
+                    const originalSetView = L.GridLayer.prototype._setView;
+                    if (originalSetView) {
+                        L.GridLayer.prototype._setView = function() {
+                            if (!this._map) return;
+                            return originalSetView.apply(this, arguments);
+                        };
+                    }
+
+                    const originalUpdate = L.GridLayer.prototype._update;
+                    if (originalUpdate) {
+                        L.GridLayer.prototype._update = function() {
+                            if (!this._map) return;
+                            return originalUpdate.apply(this, arguments);
+                        };
+                    }
+
+                    const originalResetView = L.GridLayer.prototype._resetView;
+                    if (originalResetView) {
+                        L.GridLayer.prototype._resetView = function() {
+                            if (!this._map) return;
+                            return originalResetView.apply(this, arguments);
+                        };
+                    }
+                },
+
                 initMap() {
+                    if (typeof L === 'undefined') {
+                        setTimeout(() => this.initMap(), 100);
+                        return;
+                    }
+                    this.patchLeaflet();
                     const updateMarker = () => {
-                        const lat = this.$wire.get('addr_lat');
-                        const lng = this.$wire.get('addr_lng');
+                        const lat = parseFloat(this.addr_lat);
+                        const lng = parseFloat(this.addr_lng);
                         
-                        if (lat && lng) {
+                        if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
                             if (this.marker) {
                                 this.marker.setLatLng([lat, lng]);
                             } else {
-                                this.marker = L.marker([lat, lng]).addTo(this.map);
+                                this.marker = L.marker([lat, lng], { icon: this.getCustomPinIcon() }).addTo(this.map);
                             }
                             this.map.setView([lat, lng], 15);
                         } else {
@@ -261,7 +337,7 @@
                         setTimeout(() => {
                             this.map.invalidateSize();
                             updateMarker();
-                        }, 200);
+                        }, 50);
                         return;
                     }
                     setTimeout(() => {
@@ -286,9 +362,9 @@
 
                         this.map.on('click', async (e) => {
                             if (this.marker) this.marker.setLatLng(e.latlng);
-                            else this.marker = L.marker(e.latlng).addTo(this.map);
-                            this.$wire.set('addr_lat', e.latlng.lat);
-                            this.$wire.set('addr_lng', e.latlng.lng);
+                            else this.marker = L.marker(e.latlng, { icon: this.getCustomPinIcon() }).addTo(this.map);
+                            this.addr_lat = e.latlng.lat;
+                            this.addr_lng = e.latlng.lng;
                             
                             try {
                                 const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${e.latlng.lat}&lon=${e.latlng.lng}`);
@@ -305,15 +381,23 @@
                         });
 
                         updateMarker();
-                    }, 300);
+                    }, 50);
                 },
 
                 // ── Global Map ──
                 gMap: null,
                 gMarkers: [],
                 initGlobalMap() {
+                    if (typeof L === 'undefined') {
+                        setTimeout(() => this.initGlobalMap(), 100);
+                        return;
+                    }
+                    this.patchLeaflet();
                     if (this.gMap) {
-                        setTimeout(() => this.gMap.invalidateSize(), 200);
+                        setTimeout(() => {
+                            this.gMap.invalidateSize();
+                            this.updateGlobalBranches();
+                        }, 350);
                         return;
                     }
                     setTimeout(() => {
@@ -336,43 +420,75 @@
 
                         L.control.layers({ "Street": street, "Satellite": satellite }).addTo(this.gMap);
                         this.updateGlobalBranches();
-                    }, 300);
+                    }, 350);
                 },
 
                 updateGlobalBranches(branches) {
                     if (!this.gMap) return;
-                    const bData = branches || @js(json_decode($plottableBranches));
+                    const rawData = branches || @js(json_decode($plottableBranches));
+                    const bData = rawData.filter(b => {
+                        const lat = parseFloat(b.lat);
+                        const lng = parseFloat(b.lng);
+                        return !isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+                    });
+                    
                     this.gMarkers.forEach(m => this.gMap.removeLayer(m));
                     this.gMarkers = [];
                     
                     let mainBranch = null;
 
                     bData.forEach(b => {
-                        const marker = L.marker([b.lat, b.lng]).addTo(this.gMap)
+                        const branchIcon = L.divIcon({
+                            html: `
+                                \x3cdiv class="relative flex flex-col items-center justify-end w-10 h-10"\x3e
+                                    \x3cspan class="absolute w-4 h-2 ${b.is_main ? 'bg-amber-500/40' : 'bg-indigo-500/40'} rounded-full blur-[2px] ${b.status ? 'animate-ping' : ''} bottom-[-2px] left-1/2 -translate-x-1/2"\x3e\x3c/span\x3e
+                                    \x3cdiv class="relative w-8 h-8 ${b.is_main ? 'bg-amber-500 border-amber-300' : 'bg-indigo-600 border-indigo-400'} rounded-t-full rounded-bl-full rotate-45 border-2 shadow-lg flex items-center justify-center transition-all duration-300"\x3e
+                                        \x3cdiv class="w-3.5 h-3.5 bg-white rounded-full -rotate-45 flex items-center justify-center shadow-inner"\x3e
+                                            \x3cdiv class="w-1.5 h-1.5 ${b.is_main ? 'bg-amber-600' : 'bg-indigo-600'} rounded-full"\x3e\x3c/div\x3e
+                                        \x3c/div\x3e
+                                    \x3c/div\x3e
+                                \x3c/div\x3e
+                            `,
+                            className: 'custom-leaflet-icon',
+                            iconSize: [40, 40],
+                            iconAnchor: [20, 40]
+                        });
+                        const marker = L.marker([b.lat, b.lng], { icon: branchIcon }).addTo(this.gMap)
                             .bindPopup(`
-                                <div class="p-1">
-                                    <div class="flex items-center gap-2 mb-1">
-                                        <b class="text-[14px] text-slate-900">${b.name}</b>
-                                        ${b.is_main ? '<span class="px-1.5 py-0.5 bg-indigo-600 text-white text-[9px] font-black rounded uppercase tracking-tighter">Main Hub<\/span>' : ''}
-                                    <\/div>
-                                    <p class="text-[11px] text-slate-500 mb-2">${b.formatted}<\/p>
-                                    <span class="text-[10px] font-bold ${b.status ? 'text-green-600' : 'text-red-600'} uppercase tracking-widest">
+                                \x3cdiv class="p-1"\x3e
+                                    \x3cdiv class="flex items-center gap-2 mb-1"\x3e
+                                        \x3cb class="text-[14px] text-slate-900"\x3e${b.name}\x3c/b\x3e
+                                        ${b.is_main ? '\x3cspan class="px-1.5 py-0.5 bg-indigo-600 text-white text-[9px] font-black rounded uppercase tracking-tighter"\x3eMain Hub\x3c/span\x3e' : ''}
+                                    \x3c/div\x3e
+                                    \x3cp class="text-[11px] text-slate-500 mb-2"\x3e${b.formatted}\x3c/p\x3e
+                                    \x3cspan class="text-[10px] font-bold ${b.status ? 'text-green-600' : 'text-red-600'} uppercase tracking-widest"\x3e
                                         ${b.status ? '● Operational' : '○ Inactive'}
-                                    <\/span>
-                                <\/div>
+                                    \x3c/span\x3e
+                                \x3c/div\x3e
                             `);
                         this.gMarkers.push(marker);
                         if (b.is_main) mainBranch = b;
                     });
 
-                    // Center on main branch if found
-                    if (mainBranch) {
-                        this.gMap.setView([mainBranch.lat, mainBranch.lng], 15);
-                    } else if (bData.length > 0) {
-                        // Fallback: fit bounds to all branches if no main
-                        const bounds = L.latLngBounds(bData.map(b => [b.lat, b.lng]));
-                        this.gMap.fitBounds(bounds, { padding: [50, 50] });
+                    const container = document.getElementById('globalBranchMap');
+                    if (container && container.offsetWidth > 0) {
+                        // Center on main branch if found
+                        if (mainBranch) {
+                            this.gMap.setView([mainBranch.lat, mainBranch.lng], 15);
+                        } else if (bData.length > 0) {
+                            // Fallback: fit bounds to all branches if no main
+                            const bounds = L.latLngBounds(bData.map(b => [b.lat, b.lng]));
+                            this.gMap.fitBounds(bounds, { padding: [50, 50] });
+                        }
                     }
+                },
+
+                init() {
+                    this.$watch('view', (val) => {
+                        if (val === 'map') {
+                            this.initGlobalMap();
+                        }
+                    });
                 }
             };
         }
@@ -401,7 +517,7 @@
                             <div>
                                 <x-input-label for="f_branch_name" value="Branch Name *" />
                                 <x-text-input id="f_branch_name" name="branch_name" wire:model.live.debounce.500ms="branch_name" type="text" 
-                                    class="mt-1 block w-full" placeholder="e.g. Mister Takoyaki - Makati" 
+                                    class="mt-1 block w-full" placeholder="e.g. {{ \App\Services\ConfigurationService::getBusinessName() }} - Makati" 
                                     inputFilter="name" maxlength="150"
                                     @keydown="FormFilters.nameKeydown($event)" @paste="FormFilters.namePaste($event)"
                                     :hasError="$errors->has('branch_name')" />
@@ -666,50 +782,54 @@
                 </div>
             </div>
 
-            {{-- Fleet Metrics Grid --}}
+            {{-- Fleet Metrics Grid (Matching Dashboard Premium Aesthetic - Compact Footprint) --}}
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                 {{-- Total Branches --}}
-                <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm transition-transform group-hover:scale-110">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                <div class="p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Branches</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-indigo-700/60 uppercase tracking-widest leading-none mb-1">Total Branches</span>
-                        <span class="block text-[20px] font-black text-gray-900 leading-none">{{ $systemStats['total'] }}</span>
-                    </div>
+                    <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $systemStats['total'] }}</h3>
+                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Registered branch locations</p>
                 </div>
                 
                 {{-- Operational --}}
-                <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm transition-transform group-hover:scale-110">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <div class="p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-emerald-700/60 uppercase tracking-widest leading-none mb-1">Active</span>
-                        <span class="block text-[20px] font-black text-emerald-600 leading-none">{{ $systemStats['active'] }}</span>
-                    </div>
+                    <h3 class="text-2xl font-black text-emerald-600 tracking-tight leading-none">{{ $systemStats['active'] }}</h3>
+                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Operational store nodes</p>
                 </div>
 
                 {{-- Decommissioned --}}
-                <div class="bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm transition-transform group-hover:scale-110">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                <div class="p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Inactive</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-rose-700/60 uppercase tracking-widest leading-none mb-1">Inactive</span>
-                        <span class="block text-[20px] font-black text-rose-600 leading-none">{{ $systemStats['inactive'] }}</span>
-                    </div>
+                    <h3 class="text-2xl font-black text-rose-600 tracking-tight leading-none">{{ $systemStats['inactive'] }}</h3>
+                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Temporarily closed locations</p>
                 </div>
 
                 {{-- Workforce --}}
-                <div class="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm transition-transform group-hover:scale-110">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                <div class="p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Workforce</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-amber-700/60 uppercase tracking-widest leading-none mb-1">Workforce</span>
-                        <span class="block text-[20px] font-black text-gray-900 leading-none">{{ $systemStats['staff'] }}</span>
-                    </div>
+                    <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $systemStats['staff'] }}</h3>
+                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Total employees deployed</p>
                 </div>
             </div>
 
@@ -782,7 +902,9 @@
                         <th class="py-3 px-4 border-r border-slate-100/50 text-[11px] font-black text-slate-500 uppercase tracking-widest">Branch Name</th>
                         <th class="py-3 px-4 border-r border-slate-100/50 text-[11px] font-black text-slate-500 uppercase tracking-widest">Manager</th>
                         <th class="py-3 px-4 border-r border-slate-100/50 text-[11px] font-black text-slate-500 uppercase tracking-widest">Status</th>
-                        <th class="py-3 px-4 text-right text-[11px] font-black text-slate-500 uppercase tracking-widest">Actions</th>
+                        @if($this->isSuperAdmin())
+                            <th class="py-3 px-4 text-right text-[11px] font-black text-slate-500 uppercase tracking-widest">Actions</th>
+                        @endif
                     </x-slot>
                     
                     @forelse($branches as $branch)
@@ -833,16 +955,18 @@
                                     </div>
                                 @endif
                             </td>
-                            <td class="py-4 px-4 text-right">
-                                <div class="flex items-center justify-end">
-                                    <x-secondary-button @click="$dispatch('trigger-edit-branch', {id: {{ $branch->id }}})" class="h-8 px-3 inline-flex items-center gap-1.5 text-xs shadow-none border-slate-200">
-                                        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                                        </svg>
-                                        Edit Branch
-                                    </x-secondary-button>
-                                </div>
-                            </td>
+                            @if($this->isSuperAdmin())
+                                <td class="py-4 px-4 text-right">
+                                    <div class="flex items-center justify-end">
+                                        <x-secondary-button @click="$dispatch('trigger-edit-branch', {id: {{ $branch->id }}})" class="h-8 px-3 inline-flex items-center gap-1.5 text-xs shadow-none border-slate-200">
+                                            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                            </svg>
+                                            Edit Branch
+                                        </x-secondary-button>
+                                    </div>
+                                </td>
+                            @endif
                         </tr>
                     @empty
                         <tr>
@@ -889,11 +1013,13 @@
                                     <span class="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em]">Manager</span>
                                     <span class="text-[12px] font-bold text-slate-700">{{ $branch->manager?->first_name ?? '—' }} {{ $branch->manager?->last_name ?? '' }}</span>
                                 </div>
-                                <div class="flex items-center justify-end">
-                                    <button @click="$dispatch('trigger-edit-branch', {id: {{ $branch->id }}})" class="p-2 rounded-xl bg-slate-50 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-all">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
-                                    </button>
-                                </div>
+                                @if($this->isSuperAdmin())
+                                    <div class="flex items-center justify-end">
+                                        <button @click="$dispatch('trigger-edit-branch', {id: {{ $branch->id }}})" class="p-2 rounded-xl bg-slate-50 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-all">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                                        </button>
+                                    </div>
+                                @endif
                             </div>
                         </div>
                     @empty
@@ -905,7 +1031,7 @@
             </div>
 
             {{-- Map View --}}
-            <div x-show="view === 'map'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="mt-6" x-init="initGlobalMap()">
+            <div x-show="view === 'map'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="mt-6">
                 <div class="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200/80 p-2 relative">
                     <div id="globalBranchMap" wire:ignore class="h-[600px] w-full rounded-xl z-10 border border-slate-100"></div>
                 </div>
@@ -943,8 +1069,7 @@
                         @endif
 
                         <div class="flex flex-col gap-3">
-                            <x-date-range-filter startModel="startDate" endModel="endDate" :error="$dateError" :startValue="$startDate" class="w-full" />
-                            <x-quick-date-filter :activeFilter="$activeFilter" class="w-full justify-between h-10 border-gray-200 shadow-sm font-bold" />
+                            <x-date-filter startModel="startDate" endModel="endDate" activeModel="activeFilter" align="left" class="w-full" />
                         </div>
                     </div>
 
@@ -1072,8 +1197,8 @@
                                 <th class="py-3 px-4 border-r border-slate-100/50 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center cursor-help group/tooltip relative" title="Total number of transactions">Volume
                                     <span class="hidden group-hover/tooltip:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 text-white text-[10px] font-normal whitespace-nowrap rounded-lg shadow-lg z-50">Order count</span>
                                 </th>
-                                <th class="py-3 px-4 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center cursor-help group/tooltip relative" title="Average revenue efficiency per transaction">Revenue Score
-                                    <span class="hidden group-hover/tooltip:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 text-white text-[10px] font-normal whitespace-nowrap rounded-lg shadow-lg z-50 w-max">(Sales ÷ Orders × 500) × 100</span>
+                                <th class="py-3 px-4 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center cursor-help group/tooltip relative" title="Percentage share of compared net revenue">Share
+                                    <span class="hidden group-hover/tooltip:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 text-white text-[10px] font-normal whitespace-nowrap rounded-lg shadow-lg z-50 w-max">Net Sales ÷ Total Compared Net Sales × 100</span>
                                 </th>
                             </x-slot>
                             
@@ -1097,11 +1222,11 @@
                                     </td>
                                     <td class="py-4 px-4">
                                         <div class="flex items-center justify-center gap-3 group/score relative">
-                                            <div class="w-20 bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200/50 p-0.5 cursor-help" title="Average revenue per order (Sales ÷ Orders × 500) × 100">
-                                                <div class="h-full rounded-full transition-all duration-1000 {{ $row['health_score'] > 80 ? 'bg-emerald-500' : ($row['health_score'] > 40 ? 'bg-amber-400' : 'bg-rose-500') }}" style="width: {{ $row['health_score'] }}%;"></div>
+                                            <div class="w-20 bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200/50 p-0.5 cursor-help" title="Percentage share of compared net sales: {{ number_format($row['share_pct'], 1) }}%">
+                                                <div class="h-full rounded-full transition-all duration-1000 bg-indigo-500" style="width: {{ $row['share_pct'] }}%;"></div>
                                             </div>
-                                            <span class="text-[12px] font-black w-8 text-right cursor-help {{ $row['health_score'] > 80 ? 'text-emerald-600' : ($row['health_score'] > 40 ? 'text-amber-600' : 'text-rose-600') }}">{{ $row['health_score'] }}%</span>
-                                            <div class="hidden group-hover/score:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 text-white text-[10px] font-normal rounded-lg shadow-lg z-50 w-max">Revenue Efficiency Score: (Sales ÷ Orders × 500) × 100</div>
+                                            <span class="text-[12px] font-black w-10 text-right cursor-help text-indigo-600">{{ number_format($row['share_pct'], 1) }}%</span>
+                                            <div class="hidden group-hover/score:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 text-white text-[10px] font-normal rounded-lg shadow-lg z-50 w-max">Revenue Share of Compared Network: {{ number_format($row['share_pct'], 1) }}%</div>
                                         </div>
                                     </td>
                                 </tr>
@@ -1240,3 +1365,4 @@
     </x-modal>
 
 </div>
+

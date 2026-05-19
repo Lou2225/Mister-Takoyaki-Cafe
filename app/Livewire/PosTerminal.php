@@ -258,9 +258,7 @@ class PosTerminal extends Component
                 return $p->recipes->pluck('ingredient_id');
             })->unique();
 
-            $stocks = BranchIngredientStock::where('branch_id', $this->branchId)
-                ->whereIn('ingredient_id', $ingredientIds)
-                ->pluck('stock_quantity', 'ingredient_id');
+            $stocks = Product::getUnexpiredStocks((int)$this->branchId, $ingredientIds);
 
             foreach ($products as $product) {
                 // Pre-calculate availability for the instant modal
@@ -471,6 +469,17 @@ class PosTerminal extends Component
         }
 
         $this->closeEditItemModal();
+    }
+
+    public function closeEditItemModal(): void
+    {
+        $this->editCartItemId = null;
+        $this->editCartItemQty = 1;
+        $this->editCartItemNotes = '';
+        $this->applyRegularDiscount = false;
+        $this->applySeniorDiscount = false;
+
+        $this->dispatch('close-modal', name: 'edit-cart-item');
     }
 
     public function decrementEditQuantity(): void
@@ -828,9 +837,7 @@ class PosTerminal extends Component
 
         // Check each aggregated requirement against total stock in ONE query
         $ingredientIds = array_keys($ingredientRequirements);
-        $stocks = BranchIngredientStock::where('branch_id', $this->branchId)
-            ->whereIn('ingredient_id', $ingredientIds)
-            ->pluck('stock_quantity', 'ingredient_id');
+        $stocks = Product::getUnexpiredStocks((int)$this->branchId, $ingredientIds);
 
         foreach ($ingredientRequirements as $ingredientId => $data) {
             $availableQty = $stocks[$ingredientId] ?? 0;

@@ -73,16 +73,23 @@
             {{-- ── Order Health Overview ── --}}
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
                 {{-- Total Orders --}}
-                <div class="bg-gradient-to-br from-{{ $primaryColor }}-50 to-{{ $primaryColor }}-100 border border-{{ $primaryColor }}-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-2 sm:gap-4 group hover:shadow-md transition-all">
-                    <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white border border-{{ $primaryColor }}-100 flex items-center justify-center text-{{ $primaryColor }}-600 shadow-sm">
-                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                <div class="p-3 sm:p-4 bg-gradient-to-br from-{{ $primaryColor }}-500/10 via-{{ $primaryColor }}-500/5 to-white border border-{{ $primaryColor }}-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-1 sm:mb-2">
+                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Orders</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-{{ $primaryColor }}-100 flex items-center justify-center text-{{ $primaryColor }}-600 shadow-sm shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[8px] sm:text-[10px] font-black text-{{ $primaryColor }}-700/60 uppercase tracking-widest leading-none mb-1">Total Orders</span>
-                        <span x-show="sourceFilter === 'App'" class="block text-[16px] sm:text-[20px] font-black text-gray-900 leading-none">{{ $appOrders->total() }}</span>
-                        <span x-show="sourceFilter === 'POS'" x-cloak class="block text-[16px] sm:text-[20px] font-black text-gray-900 leading-none">{{ $posOrders->total() }}</span>
-                        <span x-show="sourceFilter === 'History'" x-cloak class="block text-[16px] sm:text-[20px] font-black text-gray-900 leading-none">{{ $historyOrders->total() }}</span>
-                    </div>
+                    <span x-show="sourceFilter === 'App'">
+                        <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $appOrders->total() }}</h3>
+                    </span>
+                    <span x-show="sourceFilter === 'POS'" x-cloak>
+                        <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $posOrders->total() }}</h3>
+                    </span>
+                    <span x-show="sourceFilter === 'History'" x-cloak>
+                        <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $historyOrders->total() }}</h3>
+                    </span>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Placed orders count</p>
                 </div>
                 
                 {{-- Pending Orders --}}
@@ -91,14 +98,15 @@
                         ->whereIn('status', ['Pending', 'Preparing'])
                         ->count();
                 @endphp
-                <div class="bg-gradient-to-br {{ $pendingCount > 0 ? 'from-amber-50 to-amber-100 border-amber-200' : 'from-emerald-50 to-emerald-100 border-emerald-200' }} border rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-2 sm:gap-4 group hover:shadow-md transition-all">
-                    <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white border {{ $pendingCount > 0 ? 'border-amber-100 text-amber-600' : 'border-emerald-100 text-emerald-600' }} flex items-center justify-center shadow-sm">
-                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <div class="p-3 sm:p-4 bg-gradient-to-br {{ $pendingCount > 0 ? 'from-amber-500/10 via-amber-500/5 to-white border-amber-500/10' : 'from-emerald-500/10 via-emerald-500/5 to-white border-emerald-500/10' }} border rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-1 sm:mb-2">
+                        <span class="text-[10px] sm:text-[11px] font-bold {{ $pendingCount > 0 ? 'text-amber-600/90' : 'text-emerald-600/90' }} uppercase tracking-wider">Pending</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border {{ $pendingCount > 0 ? 'border-amber-100 text-amber-600' : 'border-emerald-100 text-emerald-600' }} flex items-center justify-center shadow-sm shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[8px] sm:text-[10px] font-black {{ $pendingCount > 0 ? 'text-amber-700/60' : 'text-emerald-700/60' }} uppercase tracking-widest leading-none mb-1">Pending</span>
-                        <span class="block text-[16px] sm:text-[20px] font-black {{ $pendingCount > 0 ? 'text-amber-600' : 'text-emerald-600' }} leading-none">{{ number_format($pendingCount) }}</span>
-                    </div>
+                    <h3 class="text-xl sm:text-2xl font-black {{ $pendingCount > 0 ? 'text-amber-600' : 'text-emerald-600' }} tracking-tight leading-none">{{ number_format($pendingCount) }}</h3>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Awaiting kitchen service</p>
                 </div>
 
                 {{-- Completed Orders Today --}}
@@ -108,14 +116,15 @@
                         ->whereDate('created_at', today())
                         ->count();
                 @endphp
-                <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-2 sm:gap-4 group hover:shadow-md transition-all">
-                    <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
-                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <div class="p-3 sm:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-1 sm:mb-2">
+                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Completed Today</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[8px] sm:text-[10px] font-black text-emerald-700/60 uppercase tracking-widest leading-none mb-1">Completed Today</span>
-                        <span class="block text-[16px] sm:text-[20px] font-black text-emerald-600 leading-none">{{ number_format($completedToday) }}</span>
-                    </div>
+                    <h3 class="text-xl sm:text-2xl font-black text-emerald-600 tracking-tight leading-none">{{ number_format($completedToday) }}</h3>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Served and cleared today</p>
                 </div>
 
                 {{-- Today's Revenue --}}
@@ -125,14 +134,15 @@
                         ->whereDate('created_at', today())
                         ->sum('total_amount');
                 @endphp
-                <div class="bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-2 sm:gap-4 group hover:shadow-md transition-all">
-                    <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm">
-                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <div class="p-3 sm:p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-1 sm:mb-2">
+                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Today's Revenue</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[8px] sm:text-[10px] font-black text-rose-700/60 uppercase tracking-widest leading-none mb-1">Today's Revenue</span>
-                        <span class="block text-[16px] sm:text-[20px] font-black text-rose-600 leading-none">₱{{ number_format($todayRevenue, 0) }}</span>
-                    </div>
+                    <h3 class="text-xl sm:text-2xl font-black text-rose-600 tracking-tight leading-none">₱{{ number_format($todayRevenue, 0) }}</h3>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Net generated income today</p>
                 </div>
             </div>
 
@@ -146,40 +156,32 @@
 
                 {{-- Right: Filters --}}
                 <div class="w-full lg:w-auto">
-                    <div class="flex flex-col lg:flex-row lg:items-center gap-2 w-full">
-                        {{-- Grid for Quick Date & Status --}}
-                        <div class="grid grid-cols-2 gap-2 w-full lg:w-auto">
-                            {{-- Quick Date Dropdown --}}
-                            <div class="col-span-1 w-full">
-                                <x-quick-date-filter :activeFilter="$activeFilter" class="w-full h-10 shadow-none border-slate-200" />
-                            </div>
-
-                            {{-- Status Filter Dropdown --}}
-                            <div class="col-span-1 w-full">
-                                <x-dropdown align="right" width="full" containerClasses="w-full">
-                                    <x-slot name="trigger">
-                                        <x-secondary-button type="button" class="w-full gap-1.5 h-10 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none justify-between truncate">
-                                            <div class="flex items-center gap-1.5 truncate">
-                                                <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-                                                <span class="text-[12px] truncate">{{ $statusFilter ?: 'All Status' }}</span>
-                                            </div>
-                                            <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-                                        </x-secondary-button>
-                                    </x-slot>
-                                    <x-slot name="content">
-                                        <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', '')">All Status</x-dropdown-link>
-                                        <hr class="my-1 border-slate-100">
-                                        @foreach($statuses as $status => $label)
-                                            <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', '{{ $status }}')">{{ $label }}</x-dropdown-link>
-                                        @endforeach
-                                    </x-slot>
-                                </x-dropdown>
-                            </div>
+                    <div class="flex items-center gap-2 w-full lg:w-auto justify-between lg:justify-end">
+                        {{-- 3-in-1 Date Filter Component --}}
+                        <div class="w-full lg:w-auto">
+                            <x-date-filter startModel="startDate" endModel="endDate" activeModel="activeFilter" />
                         </div>
 
-                        {{-- Date Range (History only) --}}
-                        <div x-show="sourceFilter === 'History'" x-cloak class="w-full lg:w-[280px] animate-fadeIn">
-                            <x-date-range-filter startModel="startDate" endModel="endDate" :startValue="$startDate" :endValue="$endDate" class="w-full h-10 border-slate-200 shadow-none bg-slate-50/50" />
+                        {{-- Status Filter Dropdown --}}
+                        <div class="w-[140px] sm:w-[160px]">
+                            <x-dropdown align="right" width="full" containerClasses="w-full">
+                                <x-slot name="trigger">
+                                    <x-secondary-button type="button" class="w-full gap-1.5 h-10 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none justify-between truncate">
+                                        <div class="flex items-center gap-1.5 truncate">
+                                            <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                                            <span class="text-[12px] truncate">{{ $statusFilter ?: 'All Status' }}</span>
+                                        </div>
+                                        <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                    </x-secondary-button>
+                                </x-slot>
+                                <x-slot name="content">
+                                    <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', '')">All Status</x-dropdown-link>
+                                    <hr class="my-1 border-slate-100">
+                                    @foreach($statuses as $status => $label)
+                                        <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', '{{ $status }}')">{{ $label }}</x-dropdown-link>
+                                    @endforeach
+                                </x-slot>
+                            </x-dropdown>
                         </div>
                     </div>
                 </div>
@@ -442,18 +444,20 @@
                     </div>
 
                     {{-- Action Footer --}}
-                    <div class="p-5 border-t border-slate-100 bg-white grid grid-cols-2 gap-2" x-show="activeTab === 'summary'">
+                    <div class="p-5 border-t border-slate-100 bg-white grid grid-cols-2 gap-2 shrink-0" x-show="activeTab === 'summary'">
                         {{-- 1. App Specific Progress Actions --}}
                         @if($order->source === 'App')
                             @if($order->status === 'Pending')
-                                <x-primary-button wire:click="acceptOrder({{ $order->id }})" class="col-span-2 h-10 justify-center">
+                                <x-primary-button wire:click="acceptOrder({{ $order->id }})" class="col-span-1 h-10 justify-center">
                                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                    Accept Order
+                                    Accept
                                 </x-primary-button>
                                 @if($order->created_at->diffInHours(now()) <= 24)
-                                    <x-secondary-button wire:click="openRejectModal({{ $order->id }})" class="col-span-2 h-10 justify-center text-red-600 border-red-200">
-                                        Reject Order
+                                    <x-secondary-button wire:click="openRejectModal({{ $order->id }})" class="col-span-1 h-10 justify-center text-red-600 border-red-200">
+                                        Reject
                                     </x-secondary-button>
+                                @else
+                                    <div class="col-span-1"></div>
                                 @endif
                             @elseif($order->status === 'Preparing')
                                 <x-primary-button wire:click="openHandToRiderModal({{ $order->id }})" class="col-span-2 h-10 justify-center bg-indigo-600 hover:bg-indigo-700">
@@ -486,16 +490,16 @@
                             </x-primary-button>
                         @endif
 
-                        {{-- 4. Consolidated Void Action (Forbidden for Completed status) --}}
+                        {{-- 4. Consolidated Void Action --}}
                         @if($order->canBeVoided())
-                            <x-danger-button wire:click="openVoidModal({{ $order->id }})" class="col-span-2 h-10 justify-center text-red-600 bg-red-50 hover:bg-red-100 border-red-200">
+                            <x-danger-button wire:click="openVoidModal({{ $order->id }})" class="{{ $order->status !== 'Drafted' ? 'col-span-1' : 'col-span-2' }} h-10 justify-center text-red-600 bg-red-50 hover:bg-red-100 border-red-200">
                                 Void Order
                             </x-danger-button>
                         @endif
 
                         {{-- 5. Standard Global Actions --}}
                         @if($order->status !== 'Drafted')
-                            <x-secondary-button @click="$dispatch('open-modal', 'receipt-modal')" class="col-span-2 h-10 justify-center">
+                            <x-secondary-button @click="$dispatch('open-modal', 'receipt-modal')" class="{{ $order->canBeVoided() ? 'col-span-1' : 'col-span-2' }} h-10 justify-center">
                                 View Receipt
                             </x-secondary-button>
                         @endif
@@ -663,7 +667,7 @@
                             $address = $address['formatted'] ?? '';
                         }
                         $logoUrl = \App\Models\SystemSetting::get('business_logo') ? Storage::url(\App\Models\SystemSetting::get('business_logo')) : null;
-                        $businessName = \App\Models\SystemSetting::get('business_name', 'Mister Takoyaki Cafe');
+                        $businessName = \App\Models\SystemSetting::get('business_name', 'Your Business Name');
                         $businessEmail = \App\Models\SystemSetting::get('business_email', '');
                         $businessPhone = \App\Models\SystemSetting::get('business_phone', '');
                         $businessAddress = $address;
@@ -674,15 +678,27 @@
                         $qrUrl = \App\Models\SystemSetting::get('receipt_qr_url', '');
                         $currencySymbol = '₱';
 
-                        // Generate dynamic QR code if config is set
+                        if (empty($qrUrl)) {
+                            $qrUrl = route('customer.review', ['branch' => $order->branch_id]);
+                        } else {
+                            $qrUrl = str_replace('{order_id}', $order->id, $qrUrl);
+                            // Append branch context to custom URLs so reviews are attributed correctly
+                            $separator = str_contains($qrUrl, '?') ? '&' : '?';
+                            $qrUrl .= $separator . 'branch=' . $order->branch_id;
+                        }
+
+                        // Rewrite localhost to local LAN IP so phones can scan it
+                        if (str_contains($qrUrl, 'localhost') || str_contains($qrUrl, '127.0.0.1')) {
+                            $localIp = gethostbyname(gethostname());
+                            $qrUrl = str_replace(['localhost', '127.0.0.1'], $localIp, $qrUrl);
+                        }
+
+                        // Generate dynamic QR code
                         $qrCodeSvg = null;
-                        if (!empty($qrUrl)) {
-                            try {
-                                $reviewUrl = str_replace('{order_id}', $order->id, $qrUrl);
-                                $qrCodeSvg = \App\Helpers\QrCodeHelper::generateReviewQrCode($reviewUrl);
-                            } catch (\Exception $e) {
-                                $qrCodeSvg = null;
-                            }
+                        try {
+                            $qrCodeSvg = \App\Helpers\QrCodeHelper::generateReviewQrCode($qrUrl);
+                        } catch (\Exception $e) {
+                            $qrCodeSvg = null;
                         }
                     @endphp
 
@@ -703,7 +719,10 @@
                             <p class="text-[7px] text-gray-500 mt-0.5">{{ $businessAddress }}</p>
                         @endif
                         @if(!empty($businessPhone))
-                            <p class="text-[7px] text-gray-500">Tel: {{ $businessPhone }}</p>
+                            <p class="text-[7px] text-gray-500">Tel: +63 {{ ltrim(trim($businessPhone), '+63') }}</p>
+                        @endif
+                        @if(!empty($businessEmail))
+                            <p class="text-[7px] text-gray-500">{{ $businessEmail }}</p>
                         @endif
                     </div>
 
@@ -879,3 +898,4 @@ window.printOrderReceipt = function(orderId) {
     doc.close();
 }
 </script>
+

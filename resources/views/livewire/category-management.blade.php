@@ -54,37 +54,40 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 @php $stats = $this->kpiStats; @endphp
                 
-                {{-- Total Segments --}}
-                <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                {{-- Total Categories --}}
+                <div class="p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Categories</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-indigo-700/60 uppercase tracking-widest leading-none mb-1">Total Categories</span>
-                        <span class="block text-[20px] font-black text-gray-900 leading-none">{{ number_format($stats['total_count']) }}</span>
-                    </div>
+                    <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($stats['total_count']) }}</h3>
+                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Active category tags</p>
                 </div>
 
-                {{-- Product Focus --}}
-                <div class="bg-gradient-to-br from-violet-50 to-violet-100 border border-violet-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-violet-100 flex items-center justify-center text-violet-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" /></svg>
+                {{-- Product Groups --}}
+                <div class="p-4 bg-gradient-to-br from-violet-500/10 via-violet-500/5 to-white border border-violet-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Product Groups</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-violet-100 flex items-center justify-center text-violet-600 shadow-sm shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" /></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-violet-700/60 uppercase tracking-widest leading-none mb-1">Product Groups</span>
-                        <span class="block text-[20px] font-black text-violet-600 leading-none">{{ number_format($stats['product_count']) }}</span>
-                    </div>
+                    <h3 class="text-2xl font-black text-violet-600 tracking-tight leading-none">{{ number_format($stats['product_count']) }}</h3>
+                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Menu classification groups</p>
                 </div>
 
-                {{-- Ingredient Focus --}}
-                <div class="bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                {{-- Inventory Assets --}}
+                <div class="p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Inventory Assets</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-rose-700/60 uppercase tracking-widest leading-none mb-1">Inventory Assets</span>
-                        <span class="block text-[20px] font-black text-rose-600 leading-none">{{ number_format($stats['ingredient_count']) }}</span>
-                    </div>
+                    <h3 class="text-2xl font-black text-rose-600 tracking-tight leading-none">{{ number_format($stats['ingredient_count']) }}</h3>
+                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Stock category groupings</p>
                 </div>
             </div>
 

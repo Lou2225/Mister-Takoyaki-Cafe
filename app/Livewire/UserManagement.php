@@ -94,6 +94,11 @@ class UserManagement extends Component
             abort(403, 'Unauthorized access to user management.');
         }
 
+        if (auth()->user()->isAdmin()) {
+            $this->formRoleId = 3;
+            $this->formBranchId = auth()->user()->branch_id;
+        }
+
         $this->updateGlobalHeader('list');
     }
 
@@ -549,6 +554,8 @@ class UserManagement extends Component
 
         $message = 'User created successfully. Credentials are being emailed.';
         $this->dispatch('notify', type: 'success', message: $message);
+        $this->dispatch('close-modal', name: 'confirm-save-user');
+        $this->dispatch('close-modal', name: 'confirm-manager-replace');
         
         // Dispatch email after response to prevent blocking the UI
         dispatch(function () use ($user, $plainPassword) {
@@ -560,7 +567,6 @@ class UserManagement extends Component
             }
         })->afterResponse();
         
-        // Modal will be closed by toast component after displaying the notification
         $this->backToList();
     }
 
@@ -688,8 +694,8 @@ class UserManagement extends Component
         }
 
         $this->dispatch('notify', type: 'success', message: 'User updated successfully.');
-        // Modal will be closed by toast component after displaying the notification
-        // Return to list after successful update
+        $this->dispatch('close-modal', name: 'confirm-save-user');
+        $this->dispatch('close-modal', name: 'confirm-manager-replace');
         $this->backToList();
     }
 
@@ -721,7 +727,17 @@ class UserManagement extends Component
         $idToDelete = $userId ?: $this->deleteTargetId;
         if (!$idToDelete) return;
 
-        User::findOrFail($idToDelete)->delete();
+        $user = User::findOrFail($idToDelete);
+
+        // Nullify foreign key references before deletion to avoid constraint violations
+        \App\Models\Order::where('rider_id', $idToDelete)->update(['rider_id' => null]);
+        \App\Models\Order::where('user_id', $idToDelete)->update(['user_id' => null]);
+
+        // If user was a branch manager, unlink them from the branch
+        \App\Models\Branch::where('user_id', $idToDelete)->update(['user_id' => null]);
+
+        $user->delete();
+
         $this->deleteTargetId = null;
         $this->deleteTargetName = '';
         
@@ -773,8 +789,15 @@ class UserManagement extends Component
         $this->phone = '';
         $this->password = '';
         $this->passwordConfirm = '';
-        $this->formRoleId = '';
-        $this->formBranchId = '';
+        
+        if (auth()->check() && auth()->user()->isAdmin()) {
+            $this->formRoleId = 3;
+            $this->formBranchId = auth()->user()->branch_id;
+        } else {
+            $this->formRoleId = '';
+            $this->formBranchId = '';
+        }
+        
         $this->position = '';
         $this->employeeId = '';
         $this->dateHired = '';

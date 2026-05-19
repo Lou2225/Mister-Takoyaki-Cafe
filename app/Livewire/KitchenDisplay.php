@@ -94,7 +94,7 @@ class KitchenDisplay extends Component
         
         return [
             'active' => (clone $baseQuery)->where('status', Order::STATUS_PREPARING)->count(),
-            'delayed' => (clone $baseQuery)->where('status', Order::STATUS_PREPARING)
+            'delayed' => (clone $baseQuery)->whereIn('status', [Order::STATUS_PREPARING, Order::STATUS_READY])
                 ->where('created_at', '<', now()->subMinutes(10))
                 ->count(),
             'ready' => (clone $baseQuery)->where('status', Order::STATUS_READY)->count(),

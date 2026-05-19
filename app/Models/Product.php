@@ -144,9 +144,7 @@ class Product extends Model
         // Batch fetch stocks if not provided
         if ($prefetchedStocks === null) {
             $ingredientIds = $recipes->pluck('ingredient_id')->unique();
-            $prefetchedStocks = \App\Models\BranchIngredientStock::where('branch_id', $branchId)
-                ->whereIn('ingredient_id', $ingredientIds)
-                ->pluck('stock_quantity', 'ingredient_id');
+            $prefetchedStocks = self::getUnexpiredStocks($branchId, $ingredientIds);
         }
 
         foreach ($recipes as $recipe) {
@@ -174,9 +172,7 @@ class Product extends Model
         // Batch fetch stocks if not provided
         if ($prefetchedStocks === null) {
             $ingredientIds = $allRecipes->pluck('ingredient_id')->unique();
-            $prefetchedStocks = \App\Models\BranchIngredientStock::where('branch_id', $branchId)
-                ->whereIn('ingredient_id', $ingredientIds)
-                ->pluck('stock_quantity', 'ingredient_id');
+            $prefetchedStocks = self::getUnexpiredStocks($branchId, $ingredientIds);
         }
 
         foreach ($this->optionGroups as $group) {
@@ -214,9 +210,7 @@ class Product extends Model
 
         if ($prefetchedStocks === null) {
             $ingredientIds = $allRecipes->pluck('ingredient_id')->unique();
-            $prefetchedStocks = \App\Models\BranchIngredientStock::where('branch_id', $branchId)
-                ->whereIn('ingredient_id', $ingredientIds)
-                ->pluck('stock_quantity', 'ingredient_id');
+            $prefetchedStocks = self::getUnexpiredStocks($branchId, $ingredientIds);
         }
 
         foreach ($this->modifiers as $modifier) {
@@ -273,14 +267,12 @@ class Product extends Model
         $this->loadMissing(['recipes', 'optionGroups.options', 'modifiers']);
         $ingredientIds = $this->recipes->pluck('ingredient_id')->unique();
         
-        $stocks = \App\Models\BranchIngredientStock::where('branch_id', $branchId)
-            ->whereIn('ingredient_id', $ingredientIds)
-            ->pluck('stock_quantity', 'ingredient_id');
-
+        $stocks = self::getUnexpiredStocks($branchId, $ingredientIds);
+ 
         $qty = $this->getMaxAvailableQuantity($branchId, $stocks);
         $optionAvail = $this->getOptionAvailability($branchId, $stocks);
         $modifierAvail = $this->getModifierAvailability($branchId, $stocks);
-
+ 
         return [
             'is_available' => $qty > 0,
             'available_quantity' => $qty,
@@ -288,5 +280,25 @@ class Product extends Model
             'option_availability' => $optionAvail,
             'modifier_availability' => $modifierAvail,
         ];
+    }
+
+    /**
+     * Fetch unexpired stock quantities by summing unexpired batches
+     */
+    public static function getUnexpiredStocks(int $branchId, $ingredientIds)
+    {
+        return \App\Models\StockBatch::where('branch_id', $branchId)
+            ->whereIn('ingredient_id', $ingredientIds)
+            ->where('current_quantity', '>', 0)
+            ->where(function($q) {
+                $q->whereNull('expiry_date')
+                  ->orWhere('expiry_date', '>=', \Carbon\Carbon::today());
+            })
+            ->groupBy('ingredient_id')
+            ->select('ingredient_id', DB::raw('SUM(current_quantity) as total_stock'))
+            ->pluck('total_stock', 'ingredient_id')
+            ->mapWithKeys(function($val, $key) {
+                return [$key => (float)$val];
+            });
     }
 }

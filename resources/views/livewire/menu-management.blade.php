@@ -502,7 +502,7 @@
                         </x-secondary-button>
                     </div>
 
-                    @if($editProductId && ($this->isSuperAdmin() || $this->isAdmin()))
+                    @if($editProductId && $this->isSuperAdmin())
                         <div class="bg-rose-50/50 border border-rose-100 rounded-2xl p-5 mt-6">
                             <h2 class="text-[12px] font-black text-rose-600 uppercase tracking-widest mb-2">Danger Zone</h2>
                             <p class="text-[11px] text-rose-400 mb-4 leading-relaxed font-medium">Permanently remove this product from the menu. This action cannot be reversed.</p>
@@ -602,7 +602,7 @@
                     <p class="text-[12px] text-gray-500 font-medium">Managing <span class="text-indigo-600 font-bold">{{ $totalProducts }} catalog assets</span></p>
                 </div>
                 <div class="flex items-center gap-3">
-                    @if($this->isSuperAdmin() || $this->isAdmin())
+                    @if($this->isSuperAdmin())
                         <x-primary-button @click="panel = 'form'; mode = 'create'; activeTab = 'basic'; $wire.showCreate();" class="h-10 text-[11px] font-black uppercase tracking-widest">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
                             Add Product
@@ -614,51 +614,55 @@
 
         <div class="p-4 md:p-6 space-y-6">
             {{-- ── Menu Health Overview ── --}}
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {{-- Total Assets --}}
-            <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-2 sm:gap-4 group hover:shadow-md transition-all">
-                <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
-                    <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                {{-- Total Assets --}}
+                <div class="p-3 sm:p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-1 sm:mb-2">
+                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Catalog</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                        </div>
+                    </div>
+                    <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($totalProducts) }}</h3>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Total listed products</p>
                 </div>
-                <div>
-                    <span class="block text-[8px] sm:text-[10px] font-black text-indigo-700/60 uppercase tracking-widest leading-none mb-1">Catalog</span>
-                    <span class="block text-[16px] sm:text-[20px] font-black text-gray-900 leading-none">{{ number_format($totalProducts) }}</span>
+                
+                {{-- Active --}}
+                <div class="p-3 sm:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-1 sm:mb-2">
+                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                    </div>
+                    <h3 class="text-xl sm:text-2xl font-black text-emerald-600 tracking-tight leading-none">{{ number_format($this->activeCount) }}</h3>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Available on POS/App</p>
                 </div>
-            </div>
-            
-            {{-- Active --}}
-            <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-2 sm:gap-4 group hover:shadow-md transition-all">
-                <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
-                    <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                </div>
-                <div>
-                    <span class="block text-[8px] sm:text-[10px] font-black text-emerald-700/60 uppercase tracking-widest leading-none mb-1">Active</span>
-                    <span class="block text-[16px] sm:text-[20px] font-black text-emerald-600 leading-none">{{ number_format($this->activeCount) }}</span>
-                </div>
-            </div>
 
-            {{-- Hidden --}}
-            <div class="bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-2 sm:gap-4 group hover:shadow-md transition-all">
-                <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm">
-                    <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 14.12l4.242-4.242M3 3l18 18"/></svg>
+                {{-- Hidden --}}
+                <div class="p-3 sm:p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-1 sm:mb-2">
+                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Hidden</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 14.12l4.242-4.242M3 3l18 18"/></svg>
+                        </div>
+                    </div>
+                    <h3 class="text-xl sm:text-2xl font-black text-rose-600 tracking-tight leading-none">{{ number_format($this->hiddenCount) }}</h3>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Archived or inactive items</p>
                 </div>
-                <div>
-                    <span class="block text-[8px] sm:text-[10px] font-black text-rose-700/60 uppercase tracking-widest leading-none mb-1">Hidden</span>
-                    <span class="block text-[16px] sm:text-[20px] font-black text-rose-600 leading-none">{{ number_format($this->hiddenCount) }}</span>
-                </div>
-            </div>
 
-            {{-- Categories --}}
-            <div class="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-2 sm:gap-4 group hover:shadow-md transition-all">
-                <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm">
-                    <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
-                </div>
-                <div>
-                    <span class="block text-[8px] sm:text-[10px] font-black text-amber-700/60 uppercase tracking-widest leading-none mb-1">Categories</span>
-                    <span class="block text-[16px] sm:text-[20px] font-black text-gray-900 leading-none">{{ number_format($totalCategories) }}</span>
+                {{-- Categories --}}
+                <div class="p-3 sm:p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-1 sm:mb-2">
+                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Categories</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                        </div>
+                    </div>
+                    <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($totalCategories) }}</h3>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Product class divisions</p>
                 </div>
             </div>
-        </div>
 
         {{-- macOS Style Unified Toolbar --}}
         <div class="flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
@@ -770,7 +774,9 @@
                         <th class="py-3 px-6 border-r border-slate-100/50 text-left text-[11px] font-bold text-slate-400 uppercase tracking-widest">Product Details</th>
                         <th class="py-3 px-6 border-r border-slate-100/50 text-center text-[11px] font-bold text-slate-400 uppercase tracking-widest">Availability</th>
                         <th class="py-3 px-6 border-r border-slate-100/50 text-right text-[11px] font-bold text-slate-400 uppercase tracking-widest">Price</th>
-                        <th class="py-3 px-6 text-right text-[11px] font-bold text-slate-400 uppercase tracking-widest">Actions</th>
+                        @if($this->isSuperAdmin())
+                            <th class="py-3 px-6 text-right text-[11px] font-bold text-slate-400 uppercase tracking-widest">Actions</th>
+                        @endif
                     </x-slot>
 
                     <tbody class="divide-y divide-slate-100/80">
@@ -802,25 +808,25 @@
                                 <td class="py-4 px-6 border-r border-slate-100/50 text-right whitespace-nowrap">
                                     <span class="text-[15px] font-black text-slate-900 italic font-mono tracking-tight">₱{{ number_format($product->price, 2) }}</span>
                                 </td>
-                                <td class="py-4 px-6 text-right whitespace-nowrap">
-                                    <div class="flex items-center justify-end gap-1">
-                                        @if(!$this->isStaff())
+                                @if($this->isSuperAdmin())
+                                    <td class="py-4 px-6 text-right whitespace-nowrap">
+                                        <div class="flex items-center justify-end gap-1">
                                             <x-secondary-button wire:click="showEdit({{ $product->id }})" class="h-8 px-3 text-[11px] font-bold bg-white hover:bg-slate-50 border-slate-200 shadow-none">
                                                 Edit Product
                                             </x-secondary-button>
-                                        @endif
-                                    </div>
-                                </td>
+                                        </div>
+                                    </td>
+                                @endif
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4" class="py-12">
+                                <td colspan="{{ $this->isSuperAdmin() ? 4 : 3 }}" class="py-12">
                                     <x-empty-state title="Empty Catalog" description="No products found in this scope." />
                                 </td>
                             </tr>
                         @endforelse
                         <tr x-show="filteredProductIds.length === 0" x-cloak>
-                            <td colspan="4" class="py-12">
+                            <td colspan="{{ $this->isSuperAdmin() ? 4 : 3 }}" class="py-12">
                                 <x-empty-state title="No products match your search" description="Try typing a different name or checking your filters." />
                             </td>
                         </tr>
@@ -944,9 +950,11 @@
                                     <h4 class="text-[13px] font-bold text-slate-900 truncate tracking-tight group-hover/card:text-indigo-600 transition-colors">{{ $product->name }}</h4>
                                 </div>
                                 <div class="shrink-0 flex items-center gap-1">
-                                    <button type="button" wire:click.stop="showEdit({{ $product->id }})" class="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="Edit Product">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                    </button>
+                                    @if($this->isSuperAdmin())
+                                        <button type="button" wire:click.stop="showEdit({{ $product->id }})" class="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="Edit Product">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                        </button>
+                                    @endif
                                 </div>
                             </div>
                         </div>

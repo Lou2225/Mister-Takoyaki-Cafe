@@ -28,49 +28,53 @@
         </div>
 
         {{-- KPI Cards Section --}}
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-8">
             {{-- Total Notifications --}}
-            <div class="bg-gradient-to-br from-{{ $primaryColor }}-50 to-{{ $primaryColor }}-100 border border-{{ $primaryColor }}-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                <div class="w-10 h-10 rounded-xl bg-white border border-{{ $primaryColor }}-100 flex items-center justify-center {{ $primaryText }} shadow-sm">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            <div class="p-3 sm:p-4 bg-gradient-to-br from-{{ $primaryColor }}-500/10 via-{{ $primaryColor }}-500/5 to-white border border-{{ $primaryColor }}-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                <div class="flex items-center justify-between mb-1 sm:mb-2">
+                    <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Alerts</span>
+                    <div class="w-7 h-7 rounded-lg bg-white border border-{{ $primaryColor }}-100 flex items-center justify-center {{ $primaryText }} shadow-sm shrink-0">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    </div>
                 </div>
-                <div>
-                    <span class="block text-[10px] font-black {{ $primaryText }} opacity-60 uppercase tracking-widest leading-none mb-1">Total Alerts</span>
-                    <span class="block text-[20px] font-black text-gray-900 leading-none">{{ $stats['total'] }}</span>
-                </div>
+                <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $stats['total'] }}</h3>
+                <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Lifetime notifications logged</p>
             </div>
 
             {{-- Unread Alerts --}}
-            <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                <div class="w-10 h-10 rounded-xl bg-white border border-indigo-100 flex items-center justify-center text-indigo-500 shadow-sm">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+            <div class="p-3 sm:p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                <div class="flex items-center justify-between mb-1 sm:mb-2">
+                    <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Unread Alerts</span>
+                    <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-500 shadow-sm shrink-0">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                    </div>
                 </div>
-                <div>
-                    <span class="block text-[10px] font-black text-indigo-700/60 uppercase tracking-widest leading-none mb-1">Unread Alerts</span>
-                    <span class="block text-[20px] font-black text-gray-900 leading-none">{{ $stats['unread'] }}</span>
-                </div>
+                <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $stats['unread'] }}</h3>
+                <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">New items requiring attention</p>
             </div>
 
             {{-- Critical Alerts --}}
-            <div class="bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                <div class="w-10 h-10 rounded-xl bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <div class="p-3 sm:p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                <div class="flex items-center justify-between mb-1 sm:mb-2">
+                    <span class="text-[10px] sm:text-[11px] font-bold text-rose-600/90 uppercase tracking-wider">Critical (Unread)</span>
+                    <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm shrink-0">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
                 </div>
-                <div>
-                    <span class="block text-[10px] font-black text-rose-700/60 uppercase tracking-widest leading-none mb-1">Critical (Unread)</span>
-                    <span class="block text-[20px] font-black text-gray-900 leading-none">{{ $stats['critical'] }}</span>
-                </div>
+                <h3 class="text-xl sm:text-2xl font-black text-rose-600 tracking-tight leading-none">{{ $stats['critical'] }}</h3>
+                <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Unresolved high-priority alerts</p>
             </div>
 
             {{-- Recent Activity --}}
-            <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                <div class="w-10 h-10 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <div class="p-3 sm:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                <div class="flex items-center justify-between mb-1 sm:mb-2">
+                    <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Recent (7 Days)</span>
+                    <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    </div>
                 </div>
-                <div>
-                    <span class="block text-[10px] font-black text-emerald-700/60 uppercase tracking-widest leading-none mb-1">Recent (7 Days)</span>
-                    <span class="block text-[20px] font-black text-gray-900 leading-none">{{ $stats['recent'] }}</span>
-                </div>
+                <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $stats['recent'] }}</h3>
+                <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Alerts logged in the last week</p>
             </div>
         </div>
 

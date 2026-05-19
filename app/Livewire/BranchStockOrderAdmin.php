@@ -47,7 +47,11 @@ class BranchStockOrderAdmin extends Component
     public $editItemQuantities = [];
 
     // ── Logistics Management ──────────────────────────────────────
+    public $baseFee           = 0;
     public $globalRate        = 50; // default PHP per KM
+    public $minFee            = 0;
+    public $maxFee            = 9999;
+    public $freeThreshold     = 0;
     public $branches;
     public $branchDistances   = []; // branch_id => distance
 
@@ -57,21 +61,46 @@ class BranchStockOrderAdmin extends Component
     public $priorityFilter  = '';
     public $statusFilter    = 'all';
     public $perPage         = 10;
+    public $startDate       = '';
+    public $endDate         = '';
+    public $activeFilter    = 'All Time';
 
     protected $queryString = [
         'panel'         => ['except' => 'inbox'],
         'search'        => ['except' => '', 'as' => 'oa_search'],
         'branchFilter'  => ['except' => '', 'as' => 'oa_branch'],
         'statusFilter'  => ['except' => 'all', 'as' => 'oa_status'],
+        'startDate'     => ['except' => '', 'as' => 'oa_start'],
+        'endDate'       => ['except' => '', 'as' => 'oa_end'],
+        'activeFilter'  => ['except' => 'All Time', 'as' => 'oa_filter'],
     ];
 
     protected $listeners = ['refreshAdminOrders' => '$refresh'];
 
     // ── Initialization ────────────────────────────────────────────
 
+    public function updatedStartDate()
+    {
+        $this->resetPage('inboxPage');
+        $this->resetPage('activePage');
+        $this->resetPage('historyPage');
+    }
+
+    public function updatedEndDate()
+    {
+        $this->resetPage('inboxPage');
+        $this->resetPage('activePage');
+        $this->resetPage('historyPage');
+    }
+
     public function mount()
     {
-        $this->globalRate = 50; // Initial default
+        $this->baseFee       = \App\Models\SystemSetting::get('logistics_base_fee', 0);
+        $this->globalRate    = \App\Models\SystemSetting::get('logistics_global_rate', 50);
+        $this->minFee        = \App\Models\SystemSetting::get('logistics_min_fee', 0);
+        $this->maxFee        = \App\Models\SystemSetting::get('logistics_max_fee', 5000);
+        $this->freeThreshold = \App\Models\SystemSetting::get('logistics_free_threshold', 0);
+        
         $this->loadLogistics();
         $this->updateHeader();
     }
@@ -97,9 +126,21 @@ class BranchStockOrderAdmin extends Component
             ->findOrFail($id);
         $this->selectedOrder = $order;
 
-        // Suggested Fee Calculation: Distance * Global Rate
-        $distance = $order->requestingBranch->distance_from_main ?? 0;
-        $this->suggestedFee = (float)$distance * (float)$this->globalRate;
+        // Calculate initial subtotal
+        $itemsSubtotal = 0;
+        foreach ($order->items as $item) {
+            $qty = $item->approved_quantity ?? $item->requested_quantity;
+            $itemsSubtotal += $qty * $item->unit_price;
+        }
+
+        // Suggested Fee Calculation
+        if ($itemsSubtotal >= (float)$this->freeThreshold && (float)$this->freeThreshold > 0) {
+            $this->suggestedFee = 0;
+        } else {
+            $distance = (float)($order->requestingBranch->distance_from_main ?? 0);
+            $computedFee = (float)$this->baseFee + ($distance * (float)$this->globalRate);
+            $this->suggestedFee = max((float)$this->minFee, min((float)$this->maxFee, $computedFee));
+        }
 
         // Pre-fill delivery fee: Use existing or suggested
         $this->deliveryFee = $order->delivery_fee > 0 ? $order->delivery_fee : $this->suggestedFee;
@@ -124,12 +165,18 @@ class BranchStockOrderAdmin extends Component
 
     public function updateLogistics()
     {
+        \App\Models\SystemSetting::set('logistics_base_fee', (float)$this->baseFee);
+        \App\Models\SystemSetting::set('logistics_global_rate', (float)$this->globalRate);
+        \App\Models\SystemSetting::set('logistics_min_fee', (float)$this->minFee);
+        \App\Models\SystemSetting::set('logistics_max_fee', (float)$this->maxFee);
+        \App\Models\SystemSetting::set('logistics_free_threshold', (float)$this->freeThreshold);
+
         // Refresh all branch distances to ensure data accuracy
         $this->syncAllDistances();
         
         $this->dispatch('notify', 
             type: 'success',
-            message: 'Logistics configuration updated. Network distances have been synchronized.'
+            message: 'Logistics rules updated and network distances synchronized.'
         );
     }
 
@@ -383,6 +430,12 @@ class BranchStockOrderAdmin extends Component
     private function getInboxOrders() {
         return StockOrder::with(['items.ingredient', 'requestingBranch', 'requester'])
             ->where('status', 'pending')
+            ->when($this->startDate && $this->endDate, function($q) {
+                $q->whereBetween('created_at', [
+                    $this->startDate . ' 00:00:00',
+                    $this->endDate . ' 23:59:59'
+                ]);
+            })
             ->when($this->search, fn($q) => $q->where('reference_no', 'like', "%{$this->search}%"))
             ->when($this->branchFilter, fn($q) => $q->where('requesting_branch_id', $this->branchFilter))
             ->when($this->priorityFilter, fn($q) => $q->where('priority', $this->priorityFilter))
@@ -392,6 +445,12 @@ class BranchStockOrderAdmin extends Component
     private function getActiveOrders() {
         return StockOrder::with(['items.ingredient', 'requestingBranch', 'requester', 'approver'])
             ->whereIn('status', ['approved', 'preparing', 'in_transit'])
+            ->when($this->startDate && $this->endDate, function($q) {
+                $q->whereBetween('created_at', [
+                    $this->startDate . ' 00:00:00',
+                    $this->endDate . ' 23:59:59'
+                ]);
+            })
             ->when($this->branchFilter, fn($q) => $q->where('requesting_branch_id', $this->branchFilter))
             ->latest()->paginate($this->perPage, ['*'], 'activePage');
     }
@@ -399,6 +458,12 @@ class BranchStockOrderAdmin extends Component
     private function getHistoryOrders() {
         return StockOrder::with(['items.ingredient', 'requestingBranch', 'requester', 'approver'])
             ->whereIn('status', ['delivered', 'rejected', 'cancelled'])
+            ->when($this->startDate && $this->endDate, function($q) {
+                $q->whereBetween('created_at', [
+                    $this->startDate . ' 00:00:00',
+                    $this->endDate . ' 23:59:59'
+                ]);
+            })
             ->when($this->search, fn($q) => $q->where('reference_no', 'like', "%{$this->search}%"))
             ->when($this->branchFilter, fn($q) => $q->where('requesting_branch_id', $this->branchFilter))
             ->when($this->statusFilter !== 'all', fn($q) => $q->where('status', $this->statusFilter))
@@ -406,11 +471,22 @@ class BranchStockOrderAdmin extends Component
     }
 
     private function getKpis(): array {
+        $start = $this->startDate ?: null;
+        $end = $this->endDate ?: null;
+
         return [
-            'pending'           => StockOrder::where('status', 'pending')->count(),
-            'active'            => StockOrder::whereIn('status', ['approved', 'preparing', 'in_transit'])->count(),
-            'delivered_month'   => StockOrder::where('status', 'delivered')->whereMonth('created_at', now()->month)->count(),
-            'rejected_month'    => StockOrder::where('status', 'rejected')->whereMonth('created_at', now()->month)->count(),
+            'pending'           => StockOrder::where('status', 'pending')
+                ->when($start && $end, fn($q) => $q->whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59']))
+                ->count(),
+            'active'            => StockOrder::whereIn('status', ['approved', 'preparing', 'in_transit'])
+                ->when($start && $end, fn($q) => $q->whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59']))
+                ->count(),
+            'delivered_month'   => StockOrder::where('status', 'delivered')
+                ->when($start && $end, fn($q) => $q->whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59']), fn($q) => $q->whereMonth('created_at', now()->month))
+                ->count(),
+            'rejected_month'    => StockOrder::where('status', 'rejected')
+                ->when($start && $end, fn($q) => $q->whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59']), fn($q) => $q->whereMonth('created_at', now()->month))
+                ->count(),
         ];
     }
 
@@ -421,12 +497,16 @@ class BranchStockOrderAdmin extends Component
 
     private function getAnalytics(): array {
         if ($this->panel !== 'analytics') return [];
+        $start = $this->startDate ?: now()->startOfMonth()->toDateString();
+        $end = $this->endDate ?: now()->endOfMonth()->toDateString();
+
         return [
             'topIngredients' => StockOrderItem::with('ingredient')
-                ->whereHas('stockOrder', fn($q) => $q->whereMonth('created_at', now()->month))
+                ->whereHas('stockOrder', fn($q) => $q->whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59']))
                 ->selectRaw('ingredient_id, SUM(requested_quantity) as total_requested')
                 ->groupBy('ingredient_id')->orderByDesc('total_requested')->take(10)->get(),
-            'branchVolume' => StockOrder::where('status', 'delivered')->whereMonth('created_at', now()->month)
+            'branchVolume' => StockOrder::where('status', 'delivered')
+                ->whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])
                 ->selectRaw('requesting_branch_id, COUNT(*) as total')->groupBy('requesting_branch_id')->get(),
             'lowStock' => BranchIngredientStock::with('ingredient')->where('branch_id', Branch::where('is_main', true)->first()?->id)
                 ->get()->filter(fn($s) => $s->stock_quantity <= ($s->ingredient->minimum_stock ?? 0))->values()

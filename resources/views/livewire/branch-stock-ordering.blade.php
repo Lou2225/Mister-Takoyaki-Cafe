@@ -34,17 +34,23 @@
         </x-sliding-tabs>
     </div>
 
-    <!-- KPI Metrics (Tightened) -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+    <!-- KPI Metrics (Premium Redesigned) -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
         @foreach([
-            ['title' => 'Pending', 'value' => $kpis['pending'], 'color' => 'amber', 'icon' => 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'],
-            ['title' => 'Processing', 'value' => $kpis['approved'], 'color' => 'indigo', 'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4'],
-            ['title' => 'In Transit', 'value' => $kpis['in_transit'], 'color' => 'cyan', 'icon' => 'M13 10V3L4 14h7v7l9-11h-7z'],
-            ['title' => 'Delivered', 'value' => $kpis['delivered'], 'color' => 'emerald', 'icon' => 'M5 13l4 4L19 7']
+            ['title' => 'Pending', 'value' => $kpis['pending'], 'color' => 'amber', 'icon' => 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', 'meta' => 'Awaiting HQ approval'],
+            ['title' => 'Processing', 'value' => $kpis['approved'], 'color' => 'indigo', 'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4', 'meta' => 'Being prepared/packed'],
+            ['title' => 'In Transit', 'value' => $kpis['in_transit'], 'color' => 'cyan', 'icon' => 'M13 10V3L4 14h7v7l9-11h-7z', 'meta' => 'Dispatched from warehouse'],
+            ['title' => 'Delivered', 'value' => $kpis['delivered'], 'color' => 'emerald', 'icon' => 'M5 13l4 4L19 7', 'meta' => 'Received by branch']
         ] as $kpi)
-            <div class="bg-white p-3 rounded-2xl border border-slate-200/60 shadow-sm flex items-center gap-3">
-                <div class="w-8 h-8 rounded-lg bg-{{ $kpi['color'] }}-50 text-{{ $kpi['color'] }}-600 flex items-center justify-center"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $kpi['icon'] }}"/></svg></div>
-                <div><p class="text-[10px] font-black text-slate-400 uppercase tracking-tight">{{ $kpi['title'] }}</p><p class="text-[14px] font-black text-slate-900 tabular-nums leading-none mt-0.5">{{ number_format($kpi['value']) }}</p></div>
+            <div class="p-3 sm:p-4 bg-gradient-to-br from-{{ $kpi['color'] }}-500/10 via-{{ $kpi['color'] }}-500/5 to-white border border-{{ $kpi['color'] }}-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                <div class="flex items-center justify-between mb-1 sm:mb-2">
+                    <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">{{ $kpi['title'] }}</span>
+                    <div class="w-7 h-7 rounded-lg bg-white border border-{{ $kpi['color'] }}-100 flex items-center justify-center text-{{ $kpi['color'] }}-600 shadow-sm shrink-0">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="{{ $kpi['icon'] }}"/></svg>
+                    </div>
+                </div>
+                <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($kpi['value']) }}</h3>
+                <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">{{ $kpi['meta'] }}</p>
             </div>
         @endforeach
     </div>

@@ -27,7 +27,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>Mister Takoyaki</h1>
+            <h1>{{ \App\Services\ConfigurationService::getBusinessName() }}</h1>
         </div>
         <div class="content">
             <div class="message-box">
@@ -61,9 +61,10 @@
             </div>
         </div>
         <div class="footer">
-            <p>&copy; {{ date('Y') }} Mister Takoyaki Cafe. All rights reserved.</p>
+            <p>&copy; {{ date('Y') }} {{ \App\Services\ConfigurationService::getBusinessName() }}. All rights reserved.</p>
             <p>This is an automated system notification.</p>
         </div>
     </div>
 </body>
 </html>
+

@@ -39,11 +39,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>{{ config('app.name', 'Mister Takoyaki Cafe') }}</title>
+    <title>{{ \App\Services\ConfigurationService::getBusinessName() }}</title>
 
     {{-- Fonts --}}
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap" rel="stylesheet" />
+
+    {{-- Leaflet CDN --}}
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" data-navigate-once></script>
 
     {{-- [FIX] x-cloak must be defined here or Alpine elements will flash on load --}}
     <style>[x-cloak] { display: none !important; }</style>
@@ -52,22 +56,22 @@
     @livewireStyles
     @vite(['resources/js/app.js'])
 
-    {{-- ApexCharts --}}
-    <script src="https://cdn.jsdelivr.net/npm/apexcharts" data-navigate-once></script>
-
     {{-- Form validation --}}
     <script src="{{ asset('js/form-validation.js') }}" data-navigate-once></script>
 
     {{-- Alpine Components --}}
     <script src="{{ asset('js/alpine-components.js') }}" data-navigate-once></script>
 
-    {{-- Leaflet --}}
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" data-navigate-once></script>
+    {{-- Leaflet Overrides --}}
     <style>
         .leaflet-pane,
         .leaflet-top,
         .leaflet-bottom { z-index: 10 !important; }
+        .leaflet-control-layers-toggle {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23374151' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7'/%3E%3C/svg%3E") !important;
+            background-size: 20px 20px !important;
+            background-position: center !important;
+        }
     </style>
 </head>
 
@@ -126,18 +130,25 @@
             </svg>
         </button>
         
-        <div class="hidden md:flex items-center gap-2.5 px-3 py-1.5 bg-gray-50 border border-gray-100 rounded-xl transition-all shadow-sm ml-2">
+        <div class="hidden md:flex items-center gap-2.5 px-3 py-1.5 bg-gray-50 border border-gray-100 rounded-xl transition-all shadow-sm ml-2"
+             x-data="{ 
+                contextLabel: @js($contextLabel),
+                contextValue: @js($contextValue)
+             }"
+             @branch-switched.window="if($event.detail.branchName) contextValue = $event.detail.branchName"
+             @context-updated.window="if($event.detail.branchName) contextValue = $event.detail.branchName"
+        >
             <svg class="w-4 h-4 {{ $iconColor }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
             </svg>
             <span class="text-[12px] font-bold text-gray-500 uppercase tracking-tight truncate max-w-[200px] lg:max-w-none">
-                {{ $contextLabel }}: <span class="text-gray-900 font-black tracking-normal">{{ $contextValue }}</span>
+                <span x-text="contextLabel"></span>: <span class="text-gray-900 font-black tracking-normal" x-text="contextValue"></span>
             </span>
         </div>
         
         {{-- Page Title placeholder/brand (mobile only) --}}
         <div class="flex items-center md:hidden">
-            <span class="font-semibold text-[14px] text-gray-900">Mister Takoyaki Cafe</span>
+            <span class="font-semibold text-[14px] text-gray-900">{{ \App\Services\ConfigurationService::getBusinessName() }}</span>
         </div>
     </div>
 
@@ -244,21 +255,28 @@
         </div>
 
         {{-- Profile Dropdown --}}
-        <div class="relative" x-data="{ profileMenuOpen: false }" @branch-switched.window="profileMenuOpen = false">
+        <div class="relative" x-data="{ 
+            profileMenuOpen: false,
+            avatarEmoji: @js($avatarDisplay['emoji'] ?? null),
+            avatarStyle: @js($avatarDisplay['style'] ?? null)
+        }" 
+        @branch-switched.window="profileMenuOpen = false"
+        @avatar-updated.window="avatarEmoji = $event.detail.emoji; avatarStyle = $event.detail.style"
+        >
             <button @click="profileMenuOpen = !profileMenuOpen" @click.outside="profileMenuOpen = false" class="flex items-center gap-2.5 focus:outline-none transition-transform hover:scale-105">
                 <div class="text-right hidden sm:block">
                     <p class="text-[13px] font-semibold text-gray-900 leading-tight">{{ $firstName }} {{ $lastName }}</p>
                     <p class="text-[11px] text-gray-500 leading-tight">{{ $roleName }}</p>
                 </div>
-                @if($avatarDisplay)
-                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-lg shadow-sm ring-2 ring-white" style="{{ $avatarDisplay['style'] }}">
-                        {{ $avatarDisplay['emoji'] }}
-                    </div>
-                @else
+                
+                <template x-if="avatarEmoji">
+                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-lg shadow-sm ring-2 ring-white" :style="avatarStyle" x-text="avatarEmoji"></div>
+                </template>
+                <template x-if="!avatarEmoji">
                     <div class="flex items-center justify-center w-8 h-8 rounded-full bg-gray-900 text-white font-bold text-[11px] ring-2 ring-white shadow-sm">
                         {{ $initials }}
                     </div>
-                @endif
+                </template>
             </button>
             <div x-show="profileMenuOpen" x-transition x-cloak
                 class="absolute right-0 mt-2 w-52 bg-white border border-gray-100 rounded-xl shadow-[0_4px_25px_rgba(0,0,0,0.1)] py-1 z-50 overflow-hidden">
@@ -333,3 +351,4 @@
 
 </body>
 </html>
+

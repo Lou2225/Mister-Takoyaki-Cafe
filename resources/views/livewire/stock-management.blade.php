@@ -57,48 +57,73 @@
         <div x-show="panel === 'list'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="px-1">
 
             {{-- KPI Dashboard (User Management Aesthetic) --}}
+            {{-- KPI Dashboard (Compact Glassmorphic Theme) --}}
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
                 {{-- Total Assets --}}
-                <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-2 sm:gap-4 group hover:shadow-md transition-all">
-                    <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
-                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                <div class="bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-indigo-700/80 uppercase tracking-widest leading-none">Total Catalog</span>
+                        <div class="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-600 border border-indigo-500/10">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[8px] sm:text-[10px] font-black text-indigo-700/60 uppercase tracking-widest leading-none mb-1">Total Catalog</span>
-                        <span class="block text-[16px] sm:text-[20px] font-black text-gray-900 leading-none">{{ number_format($totalIngredients) }}</span>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ number_format($totalIngredients) }}</span>
+                        <span class="text-[9px] font-bold text-slate-400">items</span>
                     </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Active catalog assets</p>
                 </div>
                 
                 {{-- Low Stock Alerts --}}
-                <div class="bg-gradient-to-br {{ $lowStockWarnings > 0 ? 'from-amber-50 to-amber-100 border-amber-200' : 'from-emerald-50 to-emerald-100 border-emerald-200' }} border rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-2 sm:gap-4 group hover:shadow-md transition-all">
-                    <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white border {{ $lowStockWarnings > 0 ? 'border-amber-100 text-amber-600' : 'border-emerald-100 text-emerald-600' }} flex items-center justify-center shadow-sm">
-                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                @php
+                    $isLowStockActive = $lowStockWarnings > 0;
+                    $lowStockTheme = $isLowStockActive ? 'amber' : 'emerald';
+                @endphp
+                <div class="bg-gradient-to-br from-{{ $lowStockTheme }}-500/10 via-{{ $lowStockTheme }}-500/5 to-white border border-{{ $lowStockTheme }}-500/10 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-{{ $lowStockTheme }}-700/80 uppercase tracking-widest leading-none">Low Stock</span>
+                        <div class="w-7 h-7 rounded-lg bg-{{ $lowStockTheme }}-500/10 flex items-center justify-center text-{{ $lowStockTheme }}-600 border border-{{ $lowStockTheme }}-500/10">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[8px] sm:text-[10px] font-black {{ $lowStockWarnings > 0 ? 'text-amber-700/60' : 'text-emerald-700/60' }} uppercase tracking-widest leading-none mb-1">Low Stock</span>
-                        <span class="block text-[16px] sm:text-[20px] font-black {{ $lowStockWarnings > 0 ? 'text-amber-600' : 'text-emerald-600' }} leading-none">{{ $lowStockWarnings }}</span>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-{{ $isLowStockActive ? 'amber-600' : 'emerald-600' }} tracking-tight leading-none">{{ $lowStockWarnings }}</span>
+                        <span class="text-[9px] font-bold text-slate-400">alerts</span>
                     </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">{{ $isLowStockActive ? 'Needs replenishment' : 'Stock levels healthy' }}</p>
                 </div>
 
-                <div class="bg-gradient-to-br {{ $expiringCount > 0 ? 'from-rose-50 to-rose-100 border-rose-200' : 'from-slate-50 to-slate-100 border-slate-200' }} border rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-2 sm:gap-4 group hover:shadow-md transition-all">
-                    <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white border {{ $expiringCount > 0 ? 'border-rose-100 text-rose-600' : 'border-slate-100 text-slate-400' }} flex items-center justify-center shadow-sm">
-                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                {{-- Expiring --}}
+                @php
+                    $isExpiringActive = $expiringCount > 0;
+                    $expTheme = $isExpiringActive ? 'rose' : 'slate';
+                @endphp
+                <div class="bg-gradient-to-br from-{{ $expTheme }}-500/10 via-{{ $expTheme }}-500/5 to-white border border-{{ $expTheme }}-500/10 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-{{ $expTheme }}-700/80 uppercase tracking-widest leading-none">Expiring</span>
+                        <div class="w-7 h-7 rounded-lg bg-{{ $expTheme }}-500/10 flex items-center justify-center text-{{ $isExpiringActive ? 'rose-600' : 'slate-500' }} border border-{{ $expTheme }}-500/10">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[8px] sm:text-[10px] font-black {{ $expiringCount > 0 ? 'text-rose-700/60' : 'text-slate-700/60' }} uppercase tracking-widest leading-none mb-1">Expiring</span>
-                        <span class="block text-[16px] sm:text-[20px] font-black {{ $expiringCount > 0 ? 'text-rose-600' : 'text-gray-900' }} leading-none">{{ $expiringCount }}</span>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-{{ $isExpiringActive ? 'rose-600' : 'slate-800' }} tracking-tight leading-none">{{ $expiringCount }}</span>
+                        <span class="text-[9px] font-bold text-slate-400">batches</span>
                     </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">{{ $isExpiringActive ? 'Requires immediate action' : 'All batches fresh' }}</p>
                 </div>
 
                 {{-- Monthly Procurement --}}
-                <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-2 sm:gap-4 group hover:shadow-md transition-all">
-                    <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
-                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                <div class="bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-emerald-700/80 uppercase tracking-widest leading-none">Procurement</span>
+                        <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 border border-emerald-500/10">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[8px] sm:text-[10px] font-black text-emerald-700/60 uppercase tracking-widest leading-none mb-1">Procurement</span>
-                        <span class="block text-[16px] sm:text-[20px] font-black text-gray-900 leading-none">₱{{ number_format($monthlyProcurement, 0) }}</span>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-slate-900 tracking-tight leading-none">₱{{ number_format($monthlyProcurement, 0) }}</span>
                     </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Current month total cost</p>
                 </div>
             </div>
 
@@ -219,11 +244,13 @@
 
                                 <td class="py-4 px-6 text-right whitespace-nowrap">
                                     <div class="flex items-center justify-end gap-2">
-                                        @if(!$this->isStaff())
+                                        @if($this->isSuperAdmin())
                                             <x-secondary-button wire:click="showEdit({{ $ing->id }})" class="h-8 px-3 text-[11px] font-bold bg-white hover:bg-slate-50 border-slate-200">
                                                 Edit
                                             </x-secondary-button>
-                                            
+                                        @endif
+                                        
+                                        @if(!$this->isStaff())
                                             <a href="{{ route('stock.adjustment', ['id' => $ing->id, 'selectedBranchId' => $selectedBranchId]) }}" wire:navigate 
                                                class="h-8 px-3 inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all text-[11px] font-black uppercase tracking-widest shadow-sm">
                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
@@ -818,64 +845,100 @@
          x-transition:enter-end="opacity-100 translate-y-0"
          x-cloak class="px-1">
 
-        {{-- Expiry System Metrics --}}
+        {{-- Expiry System Metrics (Compact Glassmorphic Theme) --}}
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             {{-- Expired --}}
-            <div wire:click="$set('expiryStatusFilter', 'expired')" 
-                class="bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all cursor-pointer relative overflow-hidden {{ $expiryStatusFilter === 'expired' ? 'ring-2 ring-rose-500 ring-offset-2' : '' }}">
-                <div class="w-10 h-10 rounded-xl bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm transition-transform group-hover:scale-110">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            @php
+                $isExpiredActive = $expiryStatusFilter === 'expired';
+                $hasExpiredBatches = $expiryStats['expired'] > 0;
+            @endphp
+            <div wire:click="$set('expiryStatusFilter', 'expired')"
+                 class="relative overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.01] rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] hover:shadow-md {{ $isExpiredActive ? 'bg-gradient-to-br from-rose-500/15 via-rose-500/5 to-white border-2 border-rose-500/30' : 'bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10' }}">
+                <div class="absolute top-0 right-0 p-1">
+                    @if($hasExpiredBatches)
+                        <span class="flex h-2 w-2">
+                            <span class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-rose-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                        </span>
+                    @endif
                 </div>
-                <div>
-                    <span class="block text-[10px] font-black text-rose-700/60 uppercase tracking-widest leading-none mb-1">Expired</span>
-                    <span class="block text-[20px] font-black text-rose-700 leading-none">{{ number_format($expiryStats['expired']) }}</span>
-                </div>
-                @if($expiryStats['expired'] > 0)
-                    <div class="absolute top-2 right-2">
-                        <span class="flex h-2 w-2"><span class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-rose-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span></span>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-black text-rose-700/80 uppercase tracking-widest leading-none">Expired</span>
+                    <div class="w-7 h-7 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-600 border border-rose-500/10">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                     </div>
-                @endif
+                </div>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-[20px] font-black {{ $hasExpiredBatches ? 'text-rose-600' : 'text-slate-800' }} tracking-tight leading-none">{{ $expiryStats['expired'] }}</span>
+                    <span class="text-[9px] font-bold text-slate-400">batches</span>
+                </div>
+                <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Needs disposal</p>
             </div>
 
             {{-- Expiring Soon --}}
-            <div wire:click="$set('expiryStatusFilter', 'expiring')" 
-                class="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all cursor-pointer relative overflow-hidden {{ $expiryStatusFilter === 'expiring' ? 'ring-2 ring-amber-500 ring-offset-2' : '' }}">
-                <div class="w-10 h-10 rounded-xl bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm transition-transform group-hover:scale-110">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            @php
+                $isExpiringActive = $expiryStatusFilter === 'expiring';
+                $hasExpiringBatches = $expiryStats['expiring'] > 0;
+            @endphp
+            <div wire:click="$set('expiryStatusFilter', 'expiring')"
+                 class="relative overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.01] rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] hover:shadow-md {{ $isExpiringActive ? 'bg-gradient-to-br from-amber-500/15 via-amber-500/5 to-white border-2 border-amber-500/30' : 'bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10' }}">
+                <div class="absolute top-0 right-0 p-1">
+                    @if($hasExpiringBatches)
+                        <span class="flex h-2 w-2">
+                            <span class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-amber-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                        </span>
+                    @endif
                 </div>
-                <div>
-                    <span class="block text-[10px] font-black text-amber-700/60 uppercase tracking-widest leading-none mb-1">Expiring &le;{{ $alertDays }}d</span>
-                    <span class="block text-[20px] font-black text-amber-700 leading-none">{{ number_format($expiryStats['expiring']) }}</span>
-                </div>
-                @if($expiryStats['expiring'] > 0)
-                    <div class="absolute top-2 right-2">
-                        <span class="flex h-2 w-2"><span class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-amber-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span></span>
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-black text-amber-700/80 uppercase tracking-widest leading-none">Expiring &le;{{ $alertDays }}d</span>
+                    <div class="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600 border border-amber-500/10">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </div>
-                @endif
+                </div>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-[20px] font-black {{ $hasExpiringBatches ? 'text-amber-600' : 'text-slate-800' }} tracking-tight leading-none">{{ $expiryStats['expiring'] }}</span>
+                    <span class="text-[9px] font-bold text-slate-400">batches</span>
+                </div>
+                <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Expires within {{ $alertDays }} days</p>
             </div>
 
             {{-- Fresh --}}
-            <div wire:click="$set('expiryStatusFilter', 'fresh')" 
-                class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all cursor-pointer relative overflow-hidden {{ $expiryStatusFilter === 'fresh' ? 'ring-2 ring-emerald-500 ring-offset-2' : '' }}">
-                <div class="w-10 h-10 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm transition-transform group-hover:scale-110">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            @php
+                $isFreshActive = $expiryStatusFilter === 'fresh';
+            @endphp
+            <div wire:click="$set('expiryStatusFilter', 'fresh')"
+                 class="relative overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.01] rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] hover:shadow-md {{ $isFreshActive ? 'bg-gradient-to-br from-emerald-500/15 via-emerald-500/5 to-white border-2 border-emerald-500/30' : 'bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10' }}">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-black text-emerald-700/80 uppercase tracking-widest leading-none">Stable Stock</span>
+                    <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 border border-emerald-500/10">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
                 </div>
-                <div>
-                    <span class="block text-[10px] font-black text-emerald-700/60 uppercase tracking-widest leading-none mb-1">Stable Stock</span>
-                    <span class="block text-[20px] font-black text-emerald-700 leading-none">{{ number_format($expiryStats['fresh']) }}</span>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-[20px] font-black text-emerald-600 tracking-tight leading-none">{{ $expiryStats['fresh'] }}</span>
+                    <span class="text-[9px] font-bold text-slate-400">batches</span>
                 </div>
+                <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Fresh &amp; stable stock</p>
             </div>
 
             {{-- No Date --}}
-            <div wire:click="$set('expiryStatusFilter', 'no_date')" 
-                class="bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all cursor-pointer relative overflow-hidden {{ $expiryStatusFilter === 'no_date' ? 'ring-2 ring-slate-400 ring-offset-2' : '' }}">
-                <div class="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 shadow-sm transition-transform group-hover:scale-110">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            @php
+                $isNoDateActive = $expiryStatusFilter === 'no_date';
+            @endphp
+            <div wire:click="$set('expiryStatusFilter', 'no_date')"
+                 class="relative overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.01] rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] hover:shadow-md {{ $isNoDateActive ? 'bg-gradient-to-br from-slate-500/15 via-slate-500/5 to-white border-2 border-slate-500/30' : 'bg-gradient-to-br from-slate-500/10 via-slate-500/5 to-white border border-slate-500/10' }}">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-black text-slate-700/80 uppercase tracking-widest leading-none">Non-Perishable</span>
+                    <div class="w-7 h-7 rounded-lg bg-slate-500/10 flex items-center justify-center text-slate-500 border border-slate-500/10">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    </div>
                 </div>
-                <div>
-                    <span class="block text-[10px] font-black text-slate-500/60 uppercase tracking-widest leading-none mb-1">Non-Perishable</span>
-                    <span class="block text-[20px] font-black text-slate-700 leading-none">{{ number_format($expiryStats['no_date']) }}</span>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-[20px] font-black text-slate-800 tracking-tight leading-none">{{ $expiryStats['no_date'] }}</span>
+                    <span class="text-[9px] font-bold text-slate-400">batches</span>
                 </div>
+                <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">No expiration date set</p>
             </div>
         </div>
 

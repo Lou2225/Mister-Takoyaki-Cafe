@@ -1,3 +1,4 @@
+<div>
 <aside
     id="main-sidebar"
     x-ref="sidebar"
@@ -354,3 +355,4 @@
         @endif
     </nav>
 </aside>
+</div>

@@ -283,7 +283,7 @@
     @cart-toggle.window="cartExpanded = !cartExpanded"
     @cart-reset.window="cartExpanded = false"
 >
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
+    <script src="{{ asset('js/Sortable.min.js') }}"></script>
     <div id="hidden-products-data" class="hidden" data-products="{{ $products->keyBy('id')->toJson() }}"></div>
 
     {{-- ══════════════════════════════════════════════

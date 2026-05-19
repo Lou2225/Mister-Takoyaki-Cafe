@@ -280,8 +280,14 @@
                     </div>
                 @endif
                 
-                <p class="receipt-business-name">{{ $settings['business_name'] ?? 'Mister Takoyaki Cafe' }}</p>
+                <p class="receipt-business-name">{{ $settings['business_name'] ?? 'Your Business Name' }}</p>
                 
+                @if(!empty($settings['business_phone']))
+                    <div style="font-size: 8px; color: #4b5563; margin-top: 2px;">+63 {{ ltrim(trim($settings['business_phone']), '+63') }}</div>
+                @endif
+                @if(!empty($settings['business_email']))
+                    <div style="font-size: 8px; color: #4b5563; margin-top: 2px;">{{ $settings['business_email'] }}</div>
+                @endif
                 <div style="text-align: center; margin-top: 4px; margin-bottom: 8px;">
                     <span style="font-size: 14px; font-weight: 900; text-transform: uppercase; border: 2px solid black; padding: 2px 8px; border-radius: 4px; letter-spacing: 1px;">
                         {{ $order->order_type }}
@@ -441,3 +447,4 @@
     </div>
 </body>
 </html>
+

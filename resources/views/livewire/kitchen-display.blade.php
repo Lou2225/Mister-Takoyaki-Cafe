@@ -20,7 +20,7 @@
     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col h-full overflow-hidden">
         
         {{-- Section 1: Title & Action (Matching Stock Header) --}}
-        <div class="px-4 py-4 md:px-6 md:py-6 shrink-0">
+        <div class="px-4 py-4 md:px-6 md:py-6 shrink-0" wire:poll.5s>
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h2 class="text-[16px] md:text-[17px] font-bold text-gray-900 tracking-tight">Kitchen Operations Board</h2>
@@ -32,8 +32,8 @@
         </div>
 
         {{-- Section 2: Tab Navigation (Mirrored from BI) --}}
-        <div class="shrink-0">
-            <x-sliding-tabs model="activeTab" class="mb-6 px-1" ref="tabList" wire:ignore>
+        <div class="shrink-0" wire:poll.5s>
+            <x-sliding-tabs model="activeTab" class="mb-6 px-1" ref="tabList">
             @foreach([
                 'active' => ['Processing Queue', 'M13 10V3L4 14h7v7l9-11h-7'],
                 'ready' => ['Ready Board', 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'],
@@ -46,6 +46,8 @@
                     {{ $info[0] }}
                     @if($tab === 'active' && $stats['active'] > 0)
                         <span class="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full {{ $primaryBg }} text-white text-[9px] font-black shadow-sm ml-1">{{ $stats['active'] }}</span>
+                    @elseif($tab === 'ready' && $stats['ready'] > 0)
+                        <span class="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-emerald-500 text-white text-[9px] font-black shadow-sm ml-1">{{ $stats['ready'] }}</span>
                     @endif
                 </x-sliding-tab>
             @endforeach
@@ -54,50 +56,54 @@
 
         {{-- Section 3: Metrics & Content Flow --}}
                     {{-- ── KDS Health Dashboard Area ── --}}
-            <div class="px-4 pb-4 md:px-6 md:pb-6 shrink-0 border-b border-slate-100">
+            <div class="px-4 pb-4 md:px-6 md:pb-6 shrink-0 border-b border-slate-100" wire:poll.5s>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                     {{-- Active Queue --}}
-                    <div class="bg-gradient-to-br from-{{ $primaryColor }}-50 to-{{ $primaryColor }}-100 border border-{{ $primaryColor }}-200 rounded-2xl p-3 md:p-4 shadow-sm flex items-center gap-3 md:gap-4 transition-all group hover:shadow-md">
-                        <div class="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-white border border-{{ $primaryColor }}-100 flex items-center justify-center text-{{ $primaryColor }}-600 shadow-sm shrink-0">
-                            <svg class="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                    <div class="p-3 md:p-4 bg-gradient-to-br from-{{ $primaryColor }}-500/10 via-{{ $primaryColor }}-500/5 to-white border border-{{ $primaryColor }}-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                        <div class="flex items-center justify-between mb-1 md:mb-2">
+                            <span class="text-[10px] md:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Queue</span>
+                            <div class="w-7 h-7 rounded-lg bg-white border border-{{ $primaryColor }}-100 flex items-center justify-center text-{{ $primaryColor }}-600 shadow-sm shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                            </div>
                         </div>
-                        <div class="min-w-0">
-                            <span class="block text-[8px] md:text-[10px] font-black text-{{ $primaryColor }}-700/60 uppercase tracking-widest leading-none mb-1 truncate">Queue</span>
-                            <span class="block text-[16px] md:text-[20px] font-black text-gray-900 leading-none">{{ $stats['active'] }}</span>
-                        </div>
+                        <h3 class="text-xl md:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $stats['active'] }}</h3>
+                        <p class="text-[9px] md:text-[10px] text-slate-400 font-semibold mt-1 md:mt-1.5 leading-none">Active orders cooking</p>
                     </div>
                     
                     {{-- Critical Delay --}}
-                    <div class="bg-gradient-to-br {{ $stats['delayed'] > 0 ? 'from-rose-50 to-rose-100 border-rose-200' : 'from-slate-50 to-slate-100 border-slate-200' }} border rounded-2xl p-3 md:p-4 shadow-sm flex items-center gap-3 md:gap-4 transition-all group {{ $stats['delayed'] > 0 ? 'hover:shadow-md' : 'hover:shadow-sm opacity-60' }}">
-                        <div class="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-white border {{ $stats['delayed'] > 0 ? 'border-rose-100 text-rose-600' : 'border-slate-100 text-slate-400' }} flex items-center justify-center shadow-sm shrink-0">
-                            <svg class="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <div class="p-3 md:p-4 bg-gradient-to-br {{ $stats['delayed'] > 0 ? 'from-rose-500/10 via-rose-500/5 to-white border-rose-500/10' : 'from-slate-500/10 via-slate-500/5 to-white border-slate-500/10' }} border rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group {{ $stats['delayed'] > 0 ? '' : 'opacity-65' }}">
+                        <div class="flex items-center justify-between mb-1 md:mb-2">
+                            <span class="text-[10px] md:text-[11px] font-bold {{ $stats['delayed'] > 0 ? 'text-rose-600/90' : 'text-slate-400' }} uppercase tracking-wider">Delayed</span>
+                            <div class="w-7 h-7 rounded-lg bg-white border {{ $stats['delayed'] > 0 ? 'border-rose-100 text-rose-600' : 'border-slate-100 text-slate-400' }} flex items-center justify-center shadow-sm shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            </div>
                         </div>
-                        <div class="min-w-0">
-                            <span class="block text-[8px] md:text-[10px] font-black {{ $stats['delayed'] > 0 ? 'text-rose-700/60' : 'text-slate-400' }} uppercase tracking-widest leading-none mb-1 truncate">Delayed</span>
-                            <span class="block text-[16px] md:text-[20px] font-black {{ $stats['delayed'] > 0 ? 'text-rose-600' : 'text-slate-400' }} leading-none">{{ $stats['delayed'] }}</span>
-                        </div>
+                        <h3 class="text-xl md:text-2xl font-black {{ $stats['delayed'] > 0 ? 'text-rose-600' : 'text-slate-500' }} tracking-tight leading-none">{{ $stats['delayed'] }}</h3>
+                        <p class="text-[9px] md:text-[10px] text-slate-400 font-semibold mt-1 md:mt-1.5 leading-none">Pending past target limit</p>
                     </div>
  
                     {{-- Ready Board --}}
-                    <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-2xl p-3 md:p-4 shadow-sm flex items-center gap-3 md:gap-4 transition-all group hover:shadow-md">
-                        <div class="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
-                            <svg class="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    <div class="p-3 md:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                        <div class="flex items-center justify-between mb-1 md:mb-2">
+                            <span class="text-[10px] md:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Ready</span>
+                            <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                            </div>
                         </div>
-                        <div class="min-w-0">
-                            <span class="block text-[8px] md:text-[10px] font-black text-emerald-700/60 uppercase tracking-widest leading-none mb-1 truncate">Ready</span>
-                            <span class="block text-[16px] md:text-[20px] font-black text-gray-900 leading-none">{{ $stats['ready'] }}</span>
-                        </div>
+                        <h3 class="text-xl md:text-2xl font-black text-emerald-600 tracking-tight leading-none">{{ $stats['ready'] }}</h3>
+                        <p class="text-[9px] md:text-[10px] text-slate-400 font-semibold mt-1 md:mt-1.5 leading-none">Awaiting pickup/delivery</p>
                     </div>
  
                     {{-- Throughput --}}
-                    <div class="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-2xl p-3 md:p-4 shadow-sm flex items-center gap-3 md:gap-4 transition-all group hover:shadow-md">
-                        <div class="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-white border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm shrink-0">
-                            <svg class="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                    <div class="p-3 md:p-4 bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-white border border-blue-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                        <div class="flex items-center justify-between mb-1 md:mb-2">
+                            <span class="text-[10px] md:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Served</span>
+                            <div class="w-7 h-7 rounded-lg bg-white border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                            </div>
                         </div>
-                        <div class="min-w-0">
-                            <span class="block text-[8px] md:text-[10px] font-black text-blue-700/60 uppercase tracking-widest leading-none mb-1 truncate">Served</span>
-                            <span class="block text-[16px] md:text-[20px] font-black text-gray-900 leading-none">{{ $stats['completed'] }}</span>
-                        </div>
+                        <h3 class="text-xl md:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $stats['completed'] }}</h3>
+                        <p class="text-[9px] md:text-[10px] text-slate-400 font-semibold mt-1 md:mt-1.5 leading-none">Completed today</p>
                     </div>
                 </div>
             </div>
@@ -114,15 +120,7 @@
                         </div>
                         
                         <div class="flex flex-col sm:flex-row items-center gap-2 w-full sm:w-auto">
-                            {{-- Date Range (Full width on mobile) --}}
-                            <div class="w-full sm:w-[280px]">
-                                <x-date-range-filter startModel="startDate" endModel="endDate" :startValue="$startDate" :endValue="$endDate" class="w-full" />
-                            </div>
-                            
-                            {{-- Quick Select (Full width on mobile) --}}
-                            <div class="w-full sm:w-auto">
-                                <x-quick-date-filter :activeFilter="$activeFilter" class="shadow-none border-slate-200" />
-                            </div>
+                            <x-date-filter startModel="startDate" endModel="endDate" activeModel="activeFilter" />
                         </div>
                     </div>
 
@@ -190,7 +188,7 @@
                         @forelse($displayOrders as $order)
                             <div class="w-full sm:w-[340px] shrink-0 bg-white border border-slate-200 rounded-2xl flex flex-col shadow-sm hover:shadow-md hover:border-{{ $primaryColor }}-200 transition-all group">
                                 {{-- Ticket Title --}}
-                                <div class="p-4 border-b border-slate-100 {{ $stats['delayed'] > 0 && $order->isPreparing() && $order->created_at->lt(now()->subMinutes(10)) ? 'bg-red-50' : 'bg-slate-50/50' }} rounded-t-2xl">
+                                <div class="p-4 border-b border-slate-100 {{ in_array($order->status, [\App\Models\Order::STATUS_PREPARING, \App\Models\Order::STATUS_READY]) && $order->created_at->lt(now()->subMinutes(10)) ? 'bg-red-50' : 'bg-slate-50/50' }} rounded-t-2xl">
                                     <div class="flex items-center justify-between mb-3">
                                         <span class="px-2.5 py-1 rounded-lg {{ $primaryLight }} {{ $primaryText }} border {{ $primaryBorder }} text-[10px] font-black uppercase tracking-widest">{{ $order->order_type }}</span>
                                         <div class="ticket-timer-container flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-black tabular-nums transition-all bg-slate-100 text-slate-700 border border-slate-200 group-hover:bg-{{ $primaryColor }}-50 group-hover:text-{{ $primaryColor }}-700 group-hover:border-{{ $primaryColor }}-200">

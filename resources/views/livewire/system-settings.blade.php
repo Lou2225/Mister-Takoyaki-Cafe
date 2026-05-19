@@ -1,5 +1,5 @@
-<div class="space-y-6" x-data="{ 
-        ...systemSettingsData(),
+<div class="space-y-6" x-data="systemSettingsData({ 
+
         tab: 'general',
         receipt: {
             logo_enabled: @js($receiptLogoEnabled),
@@ -9,7 +9,7 @@
             copies: @js($receiptCopies),
             qr_url: @js($receiptQrUrl)
         }
-    }">
+    })">
 
     <div class="flex flex-col md:flex-row gap-10 min-h-[700px] w-full">
         {{-- Side Navigation --}}
@@ -113,7 +113,7 @@
                         <div class="flex-grow grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
                             <div class="sm:col-span-2">
                                 <x-input-label for="businessName" value="Legal Entity Name *" />
-                                <x-text-input id="businessName" wire:model.live.debounce.400ms="businessName" class="mt-1 block w-full h-10" placeholder="e.g. Mister Takoyaki Cafe" inputFilter="name" :hasError="$errors->has('businessName')" />
+                                <x-text-input id="businessName" wire:model.live.debounce.400ms="businessName" class="mt-1 block w-full h-10" placeholder="e.g. Acme Corp" inputFilter="name" :hasError="$errors->has('businessName')" />
                                 <x-input-error :messages="$errors->get('businessName')" class="mt-1" />
                             </div>
                             <div>
@@ -334,10 +334,13 @@
                                      currency: '₱',
                                      serviceCharge: 16.00,
                                      businessName: @entangle('businessName').live,
+                                     businessEmail: @entangle('businessEmail').live,
+                                     businessPhone: @entangle('businessPhone').live,
                                      logoEnabled: @entangle('receiptLogoEnabled').live,
                                      showVat: false,
                                      logoUrl: @js($businessLogo ? $businessLogo->temporaryUrl() : ($existingLogo ? Storage::url($existingLogo) : null)),
-                                     footer: @entangle('receiptFooterMessage').live
+                                     footer: @entangle('receiptFooterMessage').live,
+                                     policy: @entangle('receiptReturnPolicy').live
                                  }"
                                  @businessconfigupdated.window="logoUrl = $event.detail.logo_url; businessName = $event.detail.business_name">
                                 <div class="text-center mb-4">
@@ -347,7 +350,9 @@
                                             <span>MTC</span>
                                         </div>
                                     </div>
-                                    <p class="font-bold text-[11px]" x-text="businessName || 'Mister Takoyaki Cafe'"></p>
+                                    <p class="font-bold text-[11px]" x-text="businessName || 'Your Business Name'"></p>
+                                    <p class="text-[8px] text-gray-500 mt-0.5" x-text="'+63 ' + (businessPhone || '912 345 6789')"></p>
+                                    <p class="text-[8px] text-gray-500" x-text="businessEmail || 'contact@mistertakoyaki.com'"></p>
                                 </div>
 
                                 <div class="border-y border-dashed border-gray-200 py-1.5 mb-3 space-y-0.5 text-[9px]">
@@ -379,7 +384,9 @@
                                 <div class="text-center mt-4">
                                     <p class="font-bold italic text-gray-700 text-[8px]" x-text="footer || 'Thank you for your visit!'"></p>
                                     <div class="mt-2 pt-2 border-t border-gray-200">
-                                        <p class="text-[7px] text-gray-600 mb-1">Scan to Review:</p>
+                                        <p class="text-[7px] text-gray-600 mb-1" x-text="policy || 'No return, no exchange.'"></p>
+                                        <p class="text-[7px] text-gray-600 mb-1 mt-1 border-t border-dashed border-gray-100 pt-1" x-show="!policy">Scan to Review:</p>
+                                        <p class="text-[7px] text-gray-600 mb-1 mt-1 border-t border-dashed border-gray-100 pt-1" x-show="policy">Scan to Review:</p>
                                         @if($sampleQrCode)
                                             <div class="bg-white p-1 inline-block border border-gray-300 mx-auto">
                                                 <img src="{{ $sampleQrCode }}" alt="Review QR Code" class="w-16 h-16 block">
@@ -550,12 +557,21 @@
                                     <div class="flex-grow grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div>
                                             <x-input-label value="GCash Account Name" />
-                                            <x-text-input wire:model.live="gcashAccountName" class="w-full mt-1 h-10" placeholder="e.g. Mister Takoyaki Cafe" />
+                                            <x-text-input wire:model.live="gcashAccountName" class="w-full mt-1 h-10" placeholder="e.g. Acme Corp" />
                                             <x-input-error :messages="$errors->get('gcashAccountName')" class="mt-1" />
                                         </div>
                                         <div>
                                             <x-input-label value="Mobile Wallet Number" />
-                                            <x-text-input wire:model.live="gcashAccountNumber" class="w-full mt-1 h-10" placeholder="09XX XXX XXXX" />
+                                            <div class="flex items-center mt-1">
+                                                <div class="flex-shrink-0 inline-flex items-center px-3 h-10 rounded-l-lg border border-r-0 border-gray-200 bg-gray-50 text-gray-500 text-[13px] font-bold">
+                                                    +63
+                                                </div>
+                                                <x-text-input wire:model.live.debounce.400ms="gcashAccountNumber" type="text"
+                                                    class="block w-full rounded-l-none" placeholder="912 345 6789" autocomplete="tel"
+                                                    inputFilter="number" maxlength="10"
+                                                    @keydown="FormFilters.numberKeydown($event)" @paste="FormFilters.numberPaste($event)"
+                                                    :hasError="$errors->has('gcashAccountNumber')" />
+                                            </div>
                                             <x-input-error :messages="$errors->get('gcashAccountNumber')" class="mt-1" />
                                         </div>
                                         <div class="sm:col-span-2">
@@ -900,9 +916,7 @@
     </x-modal>
     <script>
     (function() {
-        const registerSettingsData = () => {
-            if (Alpine.data('systemSettingsData')) return;
-            Alpine.data('systemSettingsData', () => ({
+        const registerSettingsData = () => { if (Alpine.data('systemSettingsData')) return; Alpine.data('systemSettingsData', (initialData) => ({ ...initialData,
                 // ── Location state ───────────────────────────────────────
                 loc: {
                     region:   { items: [], search: '', loading: false },
@@ -910,6 +924,24 @@
                     city:     { items: [], search: '', loading: false },
                     barangay: { items: [], search: '', loading: false },
                     noProvince: false
+                },
+
+                getCustomPinIcon() {
+                    return L.divIcon({
+                        html: `
+                            \x3cdiv class="relative flex flex-col items-center justify-end w-10 h-10"\x3e
+                                \x3cspan class="absolute w-4 h-2 bg-indigo-500/40 rounded-full blur-[2px] animate-ping bottom-[-2px] left-1/2 -translate-x-1/2"\x3e\x3c/span\x3e
+                                \x3cdiv class="relative w-8 h-8 bg-indigo-600 rounded-t-full rounded-bl-full rotate-45 border-2 border-white shadow-lg flex items-center justify-center transition-all duration-300"\x3e
+                                    \x3cdiv class="w-3.5 h-3.5 bg-white rounded-full -rotate-45 flex items-center justify-center shadow-inner"\x3e
+                                        \x3cdiv class="w-1.5 h-1.5 bg-indigo-600 rounded-full"\x3e\x3c/div\x3e
+                                    \x3c/div\x3e
+                                \x3c/div\x3e
+                            \x3c/div\x3e
+                        `,
+                        className: 'custom-leaflet-icon',
+                        iconSize: [40, 40],
+                        iconAnchor: [20, 40]
+                    });
                 },
 
                 filtered(type) {
@@ -920,15 +952,24 @@
 
                 // ── PSGC loaders ─────────────────────────────────────────
                 async fetchWithRetry(url, retries = 2, delay = 1000) {
+                    try {
+                        const cached = sessionStorage.getItem(url);
+                        if (cached) return JSON.parse(cached);
+                    } catch (e) { console.error('Cache read failed:', e); }
+
                     for (let i = 0; i <= retries; i++) {
                         try {
                             const res = await fetch(url);
                             if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-                            return await res.json();
+                            const data = await res.json();
+                            try {
+                                sessionStorage.setItem(url, JSON.stringify(data));
+                            } catch (e) { console.error('Cache write failed:', e); }
+                            return data;
                         } catch (e) {
                             if (i === retries) throw e;
                             console.warn(`Fetch failed for ${url}, retrying (${i + 1}/${retries})...`, e);
-                            await new Promise(resolve => setTimeout(resolve, delay));
+                            await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
                         }
                     }
                 },
@@ -1070,7 +1111,7 @@
                                 if (this.marker) {
                                     this.marker.setLatLng([lat, lng]);
                                 } else {
-                                    this.marker = L.marker([lat, lng]).addTo(this.map);
+                                    this.marker = L.marker([lat, lng], { icon: this.getCustomPinIcon() }).addTo(this.map);
                                 }
                             }
                         }
@@ -1154,13 +1195,18 @@
                 map: null,
                 marker: null,
                 initMap() {
+                    if (typeof L === 'undefined') {
+                        setTimeout(() => this.initMap(), 100);
+                        return;
+                    }
                     if (this.map) {
-                        setTimeout(async () => {
+                        setTimeout(() => {
                             const container = document.getElementById('userMap');
                             if (!container) return;
                             this.map.invalidateSize(); 
-                            let lat = await Livewire.find('{{ $this->id() }}').get('addr_lat');
-                            let lng = await Livewire.find('{{ $this->id() }}').get('addr_lng');
+                            let component = Livewire.find('{{ $this->id() }}');
+                            let lat = component.addr_lat;
+                            let lng = component.addr_lng;
                             if (lat && lng) {
                                 this.map.setView([lat, lng], 16);
                                 if (this.marker) this.marker.setLatLng([lat, lng]);
@@ -1168,12 +1214,13 @@
                         }, 250);
                         return;
                     }
-                    setTimeout(async () => {
+                    setTimeout(() => {
                         const container = document.getElementById('userMap');
                         if (!container) return;
 
-                        let lat = await Livewire.find('{{ $this->id() }}').get('addr_lat');
-                        let lng = await Livewire.find('{{ $this->id() }}').get('addr_lng');
+                        let component = Livewire.find('{{ $this->id() }}');
+                        let lat = component.addr_lat;
+                        let lng = component.addr_lng;
                         let startLat = lat || 14.2189;
                         let startLng = lng || 121.1672;
                         let startZoom = lat ? 15 : 11;
@@ -1198,14 +1245,14 @@
                         L.control.layers({ "Street": street, "Satellite": satellite }).addTo(this.map);
                         
                         if (lat && lng) {
-                            this.marker = L.marker([lat, lng]).addTo(this.map);
+                            this.marker = L.marker([lat, lng], { icon: this.getCustomPinIcon() }).addTo(this.map);
                         }
 
                         this.map.on('click', async (e) => {
                             const lat = e.latlng.lat;
                             const lng = e.latlng.lng;
                             if (this.marker) this.marker.setLatLng(e.latlng);
-                            else this.marker = L.marker(e.latlng).addTo(this.map);
+                            else this.marker = L.marker(e.latlng, { icon: this.getCustomPinIcon() }).addTo(this.map);
                             
                             Livewire.find('{{ $this->id() }}').set('addr_lat', lat);
                             Livewire.find('{{ $this->id() }}').set('addr_lng', lng);
@@ -1221,6 +1268,7 @@
                                     
                                     await this.autoMatchLocation(data.address);
                                 }
+
                             } catch (error) { console.error(error); }
                         });
                     }, 350);
@@ -1236,3 +1284,4 @@
     })();
     </script>
 </div>
+

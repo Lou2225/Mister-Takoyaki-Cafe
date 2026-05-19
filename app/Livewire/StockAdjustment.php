@@ -33,6 +33,9 @@ class StockAdjustment extends Component
     public $panel = 'list';
     public $search = '';
     public $perPage = 10;
+    public $startDate = '';
+    public $endDate = '';
+    public $activeFilter = 'All Time';
     
     // Core Data
     public $selectedBranchId = '';
@@ -70,6 +73,9 @@ class StockAdjustment extends Component
         'panel' => ['except' => 'list'],
         'search' => ['except' => ''],
         'selectedBranchId' => ['except' => ''],
+        'startDate' => ['except' => '', 'as' => 'adj_start'],
+        'endDate' => ['except' => '', 'as' => 'adj_end'],
+        'activeFilter' => ['except' => 'All Time', 'as' => 'adj_filter'],
     ];
 
     protected $listeners = [
@@ -114,12 +120,21 @@ class StockAdjustment extends Component
         }
     }
 
-    public function viewAdjustment($refId)
+    public function viewAdjustment($date, $type = null)
     {
-        $this->viewingReferenceId = $refId;
-        $this->viewingMovements = StockMovement::with(['ingredient', 'user'])
-            ->where('reference_id', $refId)
-            ->get();
+        if ($type === null) {
+            $this->viewingReferenceId = $date;
+            $this->viewingMovements = StockMovement::with(['ingredient', 'user'])
+                ->where('reference_id', $date)
+                ->get();
+        } else {
+            $this->viewingReferenceId = strtoupper(str_replace('_', ' ', $type)) . ' • ' . Carbon::parse($date)->format('M d, Y');
+            $this->viewingMovements = StockMovement::with(['ingredient', 'user'])
+                ->where('branch_id', $this->selectedBranchId)
+                ->where('type', $type)
+                ->whereDate('created_at', $date)
+                ->get();
+        }
         
         $this->dispatch('open-modal', name: 'view-adjustment-details');
     }
@@ -145,6 +160,16 @@ class StockAdjustment extends Component
     }
 
     public function updatedSearch()
+    {
+        $this->resetPage();
+    }
+
+    public function updatedStartDate()
+    {
+        $this->resetPage();
+    }
+
+    public function updatedEndDate()
     {
         $this->resetPage();
     }
@@ -594,25 +619,36 @@ class StockAdjustment extends Component
     {
         // Get grouped adjustments (by reference_id)
         $movements = StockMovement::with(['user', 'branch'])
-            ->select('reference_id', 'created_at', 'user_id', 'branch_id', 'type', 'remarks')
-            ->selectRaw('COUNT(*) as item_count')
+            ->selectRaw('DATE(created_at) as date, type, branch_id, COUNT(*) as item_count, MAX(user_id) as user_id, MAX(remarks) as remarks, MAX(reference_id) as reference_id')
             ->where('branch_id', $this->selectedBranchId)
+            ->when($this->startDate && $this->endDate, function($q) {
+                $q->whereBetween('created_at', [
+                    $this->startDate . ' 00:00:00',
+                    $this->endDate . ' 23:59:59'
+                ]);
+            })
             ->when($this->search, function($q) {
                 $q->where(function($sub) {
                     $sub->whereHas('ingredient', fn($ing) => $ing->where('ingredients.name', 'like', '%' . $this->search . '%'))
-                        ->orWhere('reference_id', 'like', '%' . $this->search . '%')
-                        ->orWhere('remarks', 'like', '%' . $this->search . '%');
+                        ->orWhere('remarks', 'like', '%' . $this->search . '%')
+                        ->orWhere('type', 'like', '%' . $this->search . '%')
+                        ->orWhere('reference_id', 'like', '%' . $this->search . '%');
                 });
             })
-            ->groupBy('reference_id', 'created_at', 'user_id', 'branch_id', 'type', 'remarks')
-            ->latest('created_at')
+            ->groupBy(DB::raw('DATE(created_at)'), 'type', 'branch_id')
+            ->orderBy(DB::raw('DATE(created_at)'), 'desc')
+            ->orderBy('type')
             ->paginate($this->perPage);
 
+        // Stats calculation: if date filter is applied, use period. otherwise default to today.
+        $start = $this->startDate ?: now()->toDateString();
+        $end = $this->endDate ?: now()->toDateString();
+
         $stats = [
-            'today_count' => StockMovement::whereDate('created_at', now())->where('branch_id', $this->selectedBranchId)->count(),
-            'waste_count' => StockMovement::where('type', 'waste')->whereDate('created_at', now())->where('branch_id', $this->selectedBranchId)->count(),
-            'in_value'    => StockMovement::where('type', 'in')->whereDate('created_at', now())->where('branch_id', $this->selectedBranchId)->sum(DB::raw('unit_cost * quantity')),
-            'out_count'   => StockMovement::whereIn('type', ['out', 'waste'])->whereDate('created_at', now())->where('branch_id', $this->selectedBranchId)->count(),
+            'today_count' => StockMovement::whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])->where('branch_id', $this->selectedBranchId)->count(),
+            'waste_count' => StockMovement::where('type', 'waste')->whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])->where('branch_id', $this->selectedBranchId)->count(),
+            'in_value'    => StockMovement::where('type', 'in')->whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])->where('branch_id', $this->selectedBranchId)->sum(DB::raw('unit_cost * quantity')),
+            'out_count'   => StockMovement::whereIn('type', ['out', 'waste'])->whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])->where('branch_id', $this->selectedBranchId)->count(),
         ];
 
         return view('livewire.stock-adjustment', [

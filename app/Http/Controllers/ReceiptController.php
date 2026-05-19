@@ -34,6 +34,7 @@ class ReceiptController extends Controller
             'business_name' => $businessConfig['name'] ?? 'Mister Takoyaki Cafe',
             'business_address' => $businessConfig['address'] ?? 'Main Branch, Manila',
             'business_phone' => $businessConfig['phone'] ?? '',
+            'business_email' => $businessConfig['email'] ?? '',
             'receipt_footer_message' => $posConfig['footer_message'] ?? 'Thank you for your visit!',
             'receipt_logo_enabled' => $posConfig['logo_enabled'] ?? true,
             'receipt_return_policy' => $posConfig['return_policy'] ?? 'No return, no exchange.',

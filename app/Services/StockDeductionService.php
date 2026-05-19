@@ -50,9 +50,18 @@ class StockDeductionService
                 ->where('ingredient_id', $ingredientId)
                 ->first();
 
-            if (!$stock || $stock->stock_quantity < $quantity) {
+            $unexpiredStock = (float)StockBatch::where('branch_id', $branchId)
+                ->where('ingredient_id', $ingredientId)
+                ->where('current_quantity', '>', 0)
+                ->where(function($q) {
+                    $q->whereNull('expiry_date')
+                      ->orWhere('expiry_date', '>=', \Carbon\Carbon::today());
+                })
+                ->sum('current_quantity');
+ 
+            if (!$stock || $unexpiredStock < $quantity) {
                 throw new \Exception(
-                    "Insufficient stock: need {$quantity}, have " . ($stock->stock_quantity ?? 0)
+                    "Insufficient unexpired stock: need {$quantity}, have " . $unexpiredStock
                 );
             }
 
@@ -61,13 +70,17 @@ class StockDeductionService
                 ->where('branch_id', $branchId)
                 ->where('ingredient_id', $ingredientId)
                 ->where('current_quantity', '>', 0)
+                ->where(function($q) {
+                    $q->whereNull('expiry_date')
+                      ->orWhere('expiry_date', '>=', \Carbon\Carbon::today());
+                })
                 ->orderBy('expiry_date', 'asc') // Earliest expiry first
                 ->orderBy('created_at', 'asc')   // Oldest batch if same expiry
                 ->get();
 
             if ($batches->isEmpty()) {
                 throw new \Exception(
-                    "No stock batches found for ingredient (stock_quantity mismatch)"
+                    "No unexpired stock batches found for ingredient"
                 );
             }
 
@@ -109,7 +122,7 @@ class StockDeductionService
                 'ingredient_id'      => $ingredientId,
                 'type'               => $movementType,
                 'quantity'           => $quantity,
-                'reference_id'       => $orderItemId,
+                'reference_id'       => $orderItemId ?: $transferRef,
                 'user_id'            => $userId,
                 'remarks'            => $remarks ?? 'Order fulfillment (FEFO)',
                 'transfer_reference' => $transferRef,
@@ -143,10 +156,15 @@ class StockDeductionService
         $shortages = [];
 
         foreach ($ingredients as $ingredientId => $requiredQty) {
-            $available = BranchIngredientStock::where('branch_id', $branchId)
+            $available = (float)StockBatch::where('branch_id', $branchId)
                 ->where('ingredient_id', $ingredientId)
-                ->value('stock_quantity') ?? 0;
-
+                ->where('current_quantity', '>', 0)
+                ->where(function($q) {
+                    $q->whereNull('expiry_date')
+                      ->orWhere('expiry_date', '>=', \Carbon\Carbon::today());
+                })
+                ->sum('current_quantity');
+ 
             if ($available < $requiredQty) {
                 $shortages[] = [
                     'ingredient_id' => $ingredientId,

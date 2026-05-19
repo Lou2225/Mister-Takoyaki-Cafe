@@ -32,7 +32,7 @@
                     <h2 class="text-[17px] font-bold text-gray-900 tracking-tight" x-text="mode === 'create' ? 'Register New User' : (mode === 'edit' ? 'Update Profile' : 'View Profile')"></h2>
                     <p class="text-[12px] text-gray-500 font-medium" x-text="mode === 'create' ? 'New team member entry' : (mode === 'edit' ? 'Employee reference configuration' : 'Read-only profile view')"></p>
                 </div>
-                <x-secondary-button wire:click="backToList" wire:loading.attr="disabled" class="h-10">
+                <x-secondary-button @click="panel = 'list'; mode = 'list'; $wire.backToList()" class="h-10">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
@@ -389,7 +389,7 @@
                     <div class="flex flex-col gap-2">
                         <x-primary-button type="button" wire:click="validateBeforeSaveUser"
                             class="w-full justify-center" x-text="mode === 'edit' ? 'Save Changes' : 'Register User'"></x-primary-button>
-                        <x-secondary-button @click="mode === 'edit' ? $wire.showEdit($wire.get('editUserId'), 'view') : $wire.backToList()" wire:loading.attr="disabled" class="w-full justify-center">
+                        <x-secondary-button @click="if(mode === 'edit') { mode = 'view'; $wire.showEdit($wire.get('editUserId'), 'view') } else { panel = 'list'; mode = 'list'; $wire.backToList() }" class="w-full justify-center">
                             <span>Cancel</span>
                         </x-secondary-button>
 
@@ -502,8 +502,7 @@
                                     <p class="text-[12px] text-gray-400 font-medium mt-0.5">Historical performance data</p>
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <x-date-range-filter startModel="historyStartDate" endModel="historyEndDate" :startValue="$historyStartDate" />
-                                    <x-quick-date-filter :activeFilter="$activeFilter" class="h-10 border-gray-200 shadow-sm" />
+                                    <x-date-filter startModel="historyStartDate" endModel="historyEndDate" activeModel="activeFilter" />
                                 </div>
                             </div>
 
@@ -649,10 +648,10 @@
 
             <div class="mb-5 flex items-center justify-between">
                 <div>
-                    <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">User Management</h2>
+                    <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">{{ auth()->user()->isSuperAdmin() ? 'User Management' : 'Staff Management' }}</h2>
                     <p class="text-[12px] text-gray-500 font-medium">System Overview: <span class="text-indigo-600 font-bold">{{ $totalUsers }} members</span></p>
                 </div>
-                <x-primary-button wire:click="showCreate" wire:loading.attr="disabled" class="h-10">
+                <x-primary-button @click="panel = 'form'; mode = 'create'; $wire.resetForm()" class="h-10">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
@@ -660,7 +659,7 @@
                 </x-primary-button>
             </div>
 
-            {{-- System Metrics Grid (Customer Reviews Aesthetic) --}}
+            {{-- System Metrics Grid (Matching Dashboard Premium Aesthetic - Compact Footprint) --}}
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                 @php
                     $sysStats = $this->systemStats;
@@ -668,47 +667,51 @@
                 @endphp
                 
                 {{-- Total Users --}}
-                <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                <div class="p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Users</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-indigo-700/60 uppercase tracking-widest leading-none mb-1">Total Users</span>
-                        <span class="block text-[20px] font-black text-gray-900 leading-none">{{ number_format($sysStats['total']) }}</span>
-                    </div>
+                    <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($sysStats['total']) }}</h3>
+                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Registered accounts in database</p>
                 </div>
 
                 {{-- Active Status --}}
-                <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <div class="p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active Now</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-emerald-700/60 uppercase tracking-widest leading-none mb-1">Active Now</span>
-                        <span class="block text-[20px] font-black text-emerald-600 leading-none">{{ number_format($sysStats['active']) }}</span>
-                    </div>
+                    <h3 class="text-2xl font-black text-emerald-600 tracking-tight leading-none">{{ number_format($sysStats['active']) }}</h3>
+                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Accounts with active access</p>
                 </div>
 
                 {{-- Inactive Accounts --}}
-                <div class="bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                <div class="p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Inactive</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-rose-700/60 uppercase tracking-widest leading-none mb-1">Inactive</span>
-                        <span class="block text-[20px] font-black text-rose-600 leading-none">{{ number_format($sysStats['inactive']) }}</span>
-                    </div>
+                    <h3 class="text-2xl font-black text-rose-600 tracking-tight leading-none">{{ number_format($sysStats['inactive']) }}</h3>
+                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Deactivated user profiles</p>
                 </div>
 
                 {{-- Workforce --}}
-                <div class="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                <div class="p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Staff Members</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-amber-700/60 uppercase tracking-widest leading-none mb-1">Staff</span>
-                        <span class="block text-[20px] font-black text-gray-900 leading-none">{{ number_format($sysStats['staff']) }}</span>
-                    </div>
+                    <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($sysStats['staff']) }}</h3>
+                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Operational store employees</p>
                 </div>
             </div>
 
@@ -1273,6 +1276,8 @@
                 addr_province: @entangle('addr_province'),
                 addr_city: @entangle('addr_city'),
                 addr_barangay: @entangle('addr_barangay'),
+                addr_lat: @entangle('addr_lat'),
+                addr_lng: @entangle('addr_lng'),
 
                 // ── Location state ───────────────────────────────────────
                 loc: {
@@ -1283,6 +1288,24 @@
                     barangay: { items: [], search: '', loading: false }
                 },
 
+                getCustomPinIcon() {
+                    return L.divIcon({
+                        html: `
+                            \x3cdiv class="relative flex flex-col items-center justify-end w-10 h-10"\x3e
+                                \x3cspan class="absolute w-4 h-2 bg-indigo-500/40 rounded-full blur-[2px] animate-ping bottom-[-2px] left-1/2 -translate-x-1/2"\x3e\x3c/span\x3e
+                                \x3cdiv class="relative w-8 h-8 bg-indigo-600 rounded-t-full rounded-bl-full rotate-45 border-2 border-white shadow-lg flex items-center justify-center transition-all duration-300"\x3e
+                                    \x3cdiv class="w-3.5 h-3.5 bg-white rounded-full -rotate-45 flex items-center justify-center shadow-inner"\x3e
+                                        \x3cdiv class="w-1.5 h-1.5 bg-indigo-600 rounded-full"\x3e\x3c/div\x3e
+                                    \x3c/div\x3e
+                                \x3c/div\x3e
+                            \x3c/div\x3e
+                        `,
+                        className: 'custom-leaflet-icon',
+                        iconSize: [40, 40],
+                        iconAnchor: [20, 40]
+                    });
+                },
+
                 filtered(type) {
                     const s = this.loc[type];
                     const q = s.search.toLowerCase();
@@ -1291,15 +1314,24 @@
 
                 // ── PSGC loaders ─────────────────────────────────────────
                 async fetchWithRetry(url, retries = 2, delay = 1000) {
+                    try {
+                        const cached = sessionStorage.getItem(url);
+                        if (cached) return JSON.parse(cached);
+                    } catch (e) { console.error('Cache read failed:', e); }
+
                     for (let i = 0; i <= retries; i++) {
                         try {
                             const res = await fetch(url);
                             if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-                            return await res.json();
+                            const data = await res.json();
+                            try {
+                                sessionStorage.setItem(url, JSON.stringify(data));
+                            } catch (e) { console.error('Cache write failed:', e); }
+                            return data;
                         } catch (e) {
                             if (i === retries) throw e;
                             console.warn(`Fetch failed for ${url}, retrying (${i + 1}/${retries})...`, e);
-                            await new Promise(resolve => setTimeout(resolve, delay));
+                            await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
                         }
                     }
                 },
@@ -1431,7 +1463,7 @@
                                 if (this.marker) {
                                     this.marker.setLatLng([lat, lng]);
                                 } else {
-                                    this.marker = L.marker([lat, lng]).addTo(this.map);
+                                    this.marker = L.marker([lat, lng], { icon: this.getCustomPinIcon() }).addTo(this.map);
                                 }
                             }
                         }
@@ -1515,26 +1547,30 @@
                 map: null,
                 marker: null,
                 initMap() {
+                    if (typeof L === 'undefined') {
+                        setTimeout(() => this.initMap(), 100);
+                        return;
+                    }
                     if (this.map) {
-                        setTimeout(async () => {
+                        setTimeout(() => {
                             const container = document.getElementById('userMap');
                             if (!container) return;
                             this.map.invalidateSize(); 
-                            let lat = await this.$wire.get('addr_lat');
-                            let lng = await this.$wire.get('addr_lng');
+                            let lat = this.addr_lat;
+                            let lng = this.addr_lng;
                             if (lat && lng) {
                                 this.map.setView([lat, lng], 16);
                                 if (this.marker) this.marker.setLatLng([lat, lng]);
                             }
-                        }, 250);
+                        }, 50);
                         return;
                     }
-                    setTimeout(async () => {
+                    setTimeout(() => {
                         const container = document.getElementById('userMap');
                         if (!container) return;
 
-                        let lat = await this.$wire.get('addr_lat');
-                        let lng = await this.$wire.get('addr_lng');
+                        let lat = this.addr_lat;
+                        let lng = this.addr_lng;
                         let startLat = lat || 14.2189;
                         let startLng = lng || 121.1672;
                         let startZoom = lat ? 15 : 11;
@@ -1559,14 +1595,14 @@
                         L.control.layers({ "Street": street, "Satellite": satellite }).addTo(this.map);
                         
                         if (lat && lng) {
-                            this.marker = L.marker([lat, lng]).addTo(this.map);
+                            this.marker = L.marker([lat, lng], { icon: this.getCustomPinIcon() }).addTo(this.map);
                         }
 
                         this.map.on('click', async (e) => {
                             const lat = e.latlng.lat;
                             const lng = e.latlng.lng;
                             if (this.marker) this.marker.setLatLng(e.latlng);
-                            else this.marker = L.marker(e.latlng).addTo(this.map);
+                            else this.marker = L.marker(e.latlng, { icon: this.getCustomPinIcon() }).addTo(this.map);
                             
                             this.$wire.set('addr_lat', lat);
                             this.$wire.set('addr_lng', lng);
@@ -1584,27 +1620,18 @@
                                 }
                             } catch (error) { console.error(error); }
                         });
-                    }, 350);
+                    }, 50);
                 },
 
                 init() {
                     this.loadRegions();
                     this.$watch('panel', (val) => {
-                        if (this.$wire && this.$wire.get('panel') !== val) {
-                            this.$wire.set('panel', val);
-                        }
                         if (val === 'form') {
                             this.$nextTick(() => {
                                 if (typeof this.recalculateHistoryTab === 'function') {
                                     this.recalculateHistoryTab();
                                 }
                             });
-                        }
-                    });
-
-                    this.$watch('mode', (val) => {
-                        if (this.$wire && this.$wire.get('mode') !== val) {
-                            this.$wire.set('mode', val);
                         }
                     });
 

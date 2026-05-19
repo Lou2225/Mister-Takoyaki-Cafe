@@ -42,16 +42,29 @@ class ReceiptService
             'receipt_qr_url'          => SystemSetting::get('receipt_qr_url', ''),
         ];
 
-        // Generate QR code for review if URL is configured
+        // Generate QR code for review
         $qrCode = null;
-        if (!empty($settings['receipt_qr_url'])) {
-            try {
-                $reviewUrl = str_replace('{order_id}', $order->id, $settings['receipt_qr_url']);
-                $qrCode = QrCodeHelper::generateReviewQrCode($reviewUrl);
-            } catch (\Exception $e) {
-                // Silently fail QR generation - receipt will still work without it
-                $qrCode = null;
+        try {
+            $qrUrl = $settings['receipt_qr_url'];
+            if (empty($qrUrl)) {
+                $qrUrl = route('customer.review', ['branch' => $order->branch_id]);
+            } else {
+                $qrUrl = str_replace('{order_id}', $order->id, $qrUrl);
+                // Append branch context to custom URLs so reviews are attributed correctly
+                $separator = str_contains($qrUrl, '?') ? '&' : '?';
+                $qrUrl .= $separator . 'branch=' . $order->branch_id;
             }
+
+            // Rewrite localhost to local LAN IP so phones can scan it
+            if (str_contains($qrUrl, 'localhost') || str_contains($qrUrl, '127.0.0.1')) {
+                $localIp = gethostbyname(gethostname());
+                $qrUrl = str_replace(['localhost', '127.0.0.1'], $localIp, $qrUrl);
+            }
+
+            $qrCode = QrCodeHelper::generateReviewQrCode($qrUrl);
+        } catch (\Exception $e) {
+            // Silently fail QR generation - receipt will still work without it
+            $qrCode = null;
         }
 
         // Get business logo if configured

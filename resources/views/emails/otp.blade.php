@@ -3,7 +3,7 @@
 
 Hello **{{ $recipientName }}**,
 
-We received a request to reset your password for the **Mister Takoyaki Management System**.
+We received a request to reset your password for the **{{ \App\Services\ConfigurationService::getBusinessName() }} Management System**.
 
 Use the code below to verify your identity. This code is valid for **10 minutes**.
 
@@ -13,9 +13,10 @@ Use the code below to verify your identity. This code is valid for **10 minutes*
 </div>
 </x-mail::panel>
 
-> **Never share this code with anyone.** Mister Takoyaki staff will never ask for your OTP.
+> **Never share this code with anyone.** {{ \App\Services\ConfigurationService::getBusinessName() }} staff will never ask for your OTP.
 > If you did not request a password reset, you can safely ignore this email — your account remains secure.
 
 Thanks,
 {{ config('app.name') }} Management
 </x-mail::message>
+

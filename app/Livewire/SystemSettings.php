@@ -183,6 +183,9 @@ class SystemSettings extends Component
         $this->posPaymentMethods = SystemSetting::get('pos_payment_methods', ['Cash', 'GCash']);
         $this->gcashAccountName   = SystemSetting::get('gcash_account_name', 'Mister Takoyaki Cafe');
         $this->gcashAccountNumber  = SystemSetting::get('gcash_account_number', '');
+        if (str_starts_with($this->gcashAccountNumber, '+63')) {
+            $this->gcashAccountNumber = substr($this->gcashAccountNumber, 3);
+        }
         $this->existingGcashQrImage = SystemSetting::get('gcash_qr_image', '');
 
         // Per-user preference for module visibility (isolates settings between super admins)
@@ -225,6 +228,11 @@ class SystemSettings extends Component
     public function updatedPosBusinessName()
     {
         $this->validateFieldLive('posBusinessName', ['required', 'string', 'max:255', 'regex:' . ValidationHelper::REGEX_NAME], ValidationHelper::commonMessages());
+    }
+
+    public function updatedGcashAccountNumber()
+    {
+        $this->validateFieldLive('gcashAccountNumber', ['nullable', 'string', 'regex:~^[0-9]{10}$~'], ['gcashAccountNumber.regex' => 'Enter 10-digit mobile number.']);
     }
 
     public function updatedLowStockThreshold()
@@ -351,6 +359,8 @@ class SystemSettings extends Component
             $this->businessPhone   = trim(preg_replace('/\s+/', '', $this->businessPhone));
             $this->businessTin     = trim($this->businessTin);
             $this->businessAddress = $this->normalizeString($this->businessAddress);
+        } elseif ($this->tab === 'pos') {
+            $this->gcashAccountNumber = trim(preg_replace('/\s+/', '', $this->gcashAccountNumber));
         }
     }
 
@@ -389,7 +399,7 @@ class SystemSettings extends Component
                 'posOrderTypes'      => ['required', 'array', 'min:1'],
                 'posPaymentMethods'  => ['required', 'array', 'min:1'],
                 'gcashAccountName'   => ['nullable', 'string', 'max:255'],
-                'gcashAccountNumber' => ['nullable', 'string', 'max:20'],
+                'gcashAccountNumber' => ['nullable', 'string', 'regex:~^[0-9]{10}$~'],
                 'gcashQrImage'       => ['nullable', 'image', 'max:1024'],
             ],
             'system' => [
@@ -416,6 +426,7 @@ class SystemSettings extends Component
             'businessPhone.regex' => 'Enter 10-digit mobile number (e.g. 9123456789).',
             'posBusinessName.regex' => 'Terminal name has invalid characters.',
             'opBranchId.required' => 'An Operating Branch is required when operational modules are visible.',
+            'gcashAccountNumber.regex' => 'Enter 10-digit mobile number (e.g. 9123456789).',
         ]);
     }
 
@@ -505,7 +516,7 @@ class SystemSettings extends Component
         SystemSetting::set('pos_order_types', $this->posOrderTypes);
         SystemSetting::set('pos_payment_methods', $this->posPaymentMethods);
         SystemSetting::set('gcash_account_name', $this->gcashAccountName);
-        SystemSetting::set('gcash_account_number', $this->gcashAccountNumber);
+        SystemSetting::set('gcash_account_number', $this->gcashAccountNumber ? '+63' . trim($this->gcashAccountNumber) : '');
         SystemSetting::set('gcash_qr_image', $this->existingGcashQrImage);
 
         // Save per-user preferences (isolates settings from other super admins)
@@ -552,7 +563,7 @@ class SystemSettings extends Component
         $this->dispatch('close-modal', name: 'confirm-update-settings');
         
         // Dispatch to browser to refresh sidebar logo and business name
-        $this->dispatch('businessConfigUpdated', 
+        $this->dispatch('businessconfigupdated', 
             logo_url: ConfigurationService::getBusinessLogoUrl(),
             business_name: ConfigurationService::getBusinessName(),
         );
@@ -562,7 +573,11 @@ class SystemSettings extends Component
         );
 
         $this->dispatch('refreshTopbar');
-        $this->dispatch('branchContextUpdated');
+        $branchName = $this->opBranchId 
+            ? \App\Models\Branch::find($this->opBranchId)?->branch_name 
+            : 'General Headquarters';
+        $this->dispatch('branchContextUpdated', branchName: $branchName);
+        $this->dispatch('branch-switched', branchName: $branchName);
         $this->updateHeader();
         $this->regenerateQrCode();
     }

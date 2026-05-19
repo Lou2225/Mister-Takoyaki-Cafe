@@ -16,6 +16,9 @@ class CustomerReviewManagement extends Component
     public $selectedBranchId = '';
     public $viewingReview = null;
     public $perPage = 5;
+    public $startDate = '';
+    public $endDate = '';
+    public $activeFilter = 'All Time';
 
     public function mount()
     {
@@ -36,7 +39,20 @@ class CustomerReviewManagement extends Component
     protected $queryString = [
         'search' => ['except' => ''],
         'selectedBranchId' => ['except' => ''],
+        'startDate' => ['except' => ''],
+        'endDate' => ['except' => ''],
+        'activeFilter' => ['except' => 'All Time'],
     ];
+
+    public function updatedStartDate()
+    {
+        $this->resetPage();
+    }
+
+    public function updatedEndDate()
+    {
+        $this->resetPage();
+    }
 
     public function updatingSearch()
     {
@@ -91,12 +107,26 @@ class CustomerReviewManagement extends Component
             });
         }
 
+        if ($this->startDate && $this->endDate) {
+            $query->whereBetween('created_at', [
+                $this->startDate . ' 00:00:00',
+                $this->endDate . ' 23:59:59'
+            ]);
+        }
+
         $reviews = $query->latest()->paginate($this->perPage);
 
         // Calculate Stats (Scoped to branch if not super admin)
         $statsQuery = CustomerReview::query();
         if ($user->role_id !== 1) {
             $statsQuery->where('branch_id', $user->branch_id);
+        }
+
+        if ($this->startDate && $this->endDate) {
+            $statsQuery->whereBetween('created_at', [
+                $this->startDate . ' 00:00:00',
+                $this->endDate . ' 23:59:59'
+            ]);
         }
 
         $totalReviews = (clone $statsQuery)->count();

@@ -435,6 +435,7 @@ class DashboardOverview extends Component
             'lowStockAlerts'  => $this->getLowStockAlerts(),
             'bestSellers'     => $this->getBestSellers(),
             'branches'        => $this->getBranches($this->isSuperAdmin),
+            'branchMapData'   => $this->getBranchMapData(),
             'theme'           => $this->getThemeAssets($roleName),
             'chart'           => $this->getChartData(),
             'liveOrders'      => $this->getLiveOrders(),
@@ -646,6 +647,64 @@ class DashboardOverview extends Component
         return $isSuperAdmin ? Branch::withCount('staff')->orderBy('branch_name')->get() : collect([]);
     }
 
+    private function getBranchMapData(): array
+    {
+        $branchId = $this->selectedBranchId;
+        $start = $this->startDate . ' 00:00:00';
+        $end = $this->endDate . ' 23:59:59';
+
+        // Query branches with their total completed sales in the current date range
+        $branchesSales = Branch::leftJoin('orders', function($join) use ($start, $end) {
+            $join->on('branches.id', '=', 'orders.branch_id')
+                ->where('orders.status', Order::STATUS_COMPLETED)
+                ->when($this->startDate, fn($q) => $q->where('orders.created_at', '>=', $start))
+                ->when($this->endDate, fn($q) => $q->where('orders.created_at', '<=', $end));
+        })
+        ->select('branches.id', 'branches.branch_name', DB::raw('COALESCE(SUM(orders.total_amount), 0) as total_sales'))
+        ->groupBy('branches.id', 'branches.branch_name')
+        ->get();
+
+        $totalSales = $branchesSales->sum('total_sales');
+
+        // Geolocation coordinates mapping for Laguna branches (Calauan, Bay, Pila, Calamba)
+        // coordinates range within visual SVG viewbox: Left (x%): 15% - 85%, Top (y%): 15% - 85%
+        $coordinateMap = [
+            'Calauan' => ['left' => '55%', 'top' => '62%', 'color' => 'bg-emerald-500'],
+            'Bay'     => ['left' => '38%', 'top' => '48%', 'color' => 'bg-blue-500'],
+            'Pila'    => ['left' => '78%', 'top' => '38%', 'color' => 'bg-emerald-500'],
+            'Calamba' => ['left' => '20%', 'top' => '25%', 'color' => 'bg-blue-500'],
+        ];
+
+        // Determine highest sales to toggle the glowing double-bubble ping
+        $maxSales = $branchesSales->max('total_sales');
+
+        return $branchesSales->map(function($branch) use ($totalSales, $coordinateMap, $maxSales) {
+            $name = $branch->branch_name;
+            $cleanName = trim(str_ireplace('Branch', '', $name));
+            
+            // Assign coordinate dynamically by hashing name if it is a new branch
+            $coords = $coordinateMap[$cleanName] ?? [
+                'left' => (abs(crc32($cleanName)) % 50 + 25) . '%',
+                'top'  => (abs(crc32($cleanName . 'y')) % 50 + 25) . '%',
+                'color' => 'bg-indigo-500'
+            ];
+
+            $pct = $totalSales > 0 ? round(($branch->total_sales / $totalSales) * 100, 1) : 0;
+
+            return [
+                'id' => $branch->id,
+                'name' => $name,
+                'clean_name' => $cleanName,
+                'total_sales' => (float)$branch->total_sales,
+                'sales_pct' => $pct,
+                'left' => $coords['left'],
+                'top' => $coords['top'],
+                'color' => $coords['color'],
+                'is_highest' => ($branch->total_sales > 0 && $branch->total_sales == $maxSales),
+            ];
+        })->sortByDesc('total_sales')->values()->toArray();
+    }
+
     private function getThemeAssets(string $roleName): array
     {
         return [
@@ -678,9 +737,153 @@ class DashboardOverview extends Component
         $purchaseCosts = $this->fetchPurchasePrices($branchId);
         $globalCosts = Ingredient::pluck('cost', 'id');
 
+        if ($start->toDateString() === $end->toDateString()) {
+            $hourlyData = $this->aggregateHourlyChartData($orders, $branchCosts, $globalCosts, $purchaseCosts);
+            return $this->formatHourlyChartOutput($start, $end, $hourlyData, $orders);
+        }
+
         $dailyData = $this->aggregateDailyChartData($orders, $branchCosts, $globalCosts, $purchaseCosts);
         
         return $this->formatChartOutput($start, $end, $dailyData, $orders);
+    }
+
+    private function aggregateHourlyChartData(Collection $orders, Collection $branchCostMap, Collection $globalCostMap, Collection $purchaseCostMap): array
+    {
+        $hourlyData = [];
+        for ($h = 0; $h < 24; $h++) {
+            $hourlyData[$h] = ['sales' => 0, 'volume' => 0, 'profit' => 0, 'cogs' => 0];
+        }
+
+        $productCostMap = [];
+        $optionCostMap = [];
+        $modifierCostMap = [];
+
+        foreach ($orders as $order) {
+            $hour = (int)Carbon::parse($order->created_at)->hour;
+            $bid = $order->branch_id;
+            
+            $hourlyData[$hour]['sales'] += $order->total_amount;
+            $hourlyData[$hour]['volume'] += 1;
+
+            $orderCogs = 0;
+            foreach ($order->items as $item) {
+                $itemCost = $this->calculateItemCogs($item, $branchCostMap, $globalCostMap, $purchaseCostMap, $productCostMap, $optionCostMap, $modifierCostMap, $bid);
+                $orderCogs += ($itemCost * $item->quantity);
+            }
+            $hourlyData[$hour]['cogs'] += $orderCogs;
+            // Profit = (Total Amount - Delivery Fee) - COGS
+            $hourlyData[$hour]['profit'] += ($order->total_amount - $order->delivery_fee - $orderCogs);
+        }
+        
+        return $hourlyData;
+    }
+
+    private function formatHourlyChartOutput(Carbon $start, Carbon $end, array $hourlyData, Collection $orders): array
+    {
+        $categories = [];
+        $salesSeries = [];
+        $volumeSeries = [];
+        $profitSeries = [];
+        $cogsSeries = [];
+        $aovSeries = [];
+
+        for ($h = 0; $h < 24; $h++) {
+            if ($h === 0) {
+                $label = '12 AM';
+            } elseif ($h === 12) {
+                $label = '12 PM';
+            } elseif ($h < 12) {
+                $label = $h . ' AM';
+            } else {
+                $label = ($h - 12) . ' PM';
+            }
+            $categories[] = $label;
+
+            $sales = isset($hourlyData[$h]) ? round($hourlyData[$h]['sales'], 2) : 0;
+            $volume = isset($hourlyData[$h]) ? (int)$hourlyData[$h]['volume'] : 0;
+            $profit = isset($hourlyData[$h]) ? round($hourlyData[$h]['profit'], 2) : 0;
+            $cogs = isset($hourlyData[$h]) ? round($hourlyData[$h]['cogs'], 2) : 0;
+            $aov = $volume > 0 ? round($sales / $volume, 2) : 0;
+
+            $salesSeries[] = $sales;
+            $volumeSeries[] = $volume;
+            $profitSeries[] = $profit;
+            $cogsSeries[] = $cogs;
+            $aovSeries[] = $aov;
+        }
+
+        $computeForecast = function(array $arr) {
+            $totalVal = array_sum($arr);
+            $avgVal = ($totalVal > 0 && count($arr) > 0) ? $totalVal / count($arr) : 0;
+            return array_map(fn($v) => $v > 0 ? $v : round($avgVal * 0.8, 2), $arr);
+        };
+
+        $salesForecast = $computeForecast($salesSeries);
+        $volumeForecast = $computeForecast($volumeSeries);
+        $profitForecast = $computeForecast($profitSeries);
+        $cogsForecast = $computeForecast($cogsSeries);
+        $aovForecast = $computeForecast($aovSeries);
+
+        $series = match($this->selectedChartMetric) {
+            'Volume' => $volumeSeries,
+            'Profit' => $profitSeries,
+            default  => $salesSeries,
+        };
+
+        $forecast = match($this->selectedChartMetric) {
+            'Volume' => $volumeForecast,
+            'Profit' => $profitForecast,
+            default  => $salesForecast,
+        };
+
+        $posConfig = ConfigurationService::getPosConfig();
+        
+        $paymentRaw = $orders->groupBy('payment_method')->map->count();
+        $paymentTotalsRaw = $orders->groupBy('payment_method')->map(fn($g) => round($g->sum('total_amount'), 2));
+        $paymentLabels = $posConfig['payment_methods'] ?? ['Cash', 'GCash'];
+        $paymentSeries = [];
+        foreach ($paymentLabels as $label) {
+            $paymentSeries[] = (int)($paymentRaw[$label] ?? 0);
+        }
+
+        $channelsRaw = $orders->groupBy('order_type')->map->count();
+        $channelLabels = $posConfig['order_types'] ?? ['Dine-in', 'Take-out'];
+        $channelSeries = [];
+        foreach ($channelLabels as $label) {
+            $channelSeries[] = (int)($channelsRaw[$label] ?? 0);
+        }
+
+        return [
+            'categories' => $categories,
+            'history'    => $series,
+            'forecast'   => $forecast,
+            'metrics'    => [
+                'series' => [
+                    'Sales'  => $salesSeries,
+                    'Volume' => $volumeSeries,
+                    'Profit' => $profitSeries,
+                    'COGS'   => $cogsSeries,
+                    'AOV'    => $aovSeries,
+                ],
+                'forecast' => [
+                    'Sales'  => $salesForecast,
+                    'Volume' => $volumeForecast,
+                    'Profit' => $profitForecast,
+                    'COGS'   => $cogsForecast,
+                    'AOV'    => $aovForecast,
+                ]
+            ],
+            'payment'    => [
+                'series' => $paymentSeries,
+                'labels' => $paymentLabels,
+                'totals' => array_map(fn($label) => $paymentTotalsRaw[$label] ?? 0, $paymentLabels),
+            ],
+            'channels'   => [
+                'series' => $channelSeries,
+                'labels' => $channelLabels
+            ],
+            'metric' => $this->selectedChartMetric
+        ];
     }
 
     private function prepareChartDateRange(?int $branchId): array
@@ -747,7 +950,7 @@ class DashboardOverview extends Component
         foreach ($orders as $order) {
             $date = Carbon::parse($order->created_at)->toDateString();
             $bid = $order->branch_id;
-            if (!isset($dailyData[$date])) $dailyData[$date] = ['sales' => 0, 'volume' => 0, 'profit' => 0];
+            if (!isset($dailyData[$date])) $dailyData[$date] = ['sales' => 0, 'volume' => 0, 'profit' => 0, 'cogs' => 0];
             
             $dailyData[$date]['sales'] += $order->total_amount;
             $dailyData[$date]['volume'] += 1;
@@ -757,6 +960,7 @@ class DashboardOverview extends Component
                 $itemCost = $this->calculateItemCogs($item, $branchCostMap, $globalCostMap, $purchaseCostMap, $productCostMap, $optionCostMap, $modifierCostMap, $bid);
                 $orderCogs += ($itemCost * $item->quantity);
             }
+            $dailyData[$date]['cogs'] += $orderCogs;
             // Profit = (Total Amount - Delivery Fee) - COGS
             $dailyData[$date]['profit'] += ($order->total_amount - $order->delivery_fee - $orderCogs);
         }
@@ -770,6 +974,8 @@ class DashboardOverview extends Component
         $salesSeries = [];
         $volumeSeries = [];
         $profitSeries = [];
+        $cogsSeries = [];
+        $aovSeries = [];
         $curr = clone $start;
         while ($curr <= $end) {
             $dateStr = $curr->toDateString();
@@ -778,10 +984,14 @@ class DashboardOverview extends Component
             $sales = isset($dailyData[$dateStr]) ? round($dailyData[$dateStr]['sales'], 2) : 0;
             $volume = isset($dailyData[$dateStr]) ? (int)$dailyData[$dateStr]['volume'] : 0;
             $profit = isset($dailyData[$dateStr]) ? round($dailyData[$dateStr]['profit'], 2) : 0;
+            $cogs = isset($dailyData[$dateStr]) ? round($dailyData[$dateStr]['cogs'], 2) : 0;
+            $aov = $volume > 0 ? round($sales / $volume, 2) : 0;
 
             $salesSeries[] = $sales;
             $volumeSeries[] = $volume;
             $profitSeries[] = $profit;
+            $cogsSeries[] = $cogs;
+            $aovSeries[] = $aov;
 
             $curr->addDay();
         }
@@ -796,6 +1006,8 @@ class DashboardOverview extends Component
         $salesForecast = $computeForecast($salesSeries);
         $volumeForecast = $computeForecast($volumeSeries);
         $profitForecast = $computeForecast($profitSeries);
+        $cogsForecast = $computeForecast($cogsSeries);
+        $aovForecast = $computeForecast($aovSeries);
 
         // Choose series based on selected metric for backward compatibility
         $series = match($this->selectedChartMetric) {
@@ -839,11 +1051,15 @@ class DashboardOverview extends Component
                     'Sales'  => $salesSeries,
                     'Volume' => $volumeSeries,
                     'Profit' => $profitSeries,
+                    'COGS'   => $cogsSeries,
+                    'AOV'    => $aovSeries,
                 ],
                 'forecast' => [
                     'Sales'  => $salesForecast,
                     'Volume' => $volumeForecast,
                     'Profit' => $profitForecast,
+                    'COGS'   => $cogsForecast,
+                    'AOV'    => $aovForecast,
                 ]
             ],
             'payment'    => [

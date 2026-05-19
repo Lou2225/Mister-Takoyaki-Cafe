@@ -24,7 +24,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h2>Mister Takoyaki Cafe</h2>
+            <h2>{{ \App\Services\ConfigurationService::getBusinessName() }}</h2>
             <p>Daily Stock Management Alert</p>
         </div>
         
@@ -101,8 +101,9 @@
 
         <div class="footer">
             Report Generated Automatically · {{ $dateReported }}<br>
-            Mister Takoyaki Cafe · Master POS System
+            {{ \App\Services\ConfigurationService::getBusinessName() }} · Master POS System
         </div>
     </div>
 </body>
 </html>
+

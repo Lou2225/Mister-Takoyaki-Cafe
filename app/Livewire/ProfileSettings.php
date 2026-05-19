@@ -111,9 +111,12 @@ class ProfileSettings extends Component
             $user = auth()->user();
             $user->avatar = $avatarId;
             $user->save();
+            
+            $avatarData = $all->firstWhere('id', $avatarId);
+            
             $this->dispatch('notify', type: 'success', message: 'Avatar updated!');
             // Tell Topbar and other components to refresh without a page reload
-            $this->dispatch('refreshTopbar');
+            $this->dispatch('avatar-updated', emoji: $avatarData['emoji'], style: $avatarData['style']);
         }
     }
 
@@ -124,7 +127,7 @@ class ProfileSettings extends Component
         $user->avatar = null;
         $user->save();
         $this->dispatch('notify', type: 'success', message: 'Avatar removed.');
-        $this->dispatch('refreshTopbar');
+        $this->dispatch('avatar-updated', emoji: null, style: null);
     }
 
     public function updateProfile()

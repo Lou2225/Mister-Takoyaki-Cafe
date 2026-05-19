@@ -296,7 +296,7 @@ class OrderManagement extends Component
 
     public function openVoidModal(Order $order)
     {
-        if (!$order->canBeRefunded()) {
+        if (!$order->canBeVoided()) {
             $this->dispatch('notify', 
                 type: 'error',
                 message: 'This order cannot be voided.'

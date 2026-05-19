@@ -57,7 +57,6 @@ Route::middleware('auth')->group(function () {
         // Stock Management (Modular)
         Route::get('/stock', \App\Livewire\StockManagement::class)->name('stock.index');
         Route::get('/stock/adjustment/{id?}', \App\Livewire\StockAdjustment::class)->name('stock.adjustment');
-        Route::get('/stock/expiry', \App\Livewire\StockExpiry::class)->name('stock.expiry');
         
         Route::get('/branches', \App\Livewire\BranchManagement::class)->name('branches.index');
         

@@ -70,14 +70,14 @@
 
             <!-- Left Side: Marketing Cover -->
             <div class="hidden md:flex md:w-1/2 relative overflow-hidden flex-col justify-between p-10 group bg-indigo-600">
-                <img src="{{ asset('images/mtc-logo-only.png') }}" alt="Mister Takoyaki" class="absolute inset-0 w-full h-full object-cover" />
+                <img src="{{ asset('images/mtc-logo-only.png') }}" alt="{{ \App\Services\ConfigurationService::getBusinessName() }}" class="absolute inset-0 w-full h-full object-cover" />
                 <!-- Overlay for readability -->
                 <div class="absolute inset-0 bg-black/45"></div>
                 <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-orange-100/20 via-transparent to-transparent"></div>
                 
                 <div class="relative z-10 flex items-center gap-2">
                      <x-application-logo class="w-8 h-8 fill-current text-white" />
-                     <span class="text-[16px] font-extrabold tracking-tight text-white uppercase">Mister Takoyaki Cafe</span>
+                     <span class="text-[16px] font-extrabold tracking-tight text-white uppercase">{{ \App\Services\ConfigurationService::getBusinessName() }}</span>
                 </div>
 
                 <div class="relative z-10 mt-auto">
@@ -91,7 +91,7 @@
                     <!-- Mobile only logo -->
                     <div class="flex items-center gap-2 mb-8 md:hidden justify-center hover:opacity-80 transition-opacity">
                          <x-application-logo class="w-8 h-8 fill-current text-indigo-600" />
-                         <span class="text-xl font-extrabold tracking-tight text-gray-900 uppercase">Mister Takoyaki Cafe</span>
+                         <span class="text-xl font-extrabold tracking-tight text-gray-900 uppercase">{{ \App\Services\ConfigurationService::getBusinessName() }}</span>
                     </div>
                     
                     {{ $slot }}
@@ -103,3 +103,4 @@
         @livewireScripts
     </body>
 </html>
+

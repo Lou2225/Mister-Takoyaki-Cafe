@@ -129,6 +129,10 @@ class CheckStockAlerts extends Command
             }
         }
 
+        // Set cache flag to prevent web interface from triggering redundant daily alerts
+        $cacheKey = 'stock_alert_sent_' . today()->toDateString();
+        \Illuminate\Support\Facades\Cache::put($cacheKey, true, now()->endOfDay());
+
         $this->info("Stock check complete. Emails dispatched.");
         return 0;
     }

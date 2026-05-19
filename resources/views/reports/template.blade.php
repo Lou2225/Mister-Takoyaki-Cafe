@@ -196,7 +196,7 @@
     <div class="footer-bar">
         <table class="footer-table">
             <tr>
-                <td>Mister Takoyaki Cafe &mdash; Confidential Internal Report</td>
+                <td>{{ \App\Services\ConfigurationService::getBusinessName() }} &mdash; Confidential Internal Report</td>
                 <td class="footer-right">Generated: {{ $generatedAt ?? now()->format('F d, Y h:i A') }}</td>
             </tr>
         </table>
@@ -204,7 +204,7 @@
 
     {{-- ── Header ── --}}
     <div class="header-bar">
-        <div class="header-brand">Mister Takoyaki Cafe &mdash; Operations Intelligence</div>
+        <div class="header-brand">{{ \App\Services\ConfigurationService::getBusinessName() }} &mdash; Operations Intelligence</div>
         <div class="header-title">{{ $title }}</div>
         @if(!empty($subtitle))
             <div class="header-subtitle">{{ $subtitle }}</div>
@@ -333,3 +333,4 @@
 
 </body>
 </html>
+
