@@ -306,7 +306,7 @@
         this.tempEndDate = this.endDate || '';
         this.isOpen = false;
     }
-}" @click.away="cancel()" class="relative select-none">
+}" @click.away="cancel()" class="relative select-none" wire:ignore>
     {{-- Collapsed Trigger Button --}}
     <button type="button" @click="isOpen = !isOpen" class="inline-flex items-center gap-2 px-4 py-2 text-[13px] font-black text-gray-700 bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-gray-50 h-10 transition-all select-none">
         <svg class="w-4 h-4 text-indigo-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
