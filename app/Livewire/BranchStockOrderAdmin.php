@@ -34,14 +34,8 @@ class BranchStockOrderAdmin extends Component
     public $selectedOrder     = null;
 
     // ── Approval / Rejection State ────────────────────────────────
-    public $rejectTargetId     = null;
-    public $rejectTargetRef    = '';
     public $rejectionReason    = '';
     public $adminRemarks       = '';
-    public $approveTargetId    = null;
-    public $approveTargetRef   = '';
-    public $dispatchTargetId   = null;
-    public $dispatchTargetRef  = '';
     public $deliveryFee        = 0;
     public $suggestedFee       = 0;
     public $editItemQuantities = [];
@@ -64,6 +58,7 @@ class BranchStockOrderAdmin extends Component
     public $startDate       = '';
     public $endDate         = '';
     public $activeFilter    = 'All Time';
+    public $lastPendingCount = null;
 
     protected $queryString = [
         'panel'         => ['except' => 'inbox'],
@@ -75,7 +70,10 @@ class BranchStockOrderAdmin extends Component
         'activeFilter'  => ['except' => 'All Time', 'as' => 'oa_filter'],
     ];
 
-    protected $listeners = ['refreshAdminOrders' => '$refresh'];
+    protected $listeners = [
+        'refreshAdminOrders' => '$refresh',
+        'order-submitted' => '$refresh',
+    ];
 
     // ── Initialization ────────────────────────────────────────────
 
@@ -103,6 +101,7 @@ class BranchStockOrderAdmin extends Component
         
         $this->loadLogistics();
         $this->updateHeader();
+        $this->lastPendingCount = StockOrder::where('status', 'pending')->count();
     }
 
     public function loadLogistics()
@@ -147,7 +146,7 @@ class BranchStockOrderAdmin extends Component
         
         $this->editItemQuantities = [];
         foreach ($order->items as $item) {
-            $this->editItemQuantities[$item->id] = $item->approved_quantity ?? $item->requested_quantity;
+            $this->editItemQuantities[$item->id] = number_format((float)($item->approved_quantity ?? $item->requested_quantity), 2, '.', '');
         }
 
         $this->dispatch('open-modal', name: 'fulfillment-review');
@@ -276,8 +275,6 @@ class BranchStockOrderAdmin extends Component
 
         $this->adminRemarks = '';
         $this->closeDetail();
-        $this->dispatch('close-modal', 'confirm-approve-order');
-        $this->reset(['approveTargetId', 'approveTargetRef']);
         $this->notify('success', "Order {$order->reference_no} approved.");
     }
 
@@ -285,7 +282,7 @@ class BranchStockOrderAdmin extends Component
     {
         $this->validate(['rejectionReason' => 'required|string|min:5']);
 
-        $order = StockOrder::findOrFail($this->rejectTargetId);
+        $order = StockOrder::findOrFail($this->selectedOrderId);
         $order->update([
             'status'           => 'rejected',
             'rejection_reason' => $this->rejectionReason,
@@ -295,7 +292,7 @@ class BranchStockOrderAdmin extends Component
 
         $this->notifyBranch($order, '❌ Stock Request Rejected', "Your request {$order->reference_no} was rejected. Reason: {$this->rejectionReason}");
 
-        $this->reset(['rejectTargetId', 'rejectionReason']);
+        $this->rejectionReason = '';
         $this->closeDetail();
         $this->dispatch('close-modal', 'confirm-reject-order');
         $this->notify('success', "Order rejected.");
@@ -314,9 +311,7 @@ class BranchStockOrderAdmin extends Component
 
     public function dispatchOrder(): void
     {
-        if (!$this->dispatchTargetId) return;
-
-        $order = StockOrder::with(['items.ingredient'])->findOrFail($this->dispatchTargetId);
+        $order = StockOrder::with(['items.ingredient'])->findOrFail($this->selectedOrderId);
         $mainBranch = Branch::where('is_main', true)->first();
 
         try {
@@ -357,9 +352,7 @@ class BranchStockOrderAdmin extends Component
                 $this->notifyBranch($order, '🚚 Stock Order In Transit', "Your request {$order->reference_no} has been dispatched.");
             });
 
-            $this->reset(['dispatchTargetId', 'dispatchTargetRef']);
             $this->closeDetail();
-            $this->dispatch('close-dispatch-modals');
             $this->notify('success', 'Transfer dispatched!');
 
         } catch (\Exception $e) {
@@ -385,9 +378,6 @@ class BranchStockOrderAdmin extends Component
                 'link'      => route('stock.orders', ['so_search' => $order->reference_no]),
             ]);
 
-            try {
-                Mail::to($user->email)->queue(new StockOrderMail($order, $title, $message));
-            } catch (\Exception $e) {}
         }
     }
 
@@ -416,15 +406,29 @@ class BranchStockOrderAdmin extends Component
 
     public function render()
     {
+        $kpis = $this->getKpis();
+
+        if ($this->lastPendingCount !== null && $kpis['pending'] > $this->lastPendingCount) {
+            $diff = $kpis['pending'] - $this->lastPendingCount;
+            $msg = $diff === 1 ? 'New stock request received.' : "{$diff} new stock requests received.";
+            $this->dispatch('notify', type: 'info', message: $msg);
+            $this->dispatch('play-chime');
+        }
+        $this->lastPendingCount = $kpis['pending'];
+
         return view('livewire.branch-stock-order-admin', [
             'inboxOrders'    => $this->getInboxOrders(),
             'activeOrders'   => $this->getActiveOrders(),
             'historyOrders'  => $this->getHistoryOrders(),
-            'kpis'           => $this->getKpis(),
+            'kpis'           => $kpis,
             'warehouseStock' => $this->getWarehouseStock(),
             'branches'       => Branch::where('is_main', false)->orderBy('branch_name')->get(),
             'analytics'      => $this->getAnalytics(),
         ])->layout('layouts.app');
+    }
+    public function updatedPanel($value)
+    {
+        $this->resetPage();
     }
 
     private function getInboxOrders() {
@@ -496,41 +500,112 @@ class BranchStockOrderAdmin extends Component
     }
 
     private function getAnalytics(): array {
-        if ($this->panel !== 'analytics') return [];
-        $start = $this->startDate ?: now()->startOfMonth()->toDateString();
-        $end = $this->endDate ?: now()->endOfMonth()->toDateString();
+        $start = $this->startDate ?: now()->subDays(29)->toDateString();
+        $end = $this->endDate ?: now()->toDateString();
+        $branchId = $this->branchFilter ?: null;
 
-        return [
-            'topIngredients' => StockOrderItem::with('ingredient')
-                ->whereHas('stockOrder', fn($q) => $q->whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59']))
-                ->selectRaw('ingredient_id, SUM(requested_quantity) as total_requested')
-                ->groupBy('ingredient_id')->orderByDesc('total_requested')->take(10)->get(),
-            'branchVolume' => StockOrder::where('status', 'delivered')
+        $cacheKey = "admin_analytics_v2_{$start}_{$end}_{$branchId}";
+
+        return \Illuminate\Support\Facades\Cache::remember($cacheKey, now()->addMinutes(5), function () use ($start, $end, $branchId) {
+            // HQ Main Branch ID
+            $hqBranch = Branch::where('is_main', true)->first();
+            $hqBranchId = $hqBranch?->id;
+
+            // Total Dispatched Value (Delivered, in_transit, preparing, approved)
+            $totalDispatched = StockOrder::whereIn('status', ['delivered', 'in_transit', 'preparing', 'approved'])
                 ->whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])
-                ->selectRaw('requesting_branch_id, COUNT(*) as total')->groupBy('requesting_branch_id')->get(),
-            'lowStock' => BranchIngredientStock::with('ingredient')->where('branch_id', Branch::where('is_main', true)->first()?->id)
-                ->get()->filter(fn($s) => $s->stock_quantity <= ($s->ingredient->minimum_stock ?? 0))->values()
-        ];
+            ->sum('total_amount');
+
+        // Avg Processing Lead Time in Hours (difference between created_at and delivered_at)
+        $avgLeadTimeHours = StockOrder::where('status', 'delivered')
+            ->whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])
+            ->whereNotNull('delivered_at')
+            ->selectRaw('AVG(TIMESTAMPDIFF(HOUR, created_at, delivered_at)) as avg_hours')
+            ->value('avg_hours') ?? 0;
+
+        // Fulfillment Rate: Delivered / (Delivered + Rejected)
+        $deliveredCount = StockOrder::where('status', 'delivered')
+            ->whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])
+            ->count();
+        $rejectedCount = StockOrder::where('status', 'rejected')
+            ->whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])
+            ->count();
+        $totalEnded = $deliveredCount + $rejectedCount;
+        $fulfillmentRate = $totalEnded > 0 ? ($deliveredCount / $totalEnded) * 100 : 100;
+
+        // HQ Low Stock Ingredients Count
+        $hqLowStockCount = $hqBranchId ? BranchIngredientStock::where('branch_id', $hqBranchId)
+            ->whereHas('ingredient')
+            ->get()
+            ->filter(fn($s) => $s->stock_quantity <= ($s->ingredient->minimum_stock ?? 0))
+            ->count() : 0;
+
+        // Top Requested Ingredients (Month or Date Range)
+        $topIngredients = StockOrderItem::with('ingredient')
+            ->whereHas('stockOrder', fn($q) => $q->whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59']))
+            ->selectRaw('ingredient_id, SUM(requested_quantity) as total_requested')
+            ->groupBy('ingredient_id')
+            ->orderByDesc('total_requested')
+            ->take(8)
+            ->get();
+
+        // Fulfillment Volume by Branch
+        $branchVolume = StockOrder::where('status', 'delivered')
+            ->whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])
+            ->selectRaw('requesting_branch_id, COUNT(*) as total, SUM(total_amount) as total_spent')
+            ->groupBy('requesting_branch_id')
+            ->orderByDesc('total')
+            ->get();
+
+        // 30-Day Activity Trend (Daily Order Count and Spent Amount)
+        $trendData = StockOrder::whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])
+            ->whereIn('status', ['delivered', 'in_transit', 'preparing', 'approved'])
+            ->selectRaw('DATE(created_at) as date, COUNT(*) as count, SUM(total_amount) as total')
+            ->groupBy('date')
+            ->orderBy('date')
+            ->get();
+
+        $trendMap = [];
+        $countMap = [];
+        foreach ($trendData as $t) {
+            $trendMap[$t->date] = $t->total;
+            $countMap[$t->date] = $t->count;
+        }
+
+        $current = \Carbon\Carbon::parse($start);
+        $last = \Carbon\Carbon::parse($end);
+
+        $dates = [];
+        $totals = [];
+        $counts = [];
+
+        $diff = $current->diffInDays($last);
+        if ($diff > 90) {
+            $current = $last->copy()->subDays(90);
+        }
+
+        while ($current->lte($last)) {
+            $d = $current->toDateString();
+            $dates[] = \Carbon\Carbon::parse($d)->format('M d');
+            $totals[] = (float)($trendMap[$d] ?? 0);
+            $counts[] = (int)($countMap[$d] ?? 0);
+            $current->addDay();
+        }
+
+            return [
+                'totalDispatched' => (float)$totalDispatched,
+                'avgLeadTimeHours' => round($avgLeadTimeHours, 1),
+                'fulfillmentRate' => round($fulfillmentRate, 1),
+                'hqLowStockCount' => (int)$hqLowStockCount,
+                'topIngredients' => $topIngredients,
+                'branchVolume' => $branchVolume,
+                'trend' => [
+                    'dates' => $dates,
+                    'totals' => $totals,
+                    'counts' => $counts
+                ]
+            ];
+        });
     }
 
-    public function confirmApprove(int $id): void {
-        $order = StockOrder::findOrFail($id);
-        $this->approveTargetId = $id;
-        $this->approveTargetRef = $order->reference_no;
-        $this->dispatch('open-modal', name: 'confirm-approve-order');
-    }
-
-    public function confirmReject(int $id): void {
-        $order = StockOrder::findOrFail($id);
-        $this->rejectTargetId = $id;
-        $this->rejectTargetRef = $order->reference_no;
-        $this->dispatch('open-modal', name: 'confirm-reject-order');
-    }
-
-    public function confirmDispatch(int $id): void {
-        $order = StockOrder::findOrFail($id);
-        $this->dispatchTargetId = $id;
-        $this->dispatchTargetRef = $order->reference_no;
-        $this->dispatch('open-modal', name: 'confirm-dispatch-order');
-    }
 }

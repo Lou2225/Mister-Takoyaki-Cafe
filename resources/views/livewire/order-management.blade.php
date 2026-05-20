@@ -258,25 +258,41 @@
                                     <div>
                                         <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Status</span>
                                         @php
-                                            $statusColors = [
-                                                'Pending' => 'amber',
-                                                'Preparing' => 'blue',
-                                                'Ready' => 'emerald',
-                                                'Handed to Rider' => 'indigo',
-                                                'Out for Delivery' => 'indigo',
-                                                'Delivered' => 'emerald',
-                                                'Completed' => 'emerald',
-                                                'Cancelled' => 'red',
-                                                'Drafted' => 'slate',
-                                                'Void' => 'rose',
-                                                'Refunded' => 'orange',
-                                                'Partially Refunded' => 'orange',
+                                            $dotColors = [
+                                                'Pending' => 'bg-amber-500',
+                                                'Preparing' => 'bg-blue-500',
+                                                'Ready' => 'bg-emerald-500',
+                                                'Handed to Rider' => 'bg-indigo-500',
+                                                'Out for Delivery' => 'bg-indigo-500',
+                                                'Delivered' => 'bg-emerald-500',
+                                                'Completed' => 'bg-emerald-500',
+                                                'Cancelled' => 'bg-rose-500',
+                                                'Drafted' => 'bg-slate-400',
+                                                'Void' => 'bg-rose-500',
+                                                'Refunded' => 'bg-orange-500',
+                                                'Partially Refunded' => 'bg-orange-500',
                                             ];
-                                            $statusColor = $statusColors[$order->status] ?? 'slate';
+                                            $dotColor = $dotColors[$order->status] ?? 'bg-slate-400';
+                                            $textColors = [
+                                                'Pending' => 'text-amber-600',
+                                                'Preparing' => 'text-blue-600',
+                                                'Ready' => 'text-emerald-600',
+                                                'Handed to Rider' => 'text-indigo-600',
+                                                'Out for Delivery' => 'text-indigo-600',
+                                                'Delivered' => 'text-emerald-600',
+                                                'Completed' => 'text-emerald-600',
+                                                'Cancelled' => 'text-rose-600',
+                                                'Drafted' => 'text-slate-600',
+                                                'Void' => 'text-rose-600',
+                                                'Refunded' => 'text-orange-600',
+                                                'Partially Refunded' => 'text-orange-600',
+                                            ];
+                                            $textColor = $textColors[$order->status] ?? 'text-slate-600';
                                         @endphp
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-{{ $statusColor }}-50 text-{{ $statusColor }}-600 border border-{{ $statusColor }}-100">
-                                            {{ $order->status }}
-                                        </span>
+                                        <div class="flex items-center gap-1.5 mt-1.5">
+                                            <span class="h-1.5 w-1.5 rounded-full {{ $dotColor }}"></span>
+                                            <span class="text-[11px] font-bold {{ $textColor }} uppercase">{{ $order->status }}</span>
+                                        </div>
                                     </div>
                                 </div>
                                 
@@ -872,8 +888,6 @@
     </div>
 </x-modal>
 
-</div>{{-- end root wrapper --}}
-
 <script>
 window.printOrderReceipt = function(orderId) {
     const element = document.getElementById('receipt_paper_' + orderId);
@@ -898,4 +912,6 @@ window.printOrderReceipt = function(orderId) {
     doc.close();
 }
 </script>
+
+</div>{{-- end root wrapper --}}
 

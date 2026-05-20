@@ -148,17 +148,14 @@
 
                     @forelse($movements as $mov)
                         @php
-                            $typeColors = [
-                                'in' => 'bg-emerald-50 text-emerald-700 border-emerald-100',
-                                'customer_return' => 'bg-emerald-50 text-emerald-700 border-emerald-100',
-                                'out' => 'bg-slate-50 text-slate-600 border-slate-100',
-                                'waste' => 'bg-rose-50 text-rose-700 border-rose-100',
-                                'waste_expired' => 'bg-rose-50 text-rose-700 border-rose-100',
-                                'adjust' => 'bg-indigo-50 text-indigo-700 border-indigo-100',
-                                'transfer_in' => 'bg-indigo-50 text-indigo-700 border-indigo-100',
-                                'transfer_out' => 'bg-amber-50 text-amber-700 border-amber-100',
-                            ];
-                            $colorClass = $typeColors[$mov->type] ?? 'bg-gray-50 text-gray-600 border-gray-100';
+                            $s = match($mov->type) {
+                                'in', 'customer_return' => ['dot' => 'bg-emerald-500', 'color' => 'emerald', 'label' => str_replace('_', ' ', $mov->type)],
+                                'out' => ['dot' => 'bg-slate-400', 'color' => 'slate', 'label' => str_replace('_', ' ', $mov->type)],
+                                'waste', 'waste_expired' => ['dot' => 'bg-rose-500', 'color' => 'rose', 'label' => str_replace('_', ' ', $mov->type)],
+                                'adjust', 'transfer_in' => ['dot' => 'bg-indigo-500', 'color' => 'indigo', 'label' => str_replace('_', ' ', $mov->type)],
+                                'transfer_out' => ['dot' => 'bg-amber-500', 'color' => 'amber', 'label' => str_replace('_', ' ', $mov->type)],
+                                default => ['dot' => 'bg-slate-400', 'color' => 'slate', 'label' => str_replace('_', ' ', $mov->type)]
+                            };
                         @endphp
                         <tr wire:key="adj-{{ $mov->date }}-{{ $mov->type }}-{{ $movements->currentPage() }}" class="hover:bg-slate-50/50 transition-colors border-b border-slate-50 group">
                             <td class="py-3 px-4 whitespace-nowrap">
@@ -169,10 +166,11 @@
                                     </span>
                                 </div>
                             </td>
-                            <td class="py-3 px-4 text-center">
-                                <span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border {{ $colorClass }}">
-                                    {{ str_replace('_', ' ', $mov->type) }}
-                                </span>
+                            <td class="py-3 px-4 text-center whitespace-nowrap">
+                                <div class="flex items-center justify-center gap-2">
+                                    <span class="h-1.5 w-1.5 rounded-full {{ $s['dot'] }}"></span>
+                                    <span class="text-[11px] font-bold text-{{ $s['color'] }}-600 uppercase">{{ $s['label'] }}</span>
+                                </div>
                             </td>
                             <td class="py-3 px-4 text-center">
                                 <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50 border border-slate-100 text-[11px] font-bold text-slate-600">
@@ -292,14 +290,18 @@
                                             <div>
                                                 <div class="flex items-center gap-2">
                                                     <span class="text-[14px] font-bold text-slate-900 leading-none">{{ $row['ingredient_name'] }}</span>
-                                                    <span @class([
-                                                        'text-[9px] px-2 py-0.5 rounded-full uppercase tracking-widest font-black',
-                                                        'bg-emerald-50 text-emerald-600 border border-emerald-100' => $row['type'] === 'in',
-                                                        'bg-rose-50 text-rose-600 border border-rose-100' => in_array($row['type'], ['waste', 'out']),
-                                                        'bg-indigo-50 text-indigo-600 border border-indigo-100' => $row['type'] === 'adjust',
-                                                    ])>
-                                                        {{ str_replace('_', ' ', $row['type']) }}
-                                                    </span>
+                                                    @php
+                                                        $rowS = match($row['type']) {
+                                                            'in' => ['dot' => 'bg-emerald-500', 'color' => 'emerald'],
+                                                            'waste', 'out' => ['dot' => 'bg-rose-500', 'color' => 'rose'],
+                                                            'adjust' => ['dot' => 'bg-indigo-500', 'color' => 'indigo'],
+                                                            default => ['dot' => 'bg-slate-400', 'color' => 'slate']
+                                                        };
+                                                    @endphp
+                                                    <div class="flex items-center gap-2">
+                                                        <span class="h-1.5 w-1.5 rounded-full {{ $rowS['dot'] }}"></span>
+                                                        <span class="text-[11px] font-bold text-{{ $rowS['color'] }}-600 uppercase">{{ str_replace('_', ' ', $row['type']) }}</span>
+                                                    </div>
                                                 </div>
                                                 <div class="flex items-center gap-3 mt-1.5">
                                                     <span class="text-[11px] font-black text-slate-900">

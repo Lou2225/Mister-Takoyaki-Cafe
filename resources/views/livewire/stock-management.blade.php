@@ -7,10 +7,20 @@
 @endphp
 
 <div
-    x-data="{ ...slidingTabs(@entangle('panel').live, 'panel'), mode: 'list' }"
+    x-data="window.stockManagement($wire)"
     x-on:switch-panel.window="panel = $event.detail.panel; if($event.detail.mode) mode = $event.detail.mode"
     @trigger-edit-ingredient.window="$wire.showEdit($event.detail.id)"
+    wire:ignore.self
+    wire:key="stock-management-main-container"
     class="relative">
+
+    {{-- Hidden reactive updater to sync allIngredients list under wire:ignore --}}
+    <div x-effect="updateIngredientsList(@js($allIngredients->map(fn($i) => ['id' => $i->id, 'name' => $i->name])))" class="hidden" wire:key="ingredients-sync-helper"></div>
+    <div x-effect="updateBatchesList(@js($allBatches->map(fn($b) => [
+        'id' => $b->id,
+        'ingredient_name' => $b->ingredient->name ?? '',
+        'status' => $b->computed_status
+    ])))" class="hidden" wire:key="batches-sync-helper"></div>
 
     <div class="relative min-h-[600px]" wire:init="triggerExpiryAlerts">
 
@@ -45,7 +55,12 @@
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </x-slot>
                     Expiry Tracking
-                    @php $expiredBadge = \App\Models\StockBatch::where('current_quantity', '>', 0)->where('expiry_date', '<', today())->count(); @endphp
+                    @php 
+                        $expiredBadge = \App\Models\StockBatch::where('current_quantity', '>', 0)
+                            ->where('expiry_date', '<', today())
+                            ->when($selectedBranchId, fn($q) => $q->where('branch_id', $selectedBranchId))
+                            ->count(); 
+                    @endphp
                     @if($expiredBadge > 0)
                         <span class="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-black ml-1">{{ $expiredBadge }}</span>
                     @endif
@@ -60,7 +75,7 @@
             {{-- KPI Dashboard (Compact Glassmorphic Theme) --}}
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
                 {{-- Total Assets --}}
-                <div class="bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300">
+                <div class="bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300">
                     <div class="flex items-center justify-between mb-2">
                         <span class="text-[10px] font-black text-indigo-700/80 uppercase tracking-widest leading-none">Total Catalog</span>
                         <div class="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-600 border border-indigo-500/10">
@@ -78,16 +93,19 @@
                 @php
                     $isLowStockActive = $lowStockWarnings > 0;
                     $lowStockTheme = $isLowStockActive ? 'amber' : 'emerald';
+                    $lowStockGradient = $isLowStockActive ? 'from-amber-50 border-amber-100 text-amber-700/80' : 'from-emerald-50 border-emerald-100 text-emerald-700/80';
+                    $lowStockIconBg = $isLowStockActive ? 'bg-amber-500/10 text-amber-600 border-amber-500/10' : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/10';
+                    $lowStockValColor = $isLowStockActive ? 'text-amber-600' : 'text-emerald-600';
                 @endphp
-                <div class="bg-gradient-to-br from-{{ $lowStockTheme }}-500/10 via-{{ $lowStockTheme }}-500/5 to-white border border-{{ $lowStockTheme }}-500/10 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300">
+                <div class="bg-gradient-to-br {{ $lowStockGradient }} to-white border rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300">
                     <div class="flex items-center justify-between mb-2">
-                        <span class="text-[10px] font-black text-{{ $lowStockTheme }}-700/80 uppercase tracking-widest leading-none">Low Stock</span>
-                        <div class="w-7 h-7 rounded-lg bg-{{ $lowStockTheme }}-500/10 flex items-center justify-center text-{{ $lowStockTheme }}-600 border border-{{ $lowStockTheme }}-500/10">
+                        <span class="text-[10px] font-black uppercase tracking-widest leading-none">Low Stock</span>
+                        <div class="w-7 h-7 rounded-lg {{ $lowStockIconBg }} flex items-center justify-center">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                         </div>
                     </div>
                     <div class="flex items-baseline gap-1">
-                        <span class="text-[20px] font-black text-{{ $isLowStockActive ? 'amber-600' : 'emerald-600' }} tracking-tight leading-none">{{ $lowStockWarnings }}</span>
+                        <span class="text-[20px] font-black {{ $lowStockValColor }} tracking-tight leading-none">{{ $lowStockWarnings }}</span>
                         <span class="text-[9px] font-bold text-slate-400">alerts</span>
                     </div>
                     <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">{{ $isLowStockActive ? 'Needs replenishment' : 'Stock levels healthy' }}</p>
@@ -97,23 +115,26 @@
                 @php
                     $isExpiringActive = $expiringCount > 0;
                     $expTheme = $isExpiringActive ? 'rose' : 'slate';
+                    $expGradient = $isExpiringActive ? 'from-rose-50 border-rose-100 text-rose-700/80' : 'from-slate-50 border-slate-100 text-slate-700/80';
+                    $expIconBg = $isExpiringActive ? 'bg-rose-500/10 text-rose-600 border-rose-500/10' : 'bg-slate-500/10 text-slate-500 border-slate-500/10';
+                    $expValColor = $isExpiringActive ? 'text-rose-600' : 'text-slate-800';
                 @endphp
-                <div class="bg-gradient-to-br from-{{ $expTheme }}-500/10 via-{{ $expTheme }}-500/5 to-white border border-{{ $expTheme }}-500/10 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300">
+                <div class="bg-gradient-to-br {{ $expGradient }} to-white border rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300">
                     <div class="flex items-center justify-between mb-2">
-                        <span class="text-[10px] font-black text-{{ $expTheme }}-700/80 uppercase tracking-widest leading-none">Expiring</span>
-                        <div class="w-7 h-7 rounded-lg bg-{{ $expTheme }}-500/10 flex items-center justify-center text-{{ $isExpiringActive ? 'rose-600' : 'slate-500' }} border border-{{ $expTheme }}-500/10">
+                        <span class="text-[10px] font-black uppercase tracking-widest leading-none">Expiring</span>
+                        <div class="w-7 h-7 rounded-lg {{ $expIconBg }} flex items-center justify-center">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </div>
                     </div>
                     <div class="flex items-baseline gap-1">
-                        <span class="text-[20px] font-black text-{{ $isExpiringActive ? 'rose-600' : 'slate-800' }} tracking-tight leading-none">{{ $expiringCount }}</span>
+                        <span class="text-[20px] font-black {{ $expValColor }} tracking-tight leading-none">{{ $expiringCount }}</span>
                         <span class="text-[9px] font-bold text-slate-400">batches</span>
                     </div>
                     <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">{{ $isExpiringActive ? 'Requires immediate action' : 'All batches fresh' }}</p>
                 </div>
 
                 {{-- Monthly Procurement --}}
-                <div class="bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300">
+                <div class="bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300">
                     <div class="flex items-center justify-between mb-2">
                         <span class="text-[10px] font-black text-emerald-700/80 uppercase tracking-widest leading-none">Procurement</span>
                         <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 border border-emerald-500/10">
@@ -133,7 +154,7 @@
                 
                 {{-- Left: Search Bar --}}
                 <div class="w-full lg:w-auto flex-1">
-                    <x-search-bar wireModel="search" wire:model.live.debounce.0ms="search" placeholder="Find ingredient..." width="w-full lg:w-80" />
+                    <x-search-bar x-model.debounce.50ms="stockSearch" placeholder="Find ingredient..." width="w-full lg:w-80" />
                 </div>
 
                 {{-- Right: Branch Switcher --}}
@@ -180,8 +201,8 @@
                         <th class="py-3 px-6 text-right text-[11px] font-black text-slate-500 uppercase tracking-widest">Actions</th>
                     </x-slot>
 
-                    <tbody class="divide-y divide-slate-100/80" wire:key="stock-list-body-{{ $ingredients->currentPage() }}-{{ $selectedBranchId }}" wire:loading.class="opacity-40" wire:target="search, filterType, selectedBranchId">
-                        @forelse($ingredients as $ing)
+                    <tbody class="divide-y divide-slate-100/80" wire:key="stock-list-body-{{ $selectedBranchId }}">
+                        @forelse($allIngredients as $ing)
                             @php
                                 $stockToDisplay = 0;
                                 $isLow = false;
@@ -204,7 +225,7 @@
                                 $colors = ['from-indigo-400 to-violet-500', 'from-emerald-400 to-teal-500', 'from-amber-400 to-orange-500', 'from-rose-400 to-pink-500'];
                                 $grad = $colors[$ing->id % count($colors)];
                             @endphp
-                            <tr wire:key="stock-row-{{ $ing->id }}" class="hover:bg-slate-50/50 transition-colors group/row">
+                            <tr wire:key="stock-row-{{ $ing->id }}" x-show="isIngredientVisible({{ $ing->id }})" x-cloak class="hover:bg-slate-50/50 transition-colors group/row">
                                 <td class="py-4 px-6 border-r border-slate-100/50 whitespace-nowrap">
                                     <div class="flex items-center gap-3">
                                         <div class="w-10 h-10 rounded-xl bg-gradient-to-br {{ $grad }} flex items-center justify-center text-white text-[14px] font-black shadow-lg shadow-indigo-100">
@@ -267,10 +288,99 @@
                                 </td>
                             </tr>
                         @endforelse
+                        <tr x-show="filteredIngredientIds.length === 0 && stockSearch.trim() !== ''" x-cloak>
+                            <td colspan="5" class="py-12">
+                                <x-empty-state title="No ingredients match your search" description="Try a different name or clear your search." />
+                            </td>
+                        </tr>
                     </tbody>
                 </x-data-table>
                 <div class="mt-4 px-1">
-                    <x-pagination :paginator="$ingredients" keyPrefix="stock-list" />
+                    <template x-if="filteredIngredientIds.length > 0 || stockSearch.trim() === ''">
+                        <div class="flex flex-col lg:flex-row items-center justify-between px-4 py-4 bg-white border-t border-gray-100 lg:px-6 gap-6">
+                            <div class="flex flex-col sm:flex-row items-center justify-between w-full lg:w-auto gap-4 sm:gap-8">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex flex-col sm:flex-row sm:items-center sm:gap-1.5 leading-[0.9] sm:leading-none">
+                                        <span class="text-[11px] sm:text-[12px] text-gray-400 font-black uppercase tracking-tighter sm:tracking-widest">Row</span>
+                                        <span class="text-[9px] sm:text-[12px] text-gray-400/70 font-black uppercase tracking-tighter sm:tracking-widest">per page</span>
+                                    </div>
+                                    <div>
+                                        <x-dropdown align="top" width="20" containerClasses="block">
+                                            <x-slot name="trigger">
+                                                <button type="button" class="inline-flex items-center justify-between min-w-[70px] px-3 py-1.5 text-[13px] font-black text-gray-900 bg-slate-50 border border-gray-200 rounded-xl hover:border-gray-300 focus:outline-none transition-all h-10 gap-2 shadow-sm">
+                                                    <span x-text="stockPerPage"></span>
+                                                    <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </button>
+                                            </x-slot>
+                                            <x-slot name="content">
+                                                <template x-for="option in [5, 10, 15, 30, 50, 100]">
+                                                    <x-dropdown-link href="#" @click.prevent="stockPerPage = option; stockCurrentPage = 1;">
+                                                        <span x-text="option"></span>
+                                                    </x-dropdown-link>
+                                                </template>
+                                            </x-slot>
+                                        </x-dropdown>
+                                    </div>
+                                </div>
+                                <div class="text-[11px] text-gray-400 font-bold uppercase tracking-widest whitespace-nowrap">
+                                    <span class="text-gray-900" x-text="Math.min(filteredIngredientIds.length, (stockCurrentPage - 1) * stockPerPage + 1)"></span>
+                                    <span class="mx-0.5 text-gray-300">-</span>
+                                    <span class="text-gray-900" x-text="Math.min(filteredIngredientIds.length, stockCurrentPage * stockPerPage)"></span>
+                                    <span class="mx-1 text-gray-300 lowercase italic font-medium">of</span>
+                                    <span class="text-indigo-600" x-text="filteredIngredientIds.length"></span>
+                                    <span class="ml-1 text-gray-300 lowercase italic font-medium">results</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 w-full lg:w-auto justify-center lg:justify-end border-t border-gray-50 pt-4 lg:border-0 lg:pt-0">
+                                <x-secondary-button @click="stockCurrentPage = 1" ::disabled="stockCurrentPage === 1" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="stockCurrentPage === 1 ? 'opacity-30 pointer-events-none' : ''">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                                    </svg>
+                                </x-secondary-button>
+                                <x-secondary-button @click="stockCurrentPage = Math.max(1, stockCurrentPage - 1)" ::disabled="stockCurrentPage === 1" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="stockCurrentPage === 1 ? 'opacity-30 pointer-events-none' : ''">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                    </svg>
+                                </x-secondary-button>
+                                <div class="flex items-center gap-1.5 px-2">
+                                    <template x-for="page in stockPageNumbers">
+                                        <div class="flex items-center gap-1.5">
+                                            <template x-if="page === stockCurrentPage">
+                                                <x-primary-button class="!p-0 w-9 h-9 items-center justify-center !rounded-xl bg-gray-900 text-[13px] font-black shadow-none ring-0">
+                                                    <span x-text="page"></span>
+                                                </x-primary-button>
+                                            </template>
+                                            <template x-if="page !== stockCurrentPage">
+                                                <x-secondary-button @click="stockCurrentPage = page" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl text-[13px] font-bold">
+                                                    <span x-text="page"></span>
+                                                </x-secondary-button>
+                                            </template>
+                                        </div>
+                                    </template>
+                                    <template x-if="Math.ceil(filteredIngredientIds.length / stockPerPage) > stockCurrentPage + 1">
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="text-gray-300 font-bold mx-1">...</span>
+                                            <x-secondary-button @click="stockCurrentPage = Math.ceil(filteredIngredientIds.length / stockPerPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl text-[13px] font-bold">
+                                                <span x-text="Math.ceil(filteredIngredientIds.length / stockPerPage)"></span>
+                                            </x-secondary-button>
+                                        </div>
+                                    </template>
+                                </div>
+                                <x-secondary-button @click="stockCurrentPage = Math.min(Math.ceil(filteredIngredientIds.length / stockPerPage), stockCurrentPage + 1)" ::disabled="stockCurrentPage >= Math.ceil(filteredIngredientIds.length / stockPerPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="stockCurrentPage >= Math.ceil(filteredIngredientIds.length / stockPerPage) ? 'opacity-30 pointer-events-none' : ''">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </x-secondary-button>
+                                <x-secondary-button @click="stockCurrentPage = Math.ceil(filteredIngredientIds.length / stockPerPage) || 1" ::disabled="stockCurrentPage >= Math.ceil(filteredIngredientIds.length / stockPerPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="stockCurrentPage >= Math.ceil(filteredIngredientIds.length / stockPerPage) ? 'opacity-30 pointer-events-none' : ''">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                                    </svg>
+                                </x-secondary-button>
+                            </div>
+                        </div>
+                    </template>
                 </div>
             </div>
 
@@ -846,22 +956,20 @@
          x-cloak class="px-1">
 
         {{-- Expiry System Metrics (Compact Glassmorphic Theme) --}}
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
             {{-- Expired --}}
             @php
-                $isExpiredActive = $expiryStatusFilter === 'expired';
                 $hasExpiredBatches = $expiryStats['expired'] > 0;
             @endphp
-            <div wire:click="$set('expiryStatusFilter', 'expired')"
-                 class="relative overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.01] rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] hover:shadow-md {{ $isExpiredActive ? 'bg-gradient-to-br from-rose-500/15 via-rose-500/5 to-white border-2 border-rose-500/30' : 'bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10' }}">
-                <div class="absolute top-0 right-0 p-1">
-                    @if($hasExpiredBatches)
-                        <span class="flex h-2 w-2">
-                            <span class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-rose-400 opacity-75"></span>
-                            <span class="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
-                        </span>
-                    @endif
-                </div>
+            <div @click="expiryStatus = (expiryStatus === 'expired' ? 'all' : 'expired'); expiryCurrentPage = 1"
+                 :class="expiryStatus === 'expired' ? 'bg-gradient-to-br from-rose-100 via-rose-50 to-white border-rose-300 shadow-md scale-[1.01]' : 'bg-gradient-to-br from-rose-50 to-white border-rose-100 shadow-[0_8px_30px_rgba(0,0,0,0.02)]'"
+                 class="relative overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.01] rounded-2xl p-4 hover:shadow-md border">
+                @if($hasExpiredBatches)
+                    <span class="absolute top-2.5 right-2.5 flex h-2 w-2">
+                        <span class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-rose-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                    </span>
+                @endif
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-[10px] font-black text-rose-700/80 uppercase tracking-widest leading-none">Expired</span>
                     <div class="w-7 h-7 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-600 border border-rose-500/10">
@@ -877,19 +985,17 @@
 
             {{-- Expiring Soon --}}
             @php
-                $isExpiringActive = $expiryStatusFilter === 'expiring';
                 $hasExpiringBatches = $expiryStats['expiring'] > 0;
             @endphp
-            <div wire:click="$set('expiryStatusFilter', 'expiring')"
-                 class="relative overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.01] rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] hover:shadow-md {{ $isExpiringActive ? 'bg-gradient-to-br from-amber-500/15 via-amber-500/5 to-white border-2 border-amber-500/30' : 'bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10' }}">
-                <div class="absolute top-0 right-0 p-1">
-                    @if($hasExpiringBatches)
-                        <span class="flex h-2 w-2">
-                            <span class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-amber-400 opacity-75"></span>
-                            <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                        </span>
-                    @endif
-                </div>
+            <div @click="expiryStatus = (expiryStatus === 'expiring' ? 'all' : 'expiring'); expiryCurrentPage = 1"
+                 :class="expiryStatus === 'expiring' ? 'bg-gradient-to-br from-amber-100 via-amber-50 to-white border-amber-300 shadow-md scale-[1.01]' : 'bg-gradient-to-br from-amber-50 to-white border-amber-100 shadow-[0_8px_30px_rgba(0,0,0,0.02)]'"
+                 class="relative overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.01] rounded-2xl p-4 hover:shadow-md border">
+                @if($hasExpiringBatches)
+                    <span class="absolute top-2.5 right-2.5 flex h-2 w-2">
+                        <span class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-amber-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                    </span>
+                @endif
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-[10px] font-black text-amber-700/80 uppercase tracking-widest leading-none">Expiring &le;{{ $alertDays }}d</span>
                     <div class="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600 border border-amber-500/10">
@@ -904,11 +1010,9 @@
             </div>
 
             {{-- Fresh --}}
-            @php
-                $isFreshActive = $expiryStatusFilter === 'fresh';
-            @endphp
-            <div wire:click="$set('expiryStatusFilter', 'fresh')"
-                 class="relative overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.01] rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] hover:shadow-md {{ $isFreshActive ? 'bg-gradient-to-br from-emerald-500/15 via-emerald-500/5 to-white border-2 border-emerald-500/30' : 'bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10' }}">
+            <div @click="expiryStatus = (expiryStatus === 'fresh' ? 'all' : 'fresh'); expiryCurrentPage = 1"
+                 :class="expiryStatus === 'fresh' ? 'bg-gradient-to-br from-emerald-100 via-emerald-50 to-white border-emerald-300 shadow-md scale-[1.01]' : 'bg-gradient-to-br from-emerald-50 to-white border-emerald-100 shadow-[0_8px_30px_rgba(0,0,0,0.02)]'"
+                 class="relative overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.01] rounded-2xl p-4 hover:shadow-md border">
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-[10px] font-black text-emerald-700/80 uppercase tracking-widest leading-none">Stable Stock</span>
                     <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 border border-emerald-500/10">
@@ -923,11 +1027,9 @@
             </div>
 
             {{-- No Date --}}
-            @php
-                $isNoDateActive = $expiryStatusFilter === 'no_date';
-            @endphp
-            <div wire:click="$set('expiryStatusFilter', 'no_date')"
-                 class="relative overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.01] rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] hover:shadow-md {{ $isNoDateActive ? 'bg-gradient-to-br from-slate-500/15 via-slate-500/5 to-white border-2 border-slate-500/30' : 'bg-gradient-to-br from-slate-500/10 via-slate-500/5 to-white border border-slate-500/10' }}">
+            <div @click="expiryStatus = (expiryStatus === 'no_date' ? 'all' : 'no_date'); expiryCurrentPage = 1"
+                 :class="expiryStatus === 'no_date' ? 'bg-gradient-to-br from-slate-100 via-slate-50 to-white border-slate-300 shadow-md scale-[1.01]' : 'bg-gradient-to-br from-slate-50 to-white border-slate-200 shadow-[0_8px_30px_rgba(0,0,0,0.02)]'"
+                 class="relative overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.01] rounded-2xl p-4 hover:shadow-md border">
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-[10px] font-black text-slate-700/80 uppercase tracking-widest leading-none">Non-Perishable</span>
                     <div class="w-7 h-7 rounded-lg bg-slate-500/10 flex items-center justify-center text-slate-500 border border-slate-500/10">
@@ -945,7 +1047,7 @@
         {{-- macOS Style Expiry Toolbar --}}
         <div class="relative z-20 flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
             <div class="flex flex-1 w-full lg:w-auto">
-                <x-search-bar wireModel="expirySearch" placeholder="Filter batches..." width="w-full lg:w-72" />
+                <x-search-bar x-model.debounce.50ms="expirySearchText" placeholder="Filter batches..." width="w-full lg:w-72" />
             </div>
 
             <div class="flex flex-wrap items-center lg:justify-end gap-2">
@@ -953,13 +1055,13 @@
                     <x-slot name="trigger">
                         <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
                             <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-                            <span class="text-[12px] whitespace-nowrap">{{ ['all' => 'All Batches', 'expired' => 'Expired Only', 'expiring' => 'Expiring Soon', 'fresh' => 'Stable Stock', 'no_date' => 'Non-Perishables'][$expiryStatusFilter] ?? 'Filter Status' }}</span>
+                            <span class="text-[12px] whitespace-nowrap" x-text="{'all': 'All Batches', 'expired': 'Expired Only', 'expiring': 'Expiring Soon', 'fresh': 'Stable Stock', 'no_date': 'Non-Perishables'}[expiryStatus] || 'Filter Status'"></span>
                             <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                         </x-secondary-button>
                     </x-slot>
                     <x-slot name="content">
                         @foreach(['all' => 'All Batches', 'expired' => 'Expired Only', 'expiring' => 'Expiring Soon', 'fresh' => 'Stable Stock', 'no_date' => 'Non-Perishables'] as $val => $label)
-                            <x-dropdown-link href="#" wire:click.prevent="$set('expiryStatusFilter', '{{ $val }}')">
+                            <x-dropdown-link href="#" @click.prevent="expiryStatus = '{{ $val }}'">
                                 <div class="flex items-center gap-2">
                                     @if($val === 'expired') <span class="w-2 h-2 rounded-full bg-rose-500"></span>
                                     @elseif($val === 'expiring') <span class="w-2 h-2 rounded-full bg-amber-500"></span>
@@ -988,8 +1090,8 @@
                     @endif
                 </x-slot>
 
-                <tbody class="divide-y divide-slate-100/80" wire:key="stock-expiry-body-{{ $expiryQuery->currentPage() }}-{{ $expiryStatusFilter }}" wire:loading.class="opacity-40" wire:target="expirySearch, expiryStatusFilter">
-                    @forelse($expiryQuery as $batch)
+                <tbody class="divide-y divide-slate-100/80" wire:key="stock-expiry-body-{{ $selectedBranchId }}">
+                    @foreach($allBatches as $batch)
                         @php
                             $expiry     = $batch->expiry_date ? \Carbon\Carbon::parse($batch->expiry_date)->startOfDay() : null;
                             $todayC     = \Carbon\Carbon::today();
@@ -999,7 +1101,7 @@
                             $isFresh    = $expiry && $expiry->gt($alertCutoff);
                             $daysLeft   = $expiry ? (int) $todayC->diffInDays($expiry, false) : null;
                         @endphp
-                        <tr class="hover:bg-slate-50/50 transition-colors {{ $isExpired ? 'bg-rose-50/30' : ($isExpiring ? 'bg-amber-50/30' : '') }}">
+                        <tr x-show="isBatchVisible({{ $batch->id }})" x-cloak class="hover:bg-slate-50/50 transition-colors {{ $isExpired ? 'bg-rose-50/30' : ($isExpiring ? 'bg-amber-50/30' : '') }}">
                             <td class="py-4 px-6 border-r border-slate-100/50 whitespace-nowrap">
                                 <div class="flex flex-col">
                                     <span class="text-[14px] font-bold text-slate-900">{{ $batch->ingredient->name ?? 'â€”' }}</span>
@@ -1028,20 +1130,13 @@
                             </td>
                             <td class="py-4 px-6 border-r border-slate-100/50 text-center whitespace-nowrap">
                                 @if($isExpired)
-                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-100 text-rose-700 text-[10px] font-black uppercase tracking-wider">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block animate-pulse"></span> EXPIRED
-                                    </span>
+                                    <div class="flex items-center justify-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-rose-500"></span><span class="text-[11px] font-bold text-rose-600">EXPIRED</span></div>
                                 @elseif($isExpiring)
-                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-[10px] font-black uppercase tracking-wider">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block animate-pulse"></span>
-                                        {{ $daysLeft === 0 ? 'TODAY' : $daysLeft . 'D LEFT' }}
-                                    </span>
+                                    <div class="flex items-center justify-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span><span class="text-[11px] font-bold text-amber-600">{{ $daysLeft === 0 ? 'TODAY' : $daysLeft . 'D LEFT' }}</span></div>
                                 @elseif($isFresh)
-                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-wider">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span> FRESH
-                                    </span>
+                                    <div class="flex items-center justify-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span><span class="text-[11px] font-bold text-emerald-600">FRESH</span></div>
                                 @else
-                                    <span class="text-[11px] text-slate-400 italic font-medium tracking-tight">NON-PERISHABLE</span>
+                                    <div class="flex items-center justify-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-slate-400"></span><span class="text-[11px] font-bold text-slate-600">NON-PERISHABLE</span></div>
                                 @endif
                             </td>
                             @if(!$this->isStaff())
@@ -1057,25 +1152,218 @@
                                 </td>
                             @endif
                         </tr>
-                    @empty
-                        <tr>
+                        <tr x-show="filteredBatchIds.length === 0 && expirySearchText.trim() !== ''" x-cloak>
                             <td colspan="{{ $this->isStaff() ? 5 : 6 }}" class="py-12">
-                                <x-empty-state 
-                                    title="No batches found" 
-                                    description="Everything looks clear for now."
-                                    icon="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                                />
+                                <x-empty-state title="No batches match your search" description="Try a different name or clear your search." />
                             </td>
                         </tr>
-                    @endforelse
+                    @endforeach
                 </tbody>
             </x-data-table>
             <div class="mt-4 px-1">
-                <x-pagination :paginator="$expiryQuery" keyPrefix="stock-expiry" />
+                <template x-if="filteredBatchIds.length > 0 || expirySearchText.trim() === ''">
+                    <div class="flex flex-col lg:flex-row items-center justify-between px-4 py-4 bg-white border-t border-gray-100 lg:px-6 gap-6">
+                        <div class="flex flex-col sm:flex-row items-center justify-between w-full lg:w-auto gap-4 sm:gap-8">
+                            <div class="flex items-center gap-3">
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:gap-1.5 leading-[0.9] sm:leading-none">
+                                    <span class="text-[11px] sm:text-[12px] text-gray-400 font-black uppercase tracking-tighter sm:tracking-widest">Row</span>
+                                    <span class="text-[9px] sm:text-[12px] text-gray-400/70 font-black uppercase tracking-tighter sm:tracking-widest">per page</span>
+                                </div>
+                                <div>
+                                    <x-dropdown align="top" width="20" containerClasses="block">
+                                        <x-slot name="trigger">
+                                            <button type="button" class="inline-flex items-center justify-between min-w-[70px] px-3 py-1.5 text-[13px] font-black text-gray-900 bg-slate-50 border border-gray-200 rounded-xl hover:border-gray-300 focus:outline-none transition-all h-10 gap-2 shadow-sm">
+                                                <span x-text="expiryPerPage"></span>
+                                                <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            </button>
+                                        </x-slot>
+                                        <x-slot name="content">
+                                            <template x-for="option in [5, 10, 15, 30, 50, 100]">
+                                                <x-dropdown-link href="#" @click.prevent="expiryPerPage = option; expiryCurrentPage = 1;">
+                                                    <span x-text="option"></span>
+                                                </x-dropdown-link>
+                                            </template>
+                                        </x-slot>
+                                    </x-dropdown>
+                                </div>
+                            </div>
+                            <div class="text-[11px] text-gray-400 font-bold uppercase tracking-widest whitespace-nowrap">
+                                <span class="text-gray-900" x-text="Math.min(filteredBatchIds.length, (expiryCurrentPage - 1) * expiryPerPage + 1)"></span>
+                                <span class="mx-0.5 text-gray-300">-</span>
+                                <span class="text-gray-900" x-text="Math.min(filteredBatchIds.length, expiryCurrentPage * expiryPerPage)"></span>
+                                <span class="mx-1 text-gray-300 lowercase italic font-medium">of</span>
+                                <span class="text-indigo-600" x-text="filteredBatchIds.length"></span>
+                                <span class="ml-1 text-gray-300 lowercase italic font-medium">results</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 w-full lg:w-auto justify-center lg:justify-end border-t border-gray-50 pt-4 lg:border-0 lg:pt-0">
+                            <x-secondary-button @click="expiryCurrentPage = 1" ::disabled="expiryCurrentPage === 1" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="expiryCurrentPage === 1 ? 'opacity-30 pointer-events-none' : ''">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                                </svg>
+                            </x-secondary-button>
+                            <x-secondary-button @click="expiryCurrentPage = Math.max(1, expiryCurrentPage - 1)" ::disabled="expiryCurrentPage === 1" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="expiryCurrentPage === 1 ? 'opacity-30 pointer-events-none' : ''">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </x-secondary-button>
+                            <div class="flex items-center gap-1.5 px-2">
+                                <template x-for="page in expiryPageNumbers">
+                                    <div class="flex items-center gap-1.5">
+                                        <template x-if="page === expiryCurrentPage">
+                                            <x-primary-button class="!p-0 w-9 h-9 items-center justify-center !rounded-xl bg-gray-900 text-[13px] font-black shadow-none ring-0">
+                                                <span x-text="page"></span>
+                                            </x-primary-button>
+                                        </template>
+                                        <template x-if="page !== expiryCurrentPage">
+                                            <x-secondary-button @click="expiryCurrentPage = page" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl text-[13px] font-bold">
+                                                <span x-text="page"></span>
+                                            </x-secondary-button>
+                                        </template>
+                                    </div>
+                                </template>
+                                <template x-if="Math.ceil(filteredBatchIds.length / expiryPerPage) > expiryCurrentPage + 1">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="text-gray-300 font-bold mx-1">...</span>
+                                        <x-secondary-button @click="expiryCurrentPage = Math.ceil(filteredBatchIds.length / expiryPerPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl text-[13px] font-bold">
+                                            <span x-text="Math.ceil(filteredBatchIds.length / expiryPerPage)"></span>
+                                        </x-secondary-button>
+                                    </div>
+                                </template>
+                            </div>
+                            <x-secondary-button @click="expiryCurrentPage = Math.min(Math.ceil(filteredBatchIds.length / expiryPerPage), expiryCurrentPage + 1)" ::disabled="expiryCurrentPage >= Math.ceil(filteredBatchIds.length / expiryPerPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="expiryCurrentPage >= Math.ceil(filteredBatchIds.length / expiryPerPage) ? 'opacity-30 pointer-events-none' : ''">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </x-secondary-button>
+                            <x-secondary-button @click="expiryCurrentPage = Math.ceil(filteredBatchIds.length / expiryPerPage) || 1" ::disabled="expiryCurrentPage >= Math.ceil(filteredBatchIds.length / expiryPerPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="expiryCurrentPage >= Math.ceil(filteredBatchIds.length / expiryPerPage) ? 'opacity-30 pointer-events-none' : ''">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                                </svg>
+                            </x-secondary-button>
+                        </div>
+                    </div>
+                </template>
             </div>
         </div>
     </div>
 
-    </div>{{-- end relative wrapper --}}
-</div>
+    <script>
+        (function() {
+            window.stockManagement = function($wire) {
+                const tabState = window.slidingTabs($wire.entangle('panel').live, 'panel');
+                return {
+                    ...tabState,
+                    panel: $wire.entangle('panel').live,
+                    mode: 'list',
 
+                    // Client-side search and pagination
+                    stockSearch: '',
+                    stockCurrentPage: 1,
+                    stockPerPage: 5,
+                    ingredientsList: [],
+
+                    expirySearchText: '',
+                    expiryStatus: 'all',
+                    expiryCurrentPage: 1,
+                    expiryPerPage: 5,
+                    batchesList: [],
+
+                    get filteredIngredientIds() {
+                        const query = this.stockSearch.toLowerCase().trim();
+                        return this.ingredientsList
+                            .filter(i => !query || i.name.toLowerCase().includes(query))
+                            .map(i => i.id);
+                    },
+                    get paginatedIngredientIds() {
+                        const start = (this.stockCurrentPage - 1) * this.stockPerPage;
+                        return this.filteredIngredientIds.slice(start, start + this.stockPerPage);
+                    },
+                    get stockPageNumbers() {
+                        const totalPages = Math.ceil(this.filteredIngredientIds.length / this.stockPerPage) || 1;
+                        const start = Math.max(1, this.stockCurrentPage - 1);
+                        const end = Math.min(totalPages, this.stockCurrentPage + 1);
+                        const pages = [];
+                        for (let i = start; i <= end; i++) {
+                            pages.push(i);
+                        }
+                        return pages;
+                    },
+                    isIngredientVisible(id) {
+                        return this.paginatedIngredientIds.includes(id);
+                    },
+                    updateIngredientsList(newList) {
+                        const oldIds = this.ingredientsList.map(i => i.id).join(',');
+                        const newIds = newList.map(i => i.id).join(',');
+                        if (oldIds !== newIds) {
+                            this.ingredientsList = newList;
+                            this.stockCurrentPage = 1;
+                        }
+                    },
+
+                    get filteredBatchIds() {
+                        const query = this.expirySearchText.toLowerCase().trim();
+                        const status = this.expiryStatus;
+                        return this.batchesList
+                            .filter(b => {
+                                const matchesSearch = !query || b.ingredient_name.toLowerCase().includes(query);
+                                const matchesStatus = status === 'all' || b.status === status;
+                                return matchesSearch && matchesStatus;
+                            })
+                            .map(b => b.id);
+                    },
+                    get paginatedBatchIds() {
+                        const start = (this.expiryCurrentPage - 1) * this.expiryPerPage;
+                        return this.filteredBatchIds.slice(start, start + this.expiryPerPage);
+                    },
+                    get expiryPageNumbers() {
+                        const totalPages = Math.ceil(this.filteredBatchIds.length / this.expiryPerPage) || 1;
+                        const start = Math.max(1, this.expiryCurrentPage - 1);
+                        const end = Math.min(totalPages, this.expiryCurrentPage + 1);
+                        const pages = [];
+                        for (let i = start; i <= end; i++) {
+                            pages.push(i);
+                        }
+                        return pages;
+                    },
+                    isBatchVisible(id) {
+                        return this.paginatedBatchIds.includes(id);
+                    },
+                    updateBatchesList(newList) {
+                        const oldIds = this.batchesList.map(b => b.id).join(',');
+                        const newIds = newList.map(b => b.id).join(',');
+                        if (oldIds !== newIds) {
+                            this.batchesList = newList;
+                            this.expiryCurrentPage = 1;
+                        }
+                    },
+
+                     init() {
+                        // Run slidingTabs init for panel indicator
+                        if (tabState.init) tabState.init.call(this);
+
+                        // Reset page on search
+                        this.$watch('stockSearch', () => {
+                            this.stockCurrentPage = 1;
+                        });
+                        this.$watch('expirySearchText', () => {
+                            this.expiryCurrentPage = 1;
+                        });
+                        this.$watch('expiryStatus', () => {
+                            this.expiryCurrentPage = 1;
+                        });
+                        this.$watch('panel', () => {
+                            this.stockSearch = '';
+                            this.stockCurrentPage = 1;
+                            this.expirySearchText = '';
+                            this.expiryStatus = 'all';
+                            this.expiryCurrentPage = 1;
+                        });
+                    }
+                };
+            };
+        })();
+    </script>
+</div>

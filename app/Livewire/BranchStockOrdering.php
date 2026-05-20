@@ -49,6 +49,9 @@ class BranchStockOrdering extends Component
     public string $search       = '';
     public string $statusFilter = 'all';
     public int $perPage      = 10;
+    public string $startDate    = '';
+    public string $endDate      = '';
+    public string $activeFilter = 'All Time';
 
     // ── Modal state ───────────────────────────────────────────────
     public ?int $cancelTargetId   = null;
@@ -56,10 +59,17 @@ class BranchStockOrdering extends Component
     public ?int $deliverTargetId  = null;
     public string $deliverTargetRef = '';
 
+    // ── Restock Suggestions (cached, loaded once via wire:init) ───
+    public array $restockSuggestions = [];
+    public bool  $restockLoaded      = false;
+
     protected $queryString = [
         'panel'        => ['except' => 'requests'],
         'search'       => ['except' => '', 'as' => 'so_search'],
         'statusFilter' => ['except' => 'all', 'as' => 'so_status'],
+        'startDate'    => ['except' => '', 'as' => 'so_start'],
+        'endDate'      => ['except' => '', 'as' => 'so_end'],
+        'activeFilter' => ['except' => 'All Time', 'as' => 'so_filter'],
     ];
 
     protected $listeners = ['refreshOrders' => '$refresh'];
@@ -117,17 +127,56 @@ class BranchStockOrdering extends Component
         $this->clearCart(); // Clear cart when branch context changes to prevent cross-branch leaks
     }
 
+    public function updatedPanel(string $value): void
+    {
+        $this->statusFilter = 'all';
+        $this->search = '';
+        $this->resetPage('req_page');
+        $this->resetPage('hist_page');
+    }
+
+    public function updatingSearch(): void
+    {
+        $this->resetPage('req_page');
+        $this->resetPage('hist_page');
+    }
+
+    public function updatingStatusFilter(): void
+    {
+        $this->resetPage('req_page');
+        $this->resetPage('hist_page');
+    }
+
     private function calculateEstimatedFee(): void
     {
         $branch = Branch::find($this->selectedBranchId);
+        if (!$branch) {
+            $this->deliveryFee = 0;
+            return;
+        }
         $this->branchDistance = $branch->distance_from_main ?? 0;
-        $this->deliveryFee = (float)$this->branchDistance * (float)$this->globalRate;
+
+        $baseFee = (float)\App\Models\SystemSetting::get('logistics_base_fee', 0);
+        $this->globalRate = (int)\App\Models\SystemSetting::get('logistics_global_rate', 50);
+        $minFee = (float)\App\Models\SystemSetting::get('logistics_min_fee', 0);
+        $maxFee = (float)\App\Models\SystemSetting::get('logistics_max_fee', 5000);
+        $freeThreshold = (float)\App\Models\SystemSetting::get('logistics_free_threshold', 0);
+
+        $itemsSubtotal = $this->getCartSubtotalProperty();
+
+        if ($freeThreshold > 0 && $itemsSubtotal >= $freeThreshold) {
+            $this->deliveryFee = 0;
+        } else {
+            $computedFee = $baseFee + ((float)$this->branchDistance * (float)$this->globalRate);
+            $this->deliveryFee = max($minFee, min($maxFee, $computedFee));
+        }
     }
 
     // ── Cart Management ───────────────────────────────────────────
 
     public function updatedCartIngredientId(string $value): void
     {
+        $this->resetValidation('cartQty');
         if ($value) {
             $ing = Ingredient::find($value);
             // Default to base unit; user can change to a packaging tier
@@ -136,6 +185,35 @@ class BranchStockOrdering extends Component
         } else {
             $this->cartUnit = '';
             $this->cartPrice = 0;
+        }
+    }
+
+    public function updatedCartQty($value): void
+    {
+        $this->resetValidation('cartQty');
+        if (!$value || !$this->cartIngredientId) return;
+
+        $ing = Ingredient::with('unitConversions')->find($this->cartIngredientId);
+        if (!$ing) return;
+
+        $selectedUnit = $this->cartUnit ?: $ing->unit;
+        $qtyInBase = \App\Helpers\StockHelper::convertToBase((float)$value, $selectedUnit, $ing);
+
+        $mainStock = BranchIngredientStock::where('branch_id', $this->mainBranchId)
+            ->where('ingredient_id', $this->cartIngredientId)
+            ->first()?->stock_quantity ?? 0;
+
+        if ($qtyInBase > $mainStock) {
+            $availableMsg = \App\Helpers\StockHelper::formatForDisplay($mainStock, $ing->unit);
+            $msg = "Insufficient stock at Main Branch. Only {$availableMsg} available.";
+            if ($selectedUnit !== $ing->unit) {
+                $conversion = $ing->unitConversions()->where('unit_name', $selectedUnit)->first();
+                if ($conversion && $conversion->qty_in_base > 0) {
+                    $availableInUnit = floor($mainStock / $conversion->qty_in_base);
+                    $msg .= " (Approx. {$availableInUnit} {$selectedUnit})";
+                }
+            }
+            $this->addError('cartQty', $msg);
         }
     }
 
@@ -158,6 +236,10 @@ class BranchStockOrdering extends Component
             // Packaging unit selected: look up its price
             $conversion = $ing->unitConversions()->where('unit_name', $unitName)->first();
             $this->cartPrice = $conversion?->price_per_unit ?? 0;
+        }
+
+        if ($this->cartQty) {
+            $this->updatedCartQty($this->cartQty);
         }
     }
 
@@ -196,6 +278,7 @@ class BranchStockOrdering extends Component
                     $msg .= " (Approx. {$availableInUnit} {$selectedUnit})";
                 }
             }
+            $this->addError('cartQty', $msg);
             $this->notify('error', $msg);
             return;
         }
@@ -445,12 +528,6 @@ class BranchStockOrdering extends Component
                 'message'   => $message,
                 'link'      => $link,
             ]);
-
-            if ($order) {
-                try {
-                    Mail::to($admin->email)->queue(new StockOrderMail($order, $title, $message));
-                } catch (\Exception $e) {}
-            }
         }
     }
 
@@ -467,34 +544,54 @@ class BranchStockOrdering extends Component
 
     public function render()
     {
+        $this->calculateEstimatedFee();
+
+        $isNewPanel = $this->panel === 'new';
+
         return view('livewire.branch-stock-ordering', [
-            'orders'        => $this->getOrders(),
+            'requestOrders' => $this->requestOrders,
+            'historyOrders' => $this->historyOrders,
             'kpis'          => $this->getKpis(),
-            'lowStockItems' => $this->getLowStockItems(),
-            'ingredients'   => Ingredient::with('unitConversions')->orderBy('name')->get(),
-            'branchStock'   => BranchIngredientStock::where('branch_id', $this->selectedBranchId)->pluck('stock_quantity', 'ingredient_id'),
-            'mainStock'     => BranchIngredientStock::where('branch_id', $this->mainBranchId)->pluck('stock_quantity', 'ingredient_id'),
+            'ingredients'   => $isNewPanel ? Ingredient::with('unitConversions')->orderBy('name')->get() : collect(),
+            'branchStock'   => $isNewPanel ? BranchIngredientStock::where('branch_id', $this->selectedBranchId)->pluck('stock_quantity', 'ingredient_id') : collect(),
+            'mainStock'     => $isNewPanel ? BranchIngredientStock::where('branch_id', $this->mainBranchId)->pluck('stock_quantity', 'ingredient_id') : collect(),
         ])->layout('layouts.app');
     }
 
-    private function getOrders()
+    public function getRequestOrdersProperty()
     {
-        $activeStatuses  = ['pending', 'approved', 'preparing', 'in_transit'];
-        $historyStatuses = ['delivered', 'rejected', 'cancelled'];
+        $activeStatuses = ['pending', 'approved', 'preparing', 'in_transit'];
+        $statusFilter = ($this->statusFilter !== 'all' && in_array($this->statusFilter, $activeStatuses))
+            ? $this->statusFilter : null;
 
         return StockOrder::with(['items.ingredient', 'sourceBranch', 'approver', 'requester'])
             ->where('requesting_branch_id', $this->selectedBranchId)
-            ->where(function($q) use ($activeStatuses, $historyStatuses) {
-                if ($this->panel === 'requests') {
-                    $q->whereIn('status', $activeStatuses);
-                } else {
-                    $q->whereIn('status', $historyStatuses);
-                }
-            })
-            ->when($this->statusFilter !== 'all', fn($q) => $q->where('status', $this->statusFilter))
+            ->whereIn('status', $activeStatuses)
+            ->when($statusFilter, fn($q) => $q->where('status', $statusFilter))
             ->when($this->search, fn($q) => $q->where('reference_no', 'like', "%{$this->search}%"))
             ->latest()
-            ->paginate($this->perPage);
+            ->paginate($this->perPage, ['*'], 'req_page');
+    }
+
+    public function getHistoryOrdersProperty()
+    {
+        $historyStatuses = ['delivered', 'rejected', 'cancelled'];
+        $statusFilter = ($this->statusFilter !== 'all' && in_array($this->statusFilter, $historyStatuses))
+            ? $this->statusFilter : null;
+
+        return StockOrder::with(['items.ingredient', 'sourceBranch', 'approver', 'requester'])
+            ->where('requesting_branch_id', $this->selectedBranchId)
+            ->whereIn('status', $historyStatuses)
+            ->when($statusFilter, fn($q) => $q->where('status', $statusFilter))
+            ->when($this->startDate && $this->endDate, function($q) {
+                $q->whereBetween('created_at', [
+                    $this->startDate . ' 00:00:00',
+                    $this->endDate . ' 23:59:59'
+                ]);
+            })
+            ->when($this->search, fn($q) => $q->where('reference_no', 'like', "%{$this->search}%"))
+            ->latest()
+            ->paginate($this->perPage, ['*'], 'hist_page');
     }
 
     private function getKpis(): array
@@ -515,30 +612,126 @@ class BranchStockOrdering extends Component
         ];
     }
 
-    private function getLowStockItems()
+    public function loadRestockSuggestions(): void
     {
-        // Fetch all ingredients that have a minimum stock requirement
+        if (!$this->selectedBranchId) return;
+
         $ingredients = Ingredient::where('minimum_stock', '>', 0)->get();
-        
-        // Fetch current branch stock levels for these ingredients
         $branchStock = BranchIngredientStock::where('branch_id', $this->selectedBranchId)
             ->whereIn('ingredient_id', $ingredients->pluck('id'))
             ->pluck('stock_quantity', 'ingredient_id');
 
-        return $ingredients->map(function($ing) use ($branchStock) {
+        $this->restockSuggestions = $ingredients->map(function ($ing) use ($branchStock) {
             $currentStock = $branchStock[$ing->id] ?? 0;
-            
             if ($currentStock <= $ing->minimum_stock) {
                 return [
                     'id'      => $ing->id,
                     'name'    => $ing->name,
-                    'current' => $currentStock,
                     'deficit' => max(1, $ing->minimum_stock - $currentStock),
-                    'in_cart' => $this->isInCart($ing->id),
                 ];
             }
             return null;
-        })->filter()->values();
+        })->filter()->values()->toArray();
+
+        $this->restockLoaded = true;
+    }
+    #[\Livewire\Attributes\Computed]
+    public function getAnalyticsDataProperty(): array
+    {
+        $branchId = $this->selectedBranchId;
+        
+        $cacheKey = "branch_analytics_v2_{$branchId}";
+
+        return \Illuminate\Support\Facades\Cache::remember($cacheKey, now()->addMinutes(5), function () use ($branchId) {
+
+        // 1. Core KPIs
+        $totalSpent = StockOrder::where('requesting_branch_id', $branchId)
+            ->whereIn('status', ['approved', 'preparing', 'in_transit', 'delivered'])
+            ->sum('total_amount');
+
+        $totalRequests = StockOrder::where('requesting_branch_id', $branchId)->count();
+
+        $avgLeadTime = StockOrder::where('requesting_branch_id', $branchId)
+            ->where('status', 'delivered')
+            ->whereNotNull('delivered_at')
+            ->selectRaw('AVG(TIMESTAMPDIFF(HOUR, created_at, delivered_at)) as avg_hours')
+            ->first()->avg_hours;
+
+        $activeRequests = StockOrder::where('requesting_branch_id', $branchId)
+            ->whereIn('status', ['pending', 'approved', 'preparing', 'in_transit'])
+            ->count();
+
+        // 2. Status Breakdown
+        $statusCounts = StockOrder::where('requesting_branch_id', $branchId)
+            ->select('status', DB::raw('count(*) as count'))
+            ->groupBy('status')
+            ->pluck('count', 'status')
+            ->toArray();
+
+        // 3. Priority Breakdown
+        $priorityCounts = StockOrder::where('requesting_branch_id', $branchId)
+            ->select('priority', DB::raw('count(*) as count'))
+            ->groupBy('priority')
+            ->pluck('count', 'priority')
+            ->toArray();
+
+        // 4. Top Ingredients
+        $topIngredients = StockOrderItem::join('stock_orders', 'stock_order_items.stock_order_id', '=', 'stock_orders.id')
+            ->join('ingredients', 'stock_order_items.ingredient_id', '=', 'ingredients.id')
+            ->where('stock_orders.requesting_branch_id', $branchId)
+            ->whereIn('stock_orders.status', ['approved', 'preparing', 'in_transit', 'delivered'])
+            ->select(
+                'ingredients.name',
+                DB::raw('SUM(stock_order_items.requested_quantity) as total_qty'),
+                'stock_order_items.unit',
+                DB::raw('SUM(stock_order_items.subtotal) as total_spent')
+            )
+            ->groupBy('ingredients.id', 'ingredients.name', 'stock_order_items.unit')
+            ->orderByDesc('total_spent')
+            ->limit(5)
+            ->get()
+            ->toArray();
+
+        // 5. Daily Spend Trend (past 30 days)
+        $trendData = StockOrder::where('requesting_branch_id', $branchId)
+            ->whereIn('status', ['approved', 'preparing', 'in_transit', 'delivered'])
+            ->where('created_at', '>=', now()->subDays(30))
+            ->selectRaw('DATE(created_at) as date, SUM(total_amount) as total, COUNT(*) as count')
+            ->groupBy('date')
+            ->orderBy('date')
+            ->get();
+
+        $dates = [];
+        $totals = [];
+        $counts = [];
+
+        for ($i = 29; $i >= 0; $i--) {
+            $dateObj = now()->subDays($i);
+            $dateStr = $dateObj->format('Y-m-d');
+            $dates[] = $dateObj->format('M d');
+
+            $found = $trendData->first(fn($item) => $item->date === $dateStr);
+            $totals[] = $found ? (float)$found->total : 0.0;
+            $counts[] = $found ? (int)$found->count : 0;
+        }
+
+        return [
+            'kpis' => [
+                'total_spent' => $totalSpent,
+                'total_requests' => $totalRequests,
+                'avg_lead_time' => $avgLeadTime ? round($avgLeadTime, 1) : null,
+                'active_requests' => $activeRequests,
+            ],
+            'status_counts' => $statusCounts,
+            'priority_counts' => $priorityCounts,
+            'top_ingredients' => $topIngredients,
+            'trend' => [
+                'dates' => $dates,
+                'totals' => $totals,
+                'counts' => $counts,
+            ]
+        ];
+        });
     }
 
     public function viewOrder(int $id): void

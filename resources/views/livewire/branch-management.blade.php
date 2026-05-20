@@ -471,9 +471,10 @@
                                         ${b.is_main ? '\x3cspan class="px-1.5 py-0.5 bg-indigo-600 text-white text-[9px] font-black rounded uppercase tracking-tighter"\x3eMain Hub\x3c/span\x3e' : ''}
                                     \x3c/div\x3e
                                     \x3cp class="text-[11px] text-slate-500 mb-2"\x3e${b.formatted}\x3c/p\x3e
-                                    \x3cspan class="text-[10px] font-bold ${b.status ? 'text-green-600' : 'text-red-600'} uppercase tracking-widest"\x3e
-                                        ${b.status ? '● Operational' : '○ Inactive'}
-                                    \x3c/span\x3e
+                                    \x3cdiv class="flex items-center gap-1.5 mt-1"\x3e
+                                        \x3cspan class="w-1.5 h-1.5 rounded-full ${b.status ? 'bg-emerald-500' : 'bg-rose-500'} inline-block"\x3e\x3c/span\x3e
+                                        \x3cspan class="text-[11px] font-bold ${b.status ? 'text-emerald-600' : 'text-rose-600'} uppercase"\x3e${b.status ? 'Active' : 'Inactive'}\x3c/span\x3e
+                                    \x3c/div\x3e
                                 \x3c/div\x3e
                             `);
                         this.gMarkers.push(marker);
@@ -986,14 +987,14 @@
                             <td class="py-4 px-4 border-r border-slate-100/50">
                                 @if($this->isSuperAdmin())
                                     <button wire:click="toggleStatus({{ $branch->id }})"
-                                        class="flex items-center gap-2 text-[12px] font-medium text-slate-600 hover:opacity-80 transition-opacity focus:outline-none">
-                                        <span class="w-1.5 h-1.5 rounded-full {{ $branch->status ? 'bg-[#27C93F] shadow-[0_0_4px_rgba(39,201,63,0.5)]' : 'bg-[#FF5F56] shadow-[0_0_4px_rgba(255,95,86,0.5)]' }}"></span>
-                                        {{ $branch->status ? 'Active' : 'Inactive' }}
+                                        class="flex items-center gap-2 hover:opacity-85 transition-opacity focus:outline-none">
+                                        <span class="h-1.5 w-1.5 rounded-full {{ $branch->status ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
+                                        <span class="text-[11px] font-bold {{ $branch->status ? 'text-emerald-600' : 'text-rose-600' }} uppercase">{{ $branch->status ? 'Active' : 'Inactive' }}</span>
                                     </button>
                                 @else
-                                    <div class="flex items-center gap-2 text-[12px] font-medium text-slate-600">
-                                        <span class="w-1.5 h-1.5 rounded-full {{ $branch->status ? 'bg-[#27C93F] shadow-[0_0_4px_rgba(39,201,63,0.5)]' : 'bg-[#FF5F56] shadow-[0_0_4px_rgba(255,95,86,0.5)]' }}"></span>
-                                        {{ $branch->status ? 'Active' : 'Inactive' }}
+                                    <div class="flex items-center gap-2">
+                                        <span class="h-1.5 w-1.5 rounded-full {{ $branch->status ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
+                                        <span class="text-[11px] font-bold {{ $branch->status ? 'text-emerald-600' : 'text-rose-600' }} uppercase">{{ $branch->status ? 'Active' : 'Inactive' }}</span>
                                     </div>
                                 @endif
                             </td>
@@ -1033,9 +1034,10 @@
                                     {{ strtoupper(substr($branch->branch_name, 0, 1)) }}
                                 </div>
                                 <div class="flex flex-col items-end gap-2">
-                                    <span class="px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-[0.1em] border {{ $branch->status ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100' }}">
-                                        {{ $branch->status ? 'Active' : 'Inactive' }}
-                                    </span>
+                                    <div class="flex items-center gap-2">
+                                        <span class="h-1.5 w-1.5 rounded-full {{ $branch->status ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
+                                        <span class="text-[11px] font-bold {{ $branch->status ? 'text-emerald-600' : 'text-rose-600' }} uppercase">{{ $branch->status ? 'Active' : 'Inactive' }}</span>
+                                    </div>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2 mb-1">
@@ -1129,7 +1131,10 @@
                                     <input type="checkbox" wire:click="toggleBranch({{ $b->id }})" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300" {{ $included ? 'checked' : '' }}>
                                     <div class="flex flex-col">
                                         <span class="text-[13px] font-bold {{ $included ? 'text-indigo-900' : 'text-gray-700' }} leading-tight">{{ $b->branch_name }}</span>
-                                        <span class="text-[10px] {{ $b->status ? 'text-emerald-500' : 'text-rose-400' }} font-bold uppercase tracking-widest mt-0.5">{{ $b->status ? 'Active' : 'Inactive' }}</span>
+                                        <div class="flex items-center gap-1.5 mt-0.5">
+                                            <span class="h-1 w-1 rounded-full {{ $b->status ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
+                                            <span class="text-[10px] {{ $b->status ? 'text-emerald-600' : 'text-rose-600' }} font-bold uppercase tracking-widest">{{ $b->status ? 'Active' : 'Inactive' }}</span>
+                                        </div>
                                     </div>
                                 </label>
                             @endforeach

@@ -800,9 +800,9 @@
                                     </div>
                                 </td>
                                 <td class="py-4 px-6 border-r border-slate-100/50 text-center whitespace-nowrap">
-                                    <button type="button" wire:click.stop="toggleStatus({{ $product->id }})" class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider {{ $product->is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-rose-700 border border-rose-100' }} transition-all hover:brightness-95 shadow-sm">
-                                        <span class="w-1.5 h-1.5 rounded-full {{ $product->is_active ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500' }}"></span>
-                                        {{ $product->is_active ? 'Active' : 'Hidden' }}
+                                    <button type="button" wire:click.stop="toggleStatus({{ $product->id }})" class="flex items-center justify-center gap-2 hover:opacity-85 transition-opacity focus:outline-none mx-auto">
+                                        <span class="h-1.5 w-1.5 rounded-full {{ $product->is_active ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
+                                        <span class="text-[11px] font-bold {{ $product->is_active ? 'text-emerald-600' : 'text-rose-600' }} uppercase">{{ $product->is_active ? 'Active' : 'Hidden' }}</span>
                                     </button>
                                 </td>
                                 <td class="py-4 px-6 border-r border-slate-100/50 text-right whitespace-nowrap">
@@ -940,8 +940,9 @@
                                 <div class="absolute top-2 right-2">
                                     <span class="px-2 py-1 bg-white/90 backdrop-blur-md border border-white/20 rounded-lg text-[11px] font-black text-slate-900 shadow-sm font-mono tracking-tighter italic">₱{{ number_format($product->price, 2) }}</span>
                                 </div>
-                                <div class="absolute bottom-2 left-2">
-                                    <span class="px-2 py-0.5 {{ $product->is_active ? 'bg-emerald-500' : 'bg-rose-500' }} text-white rounded-md text-[9px] font-black uppercase tracking-widest shadow-sm">{{ $product->is_active ? 'Active' : 'Hidden' }}</span>
+                                <div class="absolute bottom-2 left-2 bg-white/95 backdrop-blur-sm rounded-lg px-2.5 py-1 shadow-sm border border-slate-100/50 flex items-center justify-center gap-1.5">
+                                    <span class="h-1.5 w-1.5 rounded-full {{ $product->is_active ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
+                                    <span class="text-[10px] font-bold {{ $product->is_active ? 'text-emerald-600' : 'text-rose-600' }} uppercase tracking-wider">{{ $product->is_active ? 'Active' : 'Hidden' }}</span>
                                 </div>
                             </div>
                             <div class="flex items-start justify-between gap-3">

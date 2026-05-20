@@ -43,27 +43,43 @@
                 </td>
                 <td class="py-3 px-4 text-center whitespace-nowrap">
                     @php
-                        $statusBadges = [
-                            'Completed' => 'bg-emerald-50 text-emerald-600 border border-emerald-100',
-                            'Pending' => 'bg-amber-50 text-amber-600 border border-amber-500/30 relative shadow-[0_0_0_3px_rgba(251,191,36,0.15)] animate-pulse',
-                            'Preparing' => 'bg-blue-50 text-blue-600 border border-blue-100',
-                            'Ready' => 'bg-emerald-50 text-emerald-600 border border-emerald-100',
-                            'Handed to Rider' => "bg-{$primaryColor}-50 {$primaryText} border border-{$primaryColor}-100",
-                            'Out for Delivery' => "bg-{$primaryColor}-50 {$primaryText} border border-{$primaryColor}-100",
-                            'Delivered' => 'bg-emerald-50 text-emerald-600 border border-emerald-100',
-                            'Cancelled' => 'bg-red-50 text-red-600 border border-red-100',
-                            'Drafted' => 'bg-slate-50 text-slate-600 border border-slate-100',
-                            'Void' => 'bg-gray-100 text-gray-600 border border-gray-200',
-                            'Refunded' => 'bg-red-50 text-red-600 border border-red-100',
-                            'Partially Refunded' => 'bg-orange-50 text-orange-600 border border-orange-100',
-                        ];
-
                         $isFullyDone = ($order->status === 'Completed' || $order->status === 'Delivered') && $order->payment_status === 'Paid';
                         $displayStatus = $isFullyDone ? $order->status : "{$order->payment_status} / {$order->status}";
+                        $dotColors = [
+                            'Pending' => 'bg-amber-500 animate-pulse',
+                            'Preparing' => 'bg-blue-500',
+                            'Ready' => 'bg-emerald-500',
+                            'Handed to Rider' => 'bg-indigo-500',
+                            'Out for Delivery' => 'bg-indigo-500',
+                            'Delivered' => 'bg-emerald-500',
+                            'Completed' => 'bg-emerald-500',
+                            'Cancelled' => 'bg-rose-500',
+                            'Drafted' => 'bg-slate-400',
+                            'Void' => 'bg-rose-500',
+                            'Refunded' => 'bg-orange-500',
+                            'Partially Refunded' => 'bg-orange-500',
+                        ];
+                        $dotColor = $dotColors[$order->status] ?? 'bg-slate-400';
+                        $textColors = [
+                            'Pending' => 'text-amber-600',
+                            'Preparing' => 'text-blue-600',
+                            'Ready' => 'text-emerald-600',
+                            'Handed to Rider' => 'text-indigo-600',
+                            'Out for Delivery' => 'text-indigo-600',
+                            'Delivered' => 'text-emerald-600',
+                            'Completed' => 'text-emerald-600',
+                            'Cancelled' => 'text-rose-600',
+                            'Drafted' => 'text-slate-600',
+                            'Void' => 'text-rose-600',
+                            'Refunded' => 'text-orange-600',
+                            'Partially Refunded' => 'text-orange-600',
+                        ];
+                        $textColor = $textColors[$order->status] ?? 'text-slate-600';
                     @endphp
-                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-tighter {{ $statusBadges[$order->status] ?? 'bg-slate-50 text-slate-500 border border-slate-100' }}">
-                        {{ $displayStatus }}
-                    </span>
+                    <div class="flex items-center justify-center gap-2">
+                        <span class="h-1.5 w-1.5 rounded-full {{ $dotColor }}"></span>
+                        <span class="text-[11px] font-bold {{ $textColor }} uppercase">{{ $displayStatus }}</span>
+                    </div>
                 </td>
                 <td class="py-3 px-4 text-center whitespace-nowrap hidden sm:table-cell">
                     <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-slate-50 text-slate-600 border border-slate-100">{{ $order->order_type }}</span>

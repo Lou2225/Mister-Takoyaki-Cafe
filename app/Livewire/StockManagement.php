@@ -27,16 +27,10 @@ class StockManagement extends Component
     use WithPagination, HandlesValidations, HandlesExports;
 
     // ── Filters & Display ─────────────────────────────────────────
-    public $search = '';
     public $selectedBranchId = '';
-    public $perPage = 5;
 
     // ── Panel Context ─────────────────────────────────────────────
-    public $view = 'table';
     public $panel = 'list'; // Alpine listens to this via event
-    public $expirySearch = '';
-    public $expiryStatusFilter = 'all';
-    public $expiryBranchFilter = '';
 
     // ── Form: Global Ingredient (Create/Edit) ─────────────────────
     public $editIngredientId = null;
@@ -57,10 +51,6 @@ class StockManagement extends Component
     public $availableUnits = [];
     public $availableBulkUnits = [];
 
-    // ── Movement Log Filters ──────────────────────────────────────
-    public $logTypeFilter = '';
-    public $logSearch = '';
-
     // ── Deletion State ────────────────────────────────────────────
     public $deleteTargetId = null;
     public $deleteTargetName = '';
@@ -73,13 +63,7 @@ class StockManagement extends Component
 
     protected $queryString = [
         'panel'            => ['except' => 'list'],
-        'search'           => ['except' => '', 'as' => 'st_search'],
         'selectedBranchId' => ['except' => '', 'as' => 'st_branch'],
-        'view'             => ['except' => 'table', 'as' => 'st_view'],
-        'perPage'          => ['except' => 5, 'as' => 'st_pp'],
-        'expirySearch'       => ['except' => '', 'as' => 'exp_search'],
-        'expiryStatusFilter' => ['except' => 'all', 'as' => 'exp_status'],
-        'expiryBranchFilter' => ['except' => '', 'as' => 'exp_branch'],
     ];
 
     protected $listeners = [
@@ -304,17 +288,7 @@ class StockManagement extends Component
     public function isAdmin()      { return auth()->user()?->isAdmin();      }
     public function isStaff()      { return auth()->user()?->isStaff();      }
 
-    /**
-     * Magic method to handle all updating* methods that reset pagination.
-     */
-    public function __call($method, $parameters)
-    {
-        if (str_starts_with($method, 'updating') && !str_ends_with($method, 'Page')) {
-            $this->resetPage(); // Resets default 'page'
-            $this->resetPage('logPage');
-            $this->resetPage('expiryPage');
-        }
-    }
+
 
 
     public function confirmWasteBatch($id)
@@ -534,14 +508,7 @@ class StockManagement extends Component
         $this->resetPage();
     }
 
-    public function showMovementLog()
-    {
-        $this->logTypeFilter = '';
-        $this->logSearch    = '';
-        $this->resetPage('logPage');
-        $this->updateGlobalHeader('log');
-        $this->dispatch('switch-panel', panel: 'log', mode: 'log');
-    }
+
 
     public function validateBeforeSaveIngredient()
     {
@@ -788,32 +755,19 @@ class StockManagement extends Component
         $branchId = $this->selectedBranchId;
 
         // ── Component Data ──
-        $ingredientsList = $this->getIngredientsList();
         $branches = $this->getAvailableBranches();
         $kpis = $this->getKpiMetrics($branchId, $today, $alertDays, $inventoryConfig);
-        $movementLog = $this->getMovementLog($branchId);
         $expiryTracking = $this->getExpiryTracking($branchId, $today, $alertDays);
         
         $ingredientCategories = IngredientCategory::orderBy('name', 'asc')->get();
         $this->updateCategorySelection($ingredientCategories);
 
         return view('livewire.stock-management', array_merge([
-            'ingredients' => $ingredientsList,
             'branches' => $branches,
             'ingredientCategories' => $this->getFilteredCategories($ingredientCategories),
             'inventoryConfig' => $inventoryConfig,
             'alertDays' => $alertDays,
-            'movementLog' => $movementLog,
         ], $kpis, $expiryTracking))->layout('layouts.app');
-    }
-
-    private function getIngredientsList()
-    {
-        $query = Ingredient::query();
-        if ($this->search) {
-            $query->where('ingredients.name', 'like', "%{$this->search}%");
-        }
-        return $query->with(['branchStocks', 'category'])->orderBy('name', 'asc')->paginate($this->perPage);
     }
 
     private function getAvailableBranches()
@@ -859,43 +813,35 @@ class StockManagement extends Component
             'lowStockWarnings' => $lowStockWarnings,
             'expiringCount' => $expiringCount,
             'monthlyProcurement' => $monthlyProcurement,
-            'allIngredients' => Ingredient::orderBy('name', 'asc')->get(),
+            'allIngredients' => Ingredient::with(['branchStocks', 'category'])->orderBy('name', 'asc')->get(),
         ];
-    }
-
-    private function getMovementLog($branchId)
-    {
-        $query = StockMovement::with(['ingredient', 'user'])
-            ->where('branch_id', $branchId ?: 0)
-            ->latest();
-
-        if ($this->logTypeFilter) {
-            $query->where('type', $this->logTypeFilter);
-        }
-        if ($this->logSearch) {
-            $query->whereHas('ingredient', fn($q) => $q->where('ingredients.name', 'like', "%{$this->logSearch}%"));
-        }
-
-        return $query->paginate(15, ['*'], 'logPage');
     }
 
     private function getExpiryTracking($branchId, $today, $alertDays)
     {
         $nextWeek = $today->copy()->addDays($alertDays);
 
-        $expiryQuery = StockBatch::with(['ingredient', 'branch'])
+        $allBatches = StockBatch::with(['ingredient', 'branch'])
             ->where('current_quantity', '>', 0)
-            ->when($this->expiryBranchFilter, fn($q) => $q->where('branch_id', $this->expiryBranchFilter))
-            ->when($this->expirySearch, fn($q) =>
-                $q->whereHas('ingredient', fn($i) => $i->where('ingredients.name', 'like', '%' . $this->expirySearch . '%'))
-            )
-            ->when($this->expiryStatusFilter === 'expired',  fn($q) => $q->where('expiry_date', '<', $today))
-            ->when($this->expiryStatusFilter === 'expiring', fn($q) => $q->whereBetween('expiry_date', [$today, $nextWeek]))
-            ->when($this->expiryStatusFilter === 'fresh',    fn($q) => $q->where('expiry_date', '>', $nextWeek))
-            ->when($this->expiryStatusFilter === 'no_date',  fn($q) => $q->whereNull('expiry_date'))
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->orderByRaw("CASE WHEN expiry_date IS NULL THEN 1 ELSE 0 END ASC")
             ->orderBy('expiry_date', 'asc')
-            ->paginate(5, ['*'], 'expiryPage');
+            ->get()
+            ->map(function($b) use ($today, $nextWeek) {
+                $expiry = $b->expiry_date ? \Carbon\Carbon::parse($b->expiry_date)->startOfDay() : null;
+                $status = 'no_date';
+                if ($expiry) {
+                    if ($expiry->lt($today->startOfDay())) {
+                        $status = 'expired';
+                    } elseif ($expiry->lte($nextWeek->startOfDay())) {
+                        $status = 'expiring';
+                    } else {
+                        $status = 'fresh';
+                    }
+                }
+                $b->computed_status = $status;
+                return $b;
+            });
 
         $expiryStats = [
             'expired'  => StockBatch::where('current_quantity', '>', 0)->where('expiry_date', '<', $today)->when($branchId, fn($q) => $q->where('branch_id', $branchId))->count(),
@@ -905,7 +851,7 @@ class StockManagement extends Component
         ];
 
         return [
-            'expiryQuery' => $expiryQuery,
+            'allBatches' => $allBatches,
             'expiryStats' => $expiryStats
         ];
     }

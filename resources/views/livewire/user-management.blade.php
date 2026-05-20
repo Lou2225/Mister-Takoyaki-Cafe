@@ -601,9 +601,10 @@
                                                 </button>
                                             </td>
                                             <td class="px-4 py-3">
-                                                <span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider {{ $order->status === 'Completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-50 text-slate-600 border border-slate-100' }}">
-                                                    {{ $order->status }}
-                                                </span>
+                                                <div class="flex items-center gap-2">
+                                                    <span class="h-1.5 w-1.5 rounded-full {{ $order->status === 'Completed' ? 'bg-emerald-500' : 'bg-slate-400' }}"></span>
+                                                    <span class="text-[11px] font-bold {{ $order->status === 'Completed' ? 'text-emerald-600' : 'text-slate-600' }} uppercase">{{ $order->status }}</span>
+                                                </div>
                                             </td>
                                             <td class="px-4 py-3 text-right text-[13px] font-black text-slate-900">₱{{ number_format($order->total_amount, 2) }}</td>
                                         </tr>
@@ -862,9 +863,9 @@
                             <td class="py-3 px-4 whitespace-nowrap text-[13px] text-slate-600">{{ optional($user->branch)->branch_name ?? '—' }}</td>
                             <td class="py-3 px-4 whitespace-nowrap">
                                 <button wire:click="toggleStatus({{ $user->id }})"
-                                    class="flex items-center gap-2 text-[12px] font-medium text-slate-600 hover:opacity-80 transition-opacity focus:outline-none">
-                                    <span class="w-1.5 h-1.5 rounded-full {{ $user->is_active ? 'bg-[#27C93F] shadow-[0_0_4px_rgba(39,201,63,0.5)]' : 'bg-[#FF5F56] shadow-[0_0_4px_rgba(255,95,86,0.5)]' }}"></span>
-                                    {{ $user->is_active ? 'Active' : 'Inactive' }}
+                                    class="flex items-center gap-2 hover:opacity-85 transition-opacity focus:outline-none">
+                                    <span class="h-1.5 w-1.5 rounded-full {{ $user->is_active ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
+                                    <span class="text-[11px] font-bold {{ $user->is_active ? 'text-emerald-600' : 'text-rose-600' }} uppercase">{{ $user->is_active ? 'Active' : 'Inactive' }}</span>
                                 </button>
                             </td>
                             <td class="py-3 px-4 whitespace-nowrap text-[13px] text-slate-600">
@@ -920,14 +921,10 @@
                                         {{ strtoupper(substr($user->first_name, 0, 1)) }}
                                     </div>
                                 @endif
-                                <span @class([
-                                    'px-2 py-0.5 rounded-xl text-[10px] font-bold uppercase border',
-                                    'bg-green-50 text-green-700 border-green-200' => $user->is_active,
-                                    'bg-red-50 text-red-700 border-red-200' => !$user->is_active,
-                                ])>
-
-                                    {{ $user->is_active ? 'Active' : 'Inactive' }}
-                                </span>
+                                <div class="flex items-center gap-2">
+                                    <span class="h-1.5 w-1.5 rounded-full {{ $user->is_active ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
+                                    <span class="text-[11px] font-bold {{ $user->is_active ? 'text-emerald-600' : 'text-rose-600' }} uppercase">{{ $user->is_active ? 'Active' : 'Inactive' }}</span>
+                                </div>
                             </div>
                             <h3 class="font-bold text-gray-900 text-sm mb-0.5">{{ $user->first_name }}
                                 {{ $user->last_name }}</h3>
@@ -1119,9 +1116,10 @@
                             </div>
                             <div>
                                 <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Status</span>
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider {{ $viewingOrder->status === 'Completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-50 text-slate-500 border border-slate-100' }}">
-                                    {{ $viewingOrder->status }}
-                                </span>
+                                <div class="flex items-center gap-2">
+                                    <span class="h-1.5 w-1.5 rounded-full {{ $viewingOrder->status === 'Completed' ? 'bg-emerald-500' : 'bg-slate-400' }}"></span>
+                                    <span class="text-[11px] font-bold {{ $viewingOrder->status === 'Completed' ? 'text-emerald-600' : 'text-slate-600' }} uppercase">{{ $viewingOrder->status }}</span>
+                                </div>
                             </div>
                         </div>
                         

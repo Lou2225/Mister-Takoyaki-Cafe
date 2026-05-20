@@ -1,4 +1,4 @@
-<div class="px-2 py-2 space-y-6" x-data="slidingTabs({ panel: @entangle('panel').live }, ['panel'])">
+<div class="px-2 py-2 space-y-6" x-data="slidingTabs({ panel: @entangle('panel').live }, ['panel'])" @if($selectedOrderId === null) wire:poll.10s @endif>
     {{-- ════════════════ DYNAMIC HEADER ════════════════ --}}
     <div class="px-1 pt-2">
         <div class="mb-6 flex items-center justify-between">
@@ -34,7 +34,7 @@
     </div>
 
     <!-- KPI Metrics (Premium Redesigned) -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-8">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-8" x-show="panel !== 'analytics'">
         {{-- New Requests --}}
         <div class="p-3 sm:p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
             <div class="flex items-center justify-between mb-1 sm:mb-2">
@@ -84,6 +84,57 @@
         </div>
     </div>
 
+    <!-- Analytics KPI Metrics (Premium Redesigned) -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-8" x-show="panel === 'analytics'">
+        {{-- KPI 1: Value Dispatched --}}
+        <div class="p-3 sm:p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+            <div class="flex items-center justify-between mb-1 sm:mb-2">
+                <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">HQ Dispatched</span>
+                <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+            </div>
+            <h3 class="text-xl sm:text-2xl font-black text-indigo-600 tracking-tight leading-none">₱{{ number_format($analytics['totalDispatched'] ?? 0, 2) }}</h3>
+            <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Fulfillment value within filter</p>
+        </div>
+
+        {{-- KPI 2: Avg Lead Time --}}
+        <div class="p-3 sm:p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+            <div class="flex items-center justify-between mb-1 sm:mb-2">
+                <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Avg Lead Time</span>
+                <div class="w-7 h-7 rounded-lg bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm shrink-0">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+            </div>
+            <h3 class="text-xl sm:text-2xl font-black text-amber-600 tracking-tight leading-none">{{ $analytics['avgLeadTimeHours'] ?? 0 }} <span class="text-xs font-bold text-slate-400 uppercase">hrs</span></h3>
+            <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Order placement to delivery</p>
+        </div>
+
+        {{-- KPI 3: Fulfillment Success Rate --}}
+        <div class="p-3 sm:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+            <div class="flex items-center justify-between mb-1 sm:mb-2">
+                <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fulfillment Rate</span>
+                <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+            </div>
+            <h3 class="text-xl sm:text-2xl font-black text-emerald-600 tracking-tight leading-none">{{ $analytics['fulfillmentRate'] ?? 100 }}%</h3>
+            <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Delivered vs Rejected orders</p>
+        </div>
+
+        {{-- KPI 4: HQ Inventory Alerts --}}
+        <div class="p-3 sm:p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+            <div class="flex items-center justify-between mb-1 sm:mb-2">
+                <span class="text-[10px] sm:text-[11px] font-bold text-rose-600/90 uppercase tracking-wider">HQ Stock Alerts</span>
+                <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm shrink-0">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                </div>
+            </div>
+            <h3 class="text-xl sm:text-2xl font-black text-rose-600 tracking-tight leading-none">{{ $analytics['hqLowStockCount'] ?? 0 }} <span class="text-xs font-bold text-slate-400 uppercase">alerts</span></h3>
+            <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">HQ items below safety level</p>
+        </div>
+    </div>
+
     <!-- Toolbar -->
     <div class="relative z-20 flex flex-col lg:flex-row lg:items-center justify-between mb-8 gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm" x-show="panel !== 'logistics'">
         <x-search-bar wireModel="search" placeholder="Find records..." width="w-full lg:w-72" />
@@ -93,10 +144,10 @@
 
             <x-dropdown align="right" width="48" x-show="panel !== 'analytics'">
                 <x-slot name="trigger">
-                    <x-secondary-button class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
-                        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
-                        <span class="text-[12px]">Filter Options</span>
-                        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    <x-secondary-button class="gap-2 bg-white text-gray-700 hover:bg-gray-50 border-gray-200">
+                        <svg class="w-4 h-4 text-indigo-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                        <span class="text-[13px] font-black">Filter Options</span>
+                        <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </x-secondary-button>
                 </x-slot>
                 <x-slot name="content">
@@ -144,9 +195,10 @@
                         </td>
                         <td class="px-6 py-4 text-[11px] text-slate-500 tabular-nums font-bold">{{ $order->created_at->diffForHumans() }}</td>
                         <td class="px-6 py-4 text-right">
-                            <button wire:click="viewOrder({{ $order->id }})" class="inline-flex items-center px-2 py-1 border border-slate-200 text-[12px] font-semibold rounded-lg text-slate-500 bg-white hover:text-gray-700 hover:border-slate-300 transition-colors focus:outline-none shadow-sm">
+                            <x-secondary-button type="button" wire:click="viewOrder({{ $order->id }})" class="h-9 px-3 whitespace-nowrap">
+                                <svg class="w-4 h-4 mr-2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                                 View Details
-                            </button>
+                            </x-secondary-button>
                         </td>
                     </tr>
                 @empty
@@ -175,15 +227,16 @@
                         </td>
                         <td class="px-6 py-4">
                             @php $s = $order->statusConfig()[$order->status] @endphp
-                            <div class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full {{ $s['dot'] }} {{ $order->status === 'in_transit' ? 'animate-pulse' : '' }}"></span><span class="text-[12px] font-bold text-{{ $s['color'] }}-600">{{ $s['label'] }}</span></div>
+                            <div class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full {{ $s['dot'] }}"></span><span class="text-[11px] font-bold text-{{ $s['color'] }}-600">{{ $s['label'] }}</span></div>
                         </td>
                         <td class="px-6 py-4">
                             <div class="flex flex-col"><span class="text-[11px] font-black text-slate-700 uppercase">By {{ $order->approver->name ?? 'Admin' }}</span><span class="text-[10px] text-slate-400 font-bold tabular-nums">{{ $order->approved_at?->format('M d, H:i') ?? '—' }}</span></div>
                         </td>
                         <td class="px-6 py-4 text-right">
-                            <button wire:click="viewOrder({{ $order->id }})" class="inline-flex items-center px-2 py-1 border border-slate-200 text-[12px] font-semibold rounded-lg text-slate-500 bg-white hover:text-gray-700 hover:border-slate-300 transition-colors focus:outline-none shadow-sm">
+                            <x-secondary-button type="button" wire:click="viewOrder({{ $order->id }})" class="h-9 px-3 whitespace-nowrap">
+                                <svg class="w-4 h-4 mr-2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                                 View Details
-                            </button>
+                            </x-secondary-button>
                         </td>
                     </tr>
                 @empty
@@ -218,13 +271,14 @@
                         </td>
                         <td class="px-6 py-4">
                             @php $s = $order->statusConfig()[$order->status] @endphp
-                            <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-black bg-{{ $s['color'] }}-50 text-{{ $s['color'] }}-600 uppercase tracking-widest border border-{{ $s['color'] }}-100">{{ $s['label'] }}</span>
+                            <div class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full {{ $s['dot'] }}"></span><span class="text-[11px] font-bold text-{{ $s['color'] }}-600">{{ $s['label'] }}</span></div>
                         </td>
                         <td class="px-6 py-4 text-[11px] text-slate-500 tabular-nums font-bold">{{ $order->delivered_at?->format('M d, Y') ?? $order->updated_at->format('M d, Y') }}</td>
                         <td class="px-6 py-4 text-right">
-                            <button wire:click="viewOrder({{ $order->id }})" class="inline-flex items-center px-2 py-1 border border-slate-200 text-[12px] font-semibold rounded-lg text-slate-500 bg-white hover:text-gray-700 hover:border-slate-300 transition-colors focus:outline-none shadow-sm">
+                            <x-secondary-button type="button" wire:click="viewOrder({{ $order->id }})" class="h-9 px-3 whitespace-nowrap">
+                                <svg class="w-4 h-4 mr-2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                                 View Details
-                            </button>
+                            </x-secondary-button>
                         </td>
                     </tr>
                 @empty
@@ -386,36 +440,88 @@
         </div>
 
         <!-- 5. Analytics -->
-        <div x-show="panel === 'analytics'" class="space-y-8 animate-fadeIn px-1">
-            @if($panel === 'analytics')
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div class="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-8">
-                        <h3 class="text-[14px] font-black text-slate-900 uppercase tracking-tight mb-6">Top Requested <span class="text-indigo-500">(Month)</span></h3>
-                        <div class="space-y-5">
-                            @foreach($analytics['topIngredients'] as $item)
-                                <div class="space-y-1.5">
-                                    <div class="flex justify-between text-[11px] font-black uppercase tracking-tight"><span class="text-slate-600">{{ $item->ingredient->name }}</span><span class="text-indigo-600">{{ number_format($item->total_requested, 2) }} {{ $item->ingredient->unit }}</span></div>
-                                    <div class="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                                        @php $max = $analytics['topIngredients']->first()->total_requested; $pct = ($item->total_requested / max(1, $max)) * 100; @endphp
-                                        <div class="h-full bg-indigo-500 rounded-full" style="width: {{ $pct }}%"></div>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                    <div class="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-8">
-                        <h3 class="text-[14px] font-black text-slate-900 uppercase tracking-tight mb-6">Fulfillment Volume</h3>
-                        <div class="space-y-3">
-                            @foreach($analytics['branchVolume'] as $idx => $branch)
-                                <div class="flex items-center p-3 bg-slate-50 rounded-2xl border border-slate-100 hover:border-indigo-200 transition-all group">
-                                    <div class="w-8 h-8 bg-white text-indigo-600 rounded-xl shadow-sm text-[11px] font-black flex items-center justify-center mr-3 border border-slate-100 group-hover:bg-indigo-600 group-hover:text-white transition-colors">#{{ $idx + 1 }}</div>
-                                    <div class="flex-1"><span class="text-[12px] font-black text-slate-900 uppercase tracking-tight">{{ $branch->requestingBranch->branch_name }}</span><p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest">{{ $branch->total }} Orders</p></div>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                </div>
-            @endif
+        <div x-show="panel === 'analytics'" 
+             x-data="orderInboxAnalytics(@js($analytics))"
+             x-effect="updateAnalytics(@js($analytics))"
+             class="space-y-8 animate-fadeIn px-1">
+             {{-- 30-Day Activity Trend Chart --}}
+             <div class="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-6 sm:p-8">
+                 <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-3">
+                     <div>
+                         <h3 class="text-[14px] font-black text-slate-900 uppercase tracking-tight">Fulfillment Activity Trend</h3>
+                         <p class="text-[11px] text-slate-400 font-medium">Daily orders counts & total dispatched value over chosen period</p>
+                     </div>
+                 </div>
+                 <div wire:ignore class="w-full min-h-[310px] relative">
+                     <div x-ref="activityTrendChart" class="w-full"></div>
+                 </div>
+             </div>
+
+             {{-- Split Cards Grid: Top Ingredients vs Branch Fulfillment Distribution --}}
+             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                 {{-- Top Requested Ingredients --}}
+                 <div class="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-8">
+                     <div class="mb-6">
+                         <h3 class="text-[14px] font-black text-slate-900 uppercase tracking-tight">Top Demanded Ingredients</h3>
+                         <p class="text-[11px] text-slate-400 font-medium mt-0.5">Most requested items by branch networks in filter period</p>
+                     </div>
+                     <div class="space-y-5">
+                         @if(isset($analytics['topIngredients']) && count($analytics['topIngredients']) > 0)
+                             @foreach($analytics['topIngredients'] as $item)
+                                 @if($item->ingredient)
+                                     <div class="space-y-1.5">
+                                         <div class="flex justify-between text-[11px] font-black uppercase tracking-tight">
+                                             <span class="text-slate-600">{{ $item->ingredient->name }}</span>
+                                             <span class="text-indigo-600">{{ number_format($item->total_requested, 2) }} {{ $item->ingredient->unit }}</span>
+                                         </div>
+                                         <div class="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                             @php 
+                                                 $max = $analytics['topIngredients']->first()?->total_requested ?? 1; 
+                                                 $pct = ($item->total_requested / max(1, $max)) * 100; 
+                                             @endphp
+                                             <div class="h-full bg-indigo-500 rounded-full" style="width: {{ $pct }}%"></div>
+                                         </div>
+                                     </div>
+                                 @endif
+                             @endforeach
+                         @else
+                             <div class="py-12 flex flex-col items-center justify-center text-center border-2 border-dashed border-slate-100 rounded-2xl bg-slate-50/50">
+                                 <p class="text-[12px] font-bold text-slate-400 uppercase tracking-wider">No demand statistics recorded</p>
+                             </div>
+                         @endif
+                     </div>
+                 </div>
+
+                 {{-- Branch Volume and spent Value --}}
+                 <div class="bg-white rounded-[2rem] shadow-sm border border-slate-200 p-8">
+                     <div class="mb-6">
+                         <h3 class="text-[14px] font-black text-slate-900 uppercase tracking-tight">Branch Volume & Value Contribution</h3>
+                         <p class="text-[11px] text-slate-400 font-medium mt-0.5">Summary of orders fulfilled and cumulative value per branch</p>
+                     </div>
+                     <div class="space-y-3">
+                         @if(isset($analytics['branchVolume']) && count($analytics['branchVolume']) > 0)
+                             @foreach($analytics['branchVolume'] as $idx => $branch)
+                                 @if($branch->requestingBranch)
+                                     <div class="flex items-center p-3 bg-slate-50/70 rounded-2xl border border-slate-100 hover:border-indigo-200 hover:bg-white hover:shadow-sm transition-all group">
+                                         <div class="w-8 h-8 bg-white text-indigo-600 rounded-xl shadow-sm text-[11px] font-black flex items-center justify-center mr-3 border border-slate-100 group-hover:bg-indigo-600 group-hover:text-white transition-colors">#{{ $idx + 1 }}</div>
+                                         <div class="flex-1 min-w-0">
+                                             <span class="text-[12px] font-black text-slate-900 uppercase tracking-tight block truncate">{{ $branch->requestingBranch->branch_name }}</span>
+                                             <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">{{ $branch->total }} Orders Fulfilled</p>
+                                         </div>
+                                         <div class="text-right pl-2">
+                                             <span class="text-[13px] font-black text-indigo-600">₱{{ number_format($branch->total_spent, 2) }}</span>
+                                         </div>
+                                     </div>
+                                 @endif
+                             @endforeach
+                         @else
+                             <div class="py-12 flex flex-col items-center justify-center text-center border-2 border-dashed border-slate-100 rounded-2xl bg-slate-50/50">
+                                 <p class="text-[12px] font-bold text-slate-400 uppercase tracking-wider">No branch distributions recorded</p>
+                             </div>
+                         @endif
+                     </div>
+                 </div>
+             </div>
         </div>
     </div>
 
@@ -521,98 +627,256 @@
                 <div class="p-5 border-t border-slate-100 bg-white">
                     @if($selectedOrder->isPending())
                         <div class="space-y-4">
-                            <x-textarea wire:model.live="adminRemarks" rows="2" class="w-full text-xs font-medium" placeholder="Add fulfillment remarks..."></x-textarea>
-                            <div class="flex gap-3"><x-secondary-button wire:click="confirmReject({{ $selectedOrder->id }})" class="flex-1 justify-center h-11 text-red-600 border-red-100">Reject</x-secondary-button><x-primary-button wire:click="confirmApprove({{ $selectedOrder->id }})" class="flex-[2] justify-center h-11">Approve Request</x-primary-button></div>
+                            <x-textarea wire:model.live="adminRemarks" rows="2" class="w-full text-xs font-medium resize-none" placeholder="Add fulfillment remarks..."></x-textarea>
+                            <div class="flex gap-3">
+                                <x-secondary-button @click="$dispatch('open-modal', { name: 'confirm-reject-order' })" class="flex-1 justify-center h-11 text-red-600 border-red-100">Reject</x-secondary-button>
+                                <x-primary-button wire:click="approveOrder({{ $selectedOrder->id }})" class="flex-[2] justify-center h-11">Approve Request</x-primary-button>
+                            </div>
                         </div>
                     @elseif($selectedOrder->isApproved())
                         <x-primary-button 
                             wire:click="markPreparing({{ $selectedOrder->id }})" 
-                            wire:loading.attr="disabled"
-                            wire:target="markPreparing({{ $selectedOrder->id }})"
                             class="w-full h-12 justify-center"
                         >
-                            <span wire:loading.remove wire:target="markPreparing({{ $selectedOrder->id }})">Mark as Preparing</span>
-                            <span wire:loading wire:target="markPreparing({{ $selectedOrder->id }})" class="flex items-center gap-2">
-                                <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                Updating...
-                            </span>
+                            Mark as Preparing
                         </x-primary-button>
                     @elseif($selectedOrder->status === 'preparing')
-                        <x-primary-button wire:click="confirmDispatch({{ $selectedOrder->id }})" class="w-full h-12 justify-center">Ship Transfer</x-primary-button>
+                        <x-primary-button wire:click="dispatchOrder" class="w-full h-12 justify-center">Ship Transfer</x-primary-button>
                     @endif
                 </div>
             </div>
         @endif
     </x-side-panel>
 
-    <x-modal name="confirm-approve-order" maxWidth="sm">
-        <div class="p-6 text-center" x-data="{ processing: false }">
-            <div class="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-            </div>
-            <h3 class="text-lg font-black text-slate-900 uppercase">Approve Request?</h3>
-            <p class="mt-2 text-xs text-slate-500 font-medium leading-relaxed">This will authorize the transfer for <span class="font-bold text-slate-900">{{ $approveTargetRef }}</span>. Stock will be reserved for fulfillment.</p>
-            <div class="flex items-center gap-3 mt-8">
-                <x-secondary-button @click="$dispatch('close-modal', 'confirm-approve-order')" class="flex-1 justify-center h-11">Cancel</x-secondary-button>
-                <x-primary-button 
-                    @click="processing = true; $wire.approveOrder({{ $approveTargetId ?? 0 }})" 
-                    x-bind:disabled="processing"
-                    class="flex-1 justify-center h-11 shadow-indigo-100"
-                >
-                    <div x-show="!processing">Approve Now</div>
-                    <div x-show="processing" class="flex items-center gap-2" x-cloak>
-                        <svg class="animate-spin h-3 w-3 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        <span>Approving...</span>
-                    </div>
-                </x-primary-button>
-            </div>
-        </div>
-    </x-modal>
-
     <x-modal name="confirm-reject-order" maxWidth="sm">
-        <div class="p-6 text-center" x-data="{ processing: false }">
+        <div class="p-6 text-center">
             <div class="w-16 h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4"><svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></div>
             <h3 class="text-lg font-black text-red-600 uppercase">Reject Request?</h3>
-            <div class="mt-6"><x-textarea wire:model.live="rejectionReason" rows="3" class="w-full text-xs" placeholder="Reason..."></x-textarea></div>
+            <div class="mt-6"><x-textarea wire:model.live="rejectionReason" rows="3" class="w-full text-xs resize-none" placeholder="Reason..."></x-textarea></div>
             <div class="flex items-center gap-3 mt-8">
                 <x-secondary-button @click="$dispatch('close-modal', 'confirm-reject-order')" class="flex-1 justify-center h-11">Cancel</x-secondary-button>
                 <x-primary-button 
-                    @click="processing = true; $wire.rejectOrder()" 
-                    x-bind:disabled="processing"
+                    @click="$dispatch('close-modal', 'confirm-reject-order'); $wire.rejectOrder()" 
                     class="flex-1 justify-center h-11 !bg-red-600 shadow-red-100"
                 >
-                    <div x-show="!processing">Reject Now</div>
-                    <div x-show="processing" class="flex items-center gap-2" x-cloak>
-                        <svg class="animate-spin h-3 w-3 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        <span>Rejecting...</span>
-                    </div>
-                </x-primary-button>
-            </div>
-        </div>
-    </x-modal>
-
-    <x-modal name="confirm-dispatch-order" maxWidth="sm">
-        <div class="p-6 text-center" x-data="{ processing: false }">
-            <div class="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4"><svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></div>
-            <h3 class="text-lg font-black text-slate-900 uppercase">Ship Transfer?</h3>
-            <p class="mt-2 text-xs text-slate-500 font-medium leading-relaxed">This will officially dispatch <span class="font-bold text-slate-900">{{ $dispatchTargetRef }}</span> and update branch inventory levels. This action is irreversible.</p>
-            <div class="flex items-center gap-3 mt-8">
-                <x-secondary-button @click="$dispatch('close-modal', 'confirm-dispatch-order')" class="flex-1 justify-center h-11">Back</x-secondary-button>
-                <x-primary-button 
-                    @click="processing = true; $wire.dispatchOrder()" 
-                    x-bind:disabled="processing"
-                    class="flex-1 justify-center h-11 shadow-indigo-100"
-                >
-                    <div x-show="!processing">Confirm & Ship</div>
-                    <div x-show="processing" class="flex items-center gap-2" x-cloak>
-                        <svg class="animate-spin h-3 w-3 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        <span>Shipping...</span>
-                    </div>
+                    Reject Now
                 </x-primary-button>
             </div>
         </div>
     </x-modal>
 
     <style> .custom-scrollbar::-webkit-scrollbar { width: 5px; } .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; } </style>
-    <div x-on:close-dispatch-modals.window="$dispatch('close-modal', 'fulfillment-review'); $dispatch('close-modal', 'confirm-dispatch-order');"></div>
+
+    <script>
+        window.addEventListener('play-chime', () => {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Note 1
+                const osc1 = audioCtx.createOscillator();
+                const gain1 = audioCtx.createGain();
+                osc1.connect(gain1);
+                gain1.connect(audioCtx.destination);
+                osc1.type = 'sine';
+                osc1.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+                gain1.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain1.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+                osc1.start(audioCtx.currentTime);
+                osc1.stop(audioCtx.currentTime + 0.15);
+                
+                // Note 2 (Delayed higher pitch)
+                setTimeout(() => {
+                    const osc2 = audioCtx.createOscillator();
+                    const gain2 = audioCtx.createGain();
+                    osc2.connect(gain2);
+                    gain2.connect(audioCtx.destination);
+                    osc2.type = 'sine';
+                    osc2.frequency.setValueAtTime(880.00, audioCtx.currentTime); // A5
+                    gain2.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.25);
+                    osc2.start(audioCtx.currentTime);
+                    osc2.stop(audioCtx.currentTime + 0.25);
+                }, 120);
+            } catch (e) {
+                console.error('Audio chime error:', e);
+            }
+        });
+
+        // Inbox Analytics Dashboard logic
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('orderInboxAnalytics', (initialData) => ({
+                analyticsData: initialData,
+                trendChart: null,
+
+                init() {
+                    // Slight delay to ensure DOM is ready
+                    setTimeout(() => {
+                        if (this.panel === 'analytics') {
+                            this.drawCharts(this.analyticsData);
+                        }
+                    }, 50);
+
+                    // Re-draw when tab is shown
+                    this.$watch('panel', (val) => {
+                        if (val !== 'analytics') {
+                            this.destroyCharts();
+                        } else {
+                            setTimeout(() => this.drawCharts(this.analyticsData), 50);
+                        }
+                    });
+                },
+
+                updateAnalytics(data) {
+                    if (!data || !data.trend) return;
+                    
+                    // Prevent redundant redraws if data hasn't changed
+                    const newDataStr = JSON.stringify(data.trend);
+                    const oldDataStr = this.analyticsData ? JSON.stringify(this.analyticsData.trend) : null;
+                    if (newDataStr === oldDataStr) return;
+
+                    this.analyticsData = data;
+                    if (this.panel === 'analytics') {
+                        this.drawCharts(data);
+                    }
+                },
+
+                destroyCharts() {
+                    if (this.trendChart) {
+                        try { this.trendChart.destroy(); } catch (e) {}
+                        this.trendChart = null;
+                    }
+                },
+
+                drawCharts(data) {
+                    if (typeof window.ApexCharts === 'undefined' || !data || !data.trend) return;
+
+                    // In-place update to prevent flicker
+                    if (this.trendChart) {
+                        try {
+                            this.trendChart.updateOptions({
+                                xaxis: { categories: data.trend.dates || [] }
+                            }, false, false);
+                            this.trendChart.updateSeries([
+                                { name: 'Fulfillment Value', data: data.trend.totals || [] },
+                                { name: 'Orders Dispatched', data: data.trend.counts || [] }
+                            ]);
+                            return;
+                        } catch (e) {
+                            console.warn("Falling back to full chart redraw", e);
+                            this.destroyCharts();
+                        }
+                    }
+
+                    this.destroyCharts();
+
+                    const trendEl = this.$refs.activityTrendChart;
+                    if (trendEl) {
+                        const trendOptions = {
+                            series: [
+                                {
+                                    name: 'Fulfillment Value',
+                                    data: data.trend.totals || []
+                                },
+                                {
+                                    name: 'Orders Dispatched',
+                                    data: data.trend.counts || []
+                                }
+                            ],
+                            chart: {
+                                height: 310,
+                                type: 'area',
+                                toolbar: { show: false },
+                                fontFamily: 'Outfit, Inter, sans-serif',
+                                zoom: { enabled: false },
+                                animations: {
+                                    enabled: true,
+                                    easing: 'easeinout',
+                                    speed: 800,
+                                    animateGradually: { enabled: true, delay: 150 },
+                                    dynamicAnimation: { enabled: true, speed: 350 }
+                                }
+                            },
+                            colors: ['#6366F1', '#10B981'],
+                            dataLabels: { enabled: false },
+                            stroke: {
+                                width: [3, 2],
+                                curve: 'smooth',
+                                dashArray: [0, 8]
+                            },
+                            fill: {
+                                type: 'gradient',
+                                gradient: {
+                                    shadeIntensity: 1,
+                                    opacityFrom: 0.25,
+                                    opacityTo: 0.01,
+                                    stops: [0, 90, 100]
+                                }
+                            },
+                            xaxis: {
+                                categories: data.trend.dates || [],
+                                tickAmount: window.innerWidth < 640 ? 4 : 8,
+                                tooltip: { enabled: false },
+                                axisBorder: { show: false },
+                                axisTicks: { show: false },
+                                labels: {
+                                    show: true,
+                                    rotate: 0,
+                                    rotateAlways: false,
+                                    hideOverlappingLabels: true,
+                                    style: { colors: '#9CA3AF', fontSize: '10px', fontWeight: 600 }
+                                }
+                            },
+                            yaxis: [
+                                {
+                                    title: {
+                                        text: 'Dispatched Value',
+                                        style: { color: '#6366F1', fontSize: '10px', fontWeight: 700, fontFamily: 'Outfit' }
+                                    },
+                                    labels: {
+                                        style: { colors: '#9CA3AF', fontSize: '11px', fontWeight: 600 },
+                                        formatter: (val) => val >= 1000 ? "₱" + (val/1000).toFixed(1) + "k" : "₱" + val
+                                    }
+                                },
+                                {
+                                    opposite: true,
+                                    title: {
+                                        text: 'Orders Fulfilled',
+                                        style: { color: '#10B981', fontSize: '10px', fontWeight: 700, fontFamily: 'Outfit' }
+                                    },
+                                    labels: {
+                                        style: { colors: '#9CA3AF', fontSize: '11px', fontWeight: 600 },
+                                        formatter: (val) => Math.round(val)
+                                    }
+                                }
+                            ],
+                            grid: {
+                                borderColor: '#f8fafc',
+                                strokeDashArray: 4,
+                                padding: { top: 0, right: 15, bottom: 0, left: 15 }
+                            },
+                            legend: {
+                                show: true,
+                                position: 'top',
+                                horizontalAlign: 'right',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                fontFamily: 'Outfit, Inter, sans-serif',
+                                markers: { radius: 12, width: 8, height: 8 }
+                            },
+                            tooltip: {
+                                theme: 'dark',
+                                style: { fontSize: '12px', fontFamily: 'Outfit, Inter, sans-serif' },
+                                y: [
+                                    { formatter: (val) => "₱ " + val.toLocaleString(undefined, { minimumFractionDigits: 2 }) },
+                                    { formatter: (val) => val + " orders" }
+                                ]
+                            }
+                        };
+                        this.trendChart = new ApexCharts(trendEl, trendOptions);
+                        this.trendChart.render();
+                    }
+                }
+            }));
+        });
+    </script>
 </div>

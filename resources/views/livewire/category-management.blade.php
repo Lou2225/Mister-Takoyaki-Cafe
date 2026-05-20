@@ -165,9 +165,10 @@
                                     </td>
                                     <td class="py-4 px-6 border-r border-slate-100/50 text-center whitespace-nowrap">
                                         <div class="flex flex-col items-center gap-1">
-                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider {{ $category->cat_type === 'product' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-rose-50 text-rose-700 border border-rose-100' }}">
-                                                {{ ucfirst($category->cat_type) }}
-                                            </span>
+                                            <div class="flex items-center justify-center gap-1.5">
+                                                <span class="h-1.5 w-1.5 rounded-full {{ $category->cat_type === 'product' ? 'bg-indigo-500' : 'bg-rose-500' }}"></span>
+                                                <span class="text-[11px] font-bold {{ $category->cat_type === 'product' ? 'text-indigo-600' : 'text-rose-600' }} uppercase">{{ $category->cat_type }}</span>
+                                            </div>
                                             @if($category->cat_type === 'product')
                                                 <span class="text-[9px] font-black {{ $category->production_station === 'barista' ? 'text-sky-600' : 'text-slate-400' }} uppercase tracking-widest">
                                                     {{ $category->production_station === 'barista' ? 'Barista' : 'Kitchen' }}
@@ -231,10 +232,11 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
                                         </svg>
                                     </div>
-                                    <div class="flex flex-col items-end gap-1">
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider {{ $category->cat_type === 'product' ? 'bg-indigo-50 text-indigo-700' : 'bg-rose-50 text-rose-700' }}">
-                                            {{ ucfirst($category->cat_type) }}
-                                        </span>
+                                    <div class="flex flex-col items-end gap-1.5">
+                                        <div class="flex items-center gap-1.5 bg-white/95 backdrop-blur-sm rounded-lg px-2 py-0.5 shadow-sm border border-slate-100/50">
+                                            <span class="h-1.5 w-1.5 rounded-full {{ $category->cat_type === 'product' ? 'bg-indigo-500' : 'bg-rose-500' }}"></span>
+                                            <span class="text-[10px] font-bold {{ $category->cat_type === 'product' ? 'text-indigo-600' : 'text-rose-600' }} uppercase tracking-wider">{{ $category->cat_type }}</span>
+                                        </div>
                                         @if($category->cat_type === 'product')
                                             <span class="text-[9px] font-black {{ $category->production_station === 'barista' ? 'text-sky-600' : 'text-slate-400' }} uppercase tracking-widest">
                                                 {{ $category->production_station === 'barista' ? 'Barista' : 'Kitchen' }}
@@ -478,7 +480,10 @@
                             <div class="space-y-3">
                                 <div class="flex items-center justify-between py-2 border-b border-slate-100">
                                     <span class="text-[12px] text-slate-500 font-medium">Usage Type</span>
-                                    <span class="text-[12px] font-bold {{ $editCategoryType === 'product' ? 'text-indigo-600 bg-indigo-50' : 'text-rose-600 bg-rose-50' }} px-2 py-0.5 rounded-full capitalize">{{ $editCategoryType }}</span>
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="h-1.5 w-1.5 rounded-full {{ $editCategoryType === 'product' ? 'bg-indigo-500' : 'bg-rose-500' }}"></span>
+                                        <span class="text-[11px] font-bold {{ $editCategoryType === 'product' ? 'text-indigo-600' : 'text-rose-600' }} uppercase">{{ $editCategoryType }}</span>
+                                    </div>
                                 </div>
                                 
                                 @if($editCategoryId)

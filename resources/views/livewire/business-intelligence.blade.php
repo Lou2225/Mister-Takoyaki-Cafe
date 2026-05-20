@@ -192,16 +192,17 @@
                     <td class="py-3 px-4 border-r border-gray-100 text-right font-black text-[13px] text-gray-900 font-mono whitespace-nowrap">₱{{ number_format($order->total_amount, 2) }}</td>
                     <td class="py-3 px-4 border-r border-gray-100 text-center whitespace-nowrap">
                         @php
-                            $statusColor = match($order->status) {
-                                'Completed' => 'bg-emerald-50 text-emerald-700 border-emerald-100',
-                                'Refunded' => 'bg-rose-50 text-rose-700 border-rose-100',
-                                'Partially Refunded' => 'bg-amber-50 text-amber-700 border-amber-100',
-                                default => 'bg-gray-50 text-gray-700 border-gray-100'
+                            $s = match($order->status) {
+                                'Completed' => ['dot' => 'bg-emerald-500', 'color' => 'emerald', 'label' => 'Completed'],
+                                'Refunded' => ['dot' => 'bg-rose-500', 'color' => 'rose', 'label' => 'Refunded'],
+                                'Partially Refunded' => ['dot' => 'bg-amber-500', 'color' => 'amber', 'label' => 'Partially Refunded'],
+                                default => ['dot' => 'bg-slate-400', 'color' => 'slate', 'label' => $order->status]
                             };
                         @endphp
-                        <span class="inline-flex px-2 py-0.5 rounded-lg border text-[9px] font-black uppercase tracking-widest {{ $statusColor }}">
-                            {{ $order->status }}
-                        </span>
+                        <div class="flex items-center justify-center gap-2">
+                            <span class="h-1.5 w-1.5 rounded-full {{ $s['dot'] }}"></span>
+                            <span class="text-[11px] font-bold text-{{ $s['color'] }}-600">{{ $s['label'] }}</span>
+                        </div>
                     </td>
                     <td class="py-3 px-4 text-center text-[11px] font-bold text-gray-400 tabular-nums uppercase whitespace-nowrap">{{ $order->created_at->format('M d, H:i') }}</td>
                 </tr>
@@ -969,235 +970,178 @@
 
     <script>
     (function() {
-        var stSeries = @json($stSeries ?? []);
-        var ltSeries = @json($ltSeries ?? []);
-        var labels   = @json($allLabels ?? []);
-        var stCount  = {{ count($stLabels ?? []) }};
+        var stSeries     = @json($stSeries ?? []);
+        var ltSeries     = @json($ltSeries ?? []);
+        var labels       = @json($allLabels ?? []);
+        var stCount      = {{ count($stLabels ?? []) }};
         var hourlyCounts = @json($hourlyCounts ?? []);
         var hourlyHours  = @json($hourlyHours ?? []);
 
-        function initBiForecastChart() {
-            var el = document.getElementById('bi-forecast-chart');
-            if (!el || typeof window.ApexCharts === 'undefined') return;
-            if (el._apexChart) { try { el._apexChart.destroy(); } catch(e) {} }
+        var animCfg = {
+            enabled: true,
+            easing: 'easeinout',
+            speed: 800,
+            animateGradually: { enabled: false, delay: 120 },
+            dynamicAnimation: { enabled: true, speed: 400 }
+        };
 
-            var options = {
-                series: [
-                    { name: 'Demand (7 Days)',    data: stSeries },
-                    { name: 'Growth (6 Months)', data: ltSeries },
-                ],
+        function getForecastData() {
+            return [
+                { name: 'Demand (7 Days)', data: stSeries },
+                { name: 'Growth (6 Months)', data: ltSeries }
+            ];
+        }
+
+        function getHourlyData() {
+            return [{ name: 'Orders Volume', data: hourlyCounts }];
+        }
+
+        function initBiForecastChart() {
+            var container = document.getElementById('bi-forecast-chart');
+            if (!container || typeof window.ApexCharts === 'undefined') return;
+
+            var oldChart = window._biForecastChart;
+            var oldDiv = window._biForecastDiv;
+            
+            if (oldDiv) {
+                // Hide old chart instantly, let it finish its background loop safely
+                oldDiv.style.display = 'none';
+            }
+
+            // Create a fresh DOM node for the new chart so destroy() doesn't wipe it
+            var newDiv = document.createElement('div');
+            container.appendChild(newDiv);
+            window._biForecastDiv = newDiv;
+
+            window._biForecastChart = new ApexCharts(newDiv, {
+                series: getForecastData(),
                 chart: {
-                    height: 330,
-                    type: 'area',
+                    height: 330, type: 'area',
                     toolbar: { show: false },
                     fontFamily: 'Outfit, Inter, sans-serif',
                     zoom: { enabled: false },
-                    animations: {
-                        enabled: true,
-                        easing: 'easeinout',
-                        speed: 800,
-                        animateGradually: { enabled: true, delay: 150 },
-                        dynamicAnimation: { enabled: true, speed: 350 }
-                    },
-                    dropShadow: {
-                        enabled: true,
-                        top: 10, left: 0, blur: 10,
-                        color: '#6366f1',
-                        opacity: 0.12
-                    }
+                    animations: animCfg,
+                    dropShadow: { enabled: true, top: 10, left: 0, blur: 10, color: '#6366f1', opacity: 0.12 }
                 },
                 colors: ['#6366f1', '#10b981'],
                 dataLabels: { enabled: false },
-                stroke: {
-                    width: [3, 2],
-                    curve: 'smooth',
-                    dashArray: [0, 8]
-                },
-                fill: {
-                    type: 'gradient',
-                    gradient: {
-                        shadeIntensity: 1,
-                        opacityFrom: 0.25,
-                        opacityTo: 0.01,
-                        stops: [0, 90, 100]
-                    }
-                },
-                markers: {
-                    size: [4, 4],
-                    strokeWidth: 2,
-                    strokeColors: '#ffffff',
-                    hover: { size: 6 }
-                },
+                stroke: { width: [3, 2], curve: 'smooth', dashArray: [0, 8] },
+                fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.25, opacityTo: 0.01, stops: [0, 90, 100] } },
+                markers: { size: [4, 4], strokeWidth: 2, strokeColors: '#ffffff', hover: { size: 6 } },
                 xaxis: {
                     categories: labels,
-                    tooltip: { enabled: false },
-                    axisBorder: { show: false },
-                    axisTicks: { show: false },
-                    labels: {
-                        rotate: -35,
-                        rotateAlways: false,
-                        hideOverlappingLabels: true,
-                        style: { colors: '#9CA3AF', fontSize: '10px', fontWeight: 600 }
-                    }
+                    tooltip: { enabled: false }, axisBorder: { show: false }, axisTicks: { show: false },
+                    labels: { rotate: -35, rotateAlways: false, hideOverlappingLabels: true, style: { colors: '#9CA3AF', fontSize: '10px', fontWeight: 600 } }
                 },
                 yaxis: {
-                    title: {
-                        text: 'Revenue (₱)',
-                        style: { fontSize: '11px', fontWeight: 600, color: '#6B7280' }
-                    },
-                    labels: {
-                        style: { colors: '#9CA3AF', fontSize: '11px', fontWeight: 600 },
-                        formatter: function(val) {
-                            if (val === null || val === undefined) return '';
-                            return val >= 1000 ? '₱' + (val/1000).toFixed(1) + 'k' : '₱' + Math.round(val);
-                        }
-                    }
+                    title: { text: 'Revenue (₱)', style: { fontSize: '11px', fontWeight: 600, color: '#6B7280' } },
+                    labels: { style: { colors: '#9CA3AF', fontSize: '11px', fontWeight: 600 }, formatter: function(val) { if (val == null) return ''; return val >= 1000 ? '₱' + (val/1000).toFixed(1) + 'k' : '₱' + Math.round(val); } }
                 },
-                grid: {
-                    borderColor: '#f8fafc',
-                    strokeDashArray: 4,
-                    padding: { top: 0, right: 15, bottom: 20, left: 15 }
-                },
-                annotations: {
-                    xaxis: stCount > 0 ? [{
-                        x: labels[stCount - 1],
-                        borderColor: '#d1d5db',
-                        borderWidth: 1.5,
-                        strokeDashArray: 5,
-                        label: {
-                            text: '7D / 6M',
-                            style: { color: '#9ca3af', fontSize: '10px', fontWeight: 700, background: 'transparent' },
-                            position: 'top',
-                            orientation: 'horizontal'
-                        }
-                    }] : []
-                },
-                legend: {
-                    position: 'top',
-                    horizontalAlign: 'right',
-                    fontSize: '11px',
-                    fontWeight: 700,
-                    markers: { radius: 12, width: 8, height: 8 }
-                },
+                grid: { borderColor: '#f8fafc', strokeDashArray: 4, padding: { top: 0, right: 15, bottom: 20, left: 15 } },
+                annotations: { xaxis: stCount > 0 ? [{ x: labels[stCount - 1], borderColor: '#d1d5db', borderWidth: 1.5, strokeDashArray: 5, label: { text: '7D / 6M', style: { color: '#9ca3af', fontSize: '10px', fontWeight: 700, background: 'transparent' }, position: 'top', orientation: 'horizontal' } }] : [] },
+                legend: { position: 'top', horizontalAlign: 'right', fontSize: '11px', fontWeight: 700, markers: { radius: 12, width: 8, height: 8 } },
                 tooltip: {
-                    theme: 'dark',
-                    x: { show: true },
-                    y: {
-                        formatter: function(val) {
-                            if (val === null || val === undefined) return 'N/A';
-                            return '₱ ' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                        }
-                    },
-                    style: { fontSize: '12px', fontFamily: 'Outfit' },
-                    onDatasetHover: { highlightDataSeries: true },
-                    marker: { show: true },
-                    items: { display: 'flex' },
-                    fixed: { enabled: false }
+                    theme: 'dark', x: { show: true },
+                    y: { formatter: function(val) { if (val == null) return 'N/A'; return '₱ ' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); } },
+                    style: { fontSize: '12px', fontFamily: 'Outfit' }, onDatasetHover: { highlightDataSeries: true }, marker: { show: true }
                 }
-            };
-
-            el._apexChart = new ApexCharts(el, options);
-            el._apexChart.render();
+            });
+            window._biForecastChart.render();
+            
+            // Clean up old chart memory safely after its background animation has finished
+            if (oldChart) {
+                setTimeout(function() {
+                    try { oldChart.destroy(); } catch(e) {}
+                    if (oldDiv && oldDiv.parentNode) oldDiv.parentNode.removeChild(oldDiv);
+                }, 1000);
+            }
         }
 
         function initBiHourlyChart() {
-            var el = document.getElementById('bi-hourly-chart');
-            if (!el || typeof window.ApexCharts === 'undefined') return;
-            if (el._apexChart) { try { el._apexChart.destroy(); } catch(e) {} }
+            var container = document.getElementById('bi-hourly-chart');
+            if (!container || typeof window.ApexCharts === 'undefined') return;
 
-            var options = {
-                series: [
-                    { name: 'Orders Volume', data: hourlyCounts }
-                ],
+            var oldChart = window._biHourlyChart;
+            var oldDiv = window._biHourlyDiv;
+            
+            if (oldDiv) {
+                // Hide old chart instantly, let it finish its background loop safely
+                oldDiv.style.display = 'none';
+            }
+
+            // Create a fresh DOM node for the new chart so destroy() doesn't wipe it
+            var newDiv = document.createElement('div');
+            container.appendChild(newDiv);
+            window._biHourlyDiv = newDiv;
+
+            window._biHourlyChart = new ApexCharts(newDiv, {
+                series: getHourlyData(),
                 chart: {
-                    height: 310,
-                    type: 'area',
-                    toolbar: { show: false },
-                    fontFamily: 'Outfit, Inter, sans-serif',
-                    zoom: { enabled: false },
-                    animations: {
-                        enabled: true,
-                        easing: 'easeinout',
-                        speed: 800
-                    }
+                    height: 310, type: 'area',
+                    toolbar: { show: false }, fontFamily: 'Outfit, Inter, sans-serif', zoom: { enabled: false },
+                    animations: animCfg
                 },
-                colors: ['#6366f1'],
-                dataLabels: { enabled: false },
-                stroke: {
-                    width: 3,
-                    curve: 'smooth'
-                },
-                fill: {
-                    type: 'gradient',
-                    gradient: {
-                        shadeIntensity: 1,
-                        type: 'vertical',
-                        colorStops: [
-                            { offset: 0, color: '#f43f5e', opacity: 0.35 },  // Peak Hot Red
-                            { offset: 50, color: '#eab308', opacity: 0.20 }, // Mid Amber
-                            { offset: 100, color: '#6366f1', opacity: 0.02 } // Base Cool Indigo
-                        ]
-                    }
-                },
-                markers: {
-                    size: 4,
-                    strokeWidth: 2,
-                    strokeColors: '#ffffff',
-                    colors: ['#6366f1'],
-                    hover: { size: 6 }
-                },
-                xaxis: {
-                    categories: hourlyHours,
-                    tooltip: { enabled: false },
-                    axisBorder: { show: false },
-                    axisTicks: { show: false },
-                    labels: {
-                        style: { colors: '#9CA3AF', fontSize: '10px', fontWeight: 600 }
-                    }
-                },
-                yaxis: {
-                    title: {
-                        text: 'Order Count',
-                        style: { fontSize: '11px', fontWeight: 600, color: '#6B7280' }
-                    },
-                    labels: {
-                        style: { colors: '#9CA3AF', fontSize: '11px', fontWeight: 600 },
-                        formatter: function(val) {
-                            return Math.round(val);
-                        }
-                    }
-                },
-                grid: {
-                    borderColor: '#f8fafc',
-                    strokeDashArray: 4,
-                    padding: { top: 0, right: 15, bottom: 20, left: 15 }
-                },
-                tooltip: {
-                    theme: 'dark',
-                    x: { show: true },
-                    y: {
-                        formatter: function(val) {
-                            if (val === null || val === undefined) return '0';
-                            return val + ' Orders';
-                        }
-                    },
-                    style: { fontSize: '12px', fontFamily: 'Outfit' }
+                colors: ['#6366f1'], dataLabels: { enabled: false },
+                stroke: { width: 3, curve: 'smooth' },
+                fill: { type: 'gradient', gradient: { shadeIntensity: 1, type: 'vertical', colorStops: [
+                    { offset: 0, color: '#f43f5e', opacity: 0.35 },
+                    { offset: 50, color: '#eab308', opacity: 0.20 },
+                    { offset: 100, color: '#6366f1', opacity: 0.02 }
+                ] } },
+                markers: { size: 4, strokeWidth: 2, strokeColors: '#ffffff', colors: ['#6366f1'], hover: { size: 6 } },
+                xaxis: { categories: hourlyHours, tooltip: { enabled: false }, axisBorder: { show: false }, axisTicks: { show: false }, labels: { style: { colors: '#9CA3AF', fontSize: '10px', fontWeight: 600 } } },
+                yaxis: { title: { text: 'Order Count', style: { fontSize: '11px', fontWeight: 600, color: '#6B7280' } }, labels: { style: { colors: '#9CA3AF', fontSize: '11px', fontWeight: 600 }, formatter: function(val) { return Math.round(val); } } },
+                grid: { borderColor: '#f8fafc', strokeDashArray: 4, padding: { top: 0, right: 15, bottom: 20, left: 15 } },
+                tooltip: { theme: 'dark', x: { show: true }, y: { formatter: function(val) { return (val == null ? '0' : val + ' Orders'); } }, style: { fontSize: '12px', fontFamily: 'Outfit' } }
+            });
+            window._biHourlyChart.render();
+            
+            // Clean up old chart memory safely after its background animation has finished
+            if (oldChart) {
+                setTimeout(function() {
+                    try { oldChart.destroy(); } catch(e) {}
+                    if (oldDiv && oldDiv.parentNode) oldDiv.parentNode.removeChild(oldDiv);
+                }, 1000);
+            }
+        }
+
+        function watchTabPanel(selector, onShow) {
+            var panel = document.querySelector(selector);
+            if (!panel) return;
+
+            var wasHidden = panel.style.display === 'none';
+
+            var observer = new MutationObserver(function() {
+                var isHidden = panel.style.display === 'none';
+                if (wasHidden && !isHidden) {
+                    setTimeout(onShow, 60);
                 }
-            };
+                wasHidden = isHidden;
+            });
+            
+            observer.observe(panel, { attributes: true, attributeFilter: ['style'] });
 
-            el._apexChart = new ApexCharts(el, options);
-            el._apexChart.render();
+            if (!wasHidden) {
+                setTimeout(onShow, 60);
+            }
         }
 
-        function initAllBiCharts() {
-            initBiForecastChart();
-            initBiHourlyChart();
+        function setup() {
+            watchTabPanel('[x-show="activeTab === \'forecasting\'"]', initBiForecastChart);
+            watchTabPanel('[x-show="activeTab === \'operations\'"]', initBiHourlyChart);
         }
 
-        // Init on load and re-init on Livewire navigation
-        document.addEventListener('DOMContentLoaded', initAllBiCharts);
-        document.addEventListener('livewire:navigated', initAllBiCharts);
-        setTimeout(initAllBiCharts, 300); // fallback
+        document.addEventListener('alpine:initialized', setup);
+        document.addEventListener('livewire:navigated', function() {
+            if (window._biForecastChart) { try { window._biForecastChart.destroy(); } catch(e){} window._biForecastChart = null; }
+            if (window._biHourlyChart) { try { window._biHourlyChart.destroy(); } catch(e){} window._biHourlyChart = null; }
+            setTimeout(setup, 200);
+        });
+        if (document.readyState === 'complete') {
+            setup();
+        } else {
+            window.addEventListener('DOMContentLoaded', setup);
+        }
     })();
     </script>
 </div>

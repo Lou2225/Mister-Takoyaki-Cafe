@@ -147,9 +147,10 @@
                             </span>
                         </td>
                         <td class="py-4 px-4 text-center">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-600 border border-indigo-100">
-                                {{ ucfirst($tmpl->price_mode) }}
-                            </span>
+                            <div class="flex items-center justify-center gap-1.5">
+                                <span class="h-1.5 w-1.5 rounded-full {{ $tmpl->price_mode === 'fixed' ? 'bg-indigo-500' : 'bg-sky-500' }}"></span>
+                                <span class="text-[11px] font-bold {{ $tmpl->price_mode === 'fixed' ? 'text-indigo-600' : 'text-sky-600' }} uppercase">{{ $tmpl->price_mode }}</span>
+                            </div>
                         </td>
                         <td class="py-4 px-4 text-center">
                             <span class="text-[13px] font-bold text-slate-600">{{ $tmpl->items->count() }} Items</span>
@@ -205,7 +206,10 @@
                         <h3 class="text-[16px] font-black text-slate-900 tracking-tight mb-1 group-hover:text-indigo-600 transition-colors">{{ $tmpl->name }}</h3>
                         <div class="flex items-center gap-2 mb-6">
                             <span class="text-[10px] font-black {{ $tmpl->is_required ? 'text-rose-500 bg-rose-50 border-rose-100' : 'text-slate-400 bg-slate-50 border-slate-100' }} border px-2 py-0.5 rounded-lg uppercase tracking-widest">{{ $tmpl->is_required ? 'Required' : 'Optional' }}</span>
-                            <span class="text-[10px] font-black text-indigo-500 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-lg uppercase tracking-widest">{{ ucfirst($tmpl->price_mode) }}</span>
+                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-white border border-slate-100 shadow-sm">
+                                <span class="h-1.5 w-1.5 rounded-full {{ $tmpl->price_mode === 'fixed' ? 'bg-indigo-500' : 'bg-sky-500' }}"></span>
+                                <span class="text-[10px] font-bold {{ $tmpl->price_mode === 'fixed' ? 'text-indigo-600' : 'text-sky-600' }} uppercase tracking-wider">{{ $tmpl->price_mode }}</span>
+                            </span>
                         </div>
 
                         <div class="space-y-2.5 pt-4 border-t border-slate-50">
