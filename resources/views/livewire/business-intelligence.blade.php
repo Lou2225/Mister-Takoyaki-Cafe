@@ -5,7 +5,7 @@
     $primaryText = $roleTheme['text'] ?? 'text-indigo-600';
 @endphp
 <div
-    x-data="slidingTabs(@js($activeTab), 'activeTab')"
+    x-data="slidingTabs($wire.entangle('activeTab').live, 'activeTab')"
     class="relative overflow-hidden">
 
     <div class="px-1" x-cloak x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0">
@@ -25,12 +25,16 @@
                         <x-slot name="trigger">
                             <button type="button" class="inline-flex items-center gap-2 px-4 py-1.5 text-[12px] font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:border-gray-300 focus:outline-none shadow-sm transition-colors h-10">
                                 <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                                <span>{{ $branches->firstWhere('id', $selectedBranchId)?->branch_name ?? 'Select Branch' }}</span>
+                                <span>{{ $selectedBranchId === 'all' ? 'All Branches' : ($branches->firstWhere('id', $selectedBranchId)?->branch_name ?? 'Select Branch') }}</span>
                                 <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                             </button>
                         </x-slot>
                         <x-slot name="content">
 
+                                <x-dropdown-link href="#" wire:click.prevent="$set('selectedBranchId', 'all')">
+                                <span class="font-bold text-indigo-600">All Branches</span>
+                            </x-dropdown-link>
+                            <div class="border-t border-gray-100 my-1"></div>
                             @foreach($branches as $branch)
                                 <x-dropdown-link href="#" wire:click.prevent="$set('selectedBranchId', {{ $branch->id }})">
                                     {{ $branch->branch_name }}
@@ -221,158 +225,8 @@
     </div>
 
     <div x-cloak x-show="activeTab === 'forecasting'" class="space-y-6 animate-fadeIn">
-
-        {{-- Combined Dual-Line Forecast Chart (ApexCharts) --}}
-        <div class="bg-white border border-gray-200/80 rounded-2xl p-5 sm:p-6 shadow-sm mx-1 h-[400px] relative flex flex-col justify-between overflow-hidden">
-            @php
-                $st = $forecasting['short_term'];
-                $lt = $forecasting['long_term'];
-
-                // Build combined X-axis labels: 7 day labels + 6 month labels
-                $stLabels = collect($st['forecast'])->map(fn($p) => ($p['day'] ?? '') . ' ' . ($p['date'] ?? ''))->values()->toArray();
-                $ltLabels = collect($lt['forecast'])->map(fn($p) => $p['date'] ?? '')->values()->toArray();
-                $allLabels = array_merge($stLabels, $ltLabels);
-                $totalCount = count($allLabels);
-
-                // Short-term series: values for first 7 slots, null for remaining 6
-                $stSeries = array_merge(
-                    collect($st['forecast'])->map(fn($p) => round($p['predicted'], 2))->toArray(),
-                    array_fill(0, count($ltLabels), null)
-                );
-
-                // Long-term series: null for first 7 slots, values for remaining 6
-                $ltSeries = array_merge(
-                    array_fill(0, count($stLabels), null),
-                    collect($lt['forecast'])->map(fn($p) => round($p['predicted'], 2))->toArray()
-                );
-            @endphp
-
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
-                <div>
-                    <h2 class="text-[16px] font-bold text-gray-900 tracking-tight">
-                        Revenue Forecast
-                    </h2>
-                    <p class="text-[11px] text-gray-400 font-medium">Linear regression model — 7-day demand + 6-month growth trajectory</p>
-                </div>
-
-                <div class="flex items-center gap-3 self-end sm:self-auto overflow-x-auto max-w-full pb-1 sm:pb-0">
-                    <div class="flex items-center gap-4 bg-gray-50 border border-gray-100/80 rounded-lg p-1.5 px-3">
-                        <div class="flex items-center gap-2">
-                            <span class="w-6 border-t-2 border-indigo-500 inline-block"></span>
-                            <span class="text-[10px] font-black text-gray-500 uppercase tracking-wider">7D Demand</span>
-                            <span class="px-1.5 py-0.5 rounded bg-indigo-50 border border-indigo-100 text-indigo-600 text-[8px] font-black tracking-widest">{{ $st['confidence'] }}</span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="w-6 border-t-2 border-dashed border-emerald-500 inline-block"></span>
-                            <span class="text-[10px] font-black text-gray-500 uppercase tracking-wider">6M Growth</span>
-                            <span class="px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-100 text-emerald-600 text-[8px] font-black tracking-widest">{{ $lt['confidence'] }}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            @if(count($st['forecast']) > 0 || count($lt['forecast']) > 0)
-                <div wire:ignore class="relative flex-1 flex flex-col justify-end">
-                    <div id="bi-forecast-chart" class="w-full"></div>
-                </div>
-            @else
-                <div class="flex-1 flex items-center justify-center">
-                    <x-empty-state title="Insufficient Data" description="Not enough sales history to generate a forecast model." />
-                </div>
-            @endif
-        </div>
-
-
-        {{-- 3. Insights Row --}}
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 px-1">
-            {{-- Predicted Restock Insights --}}
-            <div class="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm relative overflow-hidden group">
-                <div class="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity text-emerald-500">
-                    <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-14L4 7m8 4v10M4 7v10l8 4"/></svg>
-                </div>
-                
-                <div class="flex items-center justify-between mb-6 relative z-10">
-                    <h4 class="text-[13px] font-black uppercase tracking-widest text-gray-900">Restock Insights (7d)</h4>
-                    <span class="text-[9px] font-bold text-gray-500 italic">Demand Prediction</span>
-                </div>
-
-                <div class="space-y-3 relative z-10">
-                    @forelse($forecasting['restock_insights'] as $ri)
-                    <div class="flex items-center justify-between p-3 rounded-2xl bg-gray-50 border border-gray-100 {{ $isActionable ? 'hover:bg-emerald-50 hover:border-emerald-200 cursor-pointer' : 'cursor-not-allowed opacity-60' }} transition-all"
-                         @if($isActionable) wire:click="redirectToOrdering({{ $ri['id'] }})" @endif
-                         @if(!$isActionable) title="Action not available when viewing 'All Branches'" @endif>
-                        <div class="flex items-center gap-3">
-                            <div class="w-9 h-9 rounded-xl bg-white border border-gray-200 flex items-center justify-center text-emerald-600 shadow-sm">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
-                            </div>
-                            <div>
-                                <p class="text-[12px] font-bold text-gray-900">{{ $ri['name'] }}</p>
-                                <p class="text-[10px] text-gray-500 font-medium">Need: <span class="text-gray-900 font-bold">{{ number_format($ri['amount'], 1) }} {{ $ri['unit'] }}</span></p>
-                            </div>
-                        </div>
-                        <span class="px-2.5 py-1 rounded-md bg-{{ $ri['priority'] === 'High' ? 'rose' : 'emerald' }}-50 text-{{ $ri['priority'] === 'High' ? 'rose' : 'emerald' }}-600 border border-{{ $ri['priority'] === 'High' ? 'rose' : 'emerald' }}-200 text-[9px] font-black uppercase tracking-widest shadow-sm">
-                            {{ $ri['priority'] }}
-                        </span>
-                    </div>
-                    @empty
-                    <div class="p-6 text-center bg-gray-50 rounded-2xl border border-gray-100">
-                        <p class="text-[12px] font-bold text-gray-500">No Restock Data</p>
-                        <p class="text-[10px] text-gray-400 mt-1">Not enough data to predict restocking needs.</p>
-                    </div>
-                    @endforelse
-                </div>
-
-                <div class="mt-5 pt-4 border-t border-gray-100 relative z-10">
-                    <p class="text-[10px] text-gray-400 leading-relaxed italic">
-                        * Estimates based on predicted sales of Top 5 products and recipe quantities.
-                    </p>
-                </div>
-            </div>
-
-            {{-- Growth Momentum --}}
-            <div class="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex flex-col relative overflow-hidden group">
-                <div class="absolute -right-10 -bottom-10 opacity-5 group-hover:opacity-10 transition-opacity text-{{ $primaryColor }}-500">
-                    <svg class="w-64 h-64" fill="currentColor" viewBox="0 0 24 24"><path d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
-                </div>
-                
-                <div class="flex items-center justify-between mb-6 relative z-10">
-                    <h4 class="text-[13px] font-black uppercase tracking-widest text-gray-900">Performance Velocity</h4>
-                    <div class="px-3 py-1 rounded-full bg-{{ $forecasting['short_term']['trend'] === 'Upward' ? 'emerald' : 'rose' }}-50 text-{{ $forecasting['short_term']['trend'] === 'Upward' ? 'emerald' : 'rose' }}-600 border border-current text-[9px] font-black uppercase tracking-widest">
-                        {{ $forecasting['short_term']['trend'] }} Momentum
-                    </div>
-                </div>
-                
-                <div class="flex-1 flex flex-col justify-center relative z-10">
-                    <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Average Daily Change</span>
-                    <div class="flex items-baseline gap-2 mb-8">
-                        <span class="text-[40px] font-black text-gray-900 tracking-tighter leading-none">₱{{ number_format(abs($forecasting['short_term']['growth_rate']), 2) }}</span>
-                        <span class="text-[12px] font-black text-gray-400 uppercase tracking-widest">/ day</span>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4 mt-auto">
-                        <div class="p-4 rounded-2xl bg-gray-50 border border-gray-100 hover:border-gray-200 transition-colors flex flex-col justify-center">
-                            <span class="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Baseline Avg</span>
-                            <span class="text-[14px] font-black text-gray-900">₱{{ number_format($forecasting['short_term']['baseline_avg'] ?? 0, 0) }}</span>
-                            <span class="text-[9px] text-gray-500 font-bold block mt-0.5">Last 7 active days</span>
-                        </div>
-                        <div class="p-4 rounded-2xl bg-gray-50 border border-gray-100 hover:border-gray-200 transition-colors flex flex-col justify-center">
-                            <span class="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Peak Prediction</span>
-                            <span class="text-[14px] font-black text-emerald-600">{{ $forecasting['short_term']['peak_day'] ?? 'N/A' }}</span>
-                            <span class="text-[9px] text-gray-500 font-bold block mt-0.5">Next highest day</span>
-                        </div>
-                        <div class="p-4 rounded-2xl bg-gray-50 border border-gray-100 hover:border-gray-200 transition-colors flex flex-col justify-center">
-                            <span class="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Monthly Outlook</span>
-                            <span class="text-[14px] font-black text-gray-900">₱{{ number_format($forecasting['long_term']['growth_rate'], 0) }}</span>
-                            <span class="text-[9px] text-gray-500 font-bold block mt-0.5">Avg change/mo</span>
-                        </div>
-                        <div class="p-4 rounded-2xl bg-gray-50 border border-gray-100 hover:border-gray-200 transition-colors flex flex-col justify-center">
-                            <span class="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Strategic Score</span>
-                            <span class="text-[14px] font-black text-gray-900">{{ $forecasting['long_term']['confidence'] }}</span>
-                            <span class="text-[9px] text-gray-500 font-bold block mt-0.5">Model reliability</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <div class="px-1">
+            <x-empty-state title="Forecasting Disabled" description="Revenue forecasting features have been removed." />
         </div>
     </div>
 
@@ -574,44 +428,6 @@
 
     {{-- ── Operations Tab ── --}}
     <div x-cloak x-show="activeTab === 'operations'" class="space-y-6 animate-fadeIn">
-        {{-- Hourly Intensity Line Chart (ApexCharts) --}}
-        @php
-            $hourlyHours = [];
-            $hourlyCounts = [];
-            for ($i = 0; $i < 24; $i++) {
-                $hourlyHours[] = str_pad($i, 2, '0', STR_PAD_LEFT) . ':00';
-                $hourlyCounts[] = $operations['hourly_sales']->firstWhere('hour', $i)->count ?? 0;
-            }
-        @endphp
-        <div class="bg-white border border-gray-200/80 rounded-2xl p-5 sm:p-6 shadow-sm mx-1 h-[400px] relative flex flex-col justify-between overflow-hidden">
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
-                <div>
-                    <h2 class="text-[16px] font-bold text-gray-900 tracking-tight">
-                        Hourly Sales Intensity
-                    </h2>
-                    <p class="text-[11px] text-gray-400 font-medium">Hourly customer activity and purchase density throughout the day</p>
-                </div>
-                
-                <div class="flex items-center gap-3 self-end sm:self-auto overflow-x-auto max-w-full pb-1 sm:pb-0">
-                    <div class="flex items-center gap-4 bg-gray-50 border border-gray-100/80 rounded-lg p-1.5 px-3">
-                        <div class="flex items-center gap-2">
-                            <span class="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span>
-                            <span class="text-[10px] font-black text-gray-500 uppercase tracking-wider">Peak Hot</span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block"></span>
-                            <span class="text-[10px] font-black text-gray-500 uppercase tracking-wider">Cool Base</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div wire:ignore class="relative flex-1 flex flex-col justify-end">
-                <div id="bi-hourly-chart" class="w-full"></div>
-            </div>
-        </div>
-        <div class="h-6"></div>
-
         {{-- Branch Comparison (Admin Only) --}}
         @if(auth()->user()->role_id === 1)
         <div class="mx-1 overflow-x-auto">
@@ -674,74 +490,6 @@
 
     {{-- ── Sales Report Tab ── --}}
     <div x-cloak x-show="activeTab === 'sales'" class="space-y-6 animate-fadeIn">
-        {{-- Sales Performance Trend --}}
-        <div class="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm mx-1">
-            <div class="flex items-center justify-between mb-6">
-                <div>
-                    <h4 class="text-[14px] font-bold text-gray-900 tracking-tight">Sales Performance Trend</h4>
-                    <p class="text-[11px] text-gray-400 font-medium">Daily revenue over the selected period</p>
-                </div>
-            </div>
-
-            <div class="flex gap-3">
-                @php
-                    $trend = $salesData['trend'] ?? [];
-                    $maxT = collect($trend)->max('value') ?: 1;
-                    $yStepsT = 5;
-                    $stepSizeT = ceil($maxT / $yStepsT) ?: 1;
-                    $yMaxT = $stepSizeT * $yStepsT;
-                @endphp
-                {{-- Y-Axis --}}
-                <div class="flex flex-col justify-between items-end pb-6 text-[9px] font-bold text-gray-400 select-none" style="min-width:44px; height:192px">
-                    @for($s = $yStepsT; $s >= 0; $s--)
-                        <span>₱{{ number_format($stepSizeT * $s) }}</span>
-                    @endfor
-                </div>
-
-                {{-- Chart Area --}}
-                <div class="flex-1 flex flex-col min-w-0">
-                    <div class="relative h-48 flex items-end border-l border-b border-gray-200 pb-0">
-                        {{-- Grid lines --}}
-                        <div class="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-5 pr-4">
-                            @for($s = $yStepsT; $s >= 1; $s--)
-                                <div class="border-t border-gray-900 w-full"></div>
-                            @endfor
-                            <div></div>
-                        </div>
-
-                        {{-- Bars — flex-1 so each takes equal share of full width --}}
-                        <div class="absolute inset-0 flex items-end px-1 gap-px">
-                            @foreach($trend as $day)
-                                @php $tPct = $yMaxT > 0 ? ($day['value'] / $yMaxT) * 100 : 0; @endphp
-                                <div class="flex-1 group relative flex flex-col items-center justify-end h-full z-10 hover:z-30">
-                                    <div class="w-full bg-gradient-to-t from-emerald-600 to-emerald-400 rounded-t-sm transition-all group-hover:brightness-110 shadow-sm"
-                                         style="height: {{ $tPct }}%">
-                                        <div class="opacity-0 group-hover:opacity-100 absolute -top-10 left-1/2 -translate-x-1/2 px-2 py-1.5 bg-gray-900 text-white text-[10px] font-black rounded-lg transition-all z-20 pointer-events-none shadow-xl whitespace-nowrap">
-                                            {{ $day['label'] }}: ₱{{ number_format($day['value'], 0) }}
-                                        </div>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-
-                    {{-- X-Axis Labels (sampled to avoid overlap) --}}
-                    <div class="flex px-1 gap-px mt-2">
-                        @php $skip = count($trend) > 14 ? ceil(count($trend) / 14) : 1; @endphp
-                        @foreach($trend as $idx => $day)
-                            <div class="flex-1 text-center">
-                                @if($idx % $skip == 0)
-                                    <span class="text-[8px] font-black text-gray-500 uppercase tracking-tight leading-none whitespace-nowrap">
-                                        {{ $day['label'] }}
-                                    </span>
-                                @endif
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 px-1">
 
             {{-- Payment Methods + Order Sources --}}
@@ -822,7 +570,7 @@
     </div>
 
     {{-- ─── Breakdown Side Panel ────────────────────────────────────────── --}}
-    <x-side-panel wire:model.live="showBreakdown" name="kpi-breakdown" width="max-w-md">
+    <x-side-panel name="kpi-breakdown" width="max-w-md">
         <div class="flex flex-col h-full bg-white">
             {{-- Premium Header --}}
             <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/40">
@@ -968,180 +716,12 @@
         </div>
     </x-side-panel>
 
-    <script>
-    (function() {
-        var stSeries     = @json($stSeries ?? []);
-        var ltSeries     = @json($ltSeries ?? []);
-        var labels       = @json($allLabels ?? []);
-        var stCount      = {{ count($stLabels ?? []) }};
-        var hourlyCounts = @json($hourlyCounts ?? []);
-        var hourlyHours  = @json($hourlyHours ?? []);
+    {{-- Store chart data in a hidden DOM element so Livewire updates can refresh it reliably --}}
+    @php
+        $biChartDataState = json_encode([
+            'branch' => $selectedBranchId,
+        ], JSON_UNESCAPED_UNICODE);
+    @endphp
 
-        var animCfg = {
-            enabled: true,
-            easing: 'easeinout',
-            speed: 800,
-            animateGradually: { enabled: false, delay: 120 },
-            dynamicAnimation: { enabled: true, speed: 400 }
-        };
-
-        function getForecastData() {
-            return [
-                { name: 'Demand (7 Days)', data: stSeries },
-                { name: 'Growth (6 Months)', data: ltSeries }
-            ];
-        }
-
-        function getHourlyData() {
-            return [{ name: 'Orders Volume', data: hourlyCounts }];
-        }
-
-        function initBiForecastChart() {
-            var container = document.getElementById('bi-forecast-chart');
-            if (!container || typeof window.ApexCharts === 'undefined') return;
-
-            var oldChart = window._biForecastChart;
-            var oldDiv = window._biForecastDiv;
-            
-            if (oldDiv) {
-                // Hide old chart instantly, let it finish its background loop safely
-                oldDiv.style.display = 'none';
-            }
-
-            // Create a fresh DOM node for the new chart so destroy() doesn't wipe it
-            var newDiv = document.createElement('div');
-            container.appendChild(newDiv);
-            window._biForecastDiv = newDiv;
-
-            window._biForecastChart = new ApexCharts(newDiv, {
-                series: getForecastData(),
-                chart: {
-                    height: 330, type: 'area',
-                    toolbar: { show: false },
-                    fontFamily: 'Outfit, Inter, sans-serif',
-                    zoom: { enabled: false },
-                    animations: animCfg,
-                    dropShadow: { enabled: true, top: 10, left: 0, blur: 10, color: '#6366f1', opacity: 0.12 }
-                },
-                colors: ['#6366f1', '#10b981'],
-                dataLabels: { enabled: false },
-                stroke: { width: [3, 2], curve: 'smooth', dashArray: [0, 8] },
-                fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.25, opacityTo: 0.01, stops: [0, 90, 100] } },
-                markers: { size: [4, 4], strokeWidth: 2, strokeColors: '#ffffff', hover: { size: 6 } },
-                xaxis: {
-                    categories: labels,
-                    tooltip: { enabled: false }, axisBorder: { show: false }, axisTicks: { show: false },
-                    labels: { rotate: -35, rotateAlways: false, hideOverlappingLabels: true, style: { colors: '#9CA3AF', fontSize: '10px', fontWeight: 600 } }
-                },
-                yaxis: {
-                    title: { text: 'Revenue (₱)', style: { fontSize: '11px', fontWeight: 600, color: '#6B7280' } },
-                    labels: { style: { colors: '#9CA3AF', fontSize: '11px', fontWeight: 600 }, formatter: function(val) { if (val == null) return ''; return val >= 1000 ? '₱' + (val/1000).toFixed(1) + 'k' : '₱' + Math.round(val); } }
-                },
-                grid: { borderColor: '#f8fafc', strokeDashArray: 4, padding: { top: 0, right: 15, bottom: 20, left: 15 } },
-                annotations: { xaxis: stCount > 0 ? [{ x: labels[stCount - 1], borderColor: '#d1d5db', borderWidth: 1.5, strokeDashArray: 5, label: { text: '7D / 6M', style: { color: '#9ca3af', fontSize: '10px', fontWeight: 700, background: 'transparent' }, position: 'top', orientation: 'horizontal' } }] : [] },
-                legend: { position: 'top', horizontalAlign: 'right', fontSize: '11px', fontWeight: 700, markers: { radius: 12, width: 8, height: 8 } },
-                tooltip: {
-                    theme: 'dark', x: { show: true },
-                    y: { formatter: function(val) { if (val == null) return 'N/A'; return '₱ ' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); } },
-                    style: { fontSize: '12px', fontFamily: 'Outfit' }, onDatasetHover: { highlightDataSeries: true }, marker: { show: true }
-                }
-            });
-            window._biForecastChart.render();
-            
-            // Clean up old chart memory safely after its background animation has finished
-            if (oldChart) {
-                setTimeout(function() {
-                    try { oldChart.destroy(); } catch(e) {}
-                    if (oldDiv && oldDiv.parentNode) oldDiv.parentNode.removeChild(oldDiv);
-                }, 1000);
-            }
-        }
-
-        function initBiHourlyChart() {
-            var container = document.getElementById('bi-hourly-chart');
-            if (!container || typeof window.ApexCharts === 'undefined') return;
-
-            var oldChart = window._biHourlyChart;
-            var oldDiv = window._biHourlyDiv;
-            
-            if (oldDiv) {
-                // Hide old chart instantly, let it finish its background loop safely
-                oldDiv.style.display = 'none';
-            }
-
-            // Create a fresh DOM node for the new chart so destroy() doesn't wipe it
-            var newDiv = document.createElement('div');
-            container.appendChild(newDiv);
-            window._biHourlyDiv = newDiv;
-
-            window._biHourlyChart = new ApexCharts(newDiv, {
-                series: getHourlyData(),
-                chart: {
-                    height: 310, type: 'area',
-                    toolbar: { show: false }, fontFamily: 'Outfit, Inter, sans-serif', zoom: { enabled: false },
-                    animations: animCfg
-                },
-                colors: ['#6366f1'], dataLabels: { enabled: false },
-                stroke: { width: 3, curve: 'smooth' },
-                fill: { type: 'gradient', gradient: { shadeIntensity: 1, type: 'vertical', colorStops: [
-                    { offset: 0, color: '#f43f5e', opacity: 0.35 },
-                    { offset: 50, color: '#eab308', opacity: 0.20 },
-                    { offset: 100, color: '#6366f1', opacity: 0.02 }
-                ] } },
-                markers: { size: 4, strokeWidth: 2, strokeColors: '#ffffff', colors: ['#6366f1'], hover: { size: 6 } },
-                xaxis: { categories: hourlyHours, tooltip: { enabled: false }, axisBorder: { show: false }, axisTicks: { show: false }, labels: { style: { colors: '#9CA3AF', fontSize: '10px', fontWeight: 600 } } },
-                yaxis: { title: { text: 'Order Count', style: { fontSize: '11px', fontWeight: 600, color: '#6B7280' } }, labels: { style: { colors: '#9CA3AF', fontSize: '11px', fontWeight: 600 }, formatter: function(val) { return Math.round(val); } } },
-                grid: { borderColor: '#f8fafc', strokeDashArray: 4, padding: { top: 0, right: 15, bottom: 20, left: 15 } },
-                tooltip: { theme: 'dark', x: { show: true }, y: { formatter: function(val) { return (val == null ? '0' : val + ' Orders'); } }, style: { fontSize: '12px', fontFamily: 'Outfit' } }
-            });
-            window._biHourlyChart.render();
-            
-            // Clean up old chart memory safely after its background animation has finished
-            if (oldChart) {
-                setTimeout(function() {
-                    try { oldChart.destroy(); } catch(e) {}
-                    if (oldDiv && oldDiv.parentNode) oldDiv.parentNode.removeChild(oldDiv);
-                }, 1000);
-            }
-        }
-
-        function watchTabPanel(selector, onShow) {
-            var panel = document.querySelector(selector);
-            if (!panel) return;
-
-            var wasHidden = panel.style.display === 'none';
-
-            var observer = new MutationObserver(function() {
-                var isHidden = panel.style.display === 'none';
-                if (wasHidden && !isHidden) {
-                    setTimeout(onShow, 60);
-                }
-                wasHidden = isHidden;
-            });
-            
-            observer.observe(panel, { attributes: true, attributeFilter: ['style'] });
-
-            if (!wasHidden) {
-                setTimeout(onShow, 60);
-            }
-        }
-
-        function setup() {
-            watchTabPanel('[x-show="activeTab === \'forecasting\'"]', initBiForecastChart);
-            watchTabPanel('[x-show="activeTab === \'operations\'"]', initBiHourlyChart);
-        }
-
-        document.addEventListener('alpine:initialized', setup);
-        document.addEventListener('livewire:navigated', function() {
-            if (window._biForecastChart) { try { window._biForecastChart.destroy(); } catch(e){} window._biForecastChart = null; }
-            if (window._biHourlyChart) { try { window._biHourlyChart.destroy(); } catch(e){} window._biHourlyChart = null; }
-            setTimeout(setup, 200);
-        });
-        if (document.readyState === 'complete') {
-            setup();
-        } else {
-            window.addEventListener('DOMContentLoaded', setup);
-        }
-    })();
-    </script>
+    <div id="bi-chart-data" style="display:none;" data-state='{{ $biChartDataState }}'></div>
 </div>

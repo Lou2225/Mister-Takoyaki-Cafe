@@ -254,9 +254,9 @@
                 <x-search-bar wireModel="search" placeholder="Reference..." width="w-full lg:w-64" />
             </div>
             <div class="flex flex-wrap items-center lg:justify-end gap-3">
-                @if($panel === 'history')
+                <div x-show="panel === 'history'" class="transition-all duration-200" x-cloak>
                     <x-date-filter startModel="startDate" endModel="endDate" activeModel="activeFilter" />
-                @endif
+                </div>
                 <x-dropdown align="right" width="48">
                     <x-slot name="trigger">
                         <x-secondary-button type="button" class="gap-1.5 h-10 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none text-[13px] font-black">

@@ -128,6 +128,7 @@ class BusinessIntelligence extends Component
                 $this->resetPage('branchPage');
             }
         }
+        // Charts update automatically via 'bi-data-ready' event when view re-renders
     }
 
     public function render()
@@ -138,7 +139,6 @@ class BusinessIntelligence extends Component
         return view('livewire.business-intelligence', [
             'branches'       => Branch::all(),
             'performance'    => $analytics['performance'],
-            'forecasting'    => $this->getForecastingData(),
             'productInsights'=> $this->getProductInsights($analytics),
             'operations'     => $this->getOperationalData($analytics),
             'recentOrders'   => $this->getRecentOrders(),
@@ -190,7 +190,7 @@ class BusinessIntelligence extends Component
             });
 
         $grossProfit = $netSales - $totalCogs - $wasteCost;
-        $trendData   = $this->buildTrendData($completedOrders, $start, $end);
+
         $breakdown   = $this->buildSalesBreakdown($completedOrders);
 
         return [
@@ -205,7 +205,6 @@ class BusinessIntelligence extends Component
             'total_cogs'      => $totalCogs,
             'waste_cost'      => $wasteCost,
             'gross_profit'    => $grossProfit,
-            'trend'           => $trendData,
             'performance' => [
                 'gross_sales'     => $grossSales,
                 'net_sales'       => $netSales,
@@ -282,26 +281,6 @@ class BusinessIntelligence extends Component
     }
 
     /**
-     * Build a day-by-day trend array for the given date range, filling gaps with 0.
-     */
-    private function buildTrendData(Collection $completedOrders, Carbon $start, Carbon $end): array
-    {
-        $daily = $completedOrders
-            ->groupBy(fn($o) => $o->created_at->format('Y-m-d'))
-            ->map(fn($g) => $g->sum('total_amount'));
-
-        $trend = [];
-        $cursor = $start->copy();
-        while ($cursor->lte($end)) {
-            $key     = $cursor->format('Y-m-d');
-            $trend[] = ['label' => $cursor->format('M d'), 'value' => (float)($daily[$key] ?? 0)];
-            $cursor->addDay();
-        }
-
-        return $trend;
-    }
-
-    /**
      * Build payment method breakdown, order source breakdown, and top-selling items
      * from an already-fetched collection of completed orders.
      */
@@ -338,136 +317,6 @@ class BusinessIntelligence extends Component
             'top_items'       => $topItems,
         ];
 
-    }
-
-
-    private function getForecastingData()
-    {
-        return [
-            'short_term' => $this->calculateRegression('daily', 60, 7),
-            'long_term'  => $this->calculateRegression('monthly', 12, 6),
-            'restock_insights' => $this->getIngredientDemandForecast(),
-        ];
-    }
-
-    private function calculateRegression(string $type, int $historyCount, int $predictCount)
-    {
-        $query = Order::where('status', 'Completed')
-            ->when($this->selectedBranchId !== 'all', fn($q) => $q->where('branch_id', $this->selectedBranchId));
-
-        if ($type === 'daily') {
-            $data = (clone $query)->where('created_at', '>=', Carbon::now()->subDays($historyCount))
-                ->selectRaw('DATE(created_at) as label, SUM(total_amount) as total')
-                ->groupBy('label')
-                ->orderBy('label', 'asc')
-                ->get();
-        } else {
-            $data = (clone $query)->where('created_at', '>=', Carbon::now()->subMonths($historyCount))
-                ->selectRaw('DATE_FORMAT(created_at, "%Y-%m") as label, SUM(total_amount) as total')
-                ->groupBy('label')
-                ->orderBy('label', 'asc')
-                ->get();
-        }
-
-
-
-        $n = $data->count();
-        $sumX = 0; $sumY = 0; $sumXY = 0; $sumX2 = 0;
-        foreach ($data as $index => $row) {
-            $x = $index + 1;
-            $y = (float)$row->total;
-            $sumX += $x; $sumY += $y; $sumXY += ($x * $y); $sumX2 += ($x * $x);
-        }
-
-        $denominator = ($n * $sumX2) - ($sumX * $sumX);
-        if ($denominator == 0) return ['forecast' => [], 'trend' => 'Neutral', 'growth_rate' => 0.0, 'confidence' => 'Low'];
-
-        $slope = (($n * $sumXY) - ($sumX * $sumY)) / $denominator;
-        $intercept = ($sumY - ($slope * $sumX)) / $n;
-
-        // Calculate a 'Baseline' (Average of the last 7 active days)
-        $avgDailySales = $data->take(-7)->avg('total') ?: 0;
-
-        $forecast = [];
-        $startDate = $type === 'daily' ? Carbon::tomorrow() : Carbon::now()->addMonth()->startOfMonth();
-
-        for ($i = 0; $i < $predictCount; $i++) {
-            $predictedDate = $type === 'daily' ? $startDate->copy()->addDays($i) : $startDate->copy()->addMonths($i);
-            $predictedX = $n + $i + 1;
-            
-            // Pure Linear Regression result
-            $predictedY = ($slope * $predictedX) + $intercept;
-
-            $forecast[] = [
-                'date' => $type === 'daily' ? $predictedDate->format('M d') : $predictedDate->format('M Y'),
-                'day'  => strtoupper($predictedDate->format('D')),
-                'predicted' => max(0, $predictedY),
-            ];
-        }
-
-        return [
-            'forecast' => $forecast,
-            'trend' => $slope > ($type === 'daily' ? 50 : 1000) ? 'Upward' : ($slope < ($type === 'daily' ? -50 : -1000) ? 'Downward' : 'Stable'),
-            'growth_rate' => round($slope, 2),
-            'confidence' => ($type === 'daily' ? ($n >= 45 ? 'High' : ($n >= 20 ? 'Medium' : 'Low')) : ($n >= 8 ? 'High' : ($n >= 4 ? 'Medium' : 'Low'))),
-            'baseline_avg' => round($avgDailySales, 2),
-            'peak_day' => collect($forecast)->sortByDesc('predicted')->first()['day'] ?? 'N/A',
-        ];
-    }
-
-    private function getIngredientDemandForecast()
-    {
-        // 1. Get all products with sales in the period for the branch to predict restocking
-        $topProducts = OrderItem::whereHas('order', function($q) {
-                $q->where('status', 'Completed')
-                  ->when($this->selectedBranchId !== 'all', fn($q) => $q->where('branch_id', $this->selectedBranchId))
-                  ->where('created_at', '>=', Carbon::now()->subDays(30));
-            })
-            ->select('product_id', DB::raw('SUM(quantity) / 30 as daily_avg'))
-            ->groupBy('product_id')
-            ->orderBy('daily_avg', 'desc')
-            ->with('product.recipes.ingredient')
-            ->get();
-
-        $ingredientDemand = [];
-
-        foreach ($topProducts as $tp) {
-            if (!$tp->product || !$tp->product->recipes) continue;
-
-            // Simple 14-day projection: daily_avg * 14 * (1 + current growth momentum)
-            // Use a 1.2x safety buffer
-            $projectedUnits = $tp->daily_avg * 14 * 1.2;
-
-            foreach ($tp->product->recipes as $recipe) {
-                if (!$recipe->ingredient) continue;
-                
-                $id = $recipe->ingredient_id;
-                if (!isset($ingredientDemand[$id])) {
-                    $ingredientDemand[$id] = [
-                        'id' => $id,
-                        'name' => $recipe->ingredient->name,
-                        'unit' => $recipe->ingredient->unit,
-                        'amount' => 0,
-                        'priority' => 'Medium'
-                    ];
-                }
-                $ingredientDemand[$id]['amount'] += ($recipe->quantity * $projectedUnits);
-            }
-        }
-
-        // Sort by amount descending and take top 15 "Must Stock" ingredients
-        return collect($ingredientDemand)
-            ->sortByDesc('amount')
-            ->take(15)
-            ->map(function($item) {
-                // Round to whole number
-                $item['amount'] = ceil($item['amount']);
-                // Heuristic: If amount is significant, mark as High priority
-                if ($item['amount'] > 25) $item['priority'] = 'High';
-                return $item;
-            })
-            ->values()
-            ->toArray();
     }
 
     private function getProductInsights(array $analytics): array
