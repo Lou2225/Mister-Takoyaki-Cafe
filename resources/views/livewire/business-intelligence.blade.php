@@ -16,7 +16,7 @@
                 <p class="text-[12px] text-gray-500 font-medium whitespace-nowrap overflow-hidden text-ellipsis">Consolidated analytics and <span class="{{ $primaryText }} font-bold">predictive forecasting</span></p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-                <x-date-filter startModel="startDate" endModel="endDate" activeModel="activeFilter" />
+                <x-date-filter startModel="startDate" endModel="endDate" activeModel="activeFilter" refreshAction="applyQuickDateFilter" />
                 <x-report-dropdown module="BI Report" />
 
                 {{-- Branch Scope (Super Admin) --}}
@@ -490,6 +490,41 @@
 
     {{-- ── Sales Report Tab ── --}}
     <div x-cloak x-show="activeTab === 'sales'" class="space-y-6 animate-fadeIn">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                <div>
+                    <h4 class="text-[15px] font-bold text-gray-900 tracking-tight">Sales Performance Trend</h4>
+                    <p class="text-[11px] text-gray-400 font-medium">Revenue movement for the selected reporting period.</p>
+                </div>
+                <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-50 text-[10px] font-black uppercase tracking-[0.24em] text-slate-500 border border-slate-100">
+                    Daily Trend
+                </span>
+            </div>
+            @php
+            $trendData = $salesData['sales_trend'] ?? ['categories' => [], 'gross' => [], 'net_sales' => [], 'has_data' => false];
+            @endphp
+
+            @if($trendData['has_data'])
+                <script type="application/json" id="sales-trend-data">
+                {!! json_encode($trendData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!}
+                </script>
+                <div x-data="salesReportTrend(JSON.parse(document.getElementById('sales-trend-data').textContent))"
+                     wire:ignore
+                     @refresh-bi-charts.window="updateChart($event.detail)"
+                     x-init="init()"
+                     class="w-full">
+                    <div x-ref="trendChart" class="w-full h-[320px]"></div>
+                </div>
+            @else
+                <div class="p-10">
+                    <x-empty-state
+                        title="No Sales Trend Data"
+                        description="No completed sales were recorded for the selected period. Adjust the date range or branch filter to see trend movement."
+                    />
+                </div>
+            @endif
+        </div>
+
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 px-1">
 
             {{-- Payment Methods + Order Sources --}}
@@ -724,4 +759,125 @@
     @endphp
 
     <div id="bi-chart-data" style="display:none;" data-state='{{ $biChartDataState }}'></div>
+
+    @push('scripts')
+    <script>
+        function salesReportTrend(initialData) {
+            return {
+                trendChart: null,
+                chartData: initialData || { categories: [], gross: [], net_sales: [] },
+
+                init() {
+                    if (typeof window.ApexCharts === 'undefined' || !this.$refs.trendChart) {
+                        return;
+                    }
+
+                    const options = {
+                        series: [
+                            { name: 'Gross Revenue', data: this.chartData.gross },
+                            { name: 'Net Sales', data: this.chartData.net_sales }
+                        ],
+                        chart: {
+                            type: 'area',
+                            height: 320,
+                            toolbar: { show: false },
+                            zoom: { enabled: false },
+                            animations: {
+                                enabled: true,
+                                easing: 'easeinout',
+                                speed: 800,
+                                animateGradually: { enabled: false },
+                                dynamicAnimation: { enabled: false }
+                            }
+                        },
+                        dataLabels: { enabled: false },
+                        stroke: {
+                            curve: 'smooth',
+                            width: [3, 2],
+                            dashArray: [0, 6]
+                        },
+                        fill: {
+                            type: 'gradient',
+                            gradient: {
+                                shadeIntensity: 1,
+                                opacityFrom: 0.28,
+                                opacityTo: 0.03,
+                                stops: [0, 80, 100]
+                            }
+                        },
+                        colors: ['#10B981', '#6366F1'],
+                        xaxis: {
+                            categories: this.chartData.categories,
+                            tickAmount: window.innerWidth < 640 ? 4 : 8,
+                            labels: { style: { colors: '#9CA3AF', fontSize: '10px' } },
+                            axisBorder: { show: false },
+                            axisTicks: { show: false }
+                        },
+                        yaxis: {
+                            labels: {
+                                style: { colors: '#9CA3AF', fontSize: '11px' },
+                                formatter: (val) => {
+                                    if (val >= 1000) {
+                                        return '₱' + (val / 1000).toFixed(1) + 'k';
+                                    }
+                                    return '₱' + val.toFixed(0);
+                                }
+                            }
+                        },
+                        grid: {
+                            borderColor: '#f8fafc',
+                            strokeDashArray: 4,
+                            padding: { top: 0, right: 15, bottom: 10, left: 10 }
+                        },
+                        legend: {
+                            position: 'top',
+                            horizontalAlign: 'right',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            markers: { radius: 8, width: 8, height: 8 }
+                        },
+                        tooltip: {
+                            theme: 'dark',
+                            y: {
+                                formatter: (val) => '₱ ' + Number(val).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                            }
+                        }
+                    };
+
+                    this.trendChart = new ApexCharts(this.$refs.trendChart, options);
+                    this.trendChart.render();
+                },
+
+                updateChart(detail) {
+                    if (detail && detail.categories) {
+                        this.chartData = {
+                            categories: detail.categories ?? [],
+                            gross: detail.gross ?? [],
+                            net_sales: detail.net_sales ?? [],
+                        };
+                    }
+
+                    this.$nextTick(() => {
+                        if (!this.$refs.trendChart) {
+                            return;
+                        }
+
+                        if (!this.trendChart) {
+                            this.init();
+                            return;
+                        }
+
+                        this.trendChart.updateOptions({
+                            xaxis: { categories: this.chartData.categories },
+                            series: [
+                                { name: 'Gross Revenue', data: this.chartData.gross },
+                                { name: 'Net Sales', data: this.chartData.net_sales }
+                            ]
+                        }, false, false, false);
+                    });
+                }
+            };
+        }
+    </script>
+    @endpush
 </div>

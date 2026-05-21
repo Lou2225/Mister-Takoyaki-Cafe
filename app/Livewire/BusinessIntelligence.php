@@ -57,7 +57,12 @@ class BusinessIntelligence extends Component
 
         // Initialize dates if not set via query string
         if (!$this->startDate) {
-            $this->startDate = Carbon::now()->subDays(30)->format('Y-m-d');
+            $this->startDate = Carbon::parse(
+                Order::when($this->selectedBranchId !== 'all', fn($q) => $q->where('branch_id', $this->selectedBranchId))
+                    ->min('created_at')
+                ?? now()
+            )->format('Y-m-d');
+            $this->activeFilter = 'All Time';
         }
         if (!$this->endDate) {
             $this->endDate = Carbon::now()->format('Y-m-d');
@@ -78,8 +83,13 @@ class BusinessIntelligence extends Component
         $this->updateHeader();
     }
 
-    public function applyQuickDateFilter(string $filter)
+    public function applyQuickDateFilter(?string $filter = null)
     {
+        if (!$filter) {
+            $this->resetPage();
+            return;
+        }
+
         switch ($filter) {
             case 'today':
                 $this->startDate = Carbon::now()->format('Y-m-d');
@@ -97,7 +107,11 @@ class BusinessIntelligence extends Component
                 $this->activeFilter = 'Last 30 Days';
                 break;
             case 'all':
-                $this->startDate = Carbon::parse(Order::min('created_at') ?? now())->format('Y-m-d');
+                $this->startDate = Carbon::parse(
+                    Order::when($this->selectedBranchId !== 'all', fn($q) => $q->where('branch_id', $this->selectedBranchId))
+                        ->min('created_at')
+                    ?? now()
+                )->format('Y-m-d');
                 $this->endDate = Carbon::now()->format('Y-m-d');
                 $this->activeFilter = 'All Time';
                 break;
@@ -122,19 +136,23 @@ class BusinessIntelligence extends Component
 
     public function updated(string $propertyName)
     {
-        if (in_array($propertyName, ['selectedBranchId', 'search', 'perPage'])) {
+        if (in_array($propertyName, ['selectedBranchId', 'search', 'perPage', 'startDate', 'endDate', 'seasonalityMode'])) {
             $this->resetPage();
             if ($propertyName === 'perPage') {
                 $this->resetPage('branchPage');
             }
         }
-        // Charts update automatically via 'bi-data-ready' event when view re-renders
     }
 
     public function render()
     {
         $analytics = $this->getAnalytics();
         $isActionable = $this->selectedBranchId !== 'all';
+        
+        $trendData = $analytics['sales_trend'] ?? ['categories' => [], 'gross' => [], 'net_sales' => []];
+        
+        // Dispatch browser event after Livewire renders, with chart payload
+        $this->dispatch('refresh-bi-charts', $trendData);
         
         return view('livewire.business-intelligence', [
             'branches'       => Branch::all(),
@@ -192,6 +210,7 @@ class BusinessIntelligence extends Component
         $grossProfit = $netSales - $totalCogs - $wasteCost;
 
         $breakdown   = $this->buildSalesBreakdown($completedOrders);
+        $salesTrend  = $this->buildSalesTrend($completedOrders);
 
         return [
             'gross_sales'     => $grossSales,
@@ -219,6 +238,7 @@ class BusinessIntelligence extends Component
             'payment_methods'  => $breakdown['payment_methods'],
             'order_sources'    => $breakdown['order_sources'],
             'top_items'        => $breakdown['top_items'],
+            'sales_trend'      => $salesTrend,
             'orders'           => $orders,
             'completed_orders' => $completedOrders,
         ];
@@ -319,6 +339,37 @@ class BusinessIntelligence extends Component
 
     }
 
+    private function buildSalesTrend(Collection $completedOrders): array
+    {
+        $startDate = Carbon::parse($this->startDate)->startOfDay();
+        $endDate = Carbon::parse($this->endDate)->endOfDay();
+
+        $groupedByDate = $completedOrders->groupBy(fn($order) => $order->created_at->format('Y-m-d'));
+
+        $categories = [];
+        $grossRevenue = [];
+        $netSales = [];
+
+        $cursor = $startDate->copy();
+        while ($cursor->lte($endDate)) {
+            $key = $cursor->format('Y-m-d');
+            $ordersForDay = $groupedByDate->get($key, collect());
+
+            $grossRevenue[] = (float) $ordersForDay->sum(fn($order) => $order->total_amount + $order->discount_amount);
+            $netSales[]     = (float) $ordersForDay->sum(fn($order) => $order->total_amount - $order->delivery_fee);
+            $categories[]   = $cursor->format('M d');
+
+            $cursor->addDay();
+        }
+
+        return [
+            'categories' => $categories,
+            'gross'      => $grossRevenue,
+            'net_sales'  => $netSales,
+            'has_data'   => $completedOrders->isNotEmpty(),
+        ];
+    }
+
     private function getProductInsights(array $analytics): array
     {
         $orderIds = $analytics['completed_orders']->pluck('id');
@@ -365,7 +416,7 @@ class BusinessIntelligence extends Component
         $endDate = Carbon::parse($this->endDate)->endOfDay();
 
         $topProductIds = OrderItem::whereHas('order', function($q) use ($startDate, $endDate) {
-                $q->where('payment_status', 'Paid')
+                $q->whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
                   ->when($this->selectedBranchId !== 'all', fn($q) => $q->where('branch_id', $this->selectedBranchId))
                   ->whereBetween('created_at', [$startDate, $endDate]);
             })
@@ -383,7 +434,7 @@ class BusinessIntelligence extends Component
 
             $dowSales = OrderItem::join('orders', 'order_items.order_id', '=', 'orders.id')
                 ->where('order_items.product_id', $pid)
-                ->where('orders.payment_status', 'Paid')
+                ->whereIn('orders.status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
                 ->when($this->selectedBranchId !== 'all', fn($q) => $q->where('orders.branch_id', $this->selectedBranchId))
                 ->whereBetween('orders.created_at', [$startDate, $endDate])
                 ->selectRaw('DAYOFWEEK(orders.created_at) as dow, SUM(order_items.quantity) as total')
@@ -412,7 +463,7 @@ class BusinessIntelligence extends Component
         $endDate   = Carbon::parse($this->endDate)->endOfDay();
 
         $topProductIds = OrderItem::whereHas('order', function($q) use ($startDate, $endDate) {
-                $q->where('payment_status', 'Paid')
+                $q->whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
                   ->when($this->selectedBranchId !== 'all', fn($q) => $q->where('branch_id', $this->selectedBranchId))
                   ->whereBetween('created_at', [$startDate, $endDate]);
             })
@@ -441,7 +492,7 @@ class BusinessIntelligence extends Component
 
             $monthlySales = OrderItem::join('orders', 'order_items.order_id', '=', 'orders.id')
                 ->where('order_items.product_id', $pid)
-                ->where('orders.payment_status', 'Paid')
+                ->whereIn('orders.status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
                 ->when($this->selectedBranchId !== 'all', fn($q) => $q->where('orders.branch_id', $this->selectedBranchId))
                 ->whereBetween('orders.created_at', [$startDate, $endDate])
                 ->selectRaw('MONTH(orders.created_at) as month_num, SUM(order_items.quantity) as total')
