@@ -6,6 +6,7 @@ use Endroid\QrCode\QrCode;
 use Endroid\QrCode\Writer\PngWriter;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class QrCodeHelper
 {
@@ -39,13 +40,19 @@ class QrCodeHelper
     /**
      * Generate a QR code for a customer review URL
      * 
-     * @param string $transactionId The transaction/order ID
+     * @param string $reviewTarget The branch code or full review URL
      * @param string|null $customBaseUrl Override the default base URL
      * @return string Data URI for the QR code
      */
-    public static function generateReviewQrCode(string $transactionId, ?string $customBaseUrl = null): string
+    public static function generateReviewQrCode(string $reviewTarget, ?string $customBaseUrl = null): string
     {
-        $reviewUrl = route('customer.review');
+        if (filter_var($reviewTarget, FILTER_VALIDATE_URL)) {
+            $reviewUrl = $reviewTarget;
+        } elseif (!empty($customBaseUrl) && filter_var($customBaseUrl, FILTER_VALIDATE_URL)) {
+            $reviewUrl = $customBaseUrl;
+        } else {
+            $reviewUrl = route('customer.review', ['branch' => $reviewTarget]);
+        }
         
         // Ensure that if accessed via localhost locally, the QR code uses the LAN IP so phones can scan it
         if (str_contains($reviewUrl, 'localhost') || str_contains($reviewUrl, '127.0.0.1')) {

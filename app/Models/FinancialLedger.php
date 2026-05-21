@@ -94,7 +94,7 @@ class FinancialLedger extends Model
             'order_id' => $order->id,
             'transaction_type' => self::TRANSACTION_TYPE_SALE,
             'account_type' => self::ACCOUNT_TYPE_SALES,
-            'amount' => $order->total_amount - $order->tax_amount,
+            'amount' => $order->total_amount,
             'reference_no' => $order->reference_no,
             'description' => "Sales from {$order->reference_no}",
             'recorded_by' => $userId,

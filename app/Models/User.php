@@ -195,6 +195,7 @@ class User extends Authenticatable
         'branch_id',
         'date_hired',
         'position',
+        'avatar',
         'is_active',
         'hide_modules',
         'latitude',

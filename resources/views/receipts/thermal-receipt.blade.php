@@ -280,8 +280,14 @@
                     </div>
                 @endif
                 
-                <p class="receipt-business-name">{{ $settings['business_name'] ?? 'Mister Takoyaki Cafe' }}</p>
+                <p class="receipt-business-name">{{ $settings['business_name'] ?? 'Your Business Name' }}</p>
                 
+                @if(!empty($settings['business_phone']))
+                    <div style="font-size: 8px; color: #4b5563; margin-top: 2px;">+63 {{ ltrim(trim($settings['business_phone']), '+63') }}</div>
+                @endif
+                @if(!empty($settings['business_email']))
+                    <div style="font-size: 8px; color: #4b5563; margin-top: 2px;">{{ $settings['business_email'] }}</div>
+                @endif
                 <div style="text-align: center; margin-top: 4px; margin-bottom: 8px;">
                     <span style="font-size: 14px; font-weight: 900; text-transform: uppercase; border: 2px solid black; padding: 2px 8px; border-radius: 4px; letter-spacing: 1px;">
                         {{ $order->order_type }}
@@ -423,10 +429,16 @@
                 <div class="receipt-footer">
                     <p class="receipt-footer-text">{{ $settings['receipt_footer_message'] ?? 'Thank you for your visit!' }}</p>
 
-                    @if($qrCode)
+                    @if(!empty($settings['receipt_return_policy']))
+                        <div style="font-size: 7px; color: #6b7280; margin-top: 6px; padding-top: 4px; border-top: 1px dashed #e5e7eb;">
+                            {{ $settings['receipt_return_policy'] }}
+                        </div>
+                    @endif
+
+                    @if(!empty($settings['qr_code']))
                         <div class="receipt-qr">
                             <div class="receipt-qr-label">Scan to Review:</div>
-                            <img src="{{ $qrCode }}" alt="Review QR Code">
+                            <img src="{{ $settings['qr_code'] }}" alt="Review QR Code">
                         </div>
                     @endif
                 </div>
@@ -435,3 +447,4 @@
     </div>
 </body>
 </html>
+

@@ -198,7 +198,7 @@ class Order extends Model
     {
         return in_array($this->status, [self::STATUS_COMPLETED]) 
             && $this->refundable_amount > 0 
-            && $this->created_at->diffInHours(now()) <= 24;
+            && $this->created_at->diffInHours(now()) < 1;
     }
 
     public function isPending(): bool
@@ -223,10 +223,22 @@ class Order extends Model
 
     public function canBeVoided(): bool
     {
-        return in_array($this->status, [self::STATUS_COMPLETED]) 
-            && !$this->isVoid() 
-            && !$this->isRefunded()
-            && $this->created_at->diffInHours(now()) <= 24;
+        // Cannot void an order that is already voided, refunded, drafted, or cancelled.
+        // Pending app orders should be 'Rejected' instead.
+        // Completed orders CAN be voided (e.g. wrong POS entry)
+        $invalidStatuses = [
+            self::STATUS_VOID, 
+            self::STATUS_REFUNDED, 
+            self::STATUS_PARTIALLY_REFUNDED, 
+            self::STATUS_DRAFTED,
+            self::STATUS_CANCELLED,
+            self::STATUS_PENDING,
+            self::STATUS_HANDED_TO_RIDER,
+            self::STATUS_OUT_FOR_DELIVERY
+        ];
+
+        return !in_array($this->status, $invalidStatuses) 
+            && $this->created_at->diffInMinutes(now()) <= 30;
     }
 
     // ─── Actions ───
@@ -256,6 +268,11 @@ class Order extends Model
             'refunded_at' => now(),
             'refunded_amount' => $this->total_amount,
         ]);
+
+        // Reverse stock deductions for all items
+        foreach ($this->items as $item) {
+            StockDeductionService::reverseDeduction($this->branch_id, $item->id);
+        }
 
         return $this;
     }

@@ -5,14 +5,14 @@
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>{{ config('app.name', 'Mister Takoyaki Cafe') }} - Customer Feedback</title>
+        <title>{{ \App\Services\ConfigurationService::getBusinessName() }} - Customer Feedback</title>
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800,900&display=swap" rel="stylesheet" />
 
         <!-- Scripts -->
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
+        @vite(['resources/js/app.js'])
         @livewireStyles
     </head>
     <body class="font-sans antialiased bg-gray-50 text-gray-900 selection:bg-rose-500 selection:text-white">
@@ -32,7 +32,7 @@
                         </div>
                     @endif
                     <h1 class="text-xl font-black tracking-tight text-gray-900 mb-1">We value your feedback</h1>
-                    <p class="text-[13px] text-gray-500 font-medium">Help us improve your Mister Takoyaki experience</p>
+                    <p class="text-[13px] text-gray-500 font-medium">Help us improve your {{ \App\Services\ConfigurationService::getBusinessName() }} experience</p>
                 </div>
 
                 {{ $slot }}
@@ -40,7 +40,7 @@
             </div>
             
             <div class="mt-8 text-center text-[11px] font-bold text-gray-400 uppercase tracking-widest relative z-10">
-                &copy; {{ date('Y') }} Mister Takoyaki Cafe
+                &copy; {{ date('Y') }} {{ \App\Services\ConfigurationService::getBusinessName() }}
             </div>
             
             <!-- Optional Background decorative element -->
@@ -50,3 +50,5 @@
         @livewireScripts
     </body>
 </html>
+
+

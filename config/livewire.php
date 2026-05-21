@@ -15,7 +15,7 @@ return [
     |
     */
 
-    'class_namespace' => 'App\\Http\\Livewire',
+    'class_namespace' => 'App\\Livewire',
 
     /*
     |--------------------------------------------------------------------------
@@ -35,11 +35,22 @@ return [
     |--------------------------------------------------------------------------
     | The default layout view that will be used when rendering a component via
     | Route::get('/some-endpoint', SomeComponent::class);. In this case the
-    | the view returned by SomeComponent will be wrapped in "layouts.app"
+    | the view returned by SomeComponent will be wrapped in "components.layouts.app"
     |
     */
 
-    'layout' => 'layouts.app',
+    'layout' => 'components.layouts.app',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Lazy Placeholder
+    |--------------------------------------------------------------------------
+    |
+    | This value sets the path for the default Livewire lazy placeholder.
+    |
+    */
+
+    'lazy_placeholder' => null,
 
     /*
     |--------------------------------------------------------------------------
@@ -55,20 +66,6 @@ return [
     */
 
     'asset_url' => null,
-
-    /*
-    |--------------------------------------------------------------------------
-    | Livewire App URL
-    |--------------------------------------------------------------------------
-    |
-    | This value should be used if livewire assets are served from CDN.
-    | Livewire will communicate with an app through this url.
-    |
-    | Examples: "https://my-app.com", "myurl.com/app".
-    |
-    */
-
-    'app_url' => null,
 
     /*
     |--------------------------------------------------------------------------
@@ -110,38 +107,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Manifest File Path
-    |--------------------------------------------------------------------------
-    |
-    | This value sets the path to the Livewire manifest file.
-    | The default should work for most cases (which is
-    | "<app_root>/bootstrap/cache/livewire-components.php"), but for specific
-    | cases like when hosting on Laravel Vapor, it could be set to a different value.
-    |
-    | Example: for Laravel Vapor, it would be "/tmp/storage/bootstrap/cache/livewire-components.php".
-    |
-    */
-
-    'manifest_path' => null,
-
-    /*
-    |--------------------------------------------------------------------------
-    | Back Button Cache
-    |--------------------------------------------------------------------------
-    |
-    | This value determines whether the back button cache will be used on pages
-    | that contain Livewire. By disabling back button cache, it ensures that
-    | the back button shows the correct state of components, instead of
-    | potentially stale, cached data.
-    |
-    | Setting it to "false" (default) will disable back button cache.
-    |
-    */
-
-    'back_button_cache' => false,
-
-    /*
-    |--------------------------------------------------------------------------
     | Render On Redirect
     |--------------------------------------------------------------------------
     |
@@ -154,5 +119,55 @@ return [
     */
 
     'render_on_redirect' => false,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Legacy Model Binding
+    |--------------------------------------------------------------------------
+    |
+    | This value determines whether Livewire will use the legacy model binding
+    | behavior (Livewire v2) or the new behavior (Livewire v3).
+    |
+    */
+
+    'legacy_model_binding' => false,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Inject Assets
+    |--------------------------------------------------------------------------
+    |
+    | This value determines whether Livewire will automatically inject its
+    | JavaScript and CSS assets into the page or not.
+    |
+    */
+
+    'inject_assets' => true,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Inject Morph Markers
+    |--------------------------------------------------------------------------
+    |
+    | This value determines whether Livewire will automatically inject morph
+    | markers into the page or not.
+    |
+    */
+
+    'inject_morph_markers' => true,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Navigate (SPA mode)
+    |--------------------------------------------------------------------------
+    |
+    | This value determines whether Livewire will use the new SPA mode
+    | (wire:navigate) by default or not.
+    |
+    */
+
+    'navigate' => [
+        'show_progress_bar' => true,
+    ],
 
 ];

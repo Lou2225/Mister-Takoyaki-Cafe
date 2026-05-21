@@ -1,11 +1,26 @@
-<div x-data="{ panel: @entangle('panel'), mode: @entangle('mode'), tableView: @entangle('view') }" class="relative">
+@php
+    $totalTemplates = $allTemplates->count();
+    $requiredTemplates = $allTemplates->where('is_required', true)->count();
+    $totalItems = $allTemplates->sum(fn($t) => $t->items->count());
+    $fixedTemplates = $allTemplates->where('price_mode', 'fixed')->count();
+@endphp
+
+<div 
+    x-data="window.optionLibraryManagement($wire)"
+    class="relative"
+    wire:ignore.self
+    wire:key="option-library-main-container">
+
+    {{-- Hidden reactive sync helper under wire:ignore --}}
+    <div x-effect="updateTemplatesList(@js($allTemplates->map(fn($t) => ['id' => $t->id, 'name' => $t->name, 'price_mode' => $t->price_mode, 'is_required' => (bool)$t->is_required, 'items_count' => $t->items->count(), 'items' => $t->items->map(fn($i) => ['name' => $i->name, 'price' => (float)$i->price, 'is_default' => (bool)$i->is_default])])))" class="hidden" wire:key="templates-sync-helper"></div>
+
     {{-- ════════════════ PANEL 1 — LIST ════════════════ --}}
     <div x-show="panel === 'list'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="px-1">
         
         <div class="mb-5 flex items-center justify-between">
             <div>
                 <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Options Library</h2>
-                <p class="text-[12px] text-gray-500 font-medium">Reusable configurations: <span class="text-indigo-600 font-bold">{{ $templates->total() }} templates available</span></p>
+                <p class="text-[12px] text-gray-500 font-medium">Reusable configurations: <span class="text-indigo-600 font-bold" x-text="templatesList.length + ' templates available'"></span></p>
             </div>
             <x-primary-button wire:click="showCreate" class="h-10">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -17,44 +32,52 @@
 
         {{-- Library Metrics Grid --}}
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                <div class="w-10 h-10 rounded-xl bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+            {{-- Total Templates --}}
+            <div class="p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Templates</span>
+                    <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                    </div>
                 </div>
-                <div>
-                    <span class="block text-[10px] font-black text-indigo-700/60 uppercase tracking-widest leading-none mb-1">Total Templates</span>
-                    <span class="block text-[20px] font-black text-gray-900 leading-none">{{ $templates->total() }}</span>
-                </div>
+                <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $totalTemplates }}</h3>
+                <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Configured library items</p>
             </div>
 
-            <div class="bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                <div class="w-10 h-10 rounded-xl bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            {{-- Required Fields --}}
+            <div class="p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Required Fields</span>
+                    <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm shrink-0">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    </div>
                 </div>
-                <div>
-                    <span class="block text-[10px] font-black text-rose-700/60 uppercase tracking-widest leading-none mb-1">Required Fields</span>
-                    <span class="block text-[20px] font-black text-rose-600 leading-none">{{ \App\Models\OptionTemplate::where('is_required', true)->count() }}</span>
-                </div>
+                <h3 class="text-2xl font-black text-rose-600 tracking-tight leading-none">{{ $requiredTemplates }}</h3>
+                <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Mandatory input fields</p>
             </div>
 
-            <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                <div class="w-10 h-10 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            {{-- Total Variations --}}
+            <div class="p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Variations</span>
+                    <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
                 </div>
-                <div>
-                    <span class="block text-[10px] font-black text-emerald-700/60 uppercase tracking-widest leading-none mb-1">Total Variations</span>
-                    <span class="block text-[20px] font-black text-emerald-600 leading-none">{{ \App\Models\OptionTemplateItem::count() }}</span>
-                </div>
+                <h3 class="text-2xl font-black text-emerald-600 tracking-tight leading-none">{{ $totalItems }}</h3>
+                <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Individual option choices</p>
             </div>
 
-            <div class="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                <div class="w-10 h-10 rounded-xl bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            {{-- Fixed Pricing --}}
+            <div class="p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fixed Pricing</span>
+                    <div class="w-7 h-7 rounded-lg bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm shrink-0">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    </div>
                 </div>
-                <div>
-                    <span class="block text-[10px] font-black text-amber-700/60 uppercase tracking-widest leading-none mb-1">Fixed Pricing</span>
-                    <span class="block text-[20px] font-black text-gray-900 leading-none">{{ \App\Models\OptionTemplate::where('price_mode', 'fixed')->count() }}</span>
-                </div>
+                <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $fixedTemplates }}</h3>
+                <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Templates using set prices</p>
             </div>
         </div>
 
@@ -63,13 +86,7 @@
             
             {{-- Left: Search Bar --}}
             <div class="flex flex-1 w-full lg:w-auto">
-                <div class="relative w-full lg:w-72 group">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                    </div>
-                    <input type="text" wire:model.debounce.300ms="search" placeholder="Search templates..." 
-                        class="h-9 pl-9 pr-4 w-full bg-slate-50 border-none rounded-lg text-[13px] font-medium placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all">
-                </div>
+                <x-search-bar x-model="searchQuery" placeholder="Search templates..." width="w-full lg:w-72" />
             </div>
 
             {{-- Right: Filters & View Toggle --}}
@@ -79,14 +96,14 @@
                     <x-slot name="trigger">
                         <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
                             <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            <span class="text-[12px] whitespace-nowrap">Filter: {{ $priceModeFilter ? ucfirst($priceModeFilter) : 'All' }}</span>
+                            <span class="text-[12px] whitespace-nowrap" x-text="priceModeFilter === '' ? 'Filter: All Logic' : (priceModeFilter === 'additive' ? 'Filter: Additive' : 'Filter: Fixed')"></span>
                             <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                         </x-secondary-button>
                     </x-slot>
                     <x-slot name="content">
-                        <x-dropdown-link href="#" wire:click.prevent="$set('priceModeFilter', '')">All Logic</x-dropdown-link>
-                        <x-dropdown-link href="#" wire:click.prevent="$set('priceModeFilter', 'additive')">Additive</x-dropdown-link>
-                        <x-dropdown-link href="#" wire:click.prevent="$set('priceModeFilter', 'fixed')">Fixed</x-dropdown-link>
+                        <x-dropdown-link href="#" @click.prevent="priceModeFilter = ''" ::class="priceModeFilter === '' ? 'bg-slate-50 font-bold text-indigo-600' : ''">All Logic</x-dropdown-link>
+                        <x-dropdown-link href="#" @click.prevent="priceModeFilter = 'additive'" ::class="priceModeFilter === 'additive' ? 'bg-slate-50 font-bold text-indigo-600' : ''">Additive</x-dropdown-link>
+                        <x-dropdown-link href="#" @click.prevent="priceModeFilter = 'fixed'" ::class="priceModeFilter === 'fixed' ? 'bg-slate-50 font-bold text-indigo-600' : ''">Fixed</x-dropdown-link>
                     </x-slot>
                 </x-dropdown>
 
@@ -114,8 +131,8 @@
                     <th class="py-3 px-4 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest">Actions</th>
                 </x-slot>
 
-                @forelse($templates as $tmpl)
-                    <tr class="hover:bg-slate-50/50 transition-colors group cursor-pointer" wire:click="showEdit({{ $tmpl->id }})">
+                @forelse($allTemplates as $tmpl)
+                    <tr x-show="isItemVisible({{ $tmpl->id }})" x-cloak class="hover:bg-slate-50/50 transition-colors group cursor-pointer" wire:click="showEdit({{ $tmpl->id }})">
                         <td class="py-4 px-4 whitespace-nowrap">
                             <div class="flex items-center gap-3">
                                 <div class="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors shadow-sm">
@@ -130,14 +147,15 @@
                             </span>
                         </td>
                         <td class="py-4 px-4 text-center">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-600 border border-indigo-100">
-                                {{ ucfirst($tmpl->price_mode) }}
-                            </span>
+                            <div class="flex items-center justify-center gap-1.5">
+                                <span class="h-1.5 w-1.5 rounded-full {{ $tmpl->price_mode === 'fixed' ? 'bg-indigo-500' : 'bg-sky-500' }}"></span>
+                                <span class="text-[11px] font-bold {{ $tmpl->price_mode === 'fixed' ? 'text-indigo-600' : 'text-sky-600' }} uppercase">{{ $tmpl->price_mode }}</span>
+                            </div>
                         </td>
                         <td class="py-4 px-4 text-center">
                             <span class="text-[13px] font-bold text-slate-600">{{ $tmpl->items->count() }} Items</span>
                         </td>
-                        <td class="py-4 px-4 text-right whitespace-nowrap" wire:click.stop>
+                        <td class="py-4 px-4 text-right whitespace-nowrap" @click.stop>
                             <div class="flex items-center justify-end">
                                 <x-secondary-button wire:click="showEdit({{ $tmpl->id }})" class="h-8 px-3 inline-flex items-center gap-1.5 text-xs shadow-none border-slate-200">
                                     <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
@@ -147,25 +165,33 @@
                         </td>
                     </tr>
                 @empty
-                    <tr>
-                        <td colspan="5" class="py-0">
-                            <x-empty-state title="Library Empty" description="Start building your configuration templates to speed up product management." />
-                        </td>
-                    </tr>
+                    @if($allTemplates->count() === 0)
+                        <tr>
+                            <td colspan="5" class="py-0">
+                                <x-empty-state title="Library Empty" description="Start building your configuration templates to speed up product management." />
+                            </td>
+                        </tr>
+                    @endif
                 @endforelse
+
+                <tr x-show="filteredTemplateIds.length === 0" x-cloak>
+                    <td colspan="5" class="py-0">
+                        <x-empty-state title="No templates match your search" description="Try changing your filters or search terms." />
+                    </td>
+                </tr>
             </x-data-table>
         </div>
 
         {{-- ── Board View ── --}}
         <div x-show="tableView === 'board'" class="animate-fadeIn">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                @foreach($templates as $tmpl)
-                    <div class="group relative bg-white border border-slate-100 rounded-[24px] p-6 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 hover:border-indigo-100 transition-all duration-300 cursor-pointer" wire:click="showEdit({{ $tmpl->id }})">
+                @forelse($allTemplates as $tmpl)
+                    <div x-show="isItemVisible({{ $tmpl->id }})" x-cloak class="group relative bg-white border border-slate-100 rounded-[24px] p-6 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 hover:border-indigo-100 transition-all duration-300 cursor-pointer" wire:click="showEdit({{ $tmpl->id }})">
                         <div class="flex items-start justify-between mb-4">
                             <div class="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-all duration-300 shadow-sm border border-slate-100">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18 18.247 18.477 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
                             </div>
-                            <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity" wire:click.stop>
+                            <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity" @click.stop>
                                 <x-secondary-button wire:click="showEdit({{ $tmpl->id }})" class="h-8 px-3 inline-flex items-center gap-1.5 text-xs shadow-none border-slate-200 bg-white">
                                     <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                     Edit
@@ -180,7 +206,10 @@
                         <h3 class="text-[16px] font-black text-slate-900 tracking-tight mb-1 group-hover:text-indigo-600 transition-colors">{{ $tmpl->name }}</h3>
                         <div class="flex items-center gap-2 mb-6">
                             <span class="text-[10px] font-black {{ $tmpl->is_required ? 'text-rose-500 bg-rose-50 border-rose-100' : 'text-slate-400 bg-slate-50 border-slate-100' }} border px-2 py-0.5 rounded-lg uppercase tracking-widest">{{ $tmpl->is_required ? 'Required' : 'Optional' }}</span>
-                            <span class="text-[10px] font-black text-indigo-500 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-lg uppercase tracking-widest">{{ ucfirst($tmpl->price_mode) }}</span>
+                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-white border border-slate-100 shadow-sm">
+                                <span class="h-1.5 w-1.5 rounded-full {{ $tmpl->price_mode === 'fixed' ? 'bg-indigo-500' : 'bg-sky-500' }}"></span>
+                                <span class="text-[10px] font-bold {{ $tmpl->price_mode === 'fixed' ? 'text-indigo-600' : 'text-sky-600' }} uppercase tracking-wider">{{ $tmpl->price_mode }}</span>
+                            </span>
                         </div>
 
                         <div class="space-y-2.5 pt-4 border-t border-slate-50">
@@ -200,12 +229,108 @@
                             @endif
                         </div>
                     </div>
-                @endforeach
+                @empty
+                    @if($allTemplates->count() === 0)
+                        <div class="col-span-full py-20 flex flex-col items-center justify-center border border-slate-100 rounded-3xl bg-white shadow-sm">
+                            <x-empty-state title="Library Empty" description="Start building your configuration templates to speed up product management." />
+                        </div>
+                    @endif
+                @endforelse
+
+                <div x-show="filteredTemplateIds.length === 0" x-cloak class="col-span-full py-20 flex flex-col items-center justify-center border border-slate-100 rounded-3xl bg-white shadow-sm">
+                    <x-empty-state title="No templates match your search" description="Try changing your filters or search terms." />
+                </div>
             </div>
         </div>
 
-        <div class="mt-8">
-            <x-pagination :paginator="$templates" />
+        {{-- Premium Alpine-driven Paginator --}}
+        <div class="mt-6">
+            <template x-if="filteredTemplateIds.length > 0">
+                <div class="flex flex-col lg:flex-row items-center justify-between px-4 py-4 bg-white border border-gray-100 rounded-2xl lg:px-6 gap-6 shadow-sm">
+                    <div class="flex flex-col sm:flex-row items-center justify-between w-full lg:w-auto gap-4 sm:gap-8">
+                        <div class="flex items-center gap-3">
+                            <div class="flex flex-col sm:flex-row sm:items-center sm:gap-1.5 leading-[0.9] sm:leading-none">
+                                <span class="text-[11px] sm:text-[12px] text-gray-400 font-black uppercase tracking-tighter sm:tracking-widest">Row</span>
+                                <span class="text-[9px] sm:text-[12px] text-gray-400/70 font-black uppercase tracking-tighter sm:tracking-widest">per page</span>
+                            </div>
+                            <div>
+                                <x-dropdown align="top" width="20" containerClasses="block">
+                                    <x-slot name="trigger">
+                                        <button type="button" class="inline-flex items-center justify-between min-w-[70px] px-3 py-1.5 text-[13px] font-black text-gray-900 bg-slate-50 border border-gray-200 rounded-xl hover:border-gray-300 focus:outline-none transition-all h-10 gap-2 shadow-sm font-sans">
+                                            <span x-text="perPage"></span>
+                                            <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                        </button>
+                                    </x-slot>
+                                    <x-slot name="content">
+                                        <template x-for="option in [5, 10, 15, 30, 50, 100]">
+                                            <x-dropdown-link href="#" @click.prevent="perPage = option; currentPage = 1;">
+                                                <span x-text="option"></span>
+                                            </x-dropdown-link>
+                                        </template>
+                                    </x-slot>
+                                </x-dropdown>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-gray-400 font-bold uppercase tracking-widest whitespace-nowrap">
+                            <span class="text-gray-900" x-text="Math.min(filteredTemplateIds.length, (currentPage - 1) * perPage + 1)"></span>
+                            <span class="mx-0.5 text-gray-300">-</span>
+                            <span class="text-gray-900" x-text="Math.min(filteredTemplateIds.length, currentPage * perPage)"></span>
+                            <span class="mx-1 text-gray-300 lowercase italic font-medium">of</span>
+                            <span class="text-indigo-600" x-text="filteredTemplateIds.length"></span>
+                            <span class="ml-1 text-gray-300 lowercase italic font-medium">results</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 w-full lg:w-auto justify-center lg:justify-end border-t border-gray-50 pt-4 lg:border-0 lg:pt-0">
+                        <x-secondary-button @click="currentPage = 1" ::disabled="currentPage === 1" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="currentPage === 1 ? 'opacity-30 pointer-events-none' : ''">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                            </svg>
+                        </x-secondary-button>
+                        <x-secondary-button @click="currentPage = Math.max(1, currentPage - 1)" ::disabled="currentPage === 1" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="currentPage === 1 ? 'opacity-30 pointer-events-none' : ''">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                            </svg>
+                        </x-secondary-button>
+                        <div class="flex items-center gap-1.5 px-2">
+                            <template x-for="page in pageNumbers">
+                                <div class="flex items-center gap-1.5">
+                                    <template x-if="page === currentPage">
+                                        <x-primary-button class="!p-0 w-9 h-9 items-center justify-center !rounded-xl bg-gray-900 text-[13px] font-black shadow-none ring-0">
+                                            <span x-text="page"></span>
+                                        </x-primary-button>
+                                    </template>
+                                    <template x-if="page !== currentPage">
+                                        <x-secondary-button @click="currentPage = page" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl text-[13px] font-bold">
+                                            <span x-text="page"></span>
+                                        </x-secondary-button>
+                                    </template>
+                                </div>
+                            </template>
+                            
+                            <template x-if="Math.ceil(filteredTemplateIds.length / perPage) > currentPage + 1">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-gray-300 font-bold mx-1">...</span>
+                                    <x-secondary-button @click="currentPage = Math.ceil(filteredTemplateIds.length / perPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl text-[13px] font-bold">
+                                        <span x-text="Math.ceil(filteredTemplateIds.length / perPage)"></span>
+                                    </x-secondary-button>
+                                </div>
+                            </template>
+                        </div>
+                        <x-secondary-button @click="currentPage = Math.min(Math.ceil(filteredTemplateIds.length / perPage), currentPage + 1)" ::disabled="currentPage >= Math.ceil(filteredTemplateIds.length / perPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="currentPage >= Math.ceil(filteredTemplateIds.length / perPage) ? 'opacity-30 pointer-events-none' : ''">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                            </svg>
+                        </x-secondary-button>
+                        <x-secondary-button @click="currentPage = Math.ceil(filteredTemplateIds.length / perPage) || 1" ::disabled="currentPage >= Math.ceil(filteredTemplateIds.length / perPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="currentPage >= Math.ceil(filteredTemplateIds.length / perPage) ? 'opacity-30 pointer-events-none' : ''">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                            </svg>
+                        </x-secondary-button>
+                    </div>
+                </div>
+            </template>
         </div>
     </div>
 
@@ -243,7 +368,7 @@
                             <div class="flex items-center gap-4 p-4 rounded-xl bg-slate-50/50 border border-slate-100 hover:bg-white hover:border-indigo-100 hover:shadow-sm transition-all group animate-fadeIn">
                                 <div class="flex-1">
                                     <x-input-label value="Option Name" class="text-[10px] mb-1 ml-1" />
-                                    <x-text-input type="text" wire:model="templateItems.{{ $idx }}.name" 
+                                    <x-text-input type="text" wire:model.live="templateItems.{{ $idx }}.name" 
                                         class="w-full h-10 text-[13px] font-bold text-slate-800 placeholder-slate-300" 
                                         placeholder="e.g. Regular Size" />
                                 </div>
@@ -253,7 +378,7 @@
                                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                             <span class="text-[12px] font-black text-slate-400">₱</span>
                                         </div>
-                                        <x-text-input type="text" wire:model="templateItems.{{ $idx }}.price" 
+                                        <x-text-input type="text" wire:model.live="templateItems.{{ $idx }}.price" 
                                             class="w-full h-10 pl-7 text-[13px] font-black text-slate-800 text-right" 
                                             placeholder="0.00" />
                                     </div>
@@ -294,7 +419,7 @@
                     <div class="space-y-6">
                         <div>
                             <x-input-label value="Template Identity *" />
-                            <x-text-input wire:model="name" class="w-full mt-1.5 h-10 font-bold text-slate-800" placeholder="e.g. Premium Flavors" />
+                            <x-text-input wire:model.live="name" class="w-full mt-1.5 h-10 font-bold text-slate-800" placeholder="e.g. Premium Flavors" />
                             <x-input-error :messages="$errors->get('name')" class="mt-1" />
                         </div>
 
@@ -314,7 +439,7 @@
 
                         <div class="pt-5 border-t border-slate-50">
                             <label class="flex items-center gap-3 cursor-pointer group">
-                                <input type="checkbox" wire:model="isRequired" class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                <input type="checkbox" wire:model.live="isRequired" class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
                                 <div>
                                     <span class="text-[13px] font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">Mandatory Field</span>
                                     <p class="text-[11px] text-slate-400 font-medium leading-none mt-1">Require customer selection</p>
@@ -399,4 +524,70 @@
             </div>
         </div>
     </x-modal>
+
+    <script>
+        (function() {
+            window.optionLibraryManagement = function($wire) {
+                return {
+                    panel: $wire.entangle('panel').live,
+                    mode: $wire.entangle('mode').live,
+                    tableView: $wire.entangle('view').live,
+                    priceModeFilter: '',
+                    searchQuery: '',
+                    currentPage: 1,
+                    perPage: 5,
+                    templatesList: [],
+
+                    get filteredTemplateIds() {
+                        const query = this.searchQuery.toLowerCase().trim();
+                        const filter = this.priceModeFilter;
+                        return this.templatesList
+                            .filter(t => {
+                                const matchesSearch = !query || 
+                                    t.name.toLowerCase().includes(query) || 
+                                    t.items.some(item => item.name.toLowerCase().includes(query));
+                                
+                                const matchesMode = !filter || t.price_mode === filter;
+                                
+                                return matchesSearch && matchesMode;
+                            })
+                            .map(t => t.id);
+                    },
+                    get paginatedTemplateIds() {
+                        const start = (this.currentPage - 1) * this.perPage;
+                        return this.filteredTemplateIds.slice(start, start + this.perPage);
+                    },
+                    get pageNumbers() {
+                        const totalPages = Math.ceil(this.filteredTemplateIds.length / this.perPage) || 1;
+                        const start = Math.max(1, this.currentPage - 1);
+                        const end = Math.min(totalPages, this.currentPage + 1);
+                        const pages = [];
+                        for (let i = start; i <= end; i++) {
+                            pages.push(i);
+                        }
+                        return pages;
+                    },
+                    isItemVisible(id) {
+                        return this.paginatedTemplateIds.includes(id);
+                    },
+                    updateTemplatesList(newList) {
+                        const oldSig = this.templatesList.map(t => `${t.id}-${t.name}-${t.price_mode}-${t.is_required}-${t.items_count}`).join(',');
+                        const newSig = newList.map(t => `${t.id}-${t.name}-${t.price_mode}-${t.is_required}-${t.items_count}`).join(',');
+                        if (oldSig !== newSig) {
+                            this.templatesList = newList;
+                            this.currentPage = 1;
+                        }
+                    },
+
+                    init() {
+                        this.$watch('searchQuery', () => { this.currentPage = 1; });
+                        this.$watch('priceModeFilter', () => { this.currentPage = 1; });
+                        this.$watch('perPage', () => { this.currentPage = 1; });
+                    }
+                };
+            };
+        })();
+    </script>
 </div>
+
+

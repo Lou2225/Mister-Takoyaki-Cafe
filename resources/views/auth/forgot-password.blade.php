@@ -1,16 +1,12 @@
 <div>
 <div class="w-full" x-data="{
     strength: 0,
-    step: 1,
-    countdown: 0,
+    step: $wire.entangle('step'),
+    countdown: $wire.entangle('resendCooldown'),
     timer: null,
     expireCountdown: 600,
     expireTimer: null,
-    otp: '',
     digits: ['','','','','',''],
-    email: '',
-    password: '',
-    passwordConfirmation: '',
     
     checkStrength(pw) {
         let s = 0;
@@ -55,6 +51,7 @@
         let arr = ['','','','','',''];
         paste.split('').forEach((c, index) => arr[index] = c);
         this.digits = arr;
+        $wire.set('otp', this.digits.join(''));
         if (paste.length === 6) {
             let inputs = e.target.parentElement.querySelectorAll('input');
             if (inputs[5]) inputs[5].focus();
@@ -66,78 +63,20 @@
             let inputs = e.target.parentElement.querySelectorAll('input');
             if (inputs[i - 1]) inputs[i - 1].focus();
         }
+    },
+    init() {
+        let currentOtp = $wire.otp || '';
+        for (let i = 0; i < 6; i++) {
+            this.digits[i] = currentOtp[i] || '';
+        }
+        this.$watch('digits', (value) => {
+            $wire.set('otp', value.join(''));
+        });
+        this.$watch('countdown', v => { 
+            if (v > 0 && !this.timer) this.startCountdown(); 
+        });
     }
-}" x-init="
-    const setup = () => {
-        let el = $el.closest('[wire\\:id]');
-        if (!el) return;
-        let id = el.getAttribute('wire:id');
-        let component = null;
-        try {
-            component = window.Livewire && window.Livewire.find(id);
-        } catch (e) {
-            // Livewire component not fully booted yet in the registry
-        }
-        
-        if (component) {
-            // Initial sync
-            step = component.get('step');
-            countdown = component.get('resendCooldown');
-            otp = component.get('otp') || '';
-            let arr = [...digits];
-            for (let i = 0; i < 6; i++) {
-                arr[i] = otp[i] || '';
-            }
-            digits = arr;
-            
-            email = component.get('email') || '';
-            password = component.get('password') || '';
-            passwordConfirmation = component.get('passwordConfirmation') || '';
-            
-            // Watch server updates safely
-            if (!el.__lwSync) {
-                window.Livewire.hook('message.processed', (msg, comp) => {
-                    if (comp.id === id) {
-                        step = comp.get('step');
-                        countdown = comp.get('resendCooldown');
-                        let newOtp = comp.get('otp') || '';
-                        if (otp !== newOtp) {
-                            otp = newOtp;
-                            let newArr = [...digits];
-                            for (let i = 0; i < 6; i++) {
-                                newArr[i] = otp[i] || '';
-                            }
-                            digits = newArr;
-                        }
-                    }
-                });
-                el.__lwSync = true;
-            }
-
-            // Watch local changes and push to server safely
-            $watch('digits', (value) => {
-                let currentOtp = value.join('');
-                if (otp !== currentOtp) {
-                    otp = currentOtp;
-                    try { window.Livewire?.find(id)?.set('otp', otp, true); } catch(e) {}
-                }
-            });
-            $watch('email', (value) => {
-                try { window.Livewire?.find(id)?.set('email', value, true); } catch(e) {}
-            });
-            $watch('password', (value) => {
-                try { window.Livewire?.find(id)?.set('password', value, true); } catch(e) {}
-            });
-            $watch('passwordConfirmation', (value) => {
-                try { window.Livewire?.find(id)?.set('passwordConfirmation', value, true); } catch(e) {}
-            });
-        } else {
-            setTimeout(setup, 50);
-        }
-    };
-    setup();
-    $watch('countdown', v => { if (v > 0 && !timer) startCountdown(); });
-" x-effect="if (step === 2) startExpireTimer()">
+}" x-effect="if (step === 2) startExpireTimer()">
 
     {{-- ═══════════════════════════════════════ STEP 1: Email ═══ --}}
     <div x-cloak x-show="step === 1" x-transition:enter="transition ease-out duration-300"
@@ -156,10 +95,10 @@
             </div>
         @endif
 
-        <form wire:submit.prevent="sendOtp" class="space-y-6">
+        <form wire:submit="sendOtp" class="space-y-6">
             <div>
                 <label for="fp_email" class="block text-[12px] font-semibold text-slate-900 uppercase tracking-[0.24em] mb-2">Email Address</label>
-                <input id="fp_email" type="email" x-model="email" autocomplete="email"
+                <input id="fp_email" type="email" wire:model="email" autocomplete="email"
                        placeholder="name@domain.com"
                        class="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:border-indigo-500 focus:ring-indigo-100 transition-all duration-200" />
                 @error('email')
@@ -215,7 +154,7 @@
             </div>
         </div>
 
-        <form wire:submit.prevent="verifyOtp" class="space-y-6">
+        <form wire:submit="verifyOtp" class="space-y-6">
             {{-- 6-digit OTP input --}}
             <div class="flex gap-3 justify-center" @paste.window="handlePaste">
                 <template x-for="(d, i) in digits" :key="i">
@@ -278,11 +217,11 @@
             <p class="text-[14px] text-slate-500 font-medium">Requires at least 8 characters, an uppercase letter, and a number.</p>
         </div>
 
-        <form wire:submit.prevent="resetPassword" class="space-y-6">
+        <form wire:submit="resetPassword" class="space-y-6">
             <div x-data="{ show: false }">
                 <label for="fp_password" class="block text-[12px] font-semibold text-slate-900 uppercase tracking-[0.24em] mb-2">New Password</label>
                 <div class="relative">
-                    <input id="fp_password" name="password" :type="show ? 'text' : 'password'" x-model="password"
+                    <input id="fp_password" name="password" :type="show ? 'text' : 'password'" wire:model="password"
                            placeholder="Min. 8 chars, A–Z, a–z, 0–9"
                            autocomplete="new-password"
                            x-on:input="checkStrength($event.target.value)"
@@ -321,7 +260,7 @@
             <div x-data="{ show: false }">
                 <label for="fp_password_confirmation" class="block text-[12px] font-semibold text-slate-900 uppercase tracking-[0.24em] mb-2">Confirm Password</label>
                 <div class="relative">
-                    <input id="fp_password_confirmation" name="password_confirmation" :type="show ? 'text' : 'password'" x-model="passwordConfirmation"
+                    <input id="fp_password_confirmation" name="password_confirmation" :type="show ? 'text' : 'password'" wire:model="passwordConfirmation"
                            placeholder="Re-enter your new password"
                            autocomplete="new-password"
                            class="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:border-indigo-500 focus:ring-indigo-100 transition-all duration-200 pr-12" />

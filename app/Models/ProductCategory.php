@@ -13,6 +13,7 @@ class ProductCategory extends Model
         'name',
         'icon',
         'description',
+        'production_station',
         'sort_order'
     ];
 

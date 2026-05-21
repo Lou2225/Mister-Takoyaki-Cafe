@@ -7,16 +7,12 @@
             <h2 class="text-2xl font-black text-gray-900 tracking-tight mb-2">Thank You!</h2>
             <p class="text-[14px] text-gray-500 font-medium leading-relaxed mb-6">Your feedback has been submitted successfully. We appreciate your time!</p>
             
-            <a href="/" class="inline-flex items-center justify-center w-full px-6 py-3.5 bg-gray-900 hover:bg-gray-800 text-white text-[14px] font-bold rounded-xl transition-all shadow-md focus:outline-none focus:ring-4 focus:ring-gray-200">
-                Back to Home
-            </a>
-            
             <div class="absolute -right-10 -bottom-10 opacity-5 pointer-events-none">
                 <svg class="w-40 h-40" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>
             </div>
         </div>
     @else
-        <form wire:submit.prevent="submit" class="bg-white rounded-3xl shadow-xl shadow-gray-200/50 p-6 sm:p-8 border border-gray-100 transition-all">
+        <form wire:submit="submit" class="bg-white rounded-3xl shadow-xl shadow-gray-200/50 p-6 sm:p-8 border border-gray-100 transition-all">
             
             <div class="mb-8 text-center pb-6 border-b border-gray-50">
                 <h1 class="text-xl font-black tracking-tight text-gray-900 mb-1">{{ tap($title) ? $title : 'How was your experience?' }}</h1>
@@ -74,7 +70,7 @@
                     <div class="space-y-4">
                         <div>
                             <label for="customer_name" class="block text-[13px] font-bold text-gray-700 mb-1.5">Name</label>
-                            <input type="text" wire:model.debounce.400ms="customer_name" id="customer_name" 
+                            <input type="text" wire:model.live.debounce.400ms="customer_name" id="customer_name" 
                                 class="w-full bg-gray-50 border {{ $errors->has('customer_name') ? 'border-red-500 bg-red-50' : 'border-gray-200' }} text-gray-900 text-[14px] rounded-xl focus:ring-rose-500 focus:border-rose-500 block px-3.5 py-2.5 transition-all shadow-sm placeholder-gray-400" 
                                 placeholder="Juan Dela Cruz" x-on:input="restrictInput($event, 'name')">
                             @error('customer_name') <span class="text-xs text-rose-500 font-bold mt-1 block">{{ $message }}</span> @enderror
@@ -82,7 +78,7 @@
 
                         <div>
                             <label for="contact_number" class="block text-[13px] font-bold text-gray-700 mb-1.5">Contact Number</label>
-                            <input type="tel" wire:model.debounce.400ms="contact_number" id="contact_number" 
+                            <input type="tel" wire:model.live.debounce.400ms="contact_number" id="contact_number" 
                                 class="w-full bg-gray-50 border {{ $errors->has('contact_number') ? 'border-red-500 bg-red-50' : 'border-gray-200' }} text-gray-900 text-[14px] rounded-xl focus:ring-rose-500 focus:border-rose-500 block px-3.5 py-2.5 transition-all shadow-sm placeholder-gray-400" 
                                 placeholder="09xxxxxxxxx" x-on:input="restrictInput($event, 'phone')">
                             @error('contact_number') <span class="text-xs text-rose-500 font-bold mt-1 block">{{ $message }}</span> @enderror

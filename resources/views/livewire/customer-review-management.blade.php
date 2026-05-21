@@ -6,7 +6,7 @@
     $primaryBg = "bg-{$primaryColor}-600";
 @endphp
 
-<div class="relative overflow-hidden">
+<div class="relative overflow-hidden" wire:poll.5s>
     <div class="relative min-h-[600px] px-1">
         
         {{-- Header Section --}}
@@ -17,53 +17,57 @@
             </div>
         </div>
 
-        {{-- KPI Cards Section (Matching Stock Aesthetic) --}}
+        {{-- KPI Cards Section (Matching Dashboard Premium Aesthetic - Compact Footprint) --}}
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             {{-- Total Feedback --}}
-            <div class="bg-gradient-to-br from-{{ $primaryColor }}-50 to-{{ $primaryColor }}-100 border border-{{ $primaryColor }}-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                <div class="w-10 h-10 rounded-xl bg-white border border-{{ $primaryColor }}-100 flex items-center justify-center {{ $primaryText }} shadow-sm">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"/></svg>
+            <div class="p-4 bg-gradient-to-br from-{{ $primaryColor }}-500/10 via-{{ $primaryColor }}-500/5 to-white border border-{{ $primaryColor }}-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Reviews</span>
+                    <div class="w-7 h-7 rounded-lg bg-white border border-{{ $primaryColor }}-100 flex items-center justify-center {{ $primaryText }} shadow-sm">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"/></svg>
+                    </div>
                 </div>
-                <div>
-                    <span class="block text-[10px] font-black {{ $primaryText }} opacity-60 uppercase tracking-widest leading-none mb-1">Total Reviews</span>
-                    <span class="block text-[20px] font-black text-gray-900 leading-none">{{ $stats['total'] }}</span>
-                </div>
+                <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $stats['total'] }}</h3>
+                <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Aggregated customer submissions</p>
             </div>
 
             {{-- Average Rating --}}
-            <div class="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                <div class="w-10 h-10 rounded-xl bg-white border border-amber-100 flex items-center justify-center text-amber-500 shadow-sm">
-                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                </div>
-                <div>
-                    <span class="block text-[10px] font-black text-amber-700/60 uppercase tracking-widest leading-none mb-1">Global Average</span>
-                    <div class="flex items-baseline gap-1">
-                        <span class="block text-[20px] font-black text-gray-900 leading-none">{{ number_format($stats['average'], 1) }}</span>
-                        <span class="text-[10px] font-bold text-gray-400">/ 5.0</span>
+            <div class="p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Global Average</span>
+                    <div class="w-7 h-7 rounded-lg bg-white border border-amber-100 flex items-center justify-center text-amber-500 shadow-sm">
+                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
                     </div>
                 </div>
+                <div class="flex items-baseline gap-1">
+                    <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($stats['average'], 1) }}</h3>
+                    <span class="text-[11px] font-bold text-slate-400">/ 5.0 Rating</span>
+                </div>
+                <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Overall satisfaction index</p>
             </div>
 
             {{-- Branch Specific Volume --}}
-            <div class="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                <div class="w-10 h-10 rounded-xl bg-white border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+            <div class="p-4 bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-white border border-blue-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Scope Volume</span>
+                    <div class="w-7 h-7 rounded-lg bg-white border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                    </div>
                 </div>
-                <div>
-                    <span class="block text-[10px] font-black text-blue-700/60 uppercase tracking-widest leading-none mb-1">Scope Volume</span>
-                    <span class="block text-[20px] font-black text-gray-900 leading-none">{{ $stats['branch_count'] }}</span>
-                </div>
+                <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $stats['branch_count'] }}</h3>
+                <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Interactions in active scope</p>
             </div>
 
             {{-- Latest Activity --}}
-            <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                <div class="w-10 h-10 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <div class="p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Latest Activity</span>
+                    <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
                 </div>
-                <div>
-                    <span class="block text-[10px] font-black text-emerald-700/60 uppercase tracking-widest leading-none mb-1">Latest Activity</span>
-                    <span class="block text-[12px] font-black text-gray-900 uppercase tracking-tight">{{ $stats['latest'] }}</span>
-                </div>
+                <h3 class="text-[13px] font-black text-slate-900 tracking-tight leading-none uppercase truncate" title="{{ $stats['latest'] }}">{{ $stats['latest'] }}</h3>
+                <p class="text-[10px] text-slate-400 font-semibold mt-2.5 leading-none">Most recent event logged</p>
             </div>
         </div>
 
@@ -77,6 +81,9 @@
 
             {{-- Right: Filters --}}
             <div class="flex flex-wrap items-center lg:justify-end gap-2">
+                {{-- 3-in-1 Date Filter Component --}}
+                <x-date-filter startModel="startDate" endModel="endDate" activeModel="activeFilter" />
+
                 @if(auth()->user()->isSuperAdmin())
                     <x-dropdown align="right" width="48" wire:key="filter-branch">
                         <x-slot name="trigger">
@@ -159,9 +166,10 @@
                             <div class="text-[11px] text-slate-400 font-medium italic">{{ $review->created_at->diffForHumans() }}</div>
                         </td>
                         <td class="py-3 px-4 whitespace-nowrap text-right">
-                            <button wire:click="viewReview({{ $review->id }})" class="inline-flex items-center px-2 py-1 border border-slate-200 text-[12px] font-semibold rounded-lg text-slate-500 bg-white hover:text-gray-700 hover:border-slate-300 transition-colors focus:outline-none shadow-sm">
+                            <x-secondary-button type="button" wire:click="viewReview({{ $review->id }})" class="h-9 px-3 whitespace-nowrap">
+                                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                                 View Details
-                            </button>
+                            </x-secondary-button>
                         </td>
                     </tr>
                 @empty

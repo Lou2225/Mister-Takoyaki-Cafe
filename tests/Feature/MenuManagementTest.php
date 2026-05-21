@@ -38,7 +38,7 @@ class MenuManagementTest extends TestCase
         $image = UploadedFile::fake()->image('classic_tako.jpg');
 
         Livewire::actingAs($this->user)
-            ->test(\App\Http\Livewire\MenuManagement::class)
+            ->test(\App\Livewire\MenuManagement::class)
             ->set('name', 'Classic Takoyaki')
             ->set('price', 85)
             ->set('image', $image)

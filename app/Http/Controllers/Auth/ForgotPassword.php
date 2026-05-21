@@ -62,7 +62,7 @@ class ForgotPassword extends Component
         $this->step = 2;
         $this->otp  = '';
         $this->resendCooldown = 60;
-        $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => 'Verification code sent to your email!']);
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Verification code sent to your email!']);
     }
 
     // ── Step 2: Verify OTP ────────────────────────────────────────
@@ -109,7 +109,7 @@ class ForgotPassword extends Component
         $record->delete(); // One-time use — delete immediately
         $this->step = 3;
         $this->otp  = '';
-        $this->dispatchBrowserEvent('notify', ['type' => 'success', 'message' => 'Code verified! You may now set a new password.']);
+        $this->dispatch('notify', ['type' => 'success', 'message' => 'Code verified! You may now set a new password.']);
     }
 
     // ── Step 3: Reset Password ────────────────────────────────────

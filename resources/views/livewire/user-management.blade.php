@@ -1,21 +1,9 @@
 <div
-    x-data="userManagementData(@js($panel), @js($mode), @js($view))"
-    x-on:switch-panel.window="
-        panel = $event.detail?.panel || $event.detail[0]?.panel || 'list'; 
-        mode = $event.detail?.mode || $event.detail[0]?.mode || 'list';
-        if (panel === 'form') {
-            initMap();
-        } else {
-            if (this.marker && mode === 'create') {
-                this.map.removeLayer(this.marker);
-                this.marker = null;
-            }
-        }
-    "
+    x-data="userManagementData($wire, @js($panel), @js($mode), @js($view))"
     @send-email-bg.window="$wire.sendUserEmail($event.detail.userId, $event.detail.password)"
     @trigger-edit.window="$wire.showEdit($event.detail.id, $event.detail.mode || 'edit')"
     @trigger-set-formrole.window="$wire.setFormRoleId($event.detail)"
-    @trigger-set-formbranch.window="$wire.set('formBranchId', $event.detail)"
+    @trigger-set-formbranch.window="$wire.setFormBranchId($event.detail)"
     @trigger-set-position.window="$wire.set('position', $event.detail)"
     class="relative">
 
@@ -50,7 +38,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div>
                                 <x-input-label for="f_first_name" value="First Name *" />
-                                <x-text-input id="f_first_name" name="first_name" wire:model.debounce.500ms="firstName"
+                                <x-text-input id="f_first_name" name="first_name" wire:model.live.debounce.500ms="firstName"
                                     type="text" class="mt-1 block w-full" placeholder="Juan"
                                     autocomplete="given-name" inputFilter="nameStrict" maxlength="100"
                                     @keydown="FormFilters.nameStrictKeydown($event)" @paste="FormFilters.nameStrictPaste($event)"
@@ -59,7 +47,7 @@
                             </div>
                             <div>
                                 <x-input-label for="f_middle_name" value="Middle Name" />
-                                <x-text-input id="f_middle_name" name="middle_name" wire:model.debounce.500ms="middleName"
+                                <x-text-input id="f_middle_name" name="middle_name" wire:model.live.debounce.500ms="middleName"
                                     type="text" class="mt-1 block w-full" placeholder="Dela"
                                     autocomplete="additional-name" inputFilter="nameStrict" maxlength="100"
                                     @keydown="FormFilters.nameStrictKeydown($event)" @paste="FormFilters.nameStrictPaste($event)"
@@ -68,7 +56,7 @@
                             </div>
                             <div>
                                 <x-input-label for="f_last_name" value="Last Name *" />
-                                <x-text-input id="f_last_name" name="last_name" wire:model.debounce.500ms="lastName" type="text"
+                                <x-text-input id="f_last_name" name="last_name" wire:model.live.debounce.500ms="lastName" type="text"
                                     class="mt-1 block w-full" placeholder="Cruz" autocomplete="family-name" 
                                     inputFilter="nameStrict" maxlength="100"
                                     @keydown="FormFilters.nameStrictKeydown($event)" @paste="FormFilters.nameStrictPaste($event)"
@@ -79,7 +67,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                             <div>
                                 <x-input-label for="f_email" value="Email Address *" />
-                                <x-text-input id="f_email" name="email" wire:model.debounce.500ms="email" type="email"
+                                <x-text-input id="f_email" name="email" wire:model.live.debounce.500ms="email" type="email"
                                     class="mt-1 block w-full" placeholder="juan.cruz@company.com"
                                     autocomplete="email" inputFilter="email" maxlength="255"
                                     @keydown="FormFilters.emailKeydown($event)" @paste="FormFilters.emailPaste($event)"
@@ -92,7 +80,7 @@
                                     <div class="flex-shrink-0 inline-flex items-center px-3 h-10 rounded-l-lg border border-r-0 border-gray-200 bg-gray-50 text-gray-500 text-[13px] font-bold">
                                         +63
                                     </div>
-                                    <x-text-input id="f_phone" name="phone" wire:model.debounce.500ms="phone" type="text"
+                                    <x-text-input id="f_phone" name="phone" wire:model.live.debounce.500ms="phone" type="text"
                                         class="block w-full rounded-l-none" placeholder="912 345 6789" autocomplete="tel"
                                         inputFilter="number" maxlength="10"
                                         @keydown="FormFilters.numberKeydown($event)" @paste="FormFilters.numberPaste($event)"
@@ -148,7 +136,7 @@
                             </div>
                             <div>
                                 <x-input-label for="f_date_hired" value="Date Joined" />
-                                <x-text-input id="f_date_hired" name="date_hired" wire:model.lazy="dateHired"
+                                <x-text-input id="f_date_hired" name="date_hired" wire:model.blur="dateHired"
                                     type="date" class="mt-1 block w-full" inputFilter="date"
                                     @keydown="FormFilters.dateKeydown($event)" @paste="FormFilters.datePaste($event)"
                                     :hasError="$errors->has('dateHired')" />
@@ -175,45 +163,60 @@
                             <div class="flex flex-col sm:flex-row gap-5">
                                 <div class="flex-1 w-full">
                                     <x-input-label value="Region" />
-                                    <div class="relative mt-1" @click.outside="loc.region.open = false">
-                                        <button type="button" @click="loc.region.open = !loc.region.open; loadRegions();" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm hover:border-indigo-300 focus:outline-none transition-all h-10">
-                                            <span class="truncate" :class="'{{ $addr_region }}' ? 'text-gray-900 font-medium' : 'text-gray-400'">{{ $addr_region ?: 'Select Region...' }}</span>
-                                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                        </button>
-                                        <div x-show="loc.region.open" class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden" x-cloak>
-                                            <div class="p-2 border-b border-gray-100 bg-gray-50/50">
-                                                <input x-model="loc.region.search" type="text" placeholder="Search..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
-                                            </div>
-                                            <div class="max-h-48 overflow-y-auto">
-                                                <template x-for="r in filtered('region')" :key="r.code">
-                                                    <button type="button" @click="selectRegion(r)" class="w-full text-left px-4 py-2 text-[12px] hover:bg-indigo-50 transition-colors" x-text="r.name"></button>
-                                                </template>
-                                            </div>
-                                        </div>
+                                    <div x-on:click.capture="loc.region.search = ''; loadRegions();">
+                                        <x-dropdown align="left" width="full" containerClasses="block w-full mt-1">
+                                            <x-slot name="trigger">
+                                                <button type="button" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm hover:border-indigo-300 focus:outline-none transition-all h-10">
+                                                    <span class="truncate" :class="addr_region ? 'text-gray-900 font-medium' : 'text-gray-400'" x-text="addr_region || 'Select Region...'"></span>
+                                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                                </button>
+                                            </x-slot>
+                                            <x-slot name="content">
+                                                <div class="p-2 border-b border-gray-100 bg-gray-50/50">
+                                                    <input x-model="loc.region.search" type="text" placeholder="Search region..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                                                </div>
+                                                <div class="max-h-48 overflow-y-auto">
+                                                    <template x-for="r in filtered('region')" :key="r.code">
+                                                        <x-dropdown-link href="#" @click.prevent="dropdownOpen = false; selectRegion(r)">
+                                                            <span x-text="r.name"></span>
+                                                        </x-dropdown-link>
+                                                    </template>
+                                                    <template x-if="filtered('region').length === 0">
+                                                        <div class="px-4 py-2 text-[12px] text-gray-400 italic font-medium">No regions found...</div>
+                                                    </template>
+                                                </div>
+                                            </x-slot>
+                                        </x-dropdown>
                                     </div>
                                     <x-input-error :messages="$errors->get('addr_region')" class="mt-1" />
                                 </div>
 
                                 <div class="flex-1 w-full">
                                     <x-input-label value="Province" />
-                                    <div class="relative mt-1" @click.outside="loc.province.open = false">
-                                        <button type="button" @click="loc.province.open = !loc.province.open" :disabled="!'{{ $addr_region }}' || loc.noProvince" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 h-10">
-                                            <span class="truncate" :class="'{{ $addr_province }}' ? 'text-gray-900 font-medium' : 'text-gray-400'">
-                                                <template x-if="loc.noProvince"><span>N/A (Direct to City)</span></template>
-                                                <template x-if="!loc.noProvince"><span x-text="'{{ $addr_province }}' || 'Select Province...'"></span></template>
-                                            </span>
-                                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                        </button>
-                                        <div x-show="loc.province.open" class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden" x-cloak>
-                                            <div class="p-2 border-b border-gray-100 bg-gray-50/50">
-                                                <input x-model="loc.province.search" type="text" placeholder="Search..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
-                                            </div>
-                                            <div class="max-h-48 overflow-y-auto">
-                                                <template x-for="p in filtered('province')" :key="p.code">
-                                                    <button type="button" @click="selectProvince(p)" class="w-full text-left px-4 py-2 text-[12px] hover:bg-indigo-50 transition-colors" x-text="p.name"></button>
-                                                </template>
-                                            </div>
-                                        </div>
+                                    <div x-on:click.capture="if(!addr_region || loc.noProvince) { $event.stopPropagation(); } else { loc.province.search = ''; }">
+                                        <x-dropdown align="left" width="full" containerClasses="block w-full mt-1">
+                                            <x-slot name="trigger">
+                                                <button type="button" :disabled="!addr_region || loc.noProvince" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 disabled:opacity-75 disabled:cursor-not-allowed h-10">
+                                                    <span class="truncate" :class="addr_province ? 'text-gray-900 font-medium' : 'text-gray-400'">
+                                                        <template x-if="loc.noProvince"><span>N/A (Direct to City)</span></template>
+                                                        <template x-if="!loc.noProvince"><span x-text="addr_province || 'Select Province...'"></span></template>
+                                                    </span>
+                                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                                </button>
+                                            </x-slot>
+                                            <x-slot name="content">
+                                                <div class="p-2 border-b border-gray-100 bg-gray-50/50">
+                                                    <input x-model="loc.province.search" type="text" placeholder="Search province..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                                                </div>
+                                                <div class="max-h-48 overflow-y-auto">
+                                                    <template x-for="p in filtered('province')" :key="p.code">
+                                                        <x-dropdown-link href="#" @click.prevent="dropdownOpen = false; selectProvince(p)">
+                                                            <span x-text="p.name"></span>
+                                                        </x-dropdown-link>
+                                                    </template>
+                                                </div>
+                                            </x-slot>
+                                        </x-dropdown>
                                     </div>
                                     <x-input-error :messages="$errors->get('addr_province')" class="mt-1" />
                                 </div>
@@ -223,42 +226,54 @@
                             <div class="flex flex-col sm:flex-row gap-5">
                                 <div class="flex-1 w-full">
                                     <x-input-label value="City / Municipality" />
-                                    <div class="relative mt-1" @click.outside="loc.city.open = false">
-                                        <button type="button" @click="loc.city.open = !loc.city.open" :disabled="!'{{ $addr_region }}'" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 h-10">
-                                            <span class="truncate" :class="'{{ $addr_city }}' ? 'text-gray-900 font-medium' : 'text-gray-400'">{{ $addr_city ?: 'Select City...' }}</span>
-                                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                        </button>
-                                        <div x-show="loc.city.open" class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden" x-cloak>
-                                            <div class="p-2 border-b border-gray-100 bg-gray-50/50">
-                                                <input x-model="loc.city.search" type="text" placeholder="Search..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
-                                            </div>
-                                            <div class="max-h-48 overflow-y-auto">
-                                                <template x-for="c in filtered('city')" :key="c.code">
-                                                    <button type="button" @click="selectCity(c)" class="w-full text-left px-4 py-2 text-[12px] hover:bg-indigo-50 transition-colors" x-text="c.name"></button>
-                                                </template>
-                                            </div>
-                                        </div>
+                                    <div x-on:click.capture="if(!addr_region || (!addr_province && !loc.noProvince)) { $event.stopPropagation(); } else { loc.city.search = ''; }">
+                                        <x-dropdown align="left" width="full" containerClasses="block w-full mt-1">
+                                            <x-slot name="trigger">
+                                                <button type="button" :disabled="!addr_region || (!addr_province && !loc.noProvince)" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 disabled:opacity-75 disabled:cursor-not-allowed h-10">
+                                                    <span class="truncate" :class="addr_city ? 'text-gray-900 font-medium' : 'text-gray-400'" x-text="addr_city || 'Select City...'"></span>
+                                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                                </button>
+                                            </x-slot>
+                                            <x-slot name="content">
+                                                <div class="p-2 border-b border-gray-100 bg-gray-50/50">
+                                                    <input x-model="loc.city.search" type="text" placeholder="Search city..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                                                </div>
+                                                <div class="max-h-48 overflow-y-auto">
+                                                    <template x-for="c in filtered('city')" :key="c.code">
+                                                        <x-dropdown-link href="#" @click.prevent="dropdownOpen = false; selectCity(c)">
+                                                            <span x-text="c.name"></span>
+                                                        </x-dropdown-link>
+                                                    </template>
+                                                </div>
+                                            </x-slot>
+                                        </x-dropdown>
                                     </div>
                                     <x-input-error :messages="$errors->get('addr_city')" class="mt-1" />
                                 </div>
 
                                 <div class="flex-1 w-full">
                                     <x-input-label value="Barangay" />
-                                    <div class="relative mt-1" @click.outside="loc.barangay.open = false">
-                                        <button type="button" @click="loc.barangay.open = !loc.barangay.open" :disabled="!'{{ $addr_city }}'" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 h-10">
-                                            <span class="truncate" :class="'{{ $addr_barangay }}' ? 'text-gray-900 font-medium' : 'text-gray-400'">{{ $addr_barangay ?: 'Select Barangay...' }}</span>
-                                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                        </button>
-                                        <div x-show="loc.barangay.open" class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden" x-cloak>
-                                            <div class="p-2 border-b border-gray-100 bg-gray-50/50">
-                                                <input x-model="loc.barangay.search" type="text" placeholder="Search..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
-                                            </div>
-                                            <div class="max-h-48 overflow-y-auto">
-                                                <template x-for="b in filtered('barangay')" :key="b.code">
-                                                    <button type="button" @click="selectBarangay(b)" class="w-full text-left px-4 py-2 text-[12px] hover:bg-indigo-50 transition-colors" x-text="b.name"></button>
-                                                </template>
-                                            </div>
-                                        </div>
+                                    <div x-on:click.capture="if(!addr_city) { $event.stopPropagation(); } else { loc.barangay.search = ''; }">
+                                        <x-dropdown align="left" width="full" containerClasses="block w-full mt-1">
+                                            <x-slot name="trigger">
+                                                <button type="button" :disabled="!addr_city" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 disabled:opacity-75 disabled:cursor-not-allowed h-10">
+                                                    <span class="truncate" :class="addr_barangay ? 'text-gray-900 font-medium' : 'text-gray-400'" x-text="addr_barangay || 'Select Barangay...'"></span>
+                                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                                </button>
+                                            </x-slot>
+                                            <x-slot name="content">
+                                                <div class="p-2 border-b border-gray-100 bg-gray-50/50">
+                                                    <input x-model="loc.barangay.search" type="text" placeholder="Search barangay..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                                                </div>
+                                                <div class="max-h-48 overflow-y-auto">
+                                                    <template x-for="b in filtered('barangay')" :key="b.code">
+                                                        <x-dropdown-link href="#" @click.prevent="dropdownOpen = false; selectBarangay(b)">
+                                                            <span x-text="b.name"></span>
+                                                        </x-dropdown-link>
+                                                    </template>
+                                                </div>
+                                            </x-slot>
+                                        </x-dropdown>
                                     </div>
                                     <x-input-error :messages="$errors->get('addr_barangay')" class="mt-1" />
                                 </div>
@@ -267,7 +282,7 @@
                             {{-- Row 3: Street --}}
                             <div>
                                 <x-input-label value="House # / Street / Subdivision" />
-                                <x-text-input wire:model.debounce.400ms="addr_street" class="w-full mt-1 h-10" placeholder="e.g. Unit 123, Rosewood Ave, Phase 1" :hasError="$errors->has('addr_street')" />
+                                <x-text-input wire:model.live.debounce.400ms="addr_street" class="w-full mt-1 h-10" placeholder="e.g. Unit 123, Rosewood Ave, Phase 1" :hasError="$errors->has('addr_street')" />
                                 <x-input-error :messages="$errors->get('addr_street')" class="mt-1" />
                             </div>
                         </div>
@@ -350,7 +365,7 @@
                     <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
                         <h2 class="text-[13px] font-semibold text-gray-700 uppercase tracking-wider mb-4">Account Status</h2>
                         <label for="f_is_active" class="flex items-center gap-3 cursor-pointer select-none">
-                            <input type="checkbox" id="f_is_active" name="is_active" wire:model.lazy="formIsActive"
+                            <input type="checkbox" id="f_is_active" name="is_active" wire:model.blur="formIsActive"
                                 class="rounded border-gray-300 text-gray-900 shadow-sm focus:ring-gray-900 h-4 w-4">
                             <div>
                                 <span class="block text-[13px] font-semibold text-gray-800">Active Access</span>
@@ -362,7 +377,7 @@
                     <div class="flex flex-col gap-2">
                         <x-primary-button type="button" wire:click="validateBeforeSaveUser"
                             class="w-full justify-center" x-text="mode === 'edit' ? 'Save Changes' : 'Register User'"></x-primary-button>
-                        <x-secondary-button @click="mode === 'edit' ? $wire.showEdit($wire.get('editUserId'), 'view') : (panel = 'list', mode = 'list', $wire.backToList())" class="w-full justify-center">
+                        <x-secondary-button @click="if(mode === 'edit') { mode = 'view'; $wire.showEdit($wire.get('editUserId'), 'view') } else { panel = 'list'; mode = 'list'; $wire.backToList() }" class="w-full justify-center">
                             <span>Cancel</span>
                         </x-secondary-button>
 
@@ -394,9 +409,15 @@
                             <div class="absolute -top-24 -right-24 w-48 h-48 bg-indigo-50 rounded-full blur-3xl opacity-50 group-hover:bg-indigo-100 transition-colors duration-500"></div>
                             
                             <div class="relative">
-                                <div class="w-24 h-24 bg-gradient-to-tr from-indigo-600 to-violet-500 text-white rounded-2xl flex items-center justify-center text-3xl font-black mx-auto mb-6 shadow-xl shadow-indigo-200 rotate-3 group-hover:rotate-0 transition-transform duration-500">
-                                    {{ strtoupper(substr($firstName, 0, 1) . substr($lastName, 0, 1)) }}
-                                </div>
+                                @if($editUserAvatar)
+                                    <div class="w-24 h-24 rounded-2xl flex items-center justify-center text-5xl mx-auto mb-6 shadow-xl rotate-3 group-hover:rotate-0 transition-transform duration-500" style="{{ $editUserAvatar['style'] }}">
+                                        {{ $editUserAvatar['emoji'] }}
+                                    </div>
+                                @else
+                                    <div class="w-24 h-24 bg-gradient-to-tr from-indigo-600 to-violet-500 text-white rounded-2xl flex items-center justify-center text-3xl font-black mx-auto mb-6 shadow-xl shadow-indigo-200 rotate-3 group-hover:rotate-0 transition-transform duration-500">
+                                        {{ strtoupper(substr($firstName, 0, 1) . substr($lastName, 0, 1)) }}
+                                    </div>
+                                @endif
                                 <h3 class="text-xl font-black text-slate-900 tracking-tight">{{ $firstName }} {{ $lastName }}</h3>
                                 <p class="text-[13px] text-slate-500 font-medium mt-1">{{ $email }}</p>
                                 
@@ -444,7 +465,7 @@
                                     
                                     {{-- Profile Actions --}}
                                     <div class="pt-6 mt-6 border-t border-slate-100 flex flex-col gap-2">
-                                        <button wire:click.prevent="showEdit({{ $editUserId }})"
+                                        <button wire:click.prevent="showEdit({{ $editUserId }})" wire:loading.attr="disabled"
                                             class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl transition-colors focus:outline-none">
                                             <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
@@ -469,8 +490,7 @@
                                     <p class="text-[12px] text-gray-400 font-medium mt-0.5">Historical performance data</p>
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <x-date-range-filter startModel="historyStartDate" endModel="historyEndDate" :startValue="$historyStartDate" />
-                                    <x-quick-date-filter :activeFilter="$activeFilter" class="h-10 border-gray-200 shadow-sm" />
+                                    <x-date-filter startModel="historyStartDate" endModel="historyEndDate" activeModel="activeFilter" />
                                 </div>
                             </div>
 
@@ -581,9 +601,10 @@
                                                 </button>
                                             </td>
                                             <td class="px-4 py-3">
-                                                <span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider {{ $order->status === 'Completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-slate-50 text-slate-600 border border-slate-100' }}">
-                                                    {{ $order->status }}
-                                                </span>
+                                                <div class="flex items-center gap-2">
+                                                    <span class="h-1.5 w-1.5 rounded-full {{ $order->status === 'Completed' ? 'bg-emerald-500' : 'bg-slate-400' }}"></span>
+                                                    <span class="text-[11px] font-bold {{ $order->status === 'Completed' ? 'text-emerald-600' : 'text-slate-600' }} uppercase">{{ $order->status }}</span>
+                                                </div>
                                             </td>
                                             <td class="px-4 py-3 text-right text-[13px] font-black text-slate-900">₱{{ number_format($order->total_amount, 2) }}</td>
                                         </tr>
@@ -616,7 +637,7 @@
 
             <div class="mb-5 flex items-center justify-between">
                 <div>
-                    <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">User Management</h2>
+                    <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">{{ auth()->user()->isSuperAdmin() ? 'User Management' : 'Staff Management' }}</h2>
                     <p class="text-[12px] text-gray-500 font-medium">System Overview: <span class="text-indigo-600 font-bold">{{ $totalUsers }} members</span></p>
                 </div>
                 <x-primary-button @click="panel = 'form'; mode = 'create'; $wire.showCreate()" class="h-10">
@@ -627,7 +648,7 @@
                 </x-primary-button>
             </div>
 
-            {{-- System Metrics Grid (Customer Reviews Aesthetic) --}}
+            {{-- System Metrics Grid (Matching Dashboard Premium Aesthetic - Compact Footprint) --}}
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                 @php
                     $sysStats = $this->systemStats;
@@ -635,47 +656,51 @@
                 @endphp
                 
                 {{-- Total Users --}}
-                <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                <div class="p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Users</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-indigo-700/60 uppercase tracking-widest leading-none mb-1">Total Users</span>
-                        <span class="block text-[20px] font-black text-gray-900 leading-none">{{ number_format($sysStats['total']) }}</span>
-                    </div>
+                    <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($sysStats['total']) }}</h3>
+                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Registered accounts in database</p>
                 </div>
 
                 {{-- Active Status --}}
-                <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <div class="p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active Now</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-emerald-700/60 uppercase tracking-widest leading-none mb-1">Active Now</span>
-                        <span class="block text-[20px] font-black text-emerald-600 leading-none">{{ number_format($sysStats['active']) }}</span>
-                    </div>
+                    <h3 class="text-2xl font-black text-emerald-600 tracking-tight leading-none">{{ number_format($sysStats['active']) }}</h3>
+                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Accounts with active access</p>
                 </div>
 
                 {{-- Inactive Accounts --}}
-                <div class="bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                <div class="p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Inactive</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-rose-700/60 uppercase tracking-widest leading-none mb-1">Inactive</span>
-                        <span class="block text-[20px] font-black text-rose-600 leading-none">{{ number_format($sysStats['inactive']) }}</span>
-                    </div>
+                    <h3 class="text-2xl font-black text-rose-600 tracking-tight leading-none">{{ number_format($sysStats['inactive']) }}</h3>
+                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Deactivated user profiles</p>
                 </div>
 
                 {{-- Workforce --}}
-                <div class="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                <div class="p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Staff Members</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-amber-700/60 uppercase tracking-widest leading-none mb-1">Staff</span>
-                        <span class="block text-[20px] font-black text-gray-900 leading-none">{{ number_format($sysStats['staff']) }}</span>
-                    </div>
+                    <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($sysStats['staff']) }}</h3>
+                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Operational store employees</p>
                 </div>
             </div>
 
@@ -802,19 +827,34 @@
                         <th class="py-3 px-4 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest">Actions</th>
                     </x-slot>
 
+                    @php
+                        $avatarCollection = collect(\App\Livewire\ProfileSettings::avatarCollection())->flatten(1);
+                    @endphp
+
                     @forelse($users as $user)
                         @php
                             $colors = ['from-purple-400 to-indigo-500', 'from-pink-400 to-rose-500', 'from-blue-400 to-sky-500', 'from-emerald-400 to-teal-500', 'from-amber-400 to-orange-500'];
                             $grad = $colors[$user->id % count($colors)];
                             $initials = strtoupper(substr($user->first_name ?? '', 0, 1) . substr($user->last_name ?? '', 0, 1));
+                            
+                            $userAvatar = null;
+                            if ($user->avatar) {
+                                $userAvatar = $avatarCollection->firstWhere('id', $user->avatar);
+                            }
                         @endphp
                         <tr wire:key="user-row-{{ $user->id }}-{{ $users->currentPage() }}"
                             class="hover:bg-slate-50/50 transition-colors">
                             <td class="py-3 px-4 whitespace-nowrap">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-[26px] h-[26px] rounded-full bg-gradient-to-br {{ $grad }} flex items-center justify-center text-white text-[11px] font-bold shadow-sm">
-                                        {{ $initials ?: '?' }}
-                                    </div>
+                                    @if($userAvatar)
+                                        <div class="w-[26px] h-[26px] rounded-full flex items-center justify-center text-[14px] shadow-sm" style="{{ $userAvatar['style'] }}">
+                                            {{ $userAvatar['emoji'] }}
+                                        </div>
+                                    @else
+                                        <div class="w-[26px] h-[26px] rounded-full bg-gradient-to-br {{ $grad }} flex items-center justify-center text-white text-[11px] font-bold shadow-sm">
+                                            {{ $initials ?: '?' }}
+                                        </div>
+                                    @endif
                                     <span class="font-medium text-[13px] text-slate-900">{{ $user->first_name }} {{ $user->last_name }}</span>
                                 </div>
                             </td>
@@ -823,9 +863,9 @@
                             <td class="py-3 px-4 whitespace-nowrap text-[13px] text-slate-600">{{ optional($user->branch)->branch_name ?? '—' }}</td>
                             <td class="py-3 px-4 whitespace-nowrap">
                                 <button wire:click="toggleStatus({{ $user->id }})"
-                                    class="flex items-center gap-2 text-[12px] font-medium text-slate-600 hover:opacity-80 transition-opacity focus:outline-none">
-                                    <span class="w-1.5 h-1.5 rounded-full {{ $user->is_active ? 'bg-[#27C93F] shadow-[0_0_4px_rgba(39,201,63,0.5)]' : 'bg-[#FF5F56] shadow-[0_0_4px_rgba(255,95,86,0.5)]' }}"></span>
-                                    {{ $user->is_active ? 'Active' : 'Inactive' }}
+                                    class="flex items-center gap-2 hover:opacity-85 transition-opacity focus:outline-none">
+                                    <span class="h-1.5 w-1.5 rounded-full {{ $user->is_active ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
+                                    <span class="text-[11px] font-bold {{ $user->is_active ? 'text-emerald-600' : 'text-rose-600' }} uppercase">{{ $user->is_active ? 'Active' : 'Inactive' }}</span>
                                 </button>
                             </td>
                             <td class="py-3 px-4 whitespace-nowrap text-[13px] text-slate-600">
@@ -864,21 +904,27 @@
                         @php
                             $colors = ['from-purple-400 to-indigo-500', 'from-pink-400 to-rose-500', 'from-blue-400 to-sky-500', 'from-emerald-400 to-teal-500', 'from-amber-400 to-orange-500'];
                             $grad = $colors[$user->id % count($colors)];
+                            
+                            $userAvatar = null;
+                            if ($user->avatar) {
+                                $userAvatar = $avatarCollection->firstWhere('id', $user->avatar);
+                            }
                         @endphp
                         <div class="bg-white rounded-2xl border border-slate-200/60 p-5 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_30px_-6px_rgba(0,0,0,0.1)] hover:-translate-y-0.5 transition-all duration-300">
                             <div class="flex items-start justify-between mb-3">
-                                <div
-                                    class="w-10 h-10 rounded-full bg-gradient-to-br {{ $grad }} flex items-center justify-center text-white font-bold shadow-sm">
-                                    {{ strtoupper(substr($user->first_name, 0, 1)) }}
+                                @if($userAvatar)
+                                    <div class="w-10 h-10 rounded-full flex items-center justify-center text-2xl shadow-sm" style="{{ $userAvatar['style'] }}">
+                                        {{ $userAvatar['emoji'] }}
+                                    </div>
+                                @else
+                                    <div class="w-10 h-10 rounded-full bg-gradient-to-br {{ $grad }} flex items-center justify-center text-white font-bold shadow-sm">
+                                        {{ strtoupper(substr($user->first_name, 0, 1)) }}
+                                    </div>
+                                @endif
+                                <div class="flex items-center gap-2">
+                                    <span class="h-1.5 w-1.5 rounded-full {{ $user->is_active ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
+                                    <span class="text-[11px] font-bold {{ $user->is_active ? 'text-emerald-600' : 'text-rose-600' }} uppercase">{{ $user->is_active ? 'Active' : 'Inactive' }}</span>
                                 </div>
-                                <span @class([
-                                    'px-2 py-0.5 rounded-xl text-[10px] font-bold uppercase border',
-                                    'bg-green-50 text-green-700 border-green-200' => $user->is_active,
-                                    'bg-red-50 text-red-700 border-red-200' => !$user->is_active,
-                                ])>
-
-                                    {{ $user->is_active ? 'Active' : 'Inactive' }}
-                                </span>
                             </div>
                             <h3 class="font-bold text-gray-900 text-sm mb-0.5">{{ $user->first_name }}
                                 {{ $user->last_name }}</h3>
@@ -980,9 +1026,19 @@
                 </div>
                 <div class="flex items-center justify-end gap-2">
                     <x-secondary-button @click="$dispatch('close-modal', 'confirm-manager-replace')">Cancel</x-secondary-button>
-                    <x-primary-button @click="$wire.replaceManager(); $dispatch('close-modal', 'confirm-manager-replace')"
-                        class="bg-amber-600 hover:bg-amber-700">
-                        Replace & Save
+                    <x-primary-button 
+                        wire:click="replaceManager"
+                        wire:loading.attr="disabled"
+                        wire:target="replaceManager"
+                        class="bg-amber-600 hover:bg-amber-700 min-w-[140px] flex justify-center">
+                        <span wire:loading.remove wire:target="replaceManager">Replace & Save</span>
+                        <span wire:loading wire:target="replaceManager">
+                            <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Saving...
+                        </span>
                     </x-primary-button>
                 </div>
             </div>
@@ -1007,10 +1063,18 @@
             <div class="flex items-center justify-end gap-2 mt-6">
                 <x-secondary-button @click="$dispatch('close-modal', 'confirm-save-user')" class="h-10">Cancel</x-secondary-button>
                 <x-primary-button 
-                    @click="$dispatch('close-modal', 'confirm-save-user')"
                     wire:click="{{ $editUserId ? 'updateUser' : 'saveUser' }}" 
-                    class="h-10">
-                    Confirm & Save
+                    wire:loading.attr="disabled"
+                    wire:target="updateUser, saveUser"
+                    class="h-10 min-w-[150px] flex justify-center">
+                    <span wire:loading.remove wire:target="updateUser, saveUser">Confirm & Save</span>
+                    <span wire:loading wire:target="updateUser, saveUser">
+                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Saving...
+                    </span>
                 </x-primary-button>
             </div>
         </div>
@@ -1052,9 +1116,10 @@
                             </div>
                             <div>
                                 <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Status</span>
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider {{ $viewingOrder->status === 'Completed' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-50 text-slate-500 border border-slate-100' }}">
-                                    {{ $viewingOrder->status }}
-                                </span>
+                                <div class="flex items-center gap-2">
+                                    <span class="h-1.5 w-1.5 rounded-full {{ $viewingOrder->status === 'Completed' ? 'bg-emerald-500' : 'bg-slate-400' }}"></span>
+                                    <span class="text-[11px] font-bold {{ $viewingOrder->status === 'Completed' ? 'text-emerald-600' : 'text-slate-600' }} uppercase">{{ $viewingOrder->status }}</span>
+                                </div>
                             </div>
                         </div>
                         
@@ -1179,296 +1244,410 @@
             </div>
         </div>
     </x-modal>
-</div>
+    <script>
+    (function() {
+        const registerUserData = () => {
+            if (!window.Alpine) return;
+            if (Alpine.data('userManagementData')) return;
+            Alpine.data('userManagementData', ($wire, initialPanel, initialMode, initialView) => ({
+                ...slidingTabs(@js($historyTab), 'historyTab', 'historyTabList'),
+                panel: $wire.entangle('panel').live,
+                mode: $wire.entangle('mode').live,
+                tableView: initialView || 'table',
+                deleteTargetId: null,
+                deleteTargetName: '',
 
-@push('scripts')
-@once
-<script>
-(function() {
-    const registerUserData = () => {
-        if (Alpine.data('userManagementData')) return;
-        Alpine.data('userManagementData', (initialPanel, initialMode, initialView) => ({
-            ...slidingTabs(@js($historyTab), 'historyTab', 'historyTabList'),
-            panel: initialPanel || 'list',
-            mode: initialMode || 'list',
-            tableView: initialView || 'table',
-            deleteTargetId: null,
-            deleteTargetName: '',
+                // ── Entangled Form State ─────────────────────────────────
+                addr_region: @entangle('addr_region'),
+                addr_province: @entangle('addr_province'),
+                addr_city: @entangle('addr_city'),
+                addr_barangay: @entangle('addr_barangay'),
+                addr_lat: @entangle('addr_lat'),
+                addr_lng: @entangle('addr_lng'),
 
-            // ── Location state ───────────────────────────────────────
-            loc: {
-                region:   { items: [], open: false, search: '', loading: false },
-                province: { items: [], open: false, search: '', loading: false },
-                city:     { items: [], open: false, search: '', loading: false },
-                barangay: { items: [], open: false, search: '', loading: false }
-            },
+                // ── Location state ───────────────────────────────────────
+                loc: {
+                    noProvince: false,
+                    region:   { items: [], search: '', loading: false },
+                    province: { items: [], search: '', loading: false },
+                    city:     { items: [], search: '', loading: false },
+                    barangay: { items: [], search: '', loading: false }
+                },
 
-            filtered(type) {
-                const s = this.loc[type];
-                const q = s.search.toLowerCase();
-                return q ? s.items.filter(i => i.name.toLowerCase().includes(q)) : s.items;
-            },
-
-            // ── PSGC loaders ─────────────────────────────────────────
-            async loadRegions() {
-                if (this.loc.region.items.length > 0) return;
-                this.loc.region.loading = true;
-                try {
-                    const res = await fetch('https://psgc.cloud/api/regions');
-                    if (!res.ok) throw new Error();
-                    this.loc.region.items = (await res.json()).sort((a, b) => a.name.localeCompare(b.name));
-                } catch (e) { console.error('Regions fetch failed', e); }
-                finally { this.loc.region.loading = false; }
-            },
-
-            async loadProvinces(regionCode) {
-                this.loc.province.items = []; this.loc.city.items = []; this.loc.barangay.items = [];
-                if (!regionCode) return;
-                this.loc.province.loading = true;
-                try {
-                    const res = await fetch(`https://psgc.cloud/api/regions/${regionCode}/provinces`);
-                    if (!res.ok) throw new Error();
-                    const data = await res.json();
-                    this.loc.province.items = data.sort((a, b) => a.name.localeCompare(b.name));
-                    
-                    // Handle regions that are also cities (e.g. NCR)
-                    if (this.loc.province.items.length === 0) {
-                        this.loc.province.loading = false;
-                        this.loc.city.loading = true;
-                        const res2 = await fetch(`https://psgc.cloud/api/regions/${regionCode}/cities-municipalities`);
-                        this.loc.city.items = (await res2.json()).sort((a, b) => a.name.localeCompare(b.name));
-                        this.loc.city.loading = false;
-                    }
-                } catch (e) { console.error(e); }
-                finally { this.loc.province.loading = false; }
-            },
-
-            async loadCities(provinceCode) {
-                this.loc.city.items = []; this.loc.barangay.items = [];
-                if (!provinceCode) return;
-                this.loc.city.loading = true;
-                try {
-                    const res = await fetch(`https://psgc.cloud/api/provinces/${provinceCode}/cities-municipalities`);
-                    if (!res.ok) throw new Error();
-                    this.loc.city.items = (await res.json()).sort((a, b) => a.name.localeCompare(b.name));
-                } catch (e) { console.error(e); }
-                finally { this.loc.city.loading = false; }
-            },
-
-            async loadBarangays(cityCode) {
-                this.loc.barangay.items = [];
-                if (!cityCode) return;
-                this.loc.barangay.loading = true;
-                try {
-                    const res = await fetch(`https://psgc.cloud/api/cities-municipalities/${cityCode}/barangays`);
-                    if (!res.ok) throw new Error();
-                    this.loc.barangay.items = (await res.json()).sort((a, b) => a.name.localeCompare(b.name));
-                } catch (e) { console.error(e); }
-                finally { this.loc.barangay.loading = false; }
-            },
-
-            // ── Cascade handlers ─────────────────────────────────────
-            async selectRegion(region) {
-                const lw = window.livewire.find('{{ $_instance->id }}');
-                lw.set('addr_region', region.name);
-                lw.set('addr_province', ''); lw.set('addr_city', ''); lw.set('addr_barangay', '');
-                this.loc.region.search = ''; this.loc.region.open = false;
-                this.loc.province.search = ''; this.loc.city.search = ''; this.loc.barangay.search = '';
-                await this.loadProvinces(region.code);
-            },
-            async selectProvince(province) {
-                const lw = window.livewire.find('{{ $_instance->id }}');
-                lw.set('addr_province', province.name);
-                lw.set('addr_city', ''); lw.set('addr_barangay', '');
-                this.loc.province.search = ''; this.loc.province.open = false;
-                this.loc.city.search = ''; this.loc.barangay.search = '';
-                await this.loadCities(province.code);
-            },
-            async selectCity(city) {
-                const lw = window.livewire.find('{{ $_instance->id }}');
-                lw.set('addr_city', city.name);
-                lw.set('addr_barangay', '');
-                this.loc.city.search = ''; this.loc.city.open = false;
-                this.loc.barangay.search = '';
-                await this.loadBarangays(city.code);
-            },
-            selectBarangay(brgy) {
-                window.livewire.find('{{ $_instance->id }}').set('addr_barangay', brgy.name);
-                this.loc.barangay.search = ''; this.loc.barangay.open = false;
-            },
-
-            async autoMatchLocation(addr) {
-                const clean = (str) => {
-                    if (!str) return '';
-                    return str.toLowerCase()
-                        .replace(/city of|province of|region|district|barangay|brgy\.?|municipality of/g, '')
-                        .replace(/[^a-z0-9]/g, '')
-                        .trim();
-                };
-
-                let rName = addr.region || '';
-                let pName = addr.state || addr.province || addr.county || '';
-                let cName = addr.city || addr.town || addr.municipality || '';
-                let bName = addr.quarter || addr.village || addr.suburb || addr.neighbourhood || '';
-
-                if (this.loc.region.items.length === 0) await this.loadRegions();
-
-                let crName = clean(rName);
-                let cpName = clean(pName);
-                let matchedR = this.loc.region.items.find(r => {
-                    const target = clean(r.name);
-                    return target === crName || 
-                           (crName.includes('manila') && target.includes('ncr')) ||
-                           (cpName.includes('manila') && target.includes('ncr'));
-                });
-
-                if (!matchedR && crName) {
-                    matchedR = this.loc.region.items.find(r => clean(r.name).includes(crName) || crName.includes(clean(r.name)));
-                }
-
-                if (!matchedR) return;
-                await this.selectRegion(matchedR);
-
-                if (pName && this.loc.province.items.length > 0) {
-                    let cppName = clean(pName);
-                    let matchedP = this.loc.province.items.find(p => clean(p.name) === cppName);
-                    if (!matchedP) {
-                        matchedP = this.loc.province.items.find(p => {
-                            const target = clean(p.name).replace('province', '');
-                            const search = cppName.replace('province', '');
-                            return target && search && (target === search || target.includes(search) || search.includes(target));
-                        });
-                    }
-                    if (matchedP) await this.selectProvince(matchedP);
-                }
-
-                if (cName && this.loc.city.items.length > 0) {
-                    let ccName = clean(cName);
-                    let matchedC = this.loc.city.items.find(c => clean(c.name) === ccName);
-                    if (!matchedC) {
-                        matchedC = this.loc.city.items.find(c => {
-                            const target = clean(c.name).replace('city', '').replace('municipality', '').replace('city of', '');
-                            const search = ccName.replace('city', '').replace('municipality', '').replace('city of', '');
-                            return target && search && (target === search || target.includes(search) || search.includes(target));
-                        });
-                    }
-                    if (matchedC) await this.selectCity(matchedC);
-                }
-
-                if (bName && this.loc.barangay.items.length > 0) {
-                    let cbName = clean(bName);
-                    let matchedB = this.loc.barangay.items.find(b => clean(b.name) === cbName);
-                    if (!matchedB) {
-                        matchedB = this.loc.barangay.items.find(b => {
-                            const target = clean(b.name).replace('barangay', '').replace('brgy', '').replace('poblacion', '').replace('pob', '');
-                            const search = cbName.replace('barangay', '').replace('brgy', '').replace('poblacion', '').replace('pob', '');
-                            return target && search && (target === search || target.includes(search) || search.includes(target));
-                        });
-                    }
-                    if (matchedB) this.selectBarangay(matchedB);
-                }
-            },
-
-            map: null,
-            marker: null,
-            initMap() {
-                if (this.map) {
-                    setTimeout(async () => {
-                        const container = document.getElementById('userMap');
-                        if (!container) return;
-                        this.map.invalidateSize(); 
-                        let lat = await window.livewire.find('{{ $_instance->id }}').get('addr_lat');
-                        let lng = await window.livewire.find('{{ $_instance->id }}').get('addr_lng');
-                        if (lat && lng) {
-                            this.map.setView([lat, lng], 16);
-                            if (this.marker) this.marker.setLatLng([lat, lng]);
-                        }
-                    }, 250);
-                    return;
-                }
-                setTimeout(async () => {
-                    const container = document.getElementById('userMap');
-                    if (!container) return;
-
-                    let lat = await window.livewire.find('{{ $_instance->id }}').get('addr_lat');
-                    let lng = await window.livewire.find('{{ $_instance->id }}').get('addr_lng');
-                    let startLat = lat || 14.2189;
-                    let startLng = lng || 121.1672;
-                    let startZoom = lat ? 15 : 11;
-                    
-                    const lagunaBounds = L.latLngBounds([13.9, 120.9], [14.5, 121.6]);
-                    this.map = L.map('userMap', {
-                        maxBounds: lagunaBounds,
-                        maxBoundsViscosity: 1.0
-                    }).setView([startLat, startLng], startZoom);
-
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        maxZoom: 19,
-                        minZoom: 10,
-                        attribution: '© OpenStreetMap'
-                    }).addTo(this.map);
-                    
-                    if (lat && lng) {
-                        this.marker = L.marker([lat, lng]).addTo(this.map);
-                    }
-
-                    this.map.on('click', async (e) => {
-                        const lat = e.latlng.lat;
-                        const lng = e.latlng.lng;
-                        if (this.marker) this.marker.setLatLng(e.latlng);
-                        else this.marker = L.marker(e.latlng).addTo(this.map);
-                        
-                        window.livewire.find('{{ $_instance->id }}').set('addr_lat', lat);
-                        window.livewire.find('{{ $_instance->id }}').set('addr_lng', lng);
-                        
-                        try {
-                            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&countrycodes=ph`);
-                            const data = await response.json();
-                            if (data && data.address) {
-                                let st = data.address.road || data.address.pedestrian || '';
-                                let num = data.address.house_number || '';
-                                let fst = (num + ' ' + st).trim();
-                                if(fst) window.livewire.find('{{ $_instance->id }}').set('addr_street', fst);
-                                
-                                await this.autoMatchLocation(data.address);
-                            }
-                        } catch (error) { console.error(error); }
+                getCustomPinIcon() {
+                    return L.divIcon({
+                        html: `
+                            \x3cdiv class="relative flex flex-col items-center justify-end w-10 h-10"\x3e
+                                \x3cspan class="absolute w-4 h-2 bg-indigo-500/40 rounded-full blur-[2px] animate-ping bottom-[-2px] left-1/2 -translate-x-1/2"\x3e\x3c/span\x3e
+                                \x3cdiv class="relative w-8 h-8 bg-indigo-600 rounded-t-full rounded-bl-full rotate-45 border-2 border-white shadow-lg flex items-center justify-center transition-all duration-300"\x3e
+                                    \x3cdiv class="w-3.5 h-3.5 bg-white rounded-full -rotate-45 flex items-center justify-center shadow-inner"\x3e
+                                        \x3cdiv class="w-1.5 h-1.5 bg-indigo-600 rounded-full"\x3e\x3c/div\x3e
+                                    \x3c/div\x3e
+                                \x3c/div\x3e
+                            \x3c/div\x3e
+                        `,
+                        className: 'custom-leaflet-icon',
+                        iconSize: [40, 40],
+                        iconAnchor: [20, 40]
                     });
-                }, 350);
-            },
+                },
 
-            init() {
-                this.loadRegions();
-                this.$watch('panel', (val) => {
-                    if (this.$wire && this.$wire.get('panel') !== val) {
-                        this.$wire.set('panel', val);
+                filtered(type) {
+                    const s = this.loc[type];
+                    const q = s.search.toLowerCase();
+                    return q ? s.items.filter(i => i.name.toLowerCase().includes(q)) : s.items;
+                },
+
+                // ── PSGC loaders ─────────────────────────────────────────
+                async fetchWithRetry(url, retries = 2, delay = 1000) {
+                    try {
+                        const cached = sessionStorage.getItem(url);
+                        if (cached) return JSON.parse(cached);
+                    } catch (e) { console.error('Cache read failed:', e); }
+
+                    for (let i = 0; i <= retries; i++) {
+                        try {
+                            const res = await fetch(url);
+                            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                            const data = await res.json();
+                            try {
+                                sessionStorage.setItem(url, JSON.stringify(data));
+                            } catch (e) { console.error('Cache write failed:', e); }
+                            return data;
+                        } catch (e) {
+                            if (i === retries) throw e;
+                            console.warn(`Fetch failed for ${url}, retrying (${i + 1}/${retries})...`, e);
+                            await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+                        }
                     }
-                    if (val === 'form') {
-                        this.$nextTick(() => {
-                            if (typeof this.recalculateHistoryTab === 'function') {
-                                this.recalculateHistoryTab();
+                },
+
+                async loadRegions() {
+                    if (this.loc.region.items.length > 0) return;
+                    this.loc.region.loading = true;
+                    try {
+                        const data = await this.fetchWithRetry('https://psgc.cloud/api/regions');
+                        this.loc.region.items = data.sort((a, b) => a.name.localeCompare(b.name));
+                    } catch (e) { 
+                        console.error('Regions fetch failed', e);
+                        this.dispatchNotification('error', 'Failed to load regions. Please check your connection.');
+                    }
+                    finally { this.loc.region.loading = false; }
+                },
+
+                async loadProvinces(regionCode) {
+                    this.loc.province.items = []; this.loc.city.items = []; this.loc.barangay.items = [];
+                    if (!regionCode) return;
+                    this.loc.province.loading = true;
+                    try {
+                        const data = await this.fetchWithRetry(`https://psgc.cloud/api/regions/${regionCode}/provinces`);
+                        this.loc.province.items = data.sort((a, b) => a.name.localeCompare(b.name));
+                        
+                        this.loc.noProvince = this.loc.province.items.length === 0;
+
+                        if (this.loc.noProvince) {
+                            this.loc.province.loading = false;
+                            this.loc.city.loading = true;
+                            const data2 = await this.fetchWithRetry(`https://psgc.cloud/api/regions/${regionCode}/cities-municipalities`);
+                            this.loc.city.items = data2.sort((a, b) => a.name.localeCompare(b.name));
+                            this.loc.city.loading = false;
+                        }
+                    } catch (e) { 
+                        console.error('Provinces fetch failed', e);
+                        this.dispatchNotification('error', 'Failed to load provinces.');
+                    }
+                    finally { this.loc.province.loading = false; }
+                },
+
+                async loadCities(provinceCode) {
+                    this.loc.city.items = []; this.loc.barangay.items = [];
+                    if (!provinceCode) return;
+                    this.loc.city.loading = true;
+                    try {
+                        const data = await this.fetchWithRetry(`https://psgc.cloud/api/provinces/${provinceCode}/cities-municipalities`);
+                        this.loc.city.items = data.sort((a, b) => a.name.localeCompare(b.name));
+                    } catch (e) { 
+                        console.error('Cities fetch failed', e);
+                        this.dispatchNotification('error', 'Failed to load cities.');
+                    }
+                    finally { this.loc.city.loading = false; }
+                },
+
+                async loadBarangays(cityCode) {
+                    this.loc.barangay.items = [];
+                    if (!cityCode) return;
+                    this.loc.barangay.loading = true;
+                    try {
+                        const data = await this.fetchWithRetry(`https://psgc.cloud/api/cities-municipalities/${cityCode}/barangays`);
+                        this.loc.barangay.items = data.sort((a, b) => a.name.localeCompare(b.name));
+                    } catch (e) { 
+                        console.error('Barangays fetch failed', e);
+                        this.dispatchNotification('error', 'Failed to load barangays.');
+                    }
+                    finally { this.loc.barangay.loading = false; }
+                },
+
+                dispatchNotification(type, message) {
+                    window.dispatchEvent(new CustomEvent('notify', {
+                        detail: { type, message }
+                    }));
+                },
+
+                // ── Cascade handlers ─────────────────────────────────────
+                // ── Cascade handlers ─────────────────────────────────────
+                async selectRegion(region, fromMap = false) {
+                    this.addr_region = region.name;
+                    this.addr_province = ''; this.addr_city = ''; this.addr_barangay = '';
+                    if (!fromMap) this.geocodeAddress();
+                    await this.loadProvinces(region.code);
+                },
+                async selectProvince(province, fromMap = false) {
+                    this.addr_province = province.name;
+                    this.addr_city = ''; this.addr_barangay = '';
+                    if (!fromMap) this.geocodeAddress();
+                    await this.loadCities(province.code);
+                },
+                async selectCity(city, fromMap = false) {
+                    this.addr_city = city.name;
+                    this.addr_barangay = '';
+                    if (!fromMap) this.geocodeAddress();
+                    await this.loadBarangays(city.code);
+                },
+                selectBarangay(brgy, fromMap = false) {
+                    this.addr_barangay = brgy.name;
+                    if (!fromMap) this.geocodeAddress();
+                },
+
+                async geocodeAddress() {
+                    const parts = [];
+                    if (this.addr_barangay) parts.push(this.addr_barangay);
+                    if (this.addr_city) parts.push(this.addr_city);
+                    if (this.addr_province) parts.push(this.addr_province);
+                    if (this.addr_region) parts.push(this.addr_region);
+                    
+                    if (parts.length === 0) return;
+                    
+                    const query = parts.join(', ') + ', Philippines';
+                    try {
+                        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=ph`);
+                        const data = await response.json();
+                        
+                        if (data && data.length > 0) {
+                            const lat = parseFloat(data[0].lat);
+                            const lng = parseFloat(data[0].lon);
+                            
+                            this.$wire.set('addr_lat', lat);
+                            this.$wire.set('addr_lng', lng);
+                            
+                            if (this.map) {
+                                let zoom = 11;
+                                if (this.addr_barangay) zoom = 16;
+                                else if (this.addr_city) zoom = 14;
+                                else if (this.addr_province) zoom = 12;
+                                
+                                this.map.setView([lat, lng], zoom);
+                                if (this.marker) {
+                                    this.marker.setLatLng([lat, lng]);
+                                } else {
+                                    this.marker = L.marker([lat, lng], { icon: this.getCustomPinIcon() }).addTo(this.map);
+                                }
                             }
+                        }
+                    } catch (e) {
+                        console.error('Forward geocoding failed:', e);
+                    }
+                },
+
+                async autoMatchLocation(addr) {
+                    const clean = (str) => {
+                        if (!str) return '';
+                        return str.toLowerCase()
+                            .replace(/city of|province of|region|district|barangay|brgy\.?|municipality of/g, '')
+                            .replace(/[^a-z0-9]/g, '')
+                            .trim();
+                    };
+
+                    let rName = addr.region || '';
+                    let pName = addr.state || addr.province || addr.county || '';
+                    let cName = addr.city || addr.town || addr.municipality || '';
+                    let bName = addr.quarter || addr.village || addr.suburb || addr.neighbourhood || '';
+
+                    if (this.loc.region.items.length === 0) await this.loadRegions();
+
+                    let crName = clean(rName);
+                    let cpName = clean(pName);
+                    let matchedR = this.loc.region.items.find(r => {
+                        const target = clean(r.name);
+                        return target === crName || 
+                               (crName.includes('manila') && target.includes('ncr')) ||
+                               (cpName.includes('manila') && target.includes('ncr'));
+                    });
+
+                    if (!matchedR && crName) {
+                        matchedR = this.loc.region.items.find(r => clean(r.name).includes(crName) || crName.includes(clean(r.name)));
+                    }
+
+                    if (!matchedR) return;
+                    await this.selectRegion(matchedR, true);
+
+                    if (pName && this.loc.province.items.length > 0) {
+                        let cppName = clean(pName);
+                        let matchedP = this.loc.province.items.find(p => clean(p.name) === cppName);
+                        if (!matchedP) {
+                            matchedP = this.loc.province.items.find(p => {
+                                const target = clean(p.name).replace('province', '');
+                                const search = cppName.replace('province', '');
+                                return target && search && (target === search || target.includes(search) || search.includes(target));
+                            });
+                        }
+                        if (matchedP) await this.selectProvince(matchedP, true);
+                    }
+
+                    if (cName && this.loc.city.items.length > 0) {
+                        let ccName = clean(cName);
+                        let matchedC = this.loc.city.items.find(c => clean(c.name) === ccName);
+                        if (!matchedC) {
+                            matchedC = this.loc.city.items.find(c => {
+                                const target = clean(c.name).replace('city', '').replace('municipality', '').replace('city of', '');
+                                const search = ccName.replace('city', '').replace('municipality', '').replace('city of', '');
+                                return target && search && (target === search || target.includes(search) || search.includes(target));
+                            });
+                        }
+                        if (matchedC) await this.selectCity(matchedC, true);
+                    }
+
+                    if (bName && this.loc.barangay.items.length > 0) {
+                        let cbName = clean(bName);
+                        let matchedB = this.loc.barangay.items.find(b => clean(b.name) === cbName);
+                        if (!matchedB) {
+                            matchedB = this.loc.barangay.items.find(b => {
+                                const target = clean(b.name).replace('barangay', '').replace('brgy', '').replace('poblacion', '').replace('pob', '');
+                                const search = cbName.replace('barangay', '').replace('brgy', '').replace('poblacion', '').replace('pob', '');
+                                return target && search && (target === search || target.includes(search) || search.includes(target));
+                            });
+                        }
+                        if (matchedB) this.selectBarangay(matchedB, true);
+                    }
+                },
+
+                map: null,
+                marker: null,
+                mapTimeout: null,
+                initMap() {
+                    if (typeof L === 'undefined') {
+                        if (this.mapTimeout) clearTimeout(this.mapTimeout);
+                        this.mapTimeout = setTimeout(() => this.initMap(), 100);
+                        return;
+                    }
+                    if (this.map) {
+                        if (this.mapTimeout) clearTimeout(this.mapTimeout);
+                        this.mapTimeout = setTimeout(() => {
+                            const container = document.getElementById('userMap');
+                            if (!container) return;
+                            this.map.invalidateSize(); 
+                            let lat = this.addr_lat;
+                            let lng = this.addr_lng;
+                            if (lat && lng) {
+                                this.map.setView([lat, lng], 16);
+                                if (this.marker) this.marker.setLatLng([lat, lng]);
+                            }
+                        }, 50);
+                        return;
+                    }
+                    if (this.mapTimeout) clearTimeout(this.mapTimeout);
+                    this.mapTimeout = setTimeout(() => {
+                        let container = document.getElementById('userMap');
+                        if (!container) return;
+
+                        if (container._leaflet_id) {
+                            const clone = container.cloneNode(false);
+                            clone.removeAttribute('class');
+                            container.parentNode.replaceChild(clone, container);
+                            container = clone;
+                        }
+
+                        let lat = this.addr_lat;
+                        let lng = this.addr_lng;
+                        let startLat = lat || 14.2189;
+                        let startLng = lng || 121.1672;
+                        let startZoom = lat ? 15 : 11;
+                        
+                        const street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            maxZoom: 19,
+                            minZoom: 10,
+                            attribution: '© OpenStreetMap'
                         });
-                    }
-                });
+                        const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                        });
 
-                this.$watch('mode', (val) => {
-                    if (this.$wire && this.$wire.get('mode') !== val) {
-                        this.$wire.set('mode', val);
-                    }
-                });
+                        const lagunaBounds = L.latLngBounds([13.9, 120.9], [14.5, 121.6]);
 
-                this.$watch('tableView', (val) => {
-                    if (this.$wire && this.$wire.get('view') !== val) {
-                        this.$wire.set('view', val);
-                    }
-                });
-            }
-        }));
-    };
-    if (window.Alpine) registerUserData();
-    else document.addEventListener('alpine:init', registerUserData);
-})();
-</script>
-@endonce
-@endpush
+                        this.map = L.map(container, {
+                            maxBounds: lagunaBounds,
+                            maxBoundsViscosity: 1.0,
+                            layers: [street]
+                        }).setView([startLat, startLng], startZoom);
+
+                        L.control.layers({ "Street": street, "Satellite": satellite }).addTo(this.map);
+                        
+                        if (lat && lng) {
+                            this.marker = L.marker([lat, lng], { icon: this.getCustomPinIcon() }).addTo(this.map);
+                        }
+
+                        this.map.on('click', async (e) => {
+                            const lat = e.latlng.lat;
+                            const lng = e.latlng.lng;
+                            if (this.marker) this.marker.setLatLng(e.latlng);
+                            else this.marker = L.marker(e.latlng, { icon: this.getCustomPinIcon() }).addTo(this.map);
+                            
+                            this.$wire.set('addr_lat', lat);
+                            this.$wire.set('addr_lng', lng);
+                            
+                            try {
+                                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&countrycodes=ph`);
+                                const data = await response.json();
+                                if (data && data.address) {
+                                    let st = data.address.road || data.address.pedestrian || '';
+                                    let num = data.address.house_number || '';
+                                    let fst = (num + ' ' + st).trim();
+                                    if(fst) this.$wire.set('addr_street', fst);
+                                    
+                                    await this.autoMatchLocation(data.address);
+                                }
+                            } catch (error) { console.error(error); }
+                        });
+                    }, 50);
+                },
+
+                init() {
+                    this.loadRegions();
+                    this.$watch('panel', (val) => {
+                        if (val === 'form') {
+                            this.initMap();
+                            this.$nextTick(() => {
+                                if (typeof this.recalculateHistoryTab === 'function') {
+                                    this.recalculateHistoryTab();
+                                }
+                            });
+                        } else {
+                            if (this.marker && this.mode === 'create') {
+                                this.map.removeLayer(this.marker);
+                                this.marker = null;
+                            }
+                        }
+                    });
+
+                    this.$watch('tableView', (val) => {
+                        if (this.$wire && this.$wire.get('view') !== val) {
+                            this.$wire.set('view', val);
+                        }
+                    });
+                }
+            }));
+        };
+        if (window.Alpine) registerUserData();
+        else document.addEventListener('alpine:init', registerUserData);
+    })();
+    </script>
+</div>

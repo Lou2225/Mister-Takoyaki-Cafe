@@ -7,9 +7,9 @@
 @endphp
 
 <div 
-    x-data="{ 
-        sourceFilter: @entangle('sourceFilter'),
-        ...slidingTabs(@js($sourceFilter ?: 'App'), 'sourceFilter') 
+    x-data="{
+        ...slidingTabs(@entangle('sourceFilter').live, 'sourceFilter'),
+        selectedOrderId: null
     }"
     class="relative overflow-hidden">
 
@@ -21,7 +21,12 @@
             <div class="mb-4 flex items-center justify-between">
                 <div>
                     <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Order Management</h2>
-                    <p class="text-[12px] text-gray-500 font-medium whitespace-nowrap overflow-hidden text-ellipsis">Managing <span class="{{ $primaryText }} font-bold">{{ $orders->total() }} {{ Str::plural('order', $orders->total()) }}</span></p>
+                    <p class="text-[12px] text-gray-500 font-medium whitespace-nowrap overflow-hidden text-ellipsis flex items-center gap-1">
+                        Managing 
+                        <span x-show="sourceFilter === 'App'" class="{{ $primaryText }} font-bold">{{ $appOrders->total() }} {{ Str::plural('order', $appOrders->total()) }}</span>
+                        <span x-show="sourceFilter === 'POS'" x-cloak class="{{ $primaryText }} font-bold">{{ $posOrders->total() }} {{ Str::plural('order', $posOrders->total()) }}</span>
+                        <span x-show="sourceFilter === 'History'" x-cloak class="{{ $primaryText }} font-bold">{{ $historyOrders->total() }} {{ Str::plural('order', $historyOrders->total()) }}</span>
+                    </p>
                 </div>
             </div>
 
@@ -66,16 +71,25 @@
         <div class="px-1 mt-4">
 
             {{-- ── Order Health Overview ── --}}
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
                 {{-- Total Orders --}}
-                <div class="bg-gradient-to-br from-{{ $primaryColor }}-50 to-{{ $primaryColor }}-100 border border-{{ $primaryColor }}-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-{{ $primaryColor }}-100 flex items-center justify-center text-{{ $primaryColor }}-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                <div class="p-3 sm:p-4 bg-gradient-to-br from-{{ $primaryColor }}-500/10 via-{{ $primaryColor }}-500/5 to-white border border-{{ $primaryColor }}-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-1 sm:mb-2">
+                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Orders</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-{{ $primaryColor }}-100 flex items-center justify-center text-{{ $primaryColor }}-600 shadow-sm shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-{{ $primaryColor }}-700/60 uppercase tracking-widest leading-none mb-1">Total Orders</span>
-                        <span class="block text-[20px] font-black text-gray-900 leading-none">{{ $orders->total() }}</span>
-                    </div>
+                    <span x-show="sourceFilter === 'App'">
+                        <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $appOrders->total() }}</h3>
+                    </span>
+                    <span x-show="sourceFilter === 'POS'" x-cloak>
+                        <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $posOrders->total() }}</h3>
+                    </span>
+                    <span x-show="sourceFilter === 'History'" x-cloak>
+                        <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $historyOrders->total() }}</h3>
+                    </span>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Placed orders count</p>
                 </div>
                 
                 {{-- Pending Orders --}}
@@ -84,14 +98,15 @@
                         ->whereIn('status', ['Pending', 'Preparing'])
                         ->count();
                 @endphp
-                <div class="bg-gradient-to-br {{ $pendingCount > 0 ? 'from-amber-50 to-amber-100 border-amber-200' : 'from-emerald-50 to-emerald-100 border-emerald-200' }} border rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border {{ $pendingCount > 0 ? 'border-amber-100 text-amber-600' : 'border-emerald-100 text-emerald-600' }} flex items-center justify-center shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <div class="p-3 sm:p-4 bg-gradient-to-br {{ $pendingCount > 0 ? 'from-amber-500/10 via-amber-500/5 to-white border-amber-500/10' : 'from-emerald-500/10 via-emerald-500/5 to-white border-emerald-500/10' }} border rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-1 sm:mb-2">
+                        <span class="text-[10px] sm:text-[11px] font-bold {{ $pendingCount > 0 ? 'text-amber-600/90' : 'text-emerald-600/90' }} uppercase tracking-wider">Pending</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border {{ $pendingCount > 0 ? 'border-amber-100 text-amber-600' : 'border-emerald-100 text-emerald-600' }} flex items-center justify-center shadow-sm shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black {{ $pendingCount > 0 ? 'text-amber-700/60' : 'text-emerald-700/60' }} uppercase tracking-widest leading-none mb-1">Pending</span>
-                        <span class="block text-[20px] font-black {{ $pendingCount > 0 ? 'text-amber-600' : 'text-emerald-600' }} leading-none">{{ number_format($pendingCount) }}</span>
-                    </div>
+                    <h3 class="text-xl sm:text-2xl font-black {{ $pendingCount > 0 ? 'text-amber-600' : 'text-emerald-600' }} tracking-tight leading-none">{{ number_format($pendingCount) }}</h3>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Awaiting kitchen service</p>
                 </div>
 
                 {{-- Completed Orders Today --}}
@@ -101,14 +116,15 @@
                         ->whereDate('created_at', today())
                         ->count();
                 @endphp
-                <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <div class="p-3 sm:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-1 sm:mb-2">
+                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Completed Today</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-emerald-700/60 uppercase tracking-widest leading-none mb-1">Completed Today</span>
-                        <span class="block text-[20px] font-black text-emerald-600 leading-none">{{ number_format($completedToday) }}</span>
-                    </div>
+                    <h3 class="text-xl sm:text-2xl font-black text-emerald-600 tracking-tight leading-none">{{ number_format($completedToday) }}</h3>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Served and cleared today</p>
                 </div>
 
                 {{-- Today's Revenue --}}
@@ -118,14 +134,15 @@
                         ->whereDate('created_at', today())
                         ->sum('total_amount');
                 @endphp
-                <div class="bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <div class="p-3 sm:p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-1 sm:mb-2">
+                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Today's Revenue</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-rose-700/60 uppercase tracking-widest leading-none mb-1">Today's Revenue</span>
-                        <span class="block text-[20px] font-black text-rose-600 leading-none">₱{{ number_format($todayRevenue, 0) }}</span>
-                    </div>
+                    <h3 class="text-xl sm:text-2xl font-black text-rose-600 tracking-tight leading-none">₱{{ number_format($todayRevenue, 0) }}</h3>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Net generated income today</p>
                 </div>
             </div>
 
@@ -133,54 +150,68 @@
             <div class="relative z-20 flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
                 
                 {{-- Left: Search Bar --}}
-                <div class="flex flex-1 w-full lg:w-auto">
-                    <x-search-bar wireModel="search" placeholder="Search order #..." width="w-full lg:w-72" />
+                <div class="w-full lg:w-auto lg:flex-1">
+                    <x-search-bar wire:model.live.debounce.300ms="search" placeholder="Search order #..." width="w-full lg:w-80" />
                 </div>
 
                 {{-- Right: Filters --}}
-                <div class="flex flex-wrap items-center lg:justify-end gap-2">
-                    
-                    {{-- Quick Date Dropdown --}}
-                    <x-quick-date-filter :activeFilter="$activeFilter" class="shadow-none border-slate-200" />
+                <div class="w-full lg:w-auto">
+                    <div class="flex items-center gap-2 w-full lg:w-auto justify-between lg:justify-end">
+                        {{-- 3-in-1 Date Filter Component --}}
+                        <div class="w-full lg:w-auto">
+                            <x-date-filter startModel="startDate" endModel="endDate" activeModel="activeFilter" />
+                        </div>
 
-                    @if($sourceFilter === 'History')
-                        <x-date-range-filter startModel="startDate" endModel="endDate" :startValue="$startDate" :endValue="$endDate" class="h-9 border-slate-200 shadow-none bg-slate-50/50" />
-                    @endif
-
-                    {{-- macOS Divider --}}
-                    <div class="hidden lg:block w-px h-6 bg-slate-200 mx-1"></div>
-
-                    {{-- Status Filter Dropdown --}}
-                    <x-dropdown align="right" width="48">
-                        <x-slot name="trigger">
-                            <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
-                                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-                                <span class="text-[12px] whitespace-nowrap">{{ $statusFilter ?: 'All Status' }}</span>
-                                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-                            </x-secondary-button>
-                        </x-slot>
-                        <x-slot name="content">
-                            <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', '')">All Status</x-dropdown-link>
-                            <hr class="my-1 border-slate-100">
-                            @foreach($statuses as $status => $label)
-                                <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', '{{ $status }}')">{{ $label }}</x-dropdown-link>
-                            @endforeach
-                        </x-slot>
-                    </x-dropdown>
+                        {{-- Status Filter Dropdown --}}
+                        <div class="w-[140px] sm:w-[160px]">
+                            <x-dropdown align="right" width="full" containerClasses="w-full">
+                                <x-slot name="trigger">
+                                    <x-secondary-button type="button" class="w-full gap-1.5 h-10 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none justify-between truncate">
+                                        <div class="flex items-center gap-1.5 truncate">
+                                            <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                                            <span class="text-[12px] truncate">{{ $statusFilter ?: 'All Status' }}</span>
+                                        </div>
+                                        <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                    </x-secondary-button>
+                                </x-slot>
+                                <x-slot name="content">
+                                    <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', '')">All Status</x-dropdown-link>
+                                    <hr class="my-1 border-slate-100">
+                                    @foreach($statuses as $status => $label)
+                                        <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', '{{ $status }}')">{{ $label }}</x-dropdown-link>
+                                    @endforeach
+                                </x-slot>
+                            </x-dropdown>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="w-full animate-fadeIn" wire:key="order-table-{{ $sourceFilter }}">
-                <div wire:loading.class="opacity-50 transition-opacity" wire:target="sourceFilter">
-                    @include('livewire.order-list-table')
+            <div class="w-full animate-fadeIn relative">
+                {{-- App Orders Tab Content --}}
+                <div x-show="sourceFilter === 'App'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" class="w-full">
+                    @include('livewire.order-list-table', ['orders' => $appOrders])
+                </div>
+
+                {{-- POS Orders Tab Content --}}
+                <div x-show="sourceFilter === 'POS'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" class="w-full" x-cloak>
+                    @include('livewire.order-list-table', ['orders' => $posOrders])
+                </div>
+
+                {{-- History Orders Tab Content --}}
+                <div x-show="sourceFilter === 'History'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" class="w-full" x-cloak>
+                    @include('livewire.order-list-table', ['orders' => $historyOrders])
                 </div>
             </div>
 
         </div>
-        {{-- ── Order Detail Side Panel ── --}}
         <x-side-panel name="view-order-detail" width="max-w-md">
-            @if($selectedOrder)
-                <div class="flex flex-col h-full bg-white" x-data="{ currentTab: 'summary' }" @update-active-tab.window="currentTab = $event.detail.activeTab">
+            @foreach($allLoadedOrders as $order)
+                <div x-show="selectedOrderId === {{ $order->id }}" x-cloak class="flex flex-col h-full bg-white relative"
+                    x-data="{ 
+                        ...slidingTabs('summary', 'activeTab'), 
+                        activeTab: 'summary' 
+                    }">
                     {{-- Premium Header --}}
                     <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/40">
                         <div class="flex items-center gap-3">
@@ -189,7 +220,7 @@
                             </div>
                             <div>
                                 <h3 class="text-[15px] font-black text-slate-900 tracking-tight leading-none">Order Details</h3>
-                                <span class="text-[11px] text-indigo-600 font-bold uppercase tracking-wider mt-1 block">Ref: #{{ $selectedOrder->reference_no }}</span>
+                                <span class="text-[11px] text-indigo-600 font-bold uppercase tracking-wider mt-1 block">Ref: #{{ $order->reference_no }}</span>
                             </div>
                         </div>
                         <button @click="$dispatch('close-modal', 'view-order-detail')" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-white hover:text-slate-600 hover:shadow-sm transition-all border border-transparent hover:border-slate-200">
@@ -198,160 +229,172 @@
                     </div>
 
                     {{-- Tabs Navigation --}}
-                    <div class="px-6 border-b border-slate-100 bg-white">
-                        <div class="flex gap-6">
-                            <button @click="currentTab = 'summary'" class="py-3 text-[13px] font-bold border-b-2 transition-colors" :class="currentTab === 'summary' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'">
-                                Summary
-                            </button>
-                            <button @click="currentTab = 'activity'" class="py-3 text-[13px] font-bold border-b-2 transition-colors" :class="currentTab === 'activity' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'">
-                                Order History
-                            </button>
-                        </div>
+                    <div class="px-6 bg-white">
+                        <x-sliding-tabs model="activeTab">
+                            <x-sliding-tab value="summary" model="activeTab">Summary</x-sliding-tab>
+                            <x-sliding-tab value="activity" model="activeTab">Order History</x-sliding-tab>
+                        </x-sliding-tabs>
                     </div>
 
                     {{-- Content Area --}}
                     <div class="flex-1 overflow-y-auto custom-scrollbar relative">
-                        <div x-show="currentTab === 'summary'">
+                        <div x-show="activeTab === 'summary'">
                             {{-- Transaction Context Section --}}
-                        <div class="p-6 bg-gradient-to-b from-slate-50/80 to-white border-b border-slate-50">
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Source & Branch</span>
-                                    <div class="flex items-center gap-2">
-                                        <div class="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 shadow-sm">
-                                            @if($selectedOrder->source === 'POS')
-                                                <svg class="w-3 h-3 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                                            @else
-                                                <svg class="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
-                                            @endif
-                                        </div>
-                                        <span class="text-[12px] font-bold text-slate-700">{{ $selectedOrder->branch->branch_name ?? 'N/A' }}</span>
-                                    </div>
-                                </div>
-                                <div>
-                                    <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Status</span>
-                                    @php
-                                        $statusColors = [
-                                            'Pending' => 'amber',
-                                            'Preparing' => 'blue',
-                                            'Ready' => 'emerald',
-                                            'Handed to Rider' => 'indigo',
-                                            'Out for Delivery' => 'indigo',
-                                            'Delivered' => 'emerald',
-                                            'Completed' => 'emerald',
-                                            'Cancelled' => 'red',
-                                            'Drafted' => 'slate',
-                                            'Void' => 'rose',
-                                            'Refunded' => 'orange',
-                                            'Partially Refunded' => 'orange',
-                                        ];
-                                        $statusColor = $statusColors[$selectedOrder->status] ?? 'slate';
-                                    @endphp
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-{{ $statusColor }}-50 text-{{ $statusColor }}-600 border border-{{ $statusColor }}-100">
-                                        {{ $selectedOrder->status }}
-                                    </span>
-                                </div>
-                            </div>
-                            
-                            <div class="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 gap-4">
-                                <div>
-                                    <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Processed By</span>
-                                    <span class="text-[12px] font-bold text-slate-700">{{ $selectedOrder->user->first_name ?? 'System' }} {{ $selectedOrder->user->last_name ?? '' }}</span>
-                                </div>
-                                <div>
-                                    <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Date & Time</span>
-                                    <span class="text-[12px] font-bold text-slate-700">{{ $selectedOrder->created_at->format('M d, h:i A') }}</span>
-                                </div>
-                            </div>
-
-                            @if($selectedOrder->source === 'App')
-                            <div class="mt-4 pt-4 border-t border-slate-100">
-                                <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Customer details</span>
-                                <div class="text-[12px] text-slate-700 font-medium">
-                                    <div class="font-bold">{{ $selectedOrder->customer_name ?? 'N/A' }} <span class="text-slate-400 font-normal">({{ $selectedOrder->customer_phone ?? 'No Phone' }})</span></div>
-                                    <div class="text-[11px] text-slate-500 mt-0.5 leading-tight">{{ $selectedOrder->delivery_address ?? 'No Address' }}</div>
-                                </div>
-                            </div>
-                            @endif
-                        </div>
-
-                        {{-- Itemized Breakdown Section --}}
-                        <div class="p-6">
-                            <div class="flex items-center justify-between mb-6">
-                                <h5 class="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-slate-900"></span>
-                                    Order Summary
-                                </h5>
-                                <span class="text-[10px] font-bold text-slate-400 uppercase">{{ $selectedOrder->items->count() }} Items</span>
-                            </div>
-
-                            <div class="space-y-6 relative">
-                                {{-- Vertical line --}}
-                                <div class="absolute left-[7px] top-2 bottom-2 w-[2px] bg-slate-50 rounded-full"></div>
-
-                                @forelse($selectedOrder->items as $item)
-                                    <div class="relative pl-7 group">
-                                        {{-- Dot --}}
-                                        <div class="absolute left-0 top-[6px] w-[16px] h-[16px] rounded-full border-4 border-white bg-slate-100 group-hover:bg-slate-900 transition-colors z-10"></div>
-                                        
-                                        <div class="flex justify-between items-start">
-                                            <div class="flex-1">
-                                                <p class="text-[13px] font-bold text-slate-900 leading-tight">{{ $item->product->name ?? 'Unknown Item' }}</p>
-                                                @if($item->options && $item->options->isNotEmpty())
-                                                    <div class="flex flex-wrap gap-x-2 gap-y-0.5 mt-1">
-                                                        @foreach($item->options as $opt)
-                                                            <span class="text-[11px] text-slate-400 italic">{{ $opt->option->name ?? 'N/A' }}</span>
-                                                        @endforeach
-                                                    </div>
+                            <div class="p-6 bg-gradient-to-b from-slate-50/80 to-white border-b border-slate-50">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Source & Branch</span>
+                                        <div class="flex items-center gap-2">
+                                            <div class="w-6 h-6 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-400 shadow-sm">
+                                                @if($order->source === 'POS')
+                                                    <svg class="w-3 h-3 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                                @else
+                                                    <svg class="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                                                 @endif
-                                                <p class="text-[11px] font-bold text-slate-400 mt-1">₱{{ number_format($item->unit_price, 2) }} × {{ $item->quantity }}</p>
                                             </div>
-                                            <div class="text-right">
-                                                <span class="text-[13px] font-black text-slate-900">₱{{ number_format($item->quantity * $item->unit_price, 2) }}</span>
-                                            </div>
+                                            <span class="text-[12px] font-bold text-slate-700">{{ $order->branch->branch_name ?? 'N/A' }}</span>
                                         </div>
                                     </div>
-                                @empty
-                                    <p class="text-[12px] text-slate-500 italic pl-7">No items in this order</p>
-                                @endforelse
-                            </div>
-                        </div>
-
-                        {{-- Financial Totals Section --}}
-                        <div class="p-6 bg-slate-50 border-t border-slate-100">
-                            <div class="space-y-2.5">
-                                <div class="flex justify-between text-[12px] font-medium text-slate-500">
-                                    <span>Subtotal</span>
-                                    <span class="font-bold text-slate-700">₱{{ number_format($selectedOrder->total_amount - $selectedOrder->delivery_fee + $selectedOrder->discount_amount, 2) }}</span>
-                                </div>
-                                @if($selectedOrder->discount_amount > 0)
-                                    <div class="flex justify-between text-[12px] font-bold text-rose-500">
-                                        <span>Applied Discount</span>
-                                        <span>-₱{{ number_format($selectedOrder->discount_amount, 2) }}</span>
+                                    <div>
+                                        <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Status</span>
+                                        @php
+                                            $dotColors = [
+                                                'Pending' => 'bg-amber-500',
+                                                'Preparing' => 'bg-blue-500',
+                                                'Ready' => 'bg-emerald-500',
+                                                'Handed to Rider' => 'bg-indigo-500',
+                                                'Out for Delivery' => 'bg-indigo-500',
+                                                'Delivered' => 'bg-emerald-500',
+                                                'Completed' => 'bg-emerald-500',
+                                                'Cancelled' => 'bg-rose-500',
+                                                'Drafted' => 'bg-slate-400',
+                                                'Void' => 'bg-rose-500',
+                                                'Refunded' => 'bg-orange-500',
+                                                'Partially Refunded' => 'bg-orange-500',
+                                            ];
+                                            $dotColor = $dotColors[$order->status] ?? 'bg-slate-400';
+                                            $textColors = [
+                                                'Pending' => 'text-amber-600',
+                                                'Preparing' => 'text-blue-600',
+                                                'Ready' => 'text-emerald-600',
+                                                'Handed to Rider' => 'text-indigo-600',
+                                                'Out for Delivery' => 'text-indigo-600',
+                                                'Delivered' => 'text-emerald-600',
+                                                'Completed' => 'text-emerald-600',
+                                                'Cancelled' => 'text-rose-600',
+                                                'Drafted' => 'text-slate-600',
+                                                'Void' => 'text-rose-600',
+                                                'Refunded' => 'text-orange-600',
+                                                'Partially Refunded' => 'text-orange-600',
+                                            ];
+                                            $textColor = $textColors[$order->status] ?? 'text-slate-600';
+                                        @endphp
+                                        <div class="flex items-center gap-1.5 mt-1.5">
+                                            <span class="h-1.5 w-1.5 rounded-full {{ $dotColor }}"></span>
+                                            <span class="text-[11px] font-bold {{ $textColor }} uppercase">{{ $order->status }}</span>
+                                        </div>
                                     </div>
-                                @endif
-                                @if($selectedOrder->delivery_fee > 0)
-                                    <div class="flex justify-between text-[12px] font-medium text-slate-500">
-                                        <span>Delivery Fee</span>
-                                        <span class="font-bold text-slate-700">₱{{ number_format($selectedOrder->delivery_fee, 2) }}</span>
-                                    </div>
-                                @endif
-                                <div class="pt-3 mt-3 border-t border-slate-200 flex justify-between items-baseline">
-                                    <span class="text-[13px] font-black text-slate-900 uppercase tracking-tight">Grand Total</span>
-                                    <span class="text-[24px] font-black text-slate-900 tracking-tighter">₱{{ number_format($selectedOrder->total_amount, 2) }}</span>
                                 </div>
                                 
-                                @if($selectedOrder->refunded_amount > 0)
-                                    <div class="mt-3 pt-3 border-t border-red-100 flex justify-between text-[12px] font-bold text-red-600">
-                                        <span>Refunded Amount</span>
-                                        <span>-₱{{ number_format($selectedOrder->refunded_amount, 2) }}</span>
+                                <div class="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 gap-4">
+                                    <div>
+                                        <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Processed By</span>
+                                        <span class="text-[12px] font-bold text-slate-700">{{ $order->user->first_name ?? 'System' }} {{ $order->user->last_name ?? '' }}</span>
                                     </div>
+                                    <div>
+                                        <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Date & Time</span>
+                                        <span class="text-[12px] font-bold text-slate-700">{{ $order->created_at->format('M d, h:i A') }}</span>
+                                    </div>
+                                </div>
+
+                                @if($order->source === 'App')
+                                <div class="mt-4 pt-4 border-t border-slate-100">
+                                    <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Customer details</span>
+                                    <div class="text-[12px] text-slate-700 font-medium">
+                                        <div class="font-bold">{{ $order->customer_name ?? 'N/A' }} <span class="text-slate-400 font-normal">({{ $order->customer_phone ?? 'No Phone' }})</span></div>
+                                        <div class="text-[11px] text-slate-500 mt-0.5 leading-tight">{{ $order->delivery_address ?? 'No Address' }}</div>
+                                    </div>
+                                </div>
                                 @endif
                             </div>
-                        </div>
+
+                            {{-- Itemized Breakdown Section --}}
+                            <div class="p-6">
+                                <div class="flex items-center justify-between mb-6">
+                                    <h5 class="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-slate-900"></span>
+                                        Order Summary
+                                    </h5>
+                                    <span class="text-[10px] font-bold text-slate-400 uppercase">{{ $order->items->count() }} Items</span>
+                                </div>
+
+                                <div class="space-y-6 relative">
+                                    {{-- Vertical line --}}
+                                    <div class="absolute left-[7px] top-2 bottom-2 w-[2px] bg-slate-50 rounded-full"></div>
+
+                                    @forelse($order->items as $item)
+                                        <div class="relative pl-7 group">
+                                            {{-- Dot --}}
+                                            <div class="absolute left-0 top-[6px] w-[16px] h-[16px] rounded-full border-4 border-white bg-slate-100 group-hover:bg-slate-900 transition-colors z-10"></div>
+                                            
+                                            <div class="flex justify-between items-start">
+                                                <div class="flex-1">
+                                                    <p class="text-[13px] font-bold text-slate-900 leading-tight">{{ $item->product->name ?? 'Unknown Item' }}</p>
+                                                    @if($item->options && $item->options->isNotEmpty())
+                                                        <div class="flex flex-wrap gap-x-2 gap-y-0.5 mt-1">
+                                                            @foreach($item->options as $opt)
+                                                                <span class="text-[11px] text-slate-400 italic">{{ $opt->option->name ?? 'N/A' }}</span>
+                                                            @endforeach
+                                                        </div>
+                                                    @endif
+                                                    <p class="text-[11px] font-bold text-slate-400 mt-1">₱{{ number_format($item->unit_price, 2) }} × {{ $item->quantity }}</p>
+                                                </div>
+                                                <div class="text-right">
+                                                    <span class="text-[13px] font-black text-slate-900">₱{{ number_format($item->quantity * $item->unit_price, 2) }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @empty
+                                        <p class="text-[12px] text-slate-500 italic pl-7">No items in this order</p>
+                                    @endforelse
+                                </div>
+                            </div>
+
+                            {{-- Financial Totals Section --}}
+                            <div class="p-6 bg-slate-50 border-t border-slate-100">
+                                <div class="space-y-2.5">
+                                    <div class="flex justify-between text-[12px] font-medium text-slate-500">
+                                        <span>Subtotal</span>
+                                        <span class="font-bold text-slate-700">₱{{ number_format($order->total_amount - $order->delivery_fee + $order->discount_amount, 2) }}</span>
+                                    </div>
+                                    @if($order->discount_amount > 0)
+                                        <div class="flex justify-between text-[12px] font-bold text-rose-500">
+                                            <span>Applied Discount</span>
+                                            <span>-₱{{ number_format($order->discount_amount, 2) }}</span>
+                                        </div>
+                                    @endif
+                                    @if($order->delivery_fee > 0)
+                                        <div class="flex justify-between text-[12px] font-medium text-slate-500">
+                                            <span>Delivery Fee</span>
+                                            <span class="font-bold text-slate-700">₱{{ number_format($order->delivery_fee, 2) }}</span>
+                                        </div>
+                                    @endif
+                                    <div class="pt-3 mt-3 border-t border-slate-200 flex justify-between items-baseline">
+                                        <span class="text-[13px] font-black text-slate-900 uppercase tracking-tight">Grand Total</span>
+                                        <span class="text-[24px] font-black text-slate-900 tracking-tighter">₱{{ number_format($order->total_amount, 2) }}</span>
+                                    </div>
+                                    
+                                    @if($order->refunded_amount > 0)
+                                        <div class="mt-3 pt-3 border-t border-red-100 flex justify-between text-[12px] font-bold text-red-600">
+                                            <span>Refunded Amount</span>
+                                            <span>-₱{{ number_format($order->refunded_amount, 2) }}</span>
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
                         </div>
 
-                        <div x-show="currentTab === 'activity'" style="display: none;">
+                        <div x-show="activeTab === 'activity'" style="display: none;">
                             <div class="p-6">
                                 <h5 class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-6">Activity Timeline</h5>
                                 <div class="space-y-6 relative">
@@ -360,31 +403,31 @@
 
                                     @php
                                         $timeline = collect([
-                                            ['label' => 'Order Placed', 'time' => $selectedOrder->created_at, 'icon' => 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'slate'],
+                                            ['label' => 'Order Placed', 'time' => $order->created_at, 'icon' => 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'slate'],
                                         ]);
 
-                                        if ($selectedOrder->accepted_at) {
-                                            $timeline->push(['label' => 'Order Accepted', 'time' => $selectedOrder->accepted_at, 'icon' => 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'blue']);
+                                        if ($order->accepted_at) {
+                                            $timeline->push(['label' => 'Order Accepted', 'time' => $order->accepted_at, 'icon' => 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'blue']);
                                         }
 
-                                        if ($selectedOrder->prepared_at) {
-                                            $timeline->push(['label' => 'Order Prepared', 'time' => $selectedOrder->prepared_at, 'icon' => 'M5 13l4 4L19 7', 'color' => 'indigo']);
+                                        if ($order->prepared_at) {
+                                            $timeline->push(['label' => 'Order Prepared', 'time' => $order->prepared_at, 'icon' => 'M5 13l4 4L19 7', 'color' => 'indigo']);
                                         }
 
-                                        if ($selectedOrder->dispatched_at) {
-                                            $timeline->push(['label' => 'Dispatched to Rider', 'time' => $selectedOrder->dispatched_at, 'icon' => 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'amber']);
+                                        if ($order->dispatched_at) {
+                                            $timeline->push(['label' => 'Dispatched to Rider', 'time' => $order->dispatched_at, 'icon' => 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'amber']);
                                         }
 
-                                        if ($selectedOrder->delivered_at) {
-                                            $timeline->push(['label' => 'Order Delivered/Completed', 'time' => $selectedOrder->delivered_at, 'icon' => 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'emerald']);
-                                        } elseif ($selectedOrder->status === 'Completed') {
-                                            $timeline->push(['label' => 'Order Completed', 'time' => $selectedOrder->updated_at, 'icon' => 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'emerald']);
+                                        if ($order->delivered_at) {
+                                            $timeline->push(['label' => 'Order Delivered/Completed', 'time' => $order->delivered_at, 'icon' => 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'emerald']);
+                                        } elseif ($order->status === 'Completed') {
+                                            $timeline->push(['label' => 'Order Completed', 'time' => $order->updated_at, 'icon' => 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', 'color' => 'emerald']);
                                         }
 
-                                        if ($selectedOrder->refunded_at) {
-                                            $timeline->push(['label' => 'Order Refunded/Voided', 'time' => $selectedOrder->refunded_at, 'icon' => 'M6 18L18 6M6 6l12 12', 'color' => 'red', 'desc' => $selectedOrder->refund_reason]);
-                                        } else if (in_array($selectedOrder->status, ['Cancelled', 'Void'])) {
-                                            $timeline->push(['label' => 'Order ' . $selectedOrder->status, 'time' => $selectedOrder->updated_at, 'icon' => 'M6 18L18 6M6 6l12 12', 'color' => 'red', 'desc' => $selectedOrder->notes]);
+                                        if ($order->refunded_at) {
+                                            $timeline->push(['label' => 'Order Refunded/Voided', 'time' => $order->refunded_at, 'icon' => 'M6 18L18 6M6 6l12 12', 'color' => 'red', 'desc' => $order->refund_reason]);
+                                        } else if (in_array($order->status, ['Cancelled', 'Void'])) {
+                                            $timeline->push(['label' => 'Order ' . $order->status, 'time' => $order->updated_at, 'icon' => 'M6 18L18 6M6 6l12 12', 'color' => 'red', 'desc' => $order->notes]);
                                         }
 
                                         $timeline = $timeline->sortByDesc('time')->values();
@@ -417,65 +460,68 @@
                     </div>
 
                     {{-- Action Footer --}}
-                    <div class="p-5 border-t border-slate-100 bg-white grid grid-cols-2 gap-2" x-show="currentTab === 'summary'">
-                        @if($selectedOrder->source === 'App')
-                            @if($selectedOrder->status === 'Pending')
-                                <x-primary-button wire:click="acceptOrder({{ $selectedOrder->id }})" class="col-span-2 h-10 justify-center">
+                    <div class="p-5 border-t border-slate-100 bg-white grid grid-cols-2 gap-2 shrink-0" x-show="activeTab === 'summary'">
+                        {{-- 1. App Specific Progress Actions --}}
+                        @if($order->source === 'App')
+                            @if($order->status === 'Pending')
+                                <x-primary-button wire:click="acceptOrder({{ $order->id }})" class="col-span-1 h-10 justify-center">
                                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                    Accept Order
+                                    Accept
                                 </x-primary-button>
-                                @if($selectedOrder->created_at->diffInHours(now()) <= 24)
-                                    <x-secondary-button wire:click="openRejectModal({{ $selectedOrder->id }})" class="col-span-2 h-10 justify-center text-red-600 border-red-200">
-                                        Reject Order
+                                @if($order->created_at->diffInHours(now()) <= 24)
+                                    <x-secondary-button wire:click="openRejectModal({{ $order->id }})" class="col-span-1 h-10 justify-center text-red-600 border-red-200">
+                                        Reject
                                     </x-secondary-button>
+                                @else
+                                    <div class="col-span-1"></div>
                                 @endif
-                            @elseif($selectedOrder->status === 'Preparing')
-                                <x-primary-button wire:click="openHandToRiderModal({{ $selectedOrder->id }})" class="col-span-2 h-10 justify-center bg-indigo-600 hover:bg-indigo-700">
+                            @elseif($order->status === 'Preparing')
+                                <x-primary-button wire:click="openHandToRiderModal({{ $order->id }})" class="col-span-2 h-10 justify-center bg-indigo-600 hover:bg-indigo-700">
                                     Hand to Rider
                                 </x-primary-button>
-                                <x-secondary-button wire:click="markAsOutForDelivery({{ $selectedOrder->id }})" class="col-span-2 h-10 justify-center">
+                                <x-secondary-button wire:click="markAsOutForDelivery({{ $order->id }})" class="col-span-2 h-10 justify-center">
                                     Out for Delivery
                                 </x-secondary-button>
-                            @elseif(in_array($selectedOrder->status, ['Handed to Rider', 'Out for Delivery']))
-                                <x-primary-button wire:click="markAsDelivered({{ $selectedOrder->id }})" class="col-span-2 h-10 justify-center bg-emerald-600 hover:bg-emerald-700">
+                            @elseif(in_array($order->status, ['Handed to Rider', 'Out for Delivery']))
+                                <x-primary-button wire:click="markAsDelivered({{ $order->id }})" class="col-span-2 h-10 justify-center bg-emerald-600 hover:bg-emerald-700">
                                     Mark as Delivered
                                 </x-primary-button>
                             @endif
                         @endif
 
-                        {{-- Universal Actions --}}
-                        @if($selectedOrder->canBeRefunded())
-                            <x-danger-button wire:click="openRefundModal({{ $selectedOrder->id }})" class="col-span-1 h-10 justify-center text-red-600 bg-red-50 hover:bg-red-100 border-red-200">
-                                Refund
-                            </x-danger-button>
+                        {{-- 2. POS Draft Actions --}}
+                        @if($order->source === 'POS' && $order->status === 'Drafted')
+                            <x-primary-button wire:click="restoreDraft({{ $order->id }})" class="col-span-2 h-10 justify-center">
+                                Restore to Cart
+                            </x-primary-button>
+                            <x-secondary-button wire:click="deleteDraft({{ $order->id }})" class="col-span-2 h-10 justify-center text-red-600 border-red-200">
+                                Delete Draft
+                            </x-secondary-button>
                         @endif
-                        @if($selectedOrder->canBeVoided())
-                            <x-danger-button wire:click="openVoidModal({{ $selectedOrder->id }})" class="col-span-1 h-10 justify-center text-red-600 bg-red-50 hover:bg-red-100 border-red-200">
+
+                        {{-- 3. Consolidated Refund Action (Respects 1-hour window via model) --}}
+                        @if($order->canBeRefunded())
+                            <x-primary-button wire:click="openRefundModal({{ $order->id }})" class="col-span-2 h-10 justify-center">
+                                Refund Order
+                            </x-primary-button>
+                        @endif
+
+                        {{-- 4. Consolidated Void Action --}}
+                        @if($order->canBeVoided())
+                            <x-danger-button wire:click="openVoidModal({{ $order->id }})" class="{{ $order->status !== 'Drafted' ? 'col-span-1' : 'col-span-2' }} h-10 justify-center text-red-600 bg-red-50 hover:bg-red-100 border-red-200">
                                 Void Order
                             </x-danger-button>
                         @endif
 
-                        @if($selectedOrder->source === 'POS')
-                            @if($selectedOrder->status === 'Drafted')
-                                <x-primary-button wire:click="restoreDraft({{ $selectedOrder->id }})" class="col-span-2 h-10 justify-center">
-                                    Restore to Cart
-                                </x-primary-button>
-                                <x-secondary-button wire:click="deleteDraft({{ $selectedOrder->id }})" class="col-span-2 h-10 justify-center text-red-600 border-red-200">
-                                    Delete Draft
-                                </x-secondary-button>
-                            @elseif(in_array($selectedOrder->status, ['Completed', 'Delivered']))
-                                <x-primary-button wire:click="openRefundModal({{ $selectedOrder->id }})" class="col-span-2 h-10 justify-center">
-                                    Refund Order
-                                </x-primary-button>
-                            @endif
+                        {{-- 5. Standard Global Actions --}}
+                        @if($order->status !== 'Drafted')
+                            <x-secondary-button @click="$dispatch('open-modal', 'receipt-modal')" class="{{ $order->canBeVoided() ? 'col-span-1' : 'col-span-2' }} h-10 justify-center">
+                                View Receipt
+                            </x-secondary-button>
                         @endif
-
-                        <x-secondary-button wire:click="openReceiptModal({{ $selectedOrder->id }})" class="col-span-2 h-10 justify-center">
-                            View Receipt
-                        </x-secondary-button>
                     </div>
                 </div>
-            @endif
+            @endforeach
         </x-side-panel>
 
     </div>{{-- end relative wrapper --}}
@@ -561,7 +607,7 @@
 
                 <div>
                     <x-input-label for="reject_reason" value="Reason for Rejection (Optional)" />
-                    <textarea id="reject_reason" wire:model.defer="rejectReason" rows="2" placeholder="e.g., Out of stock, branch closing..."
+                    <textarea id="reject_reason" wire:model="rejectReason" rows="2" placeholder="e.g., Out of stock, branch closing..."
                         class="mt-1.5 block w-full border border-gray-200 rounded-xl px-3 py-2 text-[13px] focus:border-red-300 focus:ring-0 resize-none transition-all"></textarea>
                 </div>
             </div>
@@ -628,14 +674,48 @@
             </div>
         </div>
 
-        @if($selectedOrder)
-            <div class="flex justify-center bg-gray-50 rounded-xl p-6 border border-gray-100 shadow-inner overflow-hidden mb-4">
-                <div class="w-full max-w-[260px] bg-white shadow-md p-4 pt-6 pb-8 font-mono text-[10px] text-gray-800 relative receipt-paper border border-gray-100">
+        @foreach($allLoadedOrders as $order)
+            <div x-show="selectedOrderId === {{ $order->id }}" x-cloak class="flex justify-center bg-gray-50 rounded-xl p-6 border border-gray-100 shadow-inner overflow-hidden mb-4">
+                <div id="receipt_paper_{{ $order->id }}" class="w-full max-w-[260px] bg-white shadow-md p-4 pt-6 pb-8 font-mono text-[10px] text-gray-800 relative receipt-paper border border-gray-100">
                     @php
+                        $address = \App\Models\SystemSetting::get('business_address', '');
+                        if (is_array($address)) {
+                            $address = $address['formatted'] ?? '';
+                        }
                         $logoUrl = \App\Models\SystemSetting::get('business_logo') ? Storage::url(\App\Models\SystemSetting::get('business_logo')) : null;
-                        $businessName = \App\Models\SystemSetting::get('business_name', 'Mister Takoyaki Cafe');
+                        $businessName = \App\Models\SystemSetting::get('business_name', 'Your Business Name');
+                        $businessEmail = \App\Models\SystemSetting::get('business_email', '');
+                        $businessPhone = \App\Models\SystemSetting::get('business_phone', '');
+                        $businessAddress = $address;
+                        $logoEnabled = (bool)\App\Models\SystemSetting::get('receipt_logo_enabled', true);
+                        $showVat = (bool)\App\Models\SystemSetting::get('receipt_show_vat', true);
                         $footer = \App\Models\SystemSetting::get('receipt_footer_message', 'Thank you for your visit!');
-                        $logoEnabled = \App\Models\SystemSetting::get('receipt_logo_enabled', true);
+                        $returnPolicy = \App\Models\SystemSetting::get('receipt_return_policy', 'No return, no exchange.');
+                        $qrUrl = \App\Models\SystemSetting::get('receipt_qr_url', '');
+                        $currencySymbol = '₱';
+
+                        if (empty($qrUrl)) {
+                            $qrUrl = route('customer.review', ['branch' => $order->branch_id]);
+                        } else {
+                            $qrUrl = str_replace('{order_id}', $order->id, $qrUrl);
+                            // Append branch context to custom URLs so reviews are attributed correctly
+                            $separator = str_contains($qrUrl, '?') ? '&' : '?';
+                            $qrUrl .= $separator . 'branch=' . $order->branch_id;
+                        }
+
+                        // Rewrite localhost to local LAN IP so phones can scan it
+                        if (str_contains($qrUrl, 'localhost') || str_contains($qrUrl, '127.0.0.1')) {
+                            $localIp = gethostbyname(gethostname());
+                            $qrUrl = str_replace(['localhost', '127.0.0.1'], $localIp, $qrUrl);
+                        }
+
+                        // Generate dynamic QR code
+                        $qrCodeSvg = null;
+                        try {
+                            $qrCodeSvg = \App\Helpers\QrCodeHelper::generateReviewQrCode($qrUrl);
+                        } catch (\Exception $e) {
+                            $qrCodeSvg = null;
+                        }
                     @endphp
 
                     <div class="text-center mb-4">
@@ -651,33 +731,44 @@
                             </div>
                         @endif
                         <p class="font-bold text-[11px]">{{ $businessName }}</p>
+                        @if(!empty($businessAddress))
+                            <p class="text-[7px] text-gray-500 mt-0.5">{{ $businessAddress }}</p>
+                        @endif
+                        @if(!empty($businessPhone))
+                            <p class="text-[7px] text-gray-500">Tel: +63 {{ ltrim(trim($businessPhone), '+63') }}</p>
+                        @endif
+                        @if(!empty($businessEmail))
+                            <p class="text-[7px] text-gray-500">{{ $businessEmail }}</p>
+                        @endif
                     </div>
 
                     <div class="border-y border-dashed border-gray-200 py-1.5 mb-3 space-y-0.5 text-[9px]">
-                        <div class="flex justify-between"><span>#{{ $selectedOrder->reference_no }}</span><span>{{ $selectedOrder->created_at->format('d/m/y H:i') }}</span></div>
+                        <div class="flex justify-between"><span>#{{ $order->reference_no }}</span><span>{{ $order->created_at->format('d/m/y H:i') }}</span></div>
                         <div class="flex justify-between font-bold" style="font-size:9px; margin-top:4px;">
-                            <span style="text-transform:uppercase; letter-spacing:0.05em;">⬛ {{ strtoupper($selectedOrder->order_type ?? 'DINE-IN') }}</span>
+                            <span style="text-transform:uppercase; letter-spacing:0.05em;">⬛ {{ strtoupper($order->order_type ?? 'DINE-IN') }}</span>
+                            <span>STAFF: {{ strtoupper($order->user->first_name ?? 'APP') }}</span>
                         </div>
                         
-                        @if($selectedOrder->source === 'App' || ($selectedOrder->order_type ?? '') === 'Delivery')
+                        @if($order->source === 'App' || ($order->order_type ?? '') === 'Delivery')
                             <div class="mt-2 pt-2 border-t border-gray-100 flex flex-col gap-0.5">
-                                <span class="font-bold">Customer: {{ $selectedOrder->customer_name ?? 'N/A' }}</span>
-                                <span>Phone: {{ $selectedOrder->customer_phone ?? 'N/A' }}</span>
-                                <span class="whitespace-normal leading-tight">Address: {{ $selectedOrder->delivery_address ?? 'N/A' }}</span>
+                                <span class="font-bold">Customer: {{ $order->customer_name ?? 'N/A' }}</span>
+                                <span>Phone: {{ $order->customer_phone ?? 'N/A' }}</span>
+                                <span class="whitespace-normal leading-tight">Address: {{ $order->delivery_address ?? 'N/A' }}</span>
                             </div>
                         @endif
                     </div>
 
                     <div class="space-y-1 mb-3">
-                        @forelse($selectedOrder->items as $item)
+                        @forelse($order->items as $item)
                             <div class="flex justify-between items-start">
                                 <span class="flex-1 pr-2 leading-tight">{{ $item->quantity }}x {{ $item->product->name ?? 'Item' }}</span>
-                                <span class="whitespace-nowrap">₱{{ number_format($item->quantity * $item->unit_price, 2) }}</span>
+                                <span class="whitespace-nowrap">₱{{ number_format($item->subtotal ?? ($item->quantity * $item->unit_price), 2) }}</span>
                             </div>
                             @if($item->options && $item->options->isNotEmpty())
                                 @foreach($item->options as $opt)
                                     <div class="flex justify-between text-[8px] text-gray-500 pl-3 leading-tight">
                                         <span>+ {{ $opt->option->name ?? 'N/A' }}</span>
+                                        <span>₱{{ number_format($opt->price, 2) }}</span>
                                     </div>
                                 @endforeach
                             @endif
@@ -689,40 +780,42 @@
                     <div class="border-t border-dashed border-gray-200 pt-1.5 mb-3 space-y-0.5">
                         <div class="flex justify-between">
                             <span>Subtotal</span>
-                            <span>₱{{ number_format($selectedOrder->total_amount - $selectedOrder->delivery_fee + $selectedOrder->discount_amount, 2) }}</span>
+                            <span>₱{{ number_format($order->total_amount + $order->discount_amount, 2) }}</span>
                         </div>
 
-                        @if($selectedOrder->discount_amount > 0)
+                        @if($order->discount_amount > 0)
                             <div class="flex justify-between text-[9px] text-gray-500">
                                 <span>Discount</span>
-                                <span>-₱{{ number_format($selectedOrder->discount_amount, 2) }}</span>
+                                <span>-₱{{ number_format($order->discount_amount, 2) }}</span>
                             </div>
                         @endif
 
-                        @if($selectedOrder->delivery_fee > 0)
+                        @if($order->delivery_fee > 0)
                             <div class="flex justify-between text-[9px] text-gray-500">
                                 <span>Delivery Fee</span>
-                                <span>₱{{ number_format($selectedOrder->delivery_fee, 2) }}</span>
+                                <span>₱{{ number_format($order->delivery_fee, 2) }}</span>
                             </div>
                         @endif
 
                         <div class="flex justify-between font-bold text-[10px] pt-1 mt-1 border-t border-gray-100">
                             <span>TOTAL</span>
-                            <span>₱{{ number_format($selectedOrder->total_amount, 2) }}</span>
+                            <span>₱{{ number_format($order->total_amount, 2) }}</span>
                         </div>
                     </div>
 
-                    @if($selectedOrder->refunded_amount > 0)
+                    @if($order->refunded_amount > 0)
                         <div class="text-center font-bold text-[9px] mb-3 mt-1 py-1 border-y border-dashed border-gray-200 uppercase text-gray-900">
-                            Refunded: ₱{{ number_format($selectedOrder->refunded_amount, 2) }}
+                            Refunded: ₱{{ number_format($order->refunded_amount, 2) }}
                         </div>
                     @endif
 
                     <div class="text-center mt-4">
                         <p class="font-bold italic text-gray-700 text-[8px] mb-2">{{ $footer }}</p>
-                        @php
-                            $qrCodeSvg = \App\Helpers\QrCodeHelper::generateReviewQrCode($selectedOrder->id);
-                        @endphp
+                        
+                        @if(!empty($returnPolicy))
+                            <p class="text-[7px] text-gray-500 border-t border-dashed border-gray-200 pt-2 mb-2 leading-tight">{{ $returnPolicy }}</p>
+                        @endif
+
                         @if($qrCodeSvg)
                             <div class="mt-2 pt-2 border-t border-gray-200">
                                 <p class="text-[7px] text-gray-600 mb-1">Scan to Review:</p>
@@ -734,13 +827,13 @@
                     </div>
                 </div>
             </div>
-        @endif
+        @endforeach
 
         <div class="flex items-center justify-end gap-2 px-6 py-4 bg-gray-50 text-right -mx-6 -mb-6 mt-6 rounded-b-lg border-t border-gray-100">
             <x-secondary-button @click="$dispatch('close-modal', 'receipt-modal')" class="h-11">
                 Close
             </x-secondary-button>
-            <x-primary-button class="h-11 font-black uppercase tracking-widest text-[11px]">
+            <x-primary-button @click="window.printOrderReceipt(selectedOrderId)" class="h-11 font-black uppercase tracking-widest text-[11px]">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                 Print Receipt
             </x-primary-button>
@@ -795,4 +888,30 @@
     </div>
 </x-modal>
 
+<script>
+window.printOrderReceipt = function(orderId) {
+    const element = document.getElementById('receipt_paper_' + orderId);
+    if (!element) return;
+
+    let iframe = document.getElementById('receipt_print_iframe');
+    if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = 'receipt_print_iframe';
+        iframe.style.position = 'fixed';
+        iframe.style.bottom = '0';
+        iframe.style.right = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = 'none';
+        document.body.appendChild(iframe);
+    }
+
+    const doc = iframe.contentWindow.document;
+    doc.open();
+    doc.write("<html><head><title>Print Receipt</title><style>@page { size: 80mm auto; margin: 0; } body { font-family: 'Courier New', Courier, monospace; font-size: 11px; color: #000; margin: 0; padding: 10px; background: #fff; width: 72mm; } .text-center { text-align: center; } .mb-2 { margin-bottom: 8px; } .mb-4 { margin-bottom: 16px; } .mt-2 { margin-top: 8px; } .mt-4 { margin-top: 16px; } .py-1.5 { padding-top: 6px; padding-bottom: 6px; } .pt-1 { padding-top: 4px; } .pt-2 { padding-top: 8px; } .pl-3 { padding-left: 12px; } .font-bold { font-weight: bold; } .italic { font-style: italic; } .border-y { border-top: 1px dashed #000; border-bottom: 1px dashed #000; } .border-t { border-top: 1px dashed #000; } .space-y-0.5 > * + * { margin-top: 2px; } .space-y-1 > * + * { margin-top: 4px; } .flex { display: flex; } .justify-between { justify-content: space-between; } .items-start { align-items: flex-start; } .flex-col { flex-direction: column; } .gap-0.5 { gap: 2px; } .gap-2 { gap: 8px; } .flex-1 { flex: 1; } .pr-2 { padding-right: 8px; } .whitespace-nowrap { white-space: nowrap; } .whitespace-normal { white-space: normal; } .leading-tight { line-height: 1.25; } .uppercase { text-transform: uppercase; } .text-[7px] { font-size: 8px; } .text-[8px] { font-size: 9px; } .text-[9px] { font-size: 10px; } .text-[10px] { font-size: 11px; } .text-[11px] { font-size: 12px; } img { max-width: 40px; height: auto; }</style></head><body>" + element.innerHTML + "<script>window.onload = function() { window.focus(); window.print(); };<\/script></body></html>");
+    doc.close();
+}
+</script>
+
 </div>{{-- end root wrapper --}}
+

@@ -7,10 +7,20 @@
 @endphp
 
 <div
-    x-data="{ ...slidingTabs(@js($panel), 'panel'), mode: 'list' }"
-    x-on:switch-panel.window="panel = $event.detail.panel; mode = $event.detail.mode || mode"
+    x-data="window.stockManagement($wire)"
+    x-on:switch-panel.window="panel = $event.detail.panel; if($event.detail.mode) mode = $event.detail.mode"
     @trigger-edit-ingredient.window="$wire.showEdit($event.detail.id)"
+    wire:ignore.self
+    wire:key="stock-management-main-container"
     class="relative">
+
+    {{-- Hidden reactive updater to sync allIngredients list under wire:ignore --}}
+    <div x-effect="updateIngredientsList(@js($allIngredients->map(fn($i) => ['id' => $i->id, 'name' => $i->name])))" class="hidden" wire:key="ingredients-sync-helper"></div>
+    <div x-effect="updateBatchesList(@js($allBatches->map(fn($b) => [
+        'id' => $b->id,
+        'ingredient_name' => $b->ingredient->name ?? '',
+        'status' => $b->computed_status
+    ])))" class="hidden" wire:key="batches-sync-helper"></div>
 
     <div class="relative min-h-[600px]" wire:init="triggerExpiryAlerts">
 
@@ -33,7 +43,7 @@
             </div>
 
             {{-- High-Fidelity Sliding Tabs --}}
-            <x-sliding-tabs model="panel" class="mb-6">
+            <x-sliding-tabs model="panel" ref="panelList" class="mb-6">
                 <x-sliding-tab value="list" model="panel">
                     <x-slot name="icon">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
@@ -45,7 +55,12 @@
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </x-slot>
                     Expiry Tracking
-                    @php $expiredBadge = \App\Models\StockBatch::where('current_quantity', '>', 0)->where('expiry_date', '<', today())->count(); @endphp
+                    @php 
+                        $expiredBadge = \App\Models\StockBatch::where('current_quantity', '>', 0)
+                            ->where('expiry_date', '<', today())
+                            ->when($selectedBranchId, fn($q) => $q->where('branch_id', $selectedBranchId))
+                            ->count(); 
+                    @endphp
                     @if($expiredBadge > 0)
                         <span class="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-black ml-1">{{ $expiredBadge }}</span>
                     @endif
@@ -57,88 +72,105 @@
         <div x-show="panel === 'list'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="px-1">
 
             {{-- KPI Dashboard (User Management Aesthetic) --}}
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            {{-- KPI Dashboard (Compact Glassmorphic Theme) --}}
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
                 {{-- Total Assets --}}
-                <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                <div class="bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-indigo-700/80 uppercase tracking-widest leading-none">Total Catalog</span>
+                        <div class="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-600 border border-indigo-500/10">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-indigo-700/60 uppercase tracking-widest leading-none mb-1">Total Catalog</span>
-                        <span class="block text-[20px] font-black text-gray-900 leading-none">&#8369;{{ number_format($totalIngredients) }}</span>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ number_format($totalIngredients) }}</span>
+                        <span class="text-[9px] font-bold text-slate-400">items</span>
                     </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Active catalog assets</p>
                 </div>
                 
                 {{-- Low Stock Alerts --}}
-                <div class="bg-gradient-to-br {{ $lowStockWarnings > 0 ? 'from-amber-50 to-amber-100 border-amber-200' : 'from-emerald-50 to-emerald-100 border-emerald-200' }} border rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border {{ $lowStockWarnings > 0 ? 'border-amber-100 text-amber-600' : 'border-emerald-100 text-emerald-600' }} flex items-center justify-center shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                @php
+                    $isLowStockActive = $lowStockWarnings > 0;
+                    $lowStockTheme = $isLowStockActive ? 'amber' : 'emerald';
+                    $lowStockGradient = $isLowStockActive ? 'from-amber-50 border-amber-100 text-amber-700/80' : 'from-emerald-50 border-emerald-100 text-emerald-700/80';
+                    $lowStockIconBg = $isLowStockActive ? 'bg-amber-500/10 text-amber-600 border-amber-500/10' : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/10';
+                    $lowStockValColor = $isLowStockActive ? 'text-amber-600' : 'text-emerald-600';
+                @endphp
+                <div class="bg-gradient-to-br {{ $lowStockGradient }} to-white border rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black uppercase tracking-widest leading-none">Low Stock</span>
+                        <div class="w-7 h-7 rounded-lg {{ $lowStockIconBg }} flex items-center justify-center">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black {{ $lowStockWarnings > 0 ? 'text-amber-700/60' : 'text-emerald-700/60' }} uppercase tracking-widest leading-none mb-1">Low Stock Alerts</span>
-                        <span class="block text-[20px] font-black {{ $lowStockWarnings > 0 ? 'text-amber-600' : 'text-emerald-600' }} leading-none">{{ $lowStockWarnings }}</span>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black {{ $lowStockValColor }} tracking-tight leading-none">{{ $lowStockWarnings }}</span>
+                        <span class="text-[9px] font-bold text-slate-400">alerts</span>
                     </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">{{ $isLowStockActive ? 'Needs replenishment' : 'Stock levels healthy' }}</p>
                 </div>
 
-                {{-- Expiring Batches --}}
+                {{-- Expiring --}}
                 @php
-                    $expiringCount = \App\Models\StockBatch::where('expiry_date', '>', now())->where('expiry_date', '<=', now()->addDays($alertDays))->where('branch_id', $selectedBranchId)->where('current_quantity', '>', 0)->count();
+                    $isExpiringActive = $expiringCount > 0;
+                    $expTheme = $isExpiringActive ? 'rose' : 'slate';
+                    $expGradient = $isExpiringActive ? 'from-rose-50 border-rose-100 text-rose-700/80' : 'from-slate-50 border-slate-100 text-slate-700/80';
+                    $expIconBg = $isExpiringActive ? 'bg-rose-500/10 text-rose-600 border-rose-500/10' : 'bg-slate-500/10 text-slate-500 border-slate-500/10';
+                    $expValColor = $isExpiringActive ? 'text-rose-600' : 'text-slate-800';
                 @endphp
-                <div class="bg-gradient-to-br {{ $expiringCount > 0 ? 'from-rose-50 to-rose-100 border-rose-200' : 'from-slate-50 to-slate-100 border-slate-200' }} border rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border {{ $expiringCount > 0 ? 'border-rose-100 text-rose-600' : 'border-slate-100 text-slate-400' }} flex items-center justify-center shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <div class="bg-gradient-to-br {{ $expGradient }} to-white border rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black uppercase tracking-widest leading-none">Expiring</span>
+                        <div class="w-7 h-7 rounded-lg {{ $expIconBg }} flex items-center justify-center">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black {{ $expiringCount > 0 ? 'text-rose-700/60' : 'text-slate-700/60' }} uppercase tracking-widest leading-none mb-1">Expiring â‰¤{{ $alertDays }}d</span>
-                        <span class="block text-[20px] font-black {{ $expiringCount > 0 ? 'text-rose-600' : 'text-gray-900' }} leading-none">{{ $expiringCount }}</span>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black {{ $expValColor }} tracking-tight leading-none">{{ $expiringCount }}</span>
+                        <span class="text-[9px] font-bold text-slate-400">batches</span>
                     </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">{{ $isExpiringActive ? 'Requires immediate action' : 'All batches fresh' }}</p>
                 </div>
 
                 {{-- Monthly Procurement --}}
-                <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                <div class="bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-emerald-700/80 uppercase tracking-widest leading-none">Procurement</span>
+                        <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 border border-emerald-500/10">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-emerald-700/60 uppercase tracking-widest leading-none mb-1">Procurement (Mo)</span>
-                        <span class="block text-[20px] font-black text-gray-900 leading-none">&#8369;{{ number_format(\App\Models\StockMovement::where('branch_id', $selectedBranchId)->where('type', 'in')->whereMonth('created_at', now()->month)->sum(DB::raw('unit_cost * quantity')), 0) }}</span>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-slate-900 tracking-tight leading-none">₱{{ number_format($monthlyProcurement, 0) }}</span>
                     </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Current month total cost</p>
                 </div>
             </div>
 
-            {{-- Settings Context Banner --}}
-            <div class="flex items-center gap-2 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-xl text-[11px] text-indigo-700 mb-4">
-                <svg class="w-3.5 h-3.5 shrink-0 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                <span>
-                    Thresholds from <strong>System Settings â†’ Inventory Controls</strong>: 
-                    Low Stock Warning = <strong>{{ $inventoryConfig['low_stock_threshold'] }}</strong> units &nbsp;Â·&nbsp;
-                    Critical Level = <strong>{{ $inventoryConfig['critical_stock_threshold'] }}</strong> units &nbsp;Â·&nbsp;
-                    Expiry Alert Window = <strong>{{ $alertDays }} days</strong>
-                </span>
-                <a href="{{ route('settings.index') }}" class="ml-auto shrink-0 font-bold underline hover:text-indigo-900 transition-colors">Configure â†’</a>
-            </div>
 
             {{-- macOS Style Unified Toolbar --}}
             <div class="relative z-20 flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
                 
                 {{-- Left: Search Bar --}}
-                <div class="flex flex-1 w-full lg:w-auto">
-                    <x-search-bar wireModel="search" placeholder="Find ingredient..." width="w-full lg:w-72" />
+                <div class="w-full lg:w-auto flex-1">
+                    <x-search-bar x-model.debounce.50ms="stockSearch" placeholder="Find ingredient..." width="w-full lg:w-80" />
                 </div>
 
                 {{-- Right: Branch Switcher --}}
-                <div class="flex items-center gap-2">
+                <div class="w-full lg:w-auto">
                     @if($this->isSuperAdmin())
-                        <x-dropdown align="right" width="48">
+                        <x-dropdown align="right" width="full">
                             <x-slot name="trigger">
-                                <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
-                                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                                    <span class="text-[12px] whitespace-nowrap">{{ $selectedBranchId ? ($branches->firstWhere('id', $selectedBranchId)->branch_name ?? 'Select Branch') : 'Global Inventory' }}</span>
-                                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                <x-secondary-button type="button" class="w-full justify-between gap-1.5 h-10 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
+                                    <div class="flex items-center gap-1.5 truncate">
+                                        <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                                        <span class="text-[12px] truncate">{{ $selectedBranchId ? ($branches->firstWhere('id', $selectedBranchId)->branch_name ?? 'Select Branch') : 'Select Branch' }}</span>
+                                    </div>
+                                    <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                                 </x-secondary-button>
                             </x-slot>
                             <x-slot name="content">
-                                <x-dropdown-link href="#" wire:click.prevent="$set('selectedBranchId', '')">Global Inventory</x-dropdown-link>
                                 @foreach($branches as $branch)
                                     <x-dropdown-link href="#" wire:click.prevent="$set('selectedBranchId', '{{ $branch->id }}')">
                                         {{ $branch->branch_name }}
@@ -147,10 +179,12 @@
                             </x-slot>
                         </x-dropdown>
                     @else
-                        <span class="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-lg font-bold text-[11px] text-emerald-700 h-9">
-                            <svg class="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                            Branch Stock
-                        </span>
+                        <div class="inline-flex items-center justify-between px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-lg font-bold text-[11px] text-emerald-700 h-10 w-full">
+                            <div class="flex items-center gap-2">
+                                <svg class="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                <span>Branch Stock</span>
+                            </div>
+                        </div>
                     @endif
                 </div>
             </div>
@@ -167,23 +201,31 @@
                         <th class="py-3 px-6 text-right text-[11px] font-black text-slate-500 uppercase tracking-widest">Actions</th>
                     </x-slot>
 
-                    <tbody class="divide-y divide-slate-100/80" wire:key="stock-list-body-{{ $ingredients->currentPage() }}-{{ $selectedBranchId }}" wire:loading.class="opacity-40" wire:target="search, filterType, selectedBranchId">
-                        @forelse($ingredients as $ing)
+                    <tbody class="divide-y divide-slate-100/80" wire:key="stock-list-body-{{ $selectedBranchId }}">
+                        @forelse($allIngredients as $ing)
                             @php
                                 $stockToDisplay = 0;
                                 $isLow = false;
+                                $isCritical = false;
+                                
+                                $globalLow = $inventoryConfig['low_stock_threshold'] ?? 10;
+                                $globalCritical = $inventoryConfig['critical_stock_threshold'] ?? 5;
+                                $effectiveMin = $ing->minimum_stock > 0 ? $ing->minimum_stock : $globalLow;
+
                                 if ($selectedBranchId) {
                                     $stockRecord = collect($ing->branchStocks)->where('branch_id', $selectedBranchId)->first();
                                     $stockToDisplay = $stockRecord ? $stockRecord->stock_quantity : 0;
-                                    $isLow = $stockToDisplay <= $ing->minimum_stock;
                                 } else {
                                     $stockToDisplay = collect($ing->branchStocks)->sum('stock_quantity');
                                 }
                                 
+                                $isLow = $stockToDisplay <= $effectiveMin;
+                                $isCritical = $stockToDisplay <= $globalCritical;
+                                
                                 $colors = ['from-indigo-400 to-violet-500', 'from-emerald-400 to-teal-500', 'from-amber-400 to-orange-500', 'from-rose-400 to-pink-500'];
                                 $grad = $colors[$ing->id % count($colors)];
                             @endphp
-                            <tr wire:key="stock-row-{{ $ing->id }}" class="hover:bg-slate-50/50 transition-colors group/row">
+                            <tr wire:key="stock-row-{{ $ing->id }}" x-show="isIngredientVisible({{ $ing->id }})" x-cloak class="hover:bg-slate-50/50 transition-colors group/row">
                                 <td class="py-4 px-6 border-r border-slate-100/50 whitespace-nowrap">
                                     <div class="flex items-center gap-3">
                                         <div class="w-10 h-10 rounded-xl bg-gradient-to-br {{ $grad }} flex items-center justify-center text-white text-[14px] font-black shadow-lg shadow-indigo-100">
@@ -210,23 +252,27 @@
                                 
                                 <td class="py-4 px-6 border-r border-slate-100/50 text-right whitespace-nowrap">
                                     <div class="flex flex-col items-end">
-                                        <span class="text-[15px] font-black {{ $isLow ? 'text-red-600' : 'text-slate-900' }}">
+                                        <span class="text-[15px] font-black {{ $isCritical ? 'text-red-600' : ($isLow ? 'text-amber-600' : 'text-slate-900') }}">
                                             {{ \App\Helpers\StockHelper::formatForDisplay($stockToDisplay, $ing->unit) }}
                                         </span>
-                                        @if($isLow)
-                                            <span class="text-[9px] font-black text-red-400 uppercase tracking-widest animate-pulse">Low Stock</span>
+                                        @if($isCritical)
+                                            <span class="text-[9px] font-black text-red-500 uppercase tracking-widest animate-pulse">Critical</span>
+                                        @elseif($isLow)
+                                            <span class="text-[9px] font-black text-amber-500 uppercase tracking-widest">Low Stock</span>
                                         @endif
                                     </div>
                                 </td>
 
                                 <td class="py-4 px-6 text-right whitespace-nowrap">
                                     <div class="flex items-center justify-end gap-2">
-                                        @if(!$this->isStaff())
+                                        @if($this->isSuperAdmin())
                                             <x-secondary-button wire:click="showEdit({{ $ing->id }})" class="h-8 px-3 text-[11px] font-bold bg-white hover:bg-slate-50 border-slate-200">
                                                 Edit
                                             </x-secondary-button>
-                                            
-                                            <a href="{{ route('stock.adjustment', ['id' => $ing->id, 'selectedBranchId' => $selectedBranchId]) }}" 
+                                        @endif
+                                        
+                                        @if(!$this->isStaff())
+                                            <a href="{{ route('stock.adjustment', ['id' => $ing->id, 'selectedBranchId' => $selectedBranchId]) }}" wire:navigate 
                                                class="h-8 px-3 inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all text-[11px] font-black uppercase tracking-widest shadow-sm">
                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
                                                 Adjust Stock
@@ -242,10 +288,99 @@
                                 </td>
                             </tr>
                         @endforelse
+                        <tr x-show="filteredIngredientIds.length === 0 && stockSearch.trim() !== ''" x-cloak>
+                            <td colspan="5" class="py-12">
+                                <x-empty-state title="No ingredients match your search" description="Try a different name or clear your search." />
+                            </td>
+                        </tr>
                     </tbody>
                 </x-data-table>
                 <div class="mt-4 px-1">
-                    <x-pagination :paginator="$ingredients" keyPrefix="stock-list" />
+                    <template x-if="filteredIngredientIds.length > 0 || stockSearch.trim() === ''">
+                        <div class="flex flex-col lg:flex-row items-center justify-between px-4 py-4 bg-white border-t border-gray-100 lg:px-6 gap-6">
+                            <div class="flex flex-col sm:flex-row items-center justify-between w-full lg:w-auto gap-4 sm:gap-8">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex flex-col sm:flex-row sm:items-center sm:gap-1.5 leading-[0.9] sm:leading-none">
+                                        <span class="text-[11px] sm:text-[12px] text-gray-400 font-black uppercase tracking-tighter sm:tracking-widest">Row</span>
+                                        <span class="text-[9px] sm:text-[12px] text-gray-400/70 font-black uppercase tracking-tighter sm:tracking-widest">per page</span>
+                                    </div>
+                                    <div>
+                                        <x-dropdown align="top" width="20" containerClasses="block">
+                                            <x-slot name="trigger">
+                                                <button type="button" class="inline-flex items-center justify-between min-w-[70px] px-3 py-1.5 text-[13px] font-black text-gray-900 bg-slate-50 border border-gray-200 rounded-xl hover:border-gray-300 focus:outline-none transition-all h-10 gap-2 shadow-sm">
+                                                    <span x-text="stockPerPage"></span>
+                                                    <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </button>
+                                            </x-slot>
+                                            <x-slot name="content">
+                                                <template x-for="option in [5, 10, 15, 30, 50, 100]">
+                                                    <x-dropdown-link href="#" @click.prevent="stockPerPage = option; stockCurrentPage = 1;">
+                                                        <span x-text="option"></span>
+                                                    </x-dropdown-link>
+                                                </template>
+                                            </x-slot>
+                                        </x-dropdown>
+                                    </div>
+                                </div>
+                                <div class="text-[11px] text-gray-400 font-bold uppercase tracking-widest whitespace-nowrap">
+                                    <span class="text-gray-900" x-text="Math.min(filteredIngredientIds.length, (stockCurrentPage - 1) * stockPerPage + 1)"></span>
+                                    <span class="mx-0.5 text-gray-300">-</span>
+                                    <span class="text-gray-900" x-text="Math.min(filteredIngredientIds.length, stockCurrentPage * stockPerPage)"></span>
+                                    <span class="mx-1 text-gray-300 lowercase italic font-medium">of</span>
+                                    <span class="text-indigo-600" x-text="filteredIngredientIds.length"></span>
+                                    <span class="ml-1 text-gray-300 lowercase italic font-medium">results</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 w-full lg:w-auto justify-center lg:justify-end border-t border-gray-50 pt-4 lg:border-0 lg:pt-0">
+                                <x-secondary-button @click="stockCurrentPage = 1" ::disabled="stockCurrentPage === 1" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="stockCurrentPage === 1 ? 'opacity-30 pointer-events-none' : ''">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                                    </svg>
+                                </x-secondary-button>
+                                <x-secondary-button @click="stockCurrentPage = Math.max(1, stockCurrentPage - 1)" ::disabled="stockCurrentPage === 1" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="stockCurrentPage === 1 ? 'opacity-30 pointer-events-none' : ''">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                    </svg>
+                                </x-secondary-button>
+                                <div class="flex items-center gap-1.5 px-2">
+                                    <template x-for="page in stockPageNumbers">
+                                        <div class="flex items-center gap-1.5">
+                                            <template x-if="page === stockCurrentPage">
+                                                <x-primary-button class="!p-0 w-9 h-9 items-center justify-center !rounded-xl bg-gray-900 text-[13px] font-black shadow-none ring-0">
+                                                    <span x-text="page"></span>
+                                                </x-primary-button>
+                                            </template>
+                                            <template x-if="page !== stockCurrentPage">
+                                                <x-secondary-button @click="stockCurrentPage = page" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl text-[13px] font-bold">
+                                                    <span x-text="page"></span>
+                                                </x-secondary-button>
+                                            </template>
+                                        </div>
+                                    </template>
+                                    <template x-if="Math.ceil(filteredIngredientIds.length / stockPerPage) > stockCurrentPage + 1">
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="text-gray-300 font-bold mx-1">...</span>
+                                            <x-secondary-button @click="stockCurrentPage = Math.ceil(filteredIngredientIds.length / stockPerPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl text-[13px] font-bold">
+                                                <span x-text="Math.ceil(filteredIngredientIds.length / stockPerPage)"></span>
+                                            </x-secondary-button>
+                                        </div>
+                                    </template>
+                                </div>
+                                <x-secondary-button @click="stockCurrentPage = Math.min(Math.ceil(filteredIngredientIds.length / stockPerPage), stockCurrentPage + 1)" ::disabled="stockCurrentPage >= Math.ceil(filteredIngredientIds.length / stockPerPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="stockCurrentPage >= Math.ceil(filteredIngredientIds.length / stockPerPage) ? 'opacity-30 pointer-events-none' : ''">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </x-secondary-button>
+                                <x-secondary-button @click="stockCurrentPage = Math.ceil(filteredIngredientIds.length / stockPerPage) || 1" ::disabled="stockCurrentPage >= Math.ceil(filteredIngredientIds.length / stockPerPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="stockCurrentPage >= Math.ceil(filteredIngredientIds.length / stockPerPage) ? 'opacity-30 pointer-events-none' : ''">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                                    </svg>
+                                </x-secondary-button>
+                            </div>
+                        </div>
+                    </template>
                 </div>
             </div>
 
@@ -276,7 +411,7 @@
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                 <div>
                                     <x-input-label value="Ingredient Name *" />
-                                    <x-text-input wire:model.debounce.400ms="ingredientName" class="w-full mt-1.5 h-11 font-medium" placeholder="e.g. Octopus Bits" inputFilter="name" :hasError="$errors->has('ingredientName')" />
+                                    <x-text-input wire:model.live.debounce.400ms="ingredientName" class="w-full mt-1.5 h-11 font-medium" placeholder="e.g. Octopus Bits" inputFilter="name" :hasError="$errors->has('ingredientName')" />
                                     <x-input-error :messages="$errors->get('ingredientName')" class="mt-1" />
                                 </div>
                                 <div>
@@ -286,16 +421,31 @@
                                             <x-dropdown align="left" width="full" containerClasses="block w-full">
                                                 <x-slot name="trigger">
                                                     <button type="button" class="flex items-center justify-between w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-[13px] text-slate-700 shadow-sm hover:border-slate-300 focus:outline-none transition-all h-11">
-                                                        <span class="font-medium text-slate-600">{{ $ingredientCategoryId ? $ingredientCategories->firstWhere('id', $ingredientCategoryId)?->name : 'Select Category' }}</span>
+                                                        <span class="font-medium text-slate-600">{{ $selectedCategoryName }}</span>
                                                         <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
                                                     </button>
                                                 </x-slot>
                                                 <x-slot name="content">
-                                                    <x-dropdown-link href="#" wire:click.prevent="$set('ingredientCategoryId', '')">Uncategorized</x-dropdown-link>
-                                                    <hr class="border-slate-50">
-                                                    @foreach($ingredientCategories as $cat)
-                                                        <x-dropdown-link href="#" wire:click.prevent="$set('ingredientCategoryId', {{ $cat->id }})">{{ $cat->name }}</x-dropdown-link>
-                                                    @endforeach
+                                                    <div class="p-2">
+                                                        <div class="px-2 pb-2 mb-2 border-b border-slate-50">
+                                                            <div class="relative">
+                                                                <svg class="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                                                <input wire:model.live.debounce.300ms="ingredientCategorySearch" type="text" placeholder="Search categories..." 
+                                                                       class="w-full pl-9 pr-4 py-2 bg-slate-50 border-none rounded-lg text-[12px] font-medium focus:ring-1 focus:ring-indigo-500 placeholder-slate-400">
+                                                            </div>
+                                                        </div>
+                                                        <div class="max-h-60 overflow-y-auto custom-scrollbar">
+                                                            @if(empty($ingredientCategorySearch))
+                                                                <x-dropdown-link href="#" wire:click.prevent="$set('ingredientCategoryId', '')">Uncategorized</x-dropdown-link>
+                                                                <hr class="border-slate-50">
+                                                            @endif
+                                                            @forelse($ingredientCategories as $cat)
+                                                                <x-dropdown-link href="#" wire:click.prevent="$set('ingredientCategoryId', {{ $cat->id }})">{{ $cat->name }}</x-dropdown-link>
+                                                            @empty
+                                                                <div class="px-4 py-3 text-[11px] text-slate-400 text-center italic">No categories found</div>
+                                                            @endforelse
+                                                        </div>
+                                                    </div>
                                                 </x-slot>
                                             </x-dropdown>
                                         </div>
@@ -313,12 +463,23 @@
                                 <div>
                                     <x-input-label value="Base Inventory Unit *" />
                                     <div class="mt-1.5">
-                                        <select wire:model.live="ingredientUnit" 
-                                            class="w-full h-11 border border-slate-200 rounded-xl text-[13px] font-bold text-slate-700 bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 transition-all">
-                                            @foreach($availableUnits as $key => $label)
-                                                <option value="{{ $key }}">{{ $label }}</option>
-                                            @endforeach
-                                        </select>
+                                        <x-dropdown align="left" width="full" containerClasses="block w-full">
+                                            <x-slot name="trigger">
+                                                <button type="button" class="flex items-center justify-between w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-[13px] text-slate-700 shadow-sm hover:border-slate-300 focus:outline-none transition-all h-11">
+                                                    <span class="font-bold text-slate-700">{{ !empty($ingredientUnit) && isset($availableUnits[$ingredientUnit]) ? $availableUnits[$ingredientUnit] : 'Select Unit' }}</span>
+                                                    <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
+                                                </button>
+                                            </x-slot>
+                                            <x-slot name="content">
+                                                <div class="p-2">
+                                                    <div class="max-h-60 overflow-y-auto custom-scrollbar">
+                                                        @foreach($availableUnits as $key => $label)
+                                                            <x-dropdown-link href="#" wire:click.prevent="$set('ingredientUnit', '{{ $key }}')">{{ $label }}</x-dropdown-link>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            </x-slot>
+                                        </x-dropdown>
                                     </div>
                                     <x-input-error :messages="$errors->get('ingredientUnit')" class="mt-1" />
                                 </div>
@@ -371,34 +532,52 @@
                             <p class="text-[13px] text-slate-400 font-medium">No bulk units defined for this ingredient.</p>
                         </div>
                     @else
-                        <div class="space-y-3 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+                        <div class="space-y-3">
                             @foreach($conversionRows as $i => $row)
                                 @php
                                     $qtyInBase   = (float)($row['qty_in_base'] ?? 0);
                                     $unitCost    = (float)($row['price_per_unit'] ?? 0);
                                     $costPerBase = ($qtyInBase > 0 && $unitCost > 0) ? $unitCost / $qtyInBase : null;
                                 @endphp
-                                <div wire:key="conv-row-{{ $i }}" class="border border-slate-100 rounded-2xl overflow-hidden shadow-sm group">
-                                    <div class="flex items-center justify-between p-3 bg-slate-50/50 border-b border-slate-100">
-                                        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-1">
+                                <div wire:key="conv-row-{{ $i }}" class="relative border border-slate-100 rounded-2xl shadow-sm group" style="z-index: {{ 100 - $i }};">
+                                    <div class="flex items-center justify-between p-3 bg-slate-50/50 border-b border-slate-100 rounded-t-2xl">
+                                        <div class="flex flex-col sm:flex-row items-start sm:items-end gap-3 flex-1">
                                             <div class="w-full sm:w-40">
-                                                <select wire:model.live="conversionRows.{{ $i }}.unit_name" 
-                                                    class="w-full h-9 border border-slate-200 rounded-xl text-[12px] font-bold text-slate-700 bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 transition-all">
-                                                    <option value="">Select Packaging...</option>
-                                                    @foreach($availableBulkUnits as $key => $label)
-                                                        <option value="{{ $key }}">{{ $label }}</option>
-                                                    @endforeach
-                                                </select>
+                                                <x-input-label value="Packaging Type" class="mb-1 text-[10px]" />
+                                                <x-dropdown align="left" width="48" containerClasses="block w-full">
+                                                    <x-slot name="trigger">
+                                                        <button type="button" class="flex items-center justify-between w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-[12px] text-slate-700 shadow-sm hover:border-slate-300 focus:outline-none transition-all h-9">
+                                                            <span class="font-bold text-slate-700 truncate mr-2">
+                                                                {{ !empty($row['unit_name']) && isset($availableBulkUnits[$row['unit_name']]) ? $availableBulkUnits[$row['unit_name']] : 'Select Packaging...' }}
+                                                            </span>
+                                                            <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
+                                                        </button>
+                                                    </x-slot>
+                                                    <x-slot name="content">
+                                                        <div class="p-2">
+                                                            <div class="max-h-60 overflow-y-auto custom-scrollbar">
+                                                                <x-dropdown-link href="#" wire:click.prevent="$set('conversionRows.{{ $i }}.unit_name', '')">Select Packaging...</x-dropdown-link>
+                                                                <hr class="border-slate-50 my-1">
+                                                                @foreach($availableBulkUnits as $key => $label)
+                                                                    <x-dropdown-link href="#" wire:click.prevent="$set('conversionRows.{{ $i }}.unit_name', '{{ $key }}')">{{ $label }}</x-dropdown-link>
+                                                                @endforeach
+                                                            </div>
+                                                        </div>
+                                                    </x-slot>
+                                                </x-dropdown>
                                             </div>
-                                            <div class="w-full sm:w-40 relative">
-                                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                                                    <span class="text-[10px] font-black uppercase tracking-tighter">Cost ₱</span>
+                                            <div class="w-full sm:w-40">
+                                                <x-input-label value="Unit Cost (₱)" class="mb-1 text-[10px]" />
+                                                <div class="relative">
+                                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                                        <span class="text-[10px] font-black uppercase tracking-tighter">Cost ₱</span>
+                                                    </div>
+                                                    <x-text-input wire:model.live.debounce.500ms="conversionRows.{{ $i }}.price_per_unit" 
+                                                        class="w-full h-9 pl-14 text-[12px] font-black text-right bg-slate-50 text-slate-400 cursor-not-allowed" 
+                                                        placeholder="0.00" 
+                                                        readonly 
+                                                    />
                                                 </div>
-                                                <x-text-input wire:model.live="conversionRows.{{ $i }}.price_per_unit" 
-                                                    class="w-full h-9 pl-14 text-[12px] font-black text-right bg-slate-50 text-slate-400 cursor-not-allowed" 
-                                                    placeholder="0.00" 
-                                                    readonly 
-                                                />
                                             </div>
                                             @if($costPerBase !== null)
                                                 <div class="flex items-center gap-2">
@@ -420,11 +599,12 @@
                                         </button>
                                         @endif
                                     </div>
-                                    <div class="p-3 bg-white">
-                                        <div class="flex items-center gap-3">
+                                    <div class="p-3 bg-white rounded-b-2xl">
+                                        <div class="flex items-end gap-3">
                                             <div class="w-20 shrink-0 relative group/hint">
+                                                <x-input-label value="Pack Size" class="mb-1 text-[10px]" />
                                                 <x-text-input 
-                                                    wire:model.live="conversionRows.{{ $i }}.chain_multiplier" 
+                                                    wire:model.live.debounce.500ms="conversionRows.{{ $i }}.chain_multiplier" 
                                                     class="w-full h-8 text-[12px] font-black text-center border-indigo-100 bg-indigo-50/30" 
                                                     placeholder="Size" 
                                                     type="number"
@@ -433,8 +613,9 @@
                                                     onkeypress="return (event.charCode >= 48 && event.charCode <= 57) || event.charCode == 46"
                                                 />
                                             </div>
-                                            <span class="text-slate-300 font-bold text-md">&times;</span>
+                                            <span class="text-slate-300 font-bold text-md mb-1.5">&times;</span>
                                             <div class="flex-1 min-w-[100px]">
+                                                <x-input-label value="Linked To" class="mb-1 text-[10px]" />
                                                 @php
                                                     $hasChainingOptions = false;
                                                     foreach($conversionRows as $j => $prevRow) {
@@ -445,19 +626,47 @@
                                                 @endphp
 
                                                 @if($hasChainingOptions)
-                                                    <select wire:model.live="conversionRows.{{ $i }}.chain_from_index" 
-                                                        class="w-full h-8 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-600 bg-slate-50/50 px-2 focus:ring-2 focus:ring-indigo-100 transition-all">
-                                                        <option value="base">1 {{ strtoupper($ingredientUnit) }}</option>
-                                                        @foreach($conversionRows as $j => $prevRow)
-                                                            @if($j < $i && ($prevRow['unit_name'] ?? ''))
-                                                                    <option value="{{ $j }}">{{ strtoupper($prevRow['unit_name'] ?? '') }} ({{ number_format((float)($prevRow['qty_in_base'] ?? 0), 2) }} {{ strtoupper($ingredientUnit) }})</option>
-                                                            @endif
-                                                        @endforeach
-                                                    </select>
+                                                    @php
+                                                        $selectedChainIdx = $row['chain_from_index'] ?? 'base';
+                                                        if ($selectedChainIdx === 'base' || $selectedChainIdx === '') {
+                                                            $chainDisplay = '1 ' . strtoupper($ingredientUnit);
+                                                        } else {
+                                                            $cRow = $conversionRows[$selectedChainIdx] ?? null;
+                                                            if ($cRow) {
+                                                                $chainDisplay = strtoupper($cRow['unit_name'] ?? '') . ' (' . number_format((float)($cRow['qty_in_base'] ?? 0), 2) . ' ' . strtoupper($ingredientUnit) . ')';
+                                                            } else {
+                                                                $chainDisplay = '1 ' . strtoupper($ingredientUnit);
+                                                            }
+                                                        }
+                                                    @endphp
+                                                    <x-dropdown align="left" width="full" containerClasses="block w-full">
+                                                        <x-slot name="trigger">
+                                                            <button type="button" class="flex items-center justify-between w-full px-2.5 py-1 bg-slate-50/50 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-600 shadow-sm hover:border-slate-300 focus:outline-none transition-all h-8">
+                                                                <span class="truncate mr-2">{{ $chainDisplay }}</span>
+                                                                <svg class="w-3 h-3 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
+                                                            </button>
+                                                        </x-slot>
+                                                        <x-slot name="content">
+                                                            <div class="p-1.5">
+                                                                <div class="max-h-60 overflow-y-auto custom-scrollbar">
+                                                                    <x-dropdown-link href="#" wire:click.prevent="$set('conversionRows.{{ $i }}.chain_from_index', 'base')">
+                                                                        <span class="text-[11px] font-bold text-slate-600">1 {{ strtoupper($ingredientUnit) }}</span>
+                                                                    </x-dropdown-link>
+                                                                    @foreach($conversionRows as $j => $prevRow)
+                                                                        @if($j < $i && ($prevRow['unit_name'] ?? ''))
+                                                                            <x-dropdown-link href="#" wire:click.prevent="$set('conversionRows.{{ $i }}.chain_from_index', '{{ $j }}')">
+                                                                                <span class="text-[11px] font-bold text-slate-600">{{ strtoupper($prevRow['unit_name'] ?? '') }} ({{ number_format((float)($prevRow['qty_in_base'] ?? 0), 2) }} {{ strtoupper($ingredientUnit) }})</span>
+                                                                            </x-dropdown-link>
+                                                                        @endif
+                                                                    @endforeach
+                                                                </div>
+                                                            </div>
+                                                        </x-slot>
+                                                    </x-dropdown>
                                                 @else
                                                     <div class="h-8 w-full border border-slate-100 bg-slate-50/30 rounded-lg flex items-center px-3 text-[11px] font-black text-slate-400 italic">
                                                         1 {{ strtoupper($ingredientUnit) }}
-                                                        <input type="hidden" wire:model="conversionRows.{{ $i }}.chain_from_index" value="base">
+                                                        <input type="hidden" wire:model.live="conversionRows.{{ $i }}.chain_from_index" value="base">
                                                     </div>
                                                 @endif
                                             </div>
@@ -593,14 +802,18 @@
 
                     <div class="space-y-6 relative z-10">
                         <div>
-                            <h4 class="text-[13px] font-bold text-white mb-2 italic">What is "Multiplier"?</h4>
-                            <p class="text-[12px] text-slate-400 leading-relaxed">
-                                It's the <span class="text-indigo-300 font-bold">Pack Size</span>. It tells the system how many units are inside one bulk package.
+                            <h4 class="text-[13px] font-bold text-white mb-2 italic">How to Setup Packaging?</h4>
+                            <p class="text-[12px] text-slate-400 leading-relaxed mb-3">
+                                Build up from your <span class="text-indigo-300 font-bold">Base Unit</span> (e.g. ML). Define the <span class="text-emerald-400 font-bold">Pack Size</span> and what it is <span class="text-indigo-300 font-bold">Linked To</span> to create chains.
                             </p>
-                            <div class="mt-3 p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
+                            <div class="p-3 bg-slate-800/50 rounded-xl border border-slate-700/50 space-y-2">
                                 <p class="text-[11px] text-slate-300 font-mono">
-                                    <span class="text-indigo-400 font-black">EX:</span> 1 Bottle contains <span class="text-emerald-400 font-black">500</span> Grams.<br>
-                                    Set Multiplier to <span class="text-emerald-400 font-black">500</span>.
+                                    <span class="text-indigo-400 font-black">STEP 1:</span> 1 Bottle = <span class="text-emerald-400 font-black">250</span> ML<br>
+                                    <span class="text-slate-500 ml-4">↳ Size: 250, Link to: 1 ML (Base)</span>
+                                </p>
+                                <p class="text-[11px] text-slate-300 font-mono border-t border-slate-700/50 pt-2">
+                                    <span class="text-indigo-400 font-black">STEP 2:</span> 1 Box = <span class="text-emerald-400 font-black">24</span> Bottles<br>
+                                    <span class="text-slate-500 ml-4">↳ Size: 24, Link to: BOTTLE</span>
                                 </p>
                             </div>
                         </div>
@@ -639,7 +852,7 @@
             <p class="mt-1 text-[13px] text-gray-500 font-medium">Add a new sorting group for your kitchen supplies.</p>
             <div class="mt-5">
                 <x-input-label for="new_ing_category_name" value="Category Label" />
-                <x-text-input id="new_ing_category_name" wire:model.debounce.400ms="newCategoryName" type="text" class="block w-full h-11 mt-1.5" placeholder="e.g. Seafood & Frozen" autofocus inputFilter="name" :hasError="$errors->has('newCategoryName')" />
+                <x-text-input id="new_ing_category_name" wire:model.live.debounce.400ms="newCategoryName" type="text" class="block w-full h-11 mt-1.5" placeholder="e.g. Seafood & Frozen" autofocus inputFilter="name" :hasError="$errors->has('newCategoryName')" />
                 <x-input-error :messages="$errors->get('newCategoryName')" class="mt-1" />
             </div>
             <div class="mt-6 flex justify-end gap-3">
@@ -742,71 +955,99 @@
          x-transition:enter-end="opacity-100 translate-y-0"
          x-cloak class="px-1">
 
-        {{-- Expiry System Metrics --}}
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {{-- Expiry System Metrics (Compact Glassmorphic Theme) --}}
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
             {{-- Expired --}}
-            <div wire:click="$set('expiryStatusFilter', 'expired')" 
-                class="bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all cursor-pointer relative overflow-hidden {{ $expiryStatusFilter === 'expired' ? 'ring-2 ring-rose-500 ring-offset-2' : '' }}">
-                <div class="w-10 h-10 rounded-xl bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm transition-transform group-hover:scale-110">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                </div>
-                <div>
-                    <span class="block text-[10px] font-black text-rose-700/60 uppercase tracking-widest leading-none mb-1">Expired</span>
-                    <span class="block text-[20px] font-black text-rose-700 leading-none">{{ number_format($expiryStats['expired']) }}</span>
-                </div>
-                @if($expiryStats['expired'] > 0)
-                    <div class="absolute top-2 right-2">
-                        <span class="flex h-2 w-2"><span class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-rose-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span></span>
-                    </div>
+            @php
+                $hasExpiredBatches = $expiryStats['expired'] > 0;
+            @endphp
+            <div @click="expiryStatus = (expiryStatus === 'expired' ? 'all' : 'expired'); expiryCurrentPage = 1"
+                 :class="expiryStatus === 'expired' ? 'bg-gradient-to-br from-rose-100 via-rose-50 to-white border-rose-300 shadow-md scale-[1.01]' : 'bg-gradient-to-br from-rose-50 to-white border-rose-100 shadow-[0_8px_30px_rgba(0,0,0,0.02)]'"
+                 class="relative overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.01] rounded-2xl p-4 hover:shadow-md border">
+                @if($hasExpiredBatches)
+                    <span class="absolute top-2.5 right-2.5 flex h-2 w-2">
+                        <span class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-rose-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                    </span>
                 @endif
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-black text-rose-700/80 uppercase tracking-widest leading-none">Expired</span>
+                    <div class="w-7 h-7 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-600 border border-rose-500/10">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    </div>
+                </div>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-[20px] font-black {{ $hasExpiredBatches ? 'text-rose-600' : 'text-slate-800' }} tracking-tight leading-none">{{ $expiryStats['expired'] }}</span>
+                    <span class="text-[9px] font-bold text-slate-400">batches</span>
+                </div>
+                <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Needs disposal</p>
             </div>
 
             {{-- Expiring Soon --}}
-            <div wire:click="$set('expiryStatusFilter', 'expiring')" 
-                class="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all cursor-pointer relative overflow-hidden {{ $expiryStatusFilter === 'expiring' ? 'ring-2 ring-amber-500 ring-offset-2' : '' }}">
-                <div class="w-10 h-10 rounded-xl bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm transition-transform group-hover:scale-110">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                </div>
-                <div>
-                    <span class="block text-[10px] font-black text-amber-700/60 uppercase tracking-widest leading-none mb-1">Expiring â‰¤{{ $alertDays }}d</span>
-                    <span class="block text-[20px] font-black text-amber-700 leading-none">{{ number_format($expiryStats['expiring']) }}</span>
-                </div>
-                @if($expiryStats['expiring'] > 0)
-                    <div class="absolute top-2 right-2">
-                        <span class="flex h-2 w-2"><span class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-amber-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span></span>
-                    </div>
+            @php
+                $hasExpiringBatches = $expiryStats['expiring'] > 0;
+            @endphp
+            <div @click="expiryStatus = (expiryStatus === 'expiring' ? 'all' : 'expiring'); expiryCurrentPage = 1"
+                 :class="expiryStatus === 'expiring' ? 'bg-gradient-to-br from-amber-100 via-amber-50 to-white border-amber-300 shadow-md scale-[1.01]' : 'bg-gradient-to-br from-amber-50 to-white border-amber-100 shadow-[0_8px_30px_rgba(0,0,0,0.02)]'"
+                 class="relative overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.01] rounded-2xl p-4 hover:shadow-md border">
+                @if($hasExpiringBatches)
+                    <span class="absolute top-2.5 right-2.5 flex h-2 w-2">
+                        <span class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-amber-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                    </span>
                 @endif
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-black text-amber-700/80 uppercase tracking-widest leading-none">Expiring &le;{{ $alertDays }}d</span>
+                    <div class="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600 border border-amber-500/10">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                </div>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-[20px] font-black {{ $hasExpiringBatches ? 'text-amber-600' : 'text-slate-800' }} tracking-tight leading-none">{{ $expiryStats['expiring'] }}</span>
+                    <span class="text-[9px] font-bold text-slate-400">batches</span>
+                </div>
+                <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Expires within {{ $alertDays }} days</p>
             </div>
 
             {{-- Fresh --}}
-            <div wire:click="$set('expiryStatusFilter', 'fresh')" 
-                class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all cursor-pointer relative overflow-hidden {{ $expiryStatusFilter === 'fresh' ? 'ring-2 ring-emerald-500 ring-offset-2' : '' }}">
-                <div class="w-10 h-10 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm transition-transform group-hover:scale-110">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <div @click="expiryStatus = (expiryStatus === 'fresh' ? 'all' : 'fresh'); expiryCurrentPage = 1"
+                 :class="expiryStatus === 'fresh' ? 'bg-gradient-to-br from-emerald-100 via-emerald-50 to-white border-emerald-300 shadow-md scale-[1.01]' : 'bg-gradient-to-br from-emerald-50 to-white border-emerald-100 shadow-[0_8px_30px_rgba(0,0,0,0.02)]'"
+                 class="relative overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.01] rounded-2xl p-4 hover:shadow-md border">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-black text-emerald-700/80 uppercase tracking-widest leading-none">Stable Stock</span>
+                    <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 border border-emerald-500/10">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
                 </div>
-                <div>
-                    <span class="block text-[10px] font-black text-emerald-700/60 uppercase tracking-widest leading-none mb-1">Stable Stock</span>
-                    <span class="block text-[20px] font-black text-emerald-700 leading-none">{{ number_format($expiryStats['fresh']) }}</span>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-[20px] font-black text-emerald-600 tracking-tight leading-none">{{ $expiryStats['fresh'] }}</span>
+                    <span class="text-[9px] font-bold text-slate-400">batches</span>
                 </div>
+                <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Fresh &amp; stable stock</p>
             </div>
 
             {{-- No Date --}}
-            <div wire:click="$set('expiryStatusFilter', 'no_date')" 
-                class="bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all cursor-pointer relative overflow-hidden {{ $expiryStatusFilter === 'no_date' ? 'ring-2 ring-slate-400 ring-offset-2' : '' }}">
-                <div class="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 shadow-sm transition-transform group-hover:scale-110">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            <div @click="expiryStatus = (expiryStatus === 'no_date' ? 'all' : 'no_date'); expiryCurrentPage = 1"
+                 :class="expiryStatus === 'no_date' ? 'bg-gradient-to-br from-slate-100 via-slate-50 to-white border-slate-300 shadow-md scale-[1.01]' : 'bg-gradient-to-br from-slate-50 to-white border-slate-200 shadow-[0_8px_30px_rgba(0,0,0,0.02)]'"
+                 class="relative overflow-hidden cursor-pointer transition-all duration-300 hover:scale-[1.01] rounded-2xl p-4 hover:shadow-md border">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-black text-slate-700/80 uppercase tracking-widest leading-none">Non-Perishable</span>
+                    <div class="w-7 h-7 rounded-lg bg-slate-500/10 flex items-center justify-center text-slate-500 border border-slate-500/10">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    </div>
                 </div>
-                <div>
-                    <span class="block text-[10px] font-black text-slate-500/60 uppercase tracking-widest leading-none mb-1">Non-Perishable</span>
-                    <span class="block text-[20px] font-black text-slate-700 leading-none">{{ number_format($expiryStats['no_date']) }}</span>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-[20px] font-black text-slate-800 tracking-tight leading-none">{{ $expiryStats['no_date'] }}</span>
+                    <span class="text-[9px] font-bold text-slate-400">batches</span>
                 </div>
+                <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">No expiration date set</p>
             </div>
         </div>
 
         {{-- macOS Style Expiry Toolbar --}}
         <div class="relative z-20 flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
             <div class="flex flex-1 w-full lg:w-auto">
-                <x-search-bar wireModel="expirySearch" placeholder="Filter batches..." width="w-full lg:w-72" />
+                <x-search-bar x-model.debounce.50ms="expirySearchText" placeholder="Filter batches..." width="w-full lg:w-72" />
             </div>
 
             <div class="flex flex-wrap items-center lg:justify-end gap-2">
@@ -814,13 +1055,13 @@
                     <x-slot name="trigger">
                         <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
                             <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-                            <span class="text-[12px] whitespace-nowrap">{{ ['all' => 'All Batches', 'expired' => 'Expired Only', 'expiring' => 'Expiring Soon', 'fresh' => 'Stable Stock', 'no_date' => 'Non-Perishables'][$expiryStatusFilter] ?? 'Filter Status' }}</span>
+                            <span class="text-[12px] whitespace-nowrap" x-text="{'all': 'All Batches', 'expired': 'Expired Only', 'expiring': 'Expiring Soon', 'fresh': 'Stable Stock', 'no_date': 'Non-Perishables'}[expiryStatus] || 'Filter Status'"></span>
                             <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                         </x-secondary-button>
                     </x-slot>
                     <x-slot name="content">
                         @foreach(['all' => 'All Batches', 'expired' => 'Expired Only', 'expiring' => 'Expiring Soon', 'fresh' => 'Stable Stock', 'no_date' => 'Non-Perishables'] as $val => $label)
-                            <x-dropdown-link href="#" wire:click.prevent="$set('expiryStatusFilter', '{{ $val }}')">
+                            <x-dropdown-link href="#" @click.prevent="expiryStatus = '{{ $val }}'">
                                 <div class="flex items-center gap-2">
                                     @if($val === 'expired') <span class="w-2 h-2 rounded-full bg-rose-500"></span>
                                     @elseif($val === 'expiring') <span class="w-2 h-2 rounded-full bg-amber-500"></span>
@@ -849,8 +1090,8 @@
                     @endif
                 </x-slot>
 
-                <tbody class="divide-y divide-slate-100/80" wire:key="stock-expiry-body-{{ $expiryQuery->currentPage() }}-{{ $expiryStatusFilter }}" wire:loading.class="opacity-40" wire:target="expirySearch, expiryStatusFilter">
-                    @forelse($expiryQuery as $batch)
+                <tbody class="divide-y divide-slate-100/80" wire:key="stock-expiry-body-{{ $selectedBranchId }}">
+                    @foreach($allBatches as $batch)
                         @php
                             $expiry     = $batch->expiry_date ? \Carbon\Carbon::parse($batch->expiry_date)->startOfDay() : null;
                             $todayC     = \Carbon\Carbon::today();
@@ -860,7 +1101,7 @@
                             $isFresh    = $expiry && $expiry->gt($alertCutoff);
                             $daysLeft   = $expiry ? (int) $todayC->diffInDays($expiry, false) : null;
                         @endphp
-                        <tr class="hover:bg-slate-50/50 transition-colors {{ $isExpired ? 'bg-rose-50/30' : ($isExpiring ? 'bg-amber-50/30' : '') }}">
+                        <tr x-show="isBatchVisible({{ $batch->id }})" x-cloak class="hover:bg-slate-50/50 transition-colors {{ $isExpired ? 'bg-rose-50/30' : ($isExpiring ? 'bg-amber-50/30' : '') }}">
                             <td class="py-4 px-6 border-r border-slate-100/50 whitespace-nowrap">
                                 <div class="flex flex-col">
                                     <span class="text-[14px] font-bold text-slate-900">{{ $batch->ingredient->name ?? 'â€”' }}</span>
@@ -889,20 +1130,13 @@
                             </td>
                             <td class="py-4 px-6 border-r border-slate-100/50 text-center whitespace-nowrap">
                                 @if($isExpired)
-                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-100 text-rose-700 text-[10px] font-black uppercase tracking-wider">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block animate-pulse"></span> EXPIRED
-                                    </span>
+                                    <div class="flex items-center justify-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-rose-500"></span><span class="text-[11px] font-bold text-rose-600">EXPIRED</span></div>
                                 @elseif($isExpiring)
-                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-[10px] font-black uppercase tracking-wider">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block animate-pulse"></span>
-                                        {{ $daysLeft === 0 ? 'TODAY' : $daysLeft . 'D LEFT' }}
-                                    </span>
+                                    <div class="flex items-center justify-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span><span class="text-[11px] font-bold text-amber-600">{{ $daysLeft === 0 ? 'TODAY' : $daysLeft . 'D LEFT' }}</span></div>
                                 @elseif($isFresh)
-                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-wider">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span> FRESH
-                                    </span>
+                                    <div class="flex items-center justify-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span><span class="text-[11px] font-bold text-emerald-600">FRESH</span></div>
                                 @else
-                                    <span class="text-[11px] text-slate-400 italic font-medium tracking-tight">NON-PERISHABLE</span>
+                                    <div class="flex items-center justify-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-slate-400"></span><span class="text-[11px] font-bold text-slate-600">NON-PERISHABLE</span></div>
                                 @endif
                             </td>
                             @if(!$this->isStaff())
@@ -918,25 +1152,218 @@
                                 </td>
                             @endif
                         </tr>
-                    @empty
-                        <tr>
+                        <tr x-show="filteredBatchIds.length === 0 && expirySearchText.trim() !== ''" x-cloak>
                             <td colspan="{{ $this->isStaff() ? 5 : 6 }}" class="py-12">
-                                <x-empty-state 
-                                    title="No batches found" 
-                                    description="Everything looks clear for now."
-                                    icon="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                                />
+                                <x-empty-state title="No batches match your search" description="Try a different name or clear your search." />
                             </td>
                         </tr>
-                    @endforelse
+                    @endforeach
                 </tbody>
             </x-data-table>
             <div class="mt-4 px-1">
-                <x-pagination :paginator="$expiryQuery" keyPrefix="stock-expiry" />
+                <template x-if="filteredBatchIds.length > 0 || expirySearchText.trim() === ''">
+                    <div class="flex flex-col lg:flex-row items-center justify-between px-4 py-4 bg-white border-t border-gray-100 lg:px-6 gap-6">
+                        <div class="flex flex-col sm:flex-row items-center justify-between w-full lg:w-auto gap-4 sm:gap-8">
+                            <div class="flex items-center gap-3">
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:gap-1.5 leading-[0.9] sm:leading-none">
+                                    <span class="text-[11px] sm:text-[12px] text-gray-400 font-black uppercase tracking-tighter sm:tracking-widest">Row</span>
+                                    <span class="text-[9px] sm:text-[12px] text-gray-400/70 font-black uppercase tracking-tighter sm:tracking-widest">per page</span>
+                                </div>
+                                <div>
+                                    <x-dropdown align="top" width="20" containerClasses="block">
+                                        <x-slot name="trigger">
+                                            <button type="button" class="inline-flex items-center justify-between min-w-[70px] px-3 py-1.5 text-[13px] font-black text-gray-900 bg-slate-50 border border-gray-200 rounded-xl hover:border-gray-300 focus:outline-none transition-all h-10 gap-2 shadow-sm">
+                                                <span x-text="expiryPerPage"></span>
+                                                <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            </button>
+                                        </x-slot>
+                                        <x-slot name="content">
+                                            <template x-for="option in [5, 10, 15, 30, 50, 100]">
+                                                <x-dropdown-link href="#" @click.prevent="expiryPerPage = option; expiryCurrentPage = 1;">
+                                                    <span x-text="option"></span>
+                                                </x-dropdown-link>
+                                            </template>
+                                        </x-slot>
+                                    </x-dropdown>
+                                </div>
+                            </div>
+                            <div class="text-[11px] text-gray-400 font-bold uppercase tracking-widest whitespace-nowrap">
+                                <span class="text-gray-900" x-text="Math.min(filteredBatchIds.length, (expiryCurrentPage - 1) * expiryPerPage + 1)"></span>
+                                <span class="mx-0.5 text-gray-300">-</span>
+                                <span class="text-gray-900" x-text="Math.min(filteredBatchIds.length, expiryCurrentPage * expiryPerPage)"></span>
+                                <span class="mx-1 text-gray-300 lowercase italic font-medium">of</span>
+                                <span class="text-indigo-600" x-text="filteredBatchIds.length"></span>
+                                <span class="ml-1 text-gray-300 lowercase italic font-medium">results</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 w-full lg:w-auto justify-center lg:justify-end border-t border-gray-50 pt-4 lg:border-0 lg:pt-0">
+                            <x-secondary-button @click="expiryCurrentPage = 1" ::disabled="expiryCurrentPage === 1" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="expiryCurrentPage === 1 ? 'opacity-30 pointer-events-none' : ''">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                                </svg>
+                            </x-secondary-button>
+                            <x-secondary-button @click="expiryCurrentPage = Math.max(1, expiryCurrentPage - 1)" ::disabled="expiryCurrentPage === 1" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="expiryCurrentPage === 1 ? 'opacity-30 pointer-events-none' : ''">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </x-secondary-button>
+                            <div class="flex items-center gap-1.5 px-2">
+                                <template x-for="page in expiryPageNumbers">
+                                    <div class="flex items-center gap-1.5">
+                                        <template x-if="page === expiryCurrentPage">
+                                            <x-primary-button class="!p-0 w-9 h-9 items-center justify-center !rounded-xl bg-gray-900 text-[13px] font-black shadow-none ring-0">
+                                                <span x-text="page"></span>
+                                            </x-primary-button>
+                                        </template>
+                                        <template x-if="page !== expiryCurrentPage">
+                                            <x-secondary-button @click="expiryCurrentPage = page" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl text-[13px] font-bold">
+                                                <span x-text="page"></span>
+                                            </x-secondary-button>
+                                        </template>
+                                    </div>
+                                </template>
+                                <template x-if="Math.ceil(filteredBatchIds.length / expiryPerPage) > expiryCurrentPage + 1">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="text-gray-300 font-bold mx-1">...</span>
+                                        <x-secondary-button @click="expiryCurrentPage = Math.ceil(filteredBatchIds.length / expiryPerPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl text-[13px] font-bold">
+                                            <span x-text="Math.ceil(filteredBatchIds.length / expiryPerPage)"></span>
+                                        </x-secondary-button>
+                                    </div>
+                                </template>
+                            </div>
+                            <x-secondary-button @click="expiryCurrentPage = Math.min(Math.ceil(filteredBatchIds.length / expiryPerPage), expiryCurrentPage + 1)" ::disabled="expiryCurrentPage >= Math.ceil(filteredBatchIds.length / expiryPerPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="expiryCurrentPage >= Math.ceil(filteredBatchIds.length / expiryPerPage) ? 'opacity-30 pointer-events-none' : ''">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </x-secondary-button>
+                            <x-secondary-button @click="expiryCurrentPage = Math.ceil(filteredBatchIds.length / expiryPerPage) || 1" ::disabled="expiryCurrentPage >= Math.ceil(filteredBatchIds.length / expiryPerPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="expiryCurrentPage >= Math.ceil(filteredBatchIds.length / expiryPerPage) ? 'opacity-30 pointer-events-none' : ''">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                                </svg>
+                            </x-secondary-button>
+                        </div>
+                    </div>
+                </template>
             </div>
         </div>
     </div>
 
-    </div>{{-- end relative wrapper --}}
-</div>
+    <script>
+        (function() {
+            window.stockManagement = function($wire) {
+                const tabState = window.slidingTabs($wire.entangle('panel').live, 'panel');
+                return {
+                    ...tabState,
+                    panel: $wire.entangle('panel').live,
+                    mode: 'list',
 
+                    // Client-side search and pagination
+                    stockSearch: '',
+                    stockCurrentPage: 1,
+                    stockPerPage: 5,
+                    ingredientsList: [],
+
+                    expirySearchText: '',
+                    expiryStatus: 'all',
+                    expiryCurrentPage: 1,
+                    expiryPerPage: 5,
+                    batchesList: [],
+
+                    get filteredIngredientIds() {
+                        const query = this.stockSearch.toLowerCase().trim();
+                        return this.ingredientsList
+                            .filter(i => !query || i.name.toLowerCase().includes(query))
+                            .map(i => i.id);
+                    },
+                    get paginatedIngredientIds() {
+                        const start = (this.stockCurrentPage - 1) * this.stockPerPage;
+                        return this.filteredIngredientIds.slice(start, start + this.stockPerPage);
+                    },
+                    get stockPageNumbers() {
+                        const totalPages = Math.ceil(this.filteredIngredientIds.length / this.stockPerPage) || 1;
+                        const start = Math.max(1, this.stockCurrentPage - 1);
+                        const end = Math.min(totalPages, this.stockCurrentPage + 1);
+                        const pages = [];
+                        for (let i = start; i <= end; i++) {
+                            pages.push(i);
+                        }
+                        return pages;
+                    },
+                    isIngredientVisible(id) {
+                        return this.paginatedIngredientIds.includes(id);
+                    },
+                    updateIngredientsList(newList) {
+                        const oldIds = this.ingredientsList.map(i => i.id).join(',');
+                        const newIds = newList.map(i => i.id).join(',');
+                        if (oldIds !== newIds) {
+                            this.ingredientsList = newList;
+                            this.stockCurrentPage = 1;
+                        }
+                    },
+
+                    get filteredBatchIds() {
+                        const query = this.expirySearchText.toLowerCase().trim();
+                        const status = this.expiryStatus;
+                        return this.batchesList
+                            .filter(b => {
+                                const matchesSearch = !query || b.ingredient_name.toLowerCase().includes(query);
+                                const matchesStatus = status === 'all' || b.status === status;
+                                return matchesSearch && matchesStatus;
+                            })
+                            .map(b => b.id);
+                    },
+                    get paginatedBatchIds() {
+                        const start = (this.expiryCurrentPage - 1) * this.expiryPerPage;
+                        return this.filteredBatchIds.slice(start, start + this.expiryPerPage);
+                    },
+                    get expiryPageNumbers() {
+                        const totalPages = Math.ceil(this.filteredBatchIds.length / this.expiryPerPage) || 1;
+                        const start = Math.max(1, this.expiryCurrentPage - 1);
+                        const end = Math.min(totalPages, this.expiryCurrentPage + 1);
+                        const pages = [];
+                        for (let i = start; i <= end; i++) {
+                            pages.push(i);
+                        }
+                        return pages;
+                    },
+                    isBatchVisible(id) {
+                        return this.paginatedBatchIds.includes(id);
+                    },
+                    updateBatchesList(newList) {
+                        const oldIds = this.batchesList.map(b => b.id).join(',');
+                        const newIds = newList.map(b => b.id).join(',');
+                        if (oldIds !== newIds) {
+                            this.batchesList = newList;
+                            this.expiryCurrentPage = 1;
+                        }
+                    },
+
+                     init() {
+                        // Run slidingTabs init for panel indicator
+                        if (tabState.init) tabState.init.call(this);
+
+                        // Reset page on search
+                        this.$watch('stockSearch', () => {
+                            this.stockCurrentPage = 1;
+                        });
+                        this.$watch('expirySearchText', () => {
+                            this.expiryCurrentPage = 1;
+                        });
+                        this.$watch('expiryStatus', () => {
+                            this.expiryCurrentPage = 1;
+                        });
+                        this.$watch('panel', () => {
+                            this.stockSearch = '';
+                            this.stockCurrentPage = 1;
+                            this.expirySearchText = '';
+                            this.expiryStatus = 'all';
+                            this.expiryCurrentPage = 1;
+                        });
+                    }
+                };
+            };
+        })();
+    </script>
+</div>

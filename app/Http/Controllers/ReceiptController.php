@@ -14,7 +14,7 @@ class ReceiptController extends Controller
     public function thermal(Order $order)
     {
         $order->load([
-            'items.product', 
+            'items.product.category', 
             'items.options.option', 
             'items.modifiers.modifier', 
             'branch', 
@@ -26,19 +26,32 @@ class ReceiptController extends Controller
             $address = !empty($address['formatted']) ? $address['formatted'] : 'Main Branch, Manila';
         }
 
+        $posConfig = \App\Services\ConfigurationService::getPosConfig();
+        $businessConfig = \App\Services\ConfigurationService::getBusinessConfig();
+        $financialConfig = \App\Services\ConfigurationService::getFinancialConfig();
+
         $settings = [
-            'business_name' => SystemSetting::get('business_name', 'Mister Takoyaki Cafe'),
-            'business_address' => $address,
-            'business_phone' => SystemSetting::get('business_phone', '0912-345-6789'),
-            'receipt_footer_message' => SystemSetting::get('receipt_footer_message', 'Thank you for your visit!'),
-            'receipt_logo_enabled' => SystemSetting::get('receipt_logo_enabled', true),
-            'receipt_show_vat' => SystemSetting::get('receipt_show_vat', true),
+            'business_name' => $businessConfig['name'] ?? 'Mister Takoyaki Cafe',
+            'business_address' => $businessConfig['address'] ?? 'Main Branch, Manila',
+            'business_phone' => $businessConfig['phone'] ?? '',
+            'business_email' => $businessConfig['email'] ?? '',
+            'receipt_footer_message' => $posConfig['footer_message'] ?? 'Thank you for your visit!',
+            'receipt_logo_enabled' => $posConfig['logo_enabled'] ?? true,
+            'receipt_return_policy' => $posConfig['return_policy'] ?? 'No return, no exchange.',
+            'receipt_show_vat' => $posConfig['show_vat'] ?? false,
+            'currency_symbol' => $financialConfig['currency_symbol'] ?? '₱',
             'qr_code' => null
         ];
 
-        $qrUrl = SystemSetting::get('receipt_qr_url');
+        $businessLogo = $businessConfig['logo'] ?? null;
+
+        $qrUrl = $posConfig['qr_url'] ?? '';
         if (empty($qrUrl)) {
             $qrUrl = route('customer.review', ['branch' => $order->branch_id]);
+        } else {
+            // Append branch context to custom URLs so reviews are attributed correctly
+            $separator = str_contains($qrUrl, '?') ? '&' : '?';
+            $qrUrl .= $separator . 'branch=' . $order->branch_id;
         }
         
         // Rewrite localhost to local LAN IP so phones can connect
@@ -51,6 +64,6 @@ class ReceiptController extends Controller
             $settings['qr_code'] = \App\Helpers\QrCodeHelper::generateDataUri($qrUrl, 100);
         }
 
-        return view('receipts.thermal', compact('order', 'settings'));
+        return view('receipts.thermal', compact('order', 'settings', 'businessLogo'));
     }
 }

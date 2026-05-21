@@ -7,14 +7,14 @@
 @endphp
 
 <div
-    x-data="{ 
-        filterType: @entangle('filterType'),
-        panel: @js($panel),
-        deleteTargetId: null,
-        deleteTargetName: ''
-    }"
+    x-data="window.categoryManagement($wire)"
     class="relative"
+    wire:ignore.self
+    wire:key="category-management-main-container"
     x-on:switch-panel.window="panel = $event.detail?.panel || $event.detail[0]?.panel || 'list'">
+
+    {{-- Hidden reactive updater to sync categories list under wire:ignore --}}
+    <div x-effect="updateCategoriesList(@js($allCategories))" class="hidden" wire:key="categories-sync-helper"></div>
 
     <div class="relative min-h-[600px]">
 
@@ -32,7 +32,7 @@
             <div class="mb-5 flex items-center justify-between">
                 <div>
                     <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Category Intelligence</h2>
-                    <p class="text-[12px] text-gray-500 font-medium">Unified Hub: <span class="text-indigo-600 font-bold">{{ $categories->total() }} segments</span></p>
+                    <p class="text-[12px] text-gray-500 font-medium">Unified Hub: <span class="text-indigo-600 font-bold"><span x-text="filteredCategories.length"></span> segments</span></p>
                 </div>
                 <div class="flex items-center gap-2">
                     <x-dropdown align="right" width="48">
@@ -54,37 +54,40 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 @php $stats = $this->kpiStats; @endphp
                 
-                {{-- Total Segments --}}
-                <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                {{-- Total Categories --}}
+                <div class="p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Categories</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-indigo-700/60 uppercase tracking-widest leading-none mb-1">Total Categories</span>
-                        <span class="block text-[20px] font-black text-gray-900 leading-none">{{ number_format($stats['total_count']) }}</span>
-                    </div>
+                    <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($stats['total_count']) }}</h3>
+                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Active category tags</p>
                 </div>
 
-                {{-- Product Focus --}}
-                <div class="bg-gradient-to-br from-violet-50 to-violet-100 border border-violet-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-violet-100 flex items-center justify-center text-violet-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" /></svg>
+                {{-- Product Groups --}}
+                <div class="p-4 bg-gradient-to-br from-violet-500/10 via-violet-500/5 to-white border border-violet-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Product Groups</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-violet-100 flex items-center justify-center text-violet-600 shadow-sm shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" /></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-violet-700/60 uppercase tracking-widest leading-none mb-1">Product Groups</span>
-                        <span class="block text-[20px] font-black text-violet-600 leading-none">{{ number_format($stats['product_count']) }}</span>
-                    </div>
+                    <h3 class="text-2xl font-black text-violet-600 tracking-tight leading-none">{{ number_format($stats['product_count']) }}</h3>
+                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Menu classification groups</p>
                 </div>
 
-                {{-- Ingredient Focus --}}
-                <div class="bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                {{-- Inventory Assets --}}
+                <div class="p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Inventory Assets</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-rose-700/60 uppercase tracking-widest leading-none mb-1">Inventory Assets</span>
-                        <span class="block text-[20px] font-black text-rose-600 leading-none">{{ number_format($stats['ingredient_count']) }}</span>
-                    </div>
+                    <h3 class="text-2xl font-black text-rose-600 tracking-tight leading-none">{{ number_format($stats['ingredient_count']) }}</h3>
+                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Stock category groupings</p>
                 </div>
             </div>
 
@@ -93,32 +96,46 @@
                 
                 {{-- Left: Search Bar --}}
                 <div class="flex flex-1 w-full lg:w-auto">
-                    <x-search-bar wireModel="search" placeholder="Search across catalog..." width="w-full lg:w-72" />
+                    <x-search-bar x-model="searchQuery" placeholder="Search across catalog..." width="w-full lg:w-72" />
                 </div>
 
                 {{-- Right: Filters --}}
                 <div class="flex flex-wrap items-center lg:justify-end gap-2">
-                    {{-- Category Focus Filter --}}
+                    {{-- Category Focus Filter (Converted to Dropdown) --}}
                     <x-dropdown align="right" width="48">
                         <x-slot name="trigger">
                             <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
                                 <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-                                <span class="text-[12px] whitespace-nowrap">{{ $filterType === 'all' ? 'All Categories' : ucfirst($filterType) . ' Only' }}</span>
-                                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                <span class="text-[12px] font-semibold whitespace-nowrap" x-text="filterType === 'all' ? 'All Types' : (filterType === 'product' ? 'Product Categories' : 'Ingredient Categories')"></span>
+                                <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
                             </x-secondary-button>
                         </x-slot>
                         <x-slot name="content">
-                            <x-dropdown-link href="#" wire:click.prevent="$set('filterType', 'all')">All Categories</x-dropdown-link>
-                            <x-dropdown-link href="#" wire:click.prevent="$set('filterType', 'product')">Product Focus</x-dropdown-link>
-                            <x-dropdown-link href="#" wire:click.prevent="$set('filterType', 'ingredient')">Ingredient Focus</x-dropdown-link>
+                            <x-dropdown-link href="#" @click.prevent="filterType = 'all'" ::class="filterType === 'all' ? 'bg-slate-50 font-bold text-indigo-600' : ''">All Types</x-dropdown-link>
+                            <hr class="border-slate-50">
+                            <x-dropdown-link href="#" @click.prevent="filterType = 'product'" ::class="filterType === 'product' ? 'bg-slate-50 font-bold text-indigo-600' : ''">Product Categories</x-dropdown-link>
+                            <x-dropdown-link href="#" @click.prevent="filterType = 'ingredient'" ::class="filterType === 'ingredient' ? 'bg-slate-50 font-bold text-indigo-600' : ''">Ingredient Categories</x-dropdown-link>
                         </x-slot>
                     </x-dropdown>
+
+                    {{-- macOS Divider --}}
+                    <div class="hidden lg:block w-px h-6 bg-slate-200 mx-2"></div>
+
+                    {{-- View Toggle --}}
+                    <button type="button" @click="view = (view === 'table' ? 'board' : 'table')"
+                        class="w-9 h-9 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors focus:outline-none shrink-0"
+                        :title="view === 'table' ? 'Switch to Board View' : 'Switch to Table View'">
+                        <svg x-cloak x-show="view === 'table'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+                        <svg x-cloak x-show="view === 'board'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                    </button>
                 </div>
             </div>
 
             {{-- Panel Container --}}
-            <div class="relative min-h-[500px]" wire:key="table-container-{{ $filterType }}">
-                <div class="animate-fadeIn">
+            <div class="relative min-h-[500px]" wire:key="container-categories-main">
+                
+                {{-- ── Table View ── --}}
+                <div x-show="view === 'table'" class="animate-fadeIn">
                     <x-data-table>
                         <x-slot name="header">
                             <th class="py-3 px-6 text-[11px] font-black text-slate-500 uppercase tracking-widest">Category Information</th>
@@ -127,12 +144,9 @@
                             <th class="py-3 px-6 text-right text-[11px] font-black text-slate-500 uppercase tracking-widest">Actions</th>
                         </x-slot>
                         
-                        <tbody class="divide-y divide-slate-100/80" 
-                            wire:key="table-body-{{ $filterType }}-{{ $categories->currentPage() }}"
-                            wire:loading.class="opacity-40" 
-                            wire:target="filterType, search, gotoPage, nextPage, previousPage">
-                            @forelse($categories as $category)
-                                <tr wire:key="cat-row-{{ $category->cat_type }}-{{ $category->id }}" class="hover:bg-slate-50/50 transition-colors group/row">
+                        <tbody class="divide-y divide-slate-100/80" wire:key="table-body-categories-list">
+                            @forelse($allCategories as $category)
+                                <tr wire:key="cat-row-{{ $category->cat_type }}-{{ $category->id }}" x-show="isItemVisible({{ $category->id }}, '{{ $category->cat_type }}')" x-cloak class="hover:bg-slate-50/50 transition-colors group/row">
                                     <td class="py-4 px-6 border-r border-slate-100/50 whitespace-nowrap">
                                         <div class="flex items-center gap-4">
                                             @php 
@@ -150,9 +164,17 @@
                                         </div>
                                     </td>
                                     <td class="py-4 px-6 border-r border-slate-100/50 text-center whitespace-nowrap">
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider {{ $category->cat_type === 'product' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-rose-50 text-rose-700 border border-rose-100' }}">
-                                            {{ ucfirst($category->cat_type) }}
-                                        </span>
+                                        <div class="flex flex-col items-center gap-1">
+                                            <div class="flex items-center justify-center gap-1.5">
+                                                <span class="h-1.5 w-1.5 rounded-full {{ $category->cat_type === 'product' ? 'bg-indigo-500' : 'bg-rose-500' }}"></span>
+                                                <span class="text-[11px] font-bold {{ $category->cat_type === 'product' ? 'text-indigo-600' : 'text-rose-600' }} uppercase">{{ $category->cat_type }}</span>
+                                            </div>
+                                            @if($category->cat_type === 'product')
+                                                <span class="text-[9px] font-black {{ $category->production_station === 'barista' ? 'text-sky-600' : 'text-slate-400' }} uppercase tracking-widest">
+                                                    {{ $category->production_station === 'barista' ? 'Barista' : 'Kitchen' }}
+                                                </span>
+                                            @endif
+                                        </div>
                                     </td>
                                     <td class="py-4 px-6 border-r border-slate-100/50 text-center whitespace-nowrap">
                                         <div class="text-[13px] font-black text-slate-900">{{ $category->associated_count ?? 0 }}</div>
@@ -176,11 +198,173 @@
                                     </td>
                                 </tr>
                             @endforelse
+                            <tr x-show="filteredCategories.length === 0" x-cloak>
+                                <td colspan="4" class="py-12">
+                                    <x-empty-state 
+                                        title="No Categories Found"
+                                        description="Try changing your search terms or filters."
+                                        icon="M4 6h16M4 12h16M4 18h16"
+                                    />
+                                </td>
+                            </tr>
                         </tbody>
                     </x-data-table>
                 </div>
+
+                {{-- ── Board View ── --}}
+                <div x-show="view === 'board'" class="animate-fadeIn" x-cloak>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        @forelse($allCategories as $category)
+                            <div wire:key="cat-board-{{ $category->cat_type }}-{{ $category->id }}" 
+                                x-show="isItemVisible({{ $category->id }}, '{{ $category->cat_type }}')"
+                                x-cloak
+                                class="group relative bg-white border border-slate-100 rounded-[24px] p-6 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300 cursor-pointer overflow-hidden"
+                                wire:click="selectCategory({{ $category->id }}, '{{ $category->cat_type }}')">
+                                
+                                @php $catColor = $category->cat_type === 'product' ? 'indigo' : 'rose'; @endphp
+                                
+                                {{-- Background Glow --}}
+                                <div class="absolute -top-10 -right-10 w-32 h-32 bg-{{ $catColor }}-50/50 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+
+                                <div class="flex items-start justify-between mb-4 relative z-10">
+                                    <div class="w-12 h-12 bg-{{ $catColor }}-50 rounded-2xl flex items-center justify-center text-{{ $catColor }}-600 group-hover:scale-110 transition-transform duration-300 shadow-sm border border-{{ $catColor }}-100/50">
+                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+                                        </svg>
+                                    </div>
+                                    <div class="flex flex-col items-end gap-1.5">
+                                        <div class="flex items-center gap-1.5 bg-white/95 backdrop-blur-sm rounded-lg px-2 py-0.5 shadow-sm border border-slate-100/50">
+                                            <span class="h-1.5 w-1.5 rounded-full {{ $category->cat_type === 'product' ? 'bg-indigo-500' : 'bg-rose-500' }}"></span>
+                                            <span class="text-[10px] font-bold {{ $category->cat_type === 'product' ? 'text-indigo-600' : 'text-rose-600' }} uppercase tracking-wider">{{ $category->cat_type }}</span>
+                                        </div>
+                                        @if($category->cat_type === 'product')
+                                            <span class="text-[9px] font-black {{ $category->production_station === 'barista' ? 'text-sky-600' : 'text-slate-400' }} uppercase tracking-widest">
+                                                {{ $category->production_station === 'barista' ? 'Barista' : 'Kitchen' }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                <h3 class="text-[16px] font-black text-slate-900 tracking-tight mb-2 group-hover:text-{{ $catColor }}-600 transition-colors relative z-10">{{ $category->name }}</h3>
+                                <p class="text-[12px] text-slate-500 font-medium line-clamp-2 min-h-[32px] mb-6 relative z-10">{{ $category->description ?: 'No operational description provided for this category segment.' }}</p>
+
+                                <div class="flex items-center justify-between pt-4 border-t border-slate-50 relative z-10">
+                                    <div class="flex flex-col">
+                                        <span class="text-[14px] font-black text-slate-900">{{ $category->associated_count ?? 0 }}</span>
+                                        <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{{ $category->cat_type === 'product' ? 'Products' : 'Ingredients' }}</span>
+                                    </div>
+                                    <div class="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-{{ $catColor }}-600 group-hover:text-white transition-all">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7" /></svg>
+                                    </div>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="col-span-full py-12 bg-white rounded-3xl border border-dashed border-slate-200">
+                                <x-empty-state 
+                                    title="No Categories Found"
+                                    description="Start organizing your catalog by creating a new category group."
+                                    icon="M4 6h16M4 12h16M4 18h16"
+                                />
+                            </div>
+                        @endforelse
+                        <div x-show="filteredCategories.length === 0" x-cloak class="col-span-full py-12 bg-white rounded-3xl border border-dashed border-slate-200">
+                            <x-empty-state 
+                                title="No Categories Found"
+                                description="Try changing your search terms or filters."
+                                icon="M4 6h16M4 12h16M4 18h16"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Premium Alpine-driven Paginator --}}
                 <div class="mt-4">
-                    <x-pagination :paginator="$categories" />
+                    <template x-if="filteredCategories.length > 0">
+                        <div class="flex flex-col lg:flex-row items-center justify-between px-4 py-4 bg-white border border-gray-100 rounded-2xl lg:px-6 gap-6 shadow-sm">
+                            <div class="flex flex-col sm:flex-row items-center justify-between w-full lg:w-auto gap-4 sm:gap-8">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex flex-col sm:flex-row sm:items-center sm:gap-1.5 leading-[0.9] sm:leading-none">
+                                        <span class="text-[11px] sm:text-[12px] text-gray-400 font-black uppercase tracking-tighter sm:tracking-widest">Row</span>
+                                        <span class="text-[9px] sm:text-[12px] text-gray-400/70 font-black uppercase tracking-tighter sm:tracking-widest">per page</span>
+                                    </div>
+                                    <div>
+                                        <x-dropdown align="top" width="20" containerClasses="block">
+                                            <x-slot name="trigger">
+                                                <button type="button" class="inline-flex items-center justify-between min-w-[70px] px-3 py-1.5 text-[13px] font-black text-gray-900 bg-slate-50 border border-gray-200 rounded-xl hover:border-gray-300 focus:outline-none transition-all h-10 gap-2 shadow-sm font-sans">
+                                                    <span x-text="perPage"></span>
+                                                    <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </button>
+                                            </x-slot>
+                                            <x-slot name="content">
+                                                <template x-for="option in [5, 10, 15, 30, 50, 100]">
+                                                    <x-dropdown-link href="#" @click.prevent="perPage = option; currentPage = 1;">
+                                                        <span x-text="option"></span>
+                                                    </x-dropdown-link>
+                                                </template>
+                                            </x-slot>
+                                        </x-dropdown>
+                                    </div>
+                                </div>
+                                <div class="text-[11px] text-gray-400 font-bold uppercase tracking-widest whitespace-nowrap">
+                                    <span class="text-gray-900" x-text="Math.min(filteredCategories.length, (currentPage - 1) * perPage + 1)"></span>
+                                    <span class="mx-0.5 text-gray-300">-</span>
+                                    <span class="text-gray-900" x-text="Math.min(filteredCategories.length, currentPage * perPage)"></span>
+                                    <span class="mx-1 text-gray-300 lowercase italic font-medium">of</span>
+                                    <span class="text-indigo-600" x-text="filteredCategories.length"></span>
+                                    <span class="ml-1 text-gray-300 lowercase italic font-medium">results</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 w-full lg:w-auto justify-center lg:justify-end border-t border-gray-50 pt-4 lg:border-0 lg:pt-0">
+                                <x-secondary-button @click="currentPage = 1" ::disabled="currentPage === 1" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="currentPage === 1 ? 'opacity-30 pointer-events-none' : ''">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                                    </svg>
+                                </x-secondary-button>
+                                <x-secondary-button @click="currentPage = Math.max(1, currentPage - 1)" ::disabled="currentPage === 1" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="currentPage === 1 ? 'opacity-30 pointer-events-none' : ''">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                                    </svg>
+                                </x-secondary-button>
+                                <div class="flex items-center gap-1.5 px-2">
+                                    <template x-for="page in pageNumbers">
+                                        <div class="flex items-center gap-1.5">
+                                            <template x-if="page === currentPage">
+                                                <x-primary-button class="!p-0 w-9 h-9 items-center justify-center !rounded-xl bg-gray-900 text-[13px] font-black shadow-none ring-0">
+                                                    <span x-text="page"></span>
+                                                </x-primary-button>
+                                            </template>
+                                            <template x-if="page !== currentPage">
+                                                <x-secondary-button @click="currentPage = page" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl text-[13px] font-bold">
+                                                    <span x-text="page"></span>
+                                                </x-secondary-button>
+                                            </template>
+                                        </div>
+                                    </template>
+                                    
+                                    <template x-if="Math.ceil(filteredCategories.length / perPage) > currentPage + 1">
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="text-gray-300 font-bold mx-1">...</span>
+                                            <x-secondary-button @click="currentPage = Math.ceil(filteredCategories.length / perPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl text-[13px] font-bold">
+                                                <span x-text="Math.ceil(filteredCategories.length / perPage)"></span>
+                                            </x-secondary-button>
+                                        </div>
+                                    </template>
+                                </div>
+                                <x-secondary-button @click="currentPage = Math.min(Math.ceil(filteredCategories.length / perPage), currentPage + 1)" ::disabled="currentPage >= Math.ceil(filteredCategories.length / perPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="currentPage >= Math.ceil(filteredCategories.length / perPage) ? 'opacity-30 pointer-events-none' : ''">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </x-secondary-button>
+                                <x-secondary-button @click="currentPage = Math.ceil(filteredCategories.length / perPage) || 1" ::disabled="currentPage >= Math.ceil(filteredCategories.length / perPage)" class="!p-0 w-9 h-9 items-center justify-center !rounded-xl" ::class="currentPage >= Math.ceil(filteredCategories.length / perPage) ? 'opacity-30 pointer-events-none' : ''">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                                    </svg>
+                                </x-secondary-button>
+                            </div>
+                        </div>
+                    </template>
                 </div>
             </div>
 
@@ -221,7 +405,7 @@
                                 <div>
                                     <x-input-label value="Display Name *" />
                                     <div class="relative mt-1">
-                                        <x-text-input type="text" wire:model.debounce.400ms="name" placeholder="e.g. Premium Seafood Platter"
+                                        <x-text-input type="text" wire:model.live.debounce.400ms="name" placeholder="e.g. Premium Seafood Platter"
                                             class="w-full pl-4 pr-10 text-[13px] {{ $errors->has('name') ? 'border-red-400 bg-red-50/30' : 'border-slate-200/60 bg-white' }} rounded-lg h-10 shadow-sm"
                                             inputFilter="name" :hasError="$errors->has('name')"
                                         />
@@ -234,13 +418,56 @@
 
                                 <div>
                                     <x-input-label value="Operational Summary" />
-                                    <x-textarea wire:model.debounce.400ms="description" rows="4" placeholder="Briefly describe the purpose or contents of this category..."
+                                    <x-textarea wire:model.live.debounce.400ms="description" rows="4" placeholder="Briefly describe the purpose or contents of this category..."
                                         class="mt-1 w-full px-4 py-3 text-[13px] text-slate-900 bg-white rounded-lg shadow-sm resize-none {{ $errors->has('description') ? 'border-red-400 bg-red-50/30' : 'border-slate-200/60' }}"
                                     ></x-textarea>
                                     <x-input-error :messages="$errors->get('description')" class="mt-1"/>
                                 </div>
 
 
+                                @if($editCategoryType === 'product')
+                                <div class="mt-4">
+                                    <x-input-label value="Production Station *" />
+                                    <div class="grid grid-cols-2 gap-3 mt-1.5">
+                                        <label class="relative flex items-center justify-between p-3 border rounded-xl cursor-pointer transition-all {{ $production_station === 'kitchen' ? 'bg-indigo-50 border-indigo-200 ring-2 ring-indigo-500/10' : 'bg-white border-slate-200 hover:border-slate-300' }}">
+                                            <div class="flex items-center gap-3">
+                                                <div class="w-8 h-8 rounded-lg {{ $production_station === 'kitchen' ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-400' }} flex items-center justify-center">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                                                </div>
+                                                <div>
+                                                    <div class="text-[13px] font-black {{ $production_station === 'kitchen' ? 'text-indigo-900' : 'text-slate-900' }}">Kitchen</div>
+                                                    <div class="text-[10px] font-bold {{ $production_station === 'kitchen' ? 'text-indigo-600' : 'text-slate-400' }} uppercase tracking-tighter">Cooked Meals</div>
+                                                </div>
+                                            </div>
+                                            <input type="radio" wire:model.live="production_station" value="kitchen" class="sr-only">
+                                            @if($production_station === 'kitchen')
+                                                <div class="text-indigo-600">
+                                                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                                                </div>
+                                            @endif
+                                        </label>
+
+                                        <label class="relative flex items-center justify-between p-3 border rounded-xl cursor-pointer transition-all {{ $production_station === 'barista' ? 'bg-sky-50 border-sky-200 ring-2 ring-sky-500/10' : 'bg-white border-slate-200 hover:border-slate-300' }}">
+                                            <div class="flex items-center gap-3">
+                                                <div class="w-8 h-8 rounded-lg {{ $production_station === 'barista' ? 'bg-sky-600 text-white' : 'bg-slate-50 text-slate-400' }} flex items-center justify-center">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                                                </div>
+                                                <div>
+                                                    <div class="text-[13px] font-black {{ $production_station === 'barista' ? 'text-sky-900' : 'text-slate-900' }}">Barista</div>
+                                                    <div class="text-[10px] font-bold {{ $production_station === 'barista' ? 'text-sky-600' : 'text-slate-400' }} uppercase tracking-tighter">Drinks & Shakes</div>
+                                                </div>
+                                            </div>
+                                            <input type="radio" wire:model.live="production_station" value="barista" class="sr-only">
+                                            @if($production_station === 'barista')
+                                                <div class="text-sky-600">
+                                                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                                                </div>
+                                            @endif
+                                        </label>
+                                    </div>
+                                    <x-input-error :messages="$errors->get('production_station')" class="mt-1"/>
+                                </div>
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -253,7 +480,10 @@
                             <div class="space-y-3">
                                 <div class="flex items-center justify-between py-2 border-b border-slate-100">
                                     <span class="text-[12px] text-slate-500 font-medium">Usage Type</span>
-                                    <span class="text-[12px] font-bold {{ $editCategoryType === 'product' ? 'text-indigo-600 bg-indigo-50' : 'text-rose-600 bg-rose-50' }} px-2 py-0.5 rounded-full capitalize">{{ $editCategoryType }}</span>
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="h-1.5 w-1.5 rounded-full {{ $editCategoryType === 'product' ? 'bg-indigo-500' : 'bg-rose-500' }}"></span>
+                                        <span class="text-[11px] font-bold {{ $editCategoryType === 'product' ? 'text-indigo-600' : 'text-rose-600' }} uppercase">{{ $editCategoryType }}</span>
+                                    </div>
                                 </div>
                                 
                                 @if($editCategoryId)
@@ -349,4 +579,76 @@
             </div>
         </div>
     </x-modal>
+
+    <script>
+        (function() {
+            window.categoryManagement = function($wire) {
+                return {
+                    view: $wire.entangle('view').live,
+                    panel: $wire.entangle('panel').live,
+                    filterType: $wire.entangle('filterType').live,
+                    
+                    searchQuery: '',
+                    currentPage: 1,
+                    perPage: 5,
+                    categoriesList: [],
+
+                    get filteredCategories() {
+                        const query = this.searchQuery.toLowerCase().trim();
+                        const type = this.filterType;
+                        return this.categoriesList.filter(cat => {
+                            // Filter by search query
+                            const matchesSearch = !query || 
+                                cat.name.toLowerCase().includes(query) || 
+                                (cat.description && cat.description.toLowerCase().includes(query));
+                            
+                            // Filter by segment type
+                            const matchesType = type === 'all' || cat.cat_type === type;
+
+                            return matchesSearch && matchesType;
+                        });
+                    },
+
+                    get paginatedCategories() {
+                        const start = (this.currentPage - 1) * this.perPage;
+                        return this.filteredCategories.slice(start, start + this.perPage);
+                    },
+
+                    get pageNumbers() {
+                        const totalPages = Math.ceil(this.filteredCategories.length / this.perPage) || 1;
+                        const start = Math.max(1, this.currentPage - 1);
+                        const end = Math.min(totalPages, this.currentPage + 1);
+                        const pages = [];
+                        for (let i = start; i <= end; i++) {
+                            pages.push(i);
+                        }
+                        return pages;
+                    },
+
+                    isItemVisible(id, catType) {
+                        return this.paginatedCategories.some(c => c.id === id && c.cat_type === catType);
+                    },
+
+                    updateCategoriesList(newList) {
+                        const oldIds = this.categoriesList.map(c => `${c.cat_type}-${c.id}`).join(',');
+                        const newIds = newList.map(c => `${c.cat_type}-${c.id}`).join(',');
+                        if (oldIds !== newIds) {
+                            this.categoriesList = newList;
+                            this.currentPage = 1;
+                        }
+                    },
+
+                    init() {
+                        this.$watch('filterType', () => {
+                            this.currentPage = 1;
+                        });
+                        this.$watch('searchQuery', () => {
+                            this.currentPage = 1;
+                        });
+                    }
+                };
+            };
+        })();
+    </script>
 </div>
+

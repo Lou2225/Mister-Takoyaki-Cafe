@@ -21,50 +21,23 @@ $maxWidth = [
 @endphp
 
 <div
-    x-data="{
-        show: @js($show),
-        focusables() {
-            // All focusable element types...
-            let selector = 'a, button, input:not([type=\'hidden\']), textarea, select, details, [tabindex]:not([tabindex=\'-1\'])'
-            return [...$el.querySelectorAll(selector)]
-                // All non-disabled elements...
-                .filter(el => ! el.hasAttribute('disabled'))
-        },
-        firstFocusable() { return this.focusables()[0] },
-        lastFocusable() { return this.focusables().slice(-1)[0] },
-        nextFocusable() { return this.focusables()[this.nextFocusableIndex()] || this.firstFocusable() },
-        prevFocusable() { return this.focusables()[this.prevFocusableIndex()] || this.lastFocusable() },
-        nextFocusableIndex() { return (this.focusables().indexOf(document.activeElement) + 1) % (this.focusables().length + 1) },
-        prevFocusableIndex() { return Math.max(0, this.focusables().indexOf(document.activeElement)) -1 },
-    }"
-    x-init="$watch('show', value => {
-        if (value) {
-            document.body.classList.add('overflow-y-hidden');
-            {{ $attributes->has('focusable') ? 'setTimeout(() => firstFocusable()?.focus(), 100)' : '' }}
-        } else {
-            document.body.classList.remove('overflow-y-hidden');
-        }
-    })"
-    x-on:open-modal.window="(() => {
-        const target = $event.detail?.name || $event.detail?.[0]?.name || $event.detail;
-        if (target == '{{ $name }}') show = true;
-    })()"
-    x-on:close-modal.window="(() => {
-        const target = $event.detail?.name || $event.detail?.[0]?.name || $event.detail;
-        if (target == '{{ $name }}') show = false;
-    })()"
-    x-on:close.stop="show = false"
-    x-on:keydown.escape.window="show = false"
+    wire:ignore.self
+    x-data="modal({ name: '{{ $name }}', show: @js($show) })"
+    x-on:open-modal.window="open($event.detail)"
+    x-on:close-modal.window="close($event.detail)"
+    x-on:close.stop="isModalOpen = false"
+    x-on:keydown.escape.window="isModalOpen = false"
     x-on:keydown.tab.prevent="$event.shiftKey || nextFocusable()?.focus()"
     x-on:keydown.shift.tab.prevent="prevFocusable()?.focus()"
-    x-show="show"
+    x-show="isModalOpen"
+    x-cloak
     class="fixed inset-0 z-[9999] overflow-y-auto px-4 py-6 sm:px-0"
-    style="display: {{ $show ? 'block' : 'none' }};"
+    style="display: none;"
 >
     <div
-        x-show="show"
+        x-show="isModalOpen"
         class="fixed inset-0 transform transition-all"
-        x-on:click="show = false"
+        x-on:click="isModalOpen = false"
         x-transition:enter="ease-out duration-300"
         x-transition:enter-start="opacity-0"
         x-transition:enter-end="opacity-100"
@@ -76,7 +49,7 @@ $maxWidth = [
     </div>
 
     <div
-        x-show="show"
+        x-show="isModalOpen"
         class="mb-6 bg-white rounded-xl overflow-hidden shadow-2xl transform transition-all sm:w-full {{ $maxWidth }} sm:mx-auto relative z-10"
         x-transition:enter="ease-out duration-300"
         x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
@@ -88,3 +61,4 @@ $maxWidth = [
         {{ $slot }}
     </div>
 </div>
+

@@ -1,37 +1,49 @@
 <div
-    x-data="branchManagementData(@js($panel), @js($view))"
-    x-on:switch-panel.window="
-        panel = $event.detail?.panel || $event.detail[0]?.panel || 'list'; 
-        mode = $event.detail?.mode || $event.detail[0]?.mode || 'list';
-        if (panel === 'form') {
-            initMap();
-        } else {
-            if (this.marker && mode === 'create') {
-                this.map.removeLayer(this.marker);
-                this.marker = null;
-            }
-        }
-    "
+    x-data="branchManagementData($wire, @js($panel), @js($view))"
     x-on:refresh-global-map.window="updateGlobalBranches($event.detail.branches || $event.detail[0]?.branches)"
     @trigger-edit-branch.window="$wire.showEdit($event.detail.id)"
     class="relative">
 
     <script>
-        function branchManagementData(initialPanel, initialView) {
+        function branchManagementData($wire, initialPanel, initialView) {
             return {
                 ...slidingTabs({ view: initialView || 'table' }, 'view'),
-                panel: initialPanel || 'list',
-                mode: 'list',
+                panel: $wire.entangle('panel').live,
+                mode: $wire.entangle('mode').live,
                 view: initialView || 'table',
-                status: @entangle('status'),
+                status: @entangle('status').live,
+                addr_lat: @entangle('addr_lat'),
+                addr_lng: @entangle('addr_lng'),
+                addr_region: @entangle('addr_region'),
+                addr_province: @entangle('addr_province'),
+                addr_city: @entangle('addr_city'),
+                addr_barangay: @entangle('addr_barangay'),
                 
                 // ── Location ──
                 loc: {
-                    region: { open: false, items: [], search: '', loading: false },
-                    province: { open: false, items: [], search: '', loading: false },
-                    city: { open: false, items: [], search: '', loading: false },
-                    barangay: { open: false, items: [], search: '', loading: false },
+                    region: { items: [], search: '', loading: false },
+                    province: { items: [], search: '', loading: false },
+                    city: { items: [], search: '', loading: false },
+                    barangay: { items: [], search: '', loading: false },
                     noProvince: false
+                },
+
+                getCustomPinIcon() {
+                    return L.divIcon({
+                        html: `
+                            \x3cdiv class="relative flex flex-col items-center justify-end w-10 h-10"\x3e
+                                \x3cspan class="absolute w-4 h-2 bg-indigo-500/40 rounded-full blur-[2px] animate-ping bottom-[-2px] left-1/2 -translate-x-1/2"\x3e\x3c/span\x3e
+                                \x3cdiv class="relative w-8 h-8 bg-indigo-600 rounded-t-full rounded-bl-full rotate-45 border-2 border-white shadow-lg flex items-center justify-center transition-all duration-300"\x3e
+                                    \x3cdiv class="w-3.5 h-3.5 bg-white rounded-full -rotate-45 flex items-center justify-center shadow-inner"\x3e
+                                        \x3cdiv class="w-1.5 h-1.5 bg-indigo-600 rounded-full"\x3e\x3c/div\x3e
+                                    \x3c/div\x3e
+                                \x3c/div\x3e
+                            \x3c/div\x3e
+                        `,
+                        className: 'custom-leaflet-icon',
+                        iconSize: [40, 40],
+                        iconAnchor: [20, 40]
+                    });
                 },
 
                 filtered(type) {
@@ -39,151 +51,464 @@
                     return q ? this.loc[type].items.filter(i => i.name.toLowerCase().includes(q)) : this.loc[type].items;
                 },
 
+                async fetchWithRetry(url, retries = 2, delay = 1000) {
+                    try {
+                        const cached = sessionStorage.getItem(url);
+                        if (cached) return JSON.parse(cached);
+                    } catch (e) { console.error('Cache read failed:', e); }
+
+                    for (let i = 0; i <= retries; i++) {
+                        try {
+                            const res = await fetch(url);
+                            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                            const data = await res.json();
+                            try {
+                                sessionStorage.setItem(url, JSON.stringify(data));
+                            } catch (e) { console.error('Cache write failed:', e); }
+                            return data;
+                        } catch (e) {
+                            if (i === retries) throw e;
+                            await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+                        }
+                    }
+                },
+
                 async loadRegions() {
                     if (this.loc.region.items.length > 0) return;
                     this.loc.region.loading = true;
                     try {
-                        const res = await fetch('https://psgc.cloud/api/regions');
-                        this.loc.region.items = (await res.json()).sort((a, b) => a.name.localeCompare(b.name));
+                        const data = await this.fetchWithRetry('https://psgc.cloud/api/regions');
+                        this.loc.region.items = data.sort((a, b) => a.name.localeCompare(b.name));
                     } catch (e) { console.error(e); }
                     finally { this.loc.region.loading = false; }
                 },
 
-                async selectRegion(region) {
-                    this.$wire.set('addr_region', region.name);
-                    this.$wire.set('addr_province', ''); this.$wire.set('addr_city', ''); this.$wire.set('addr_barangay', '');
-                    this.loc.region.open = false;
+                async selectRegion(region, fromMap = false) {
+                    this.addr_region = region.name;
+                    this.addr_province = ''; this.addr_city = ''; this.addr_barangay = '';
                     this.loc.province.items = []; this.loc.city.items = []; this.loc.barangay.items = [];
                     this.loc.noProvince = false;
                     
+                    if (!fromMap) this.geocodeAddress();
+                    
                     this.loc.province.loading = true;
                     try {
-                        const res = await fetch(`https://psgc.cloud/api/regions/${region.code}/provinces`);
-                        const data = await res.json();
+                        const data = await this.fetchWithRetry(`https://psgc.cloud/api/regions/${region.code}/provinces`);
                         this.loc.province.items = data.sort((a, b) => a.name.localeCompare(b.name));
                         if (this.loc.province.items.length === 0) {
                             this.loc.noProvince = true;
-                            const res2 = await fetch(`https://psgc.cloud/api/regions/${region.code}/cities-municipalities`);
-                            this.loc.city.items = (await res2.json()).sort((a, b) => a.name.localeCompare(b.name));
+                            const data2 = await this.fetchWithRetry(`https://psgc.cloud/api/regions/${region.code}/cities-municipalities`);
+                            this.loc.city.items = data2.sort((a, b) => a.name.localeCompare(b.name));
                         }
                     } catch (e) { console.error(e); }
                     finally { this.loc.province.loading = false; }
                 },
 
-                async selectProvince(province) {
-                    this.$wire.set('addr_province', province.name);
-                    this.$wire.set('addr_city', ''); this.$wire.set('addr_barangay', '');
-                    this.loc.province.open = false;
+                async selectProvince(province, fromMap = false) {
+                    this.addr_province = province.name;
+                    this.addr_city = ''; this.addr_barangay = '';
+                    
+                    if (!fromMap) this.geocodeAddress();
                     
                     this.loc.city.loading = true;
                     try {
-                        const res = await fetch(`https://psgc.cloud/api/provinces/${province.code}/cities-municipalities`);
-                        this.loc.city.items = (await res.json()).sort((a, b) => a.name.localeCompare(b.name));
+                        const data = await this.fetchWithRetry(`https://psgc.cloud/api/provinces/${province.code}/cities-municipalities`);
+                        this.loc.city.items = data.sort((a, b) => a.name.localeCompare(b.name));
                     } catch (e) { console.error(e); }
                     finally { this.loc.city.loading = false; }
                 },
 
-                async selectCity(city) {
-                    this.$wire.set('addr_city', city.name);
-                    this.$wire.set('addr_barangay', '');
-                    this.loc.city.open = false;
+                async selectCity(city, fromMap = false) {
+                    this.addr_city = city.name;
+                    this.addr_barangay = '';
+                    
+                    if (!fromMap) this.geocodeAddress();
                     
                     this.loc.barangay.loading = true;
                     try {
-                        const res = await fetch(`https://psgc.cloud/api/cities-municipalities/${city.code}/barangays`);
-                        this.loc.barangay.items = (await res.json()).sort((a, b) => a.name.localeCompare(b.name));
+                        const data = await this.fetchWithRetry(`https://psgc.cloud/api/cities-municipalities/${city.code}/barangays`);
+                        this.loc.barangay.items = data.sort((a, b) => a.name.localeCompare(b.name));
                     } catch (e) { console.error(e); }
                     finally { this.loc.barangay.loading = false; }
                 },
 
-                selectBarangay(brgy) {
-                    this.$wire.set('addr_barangay', brgy.name);
-                    this.loc.barangay.open = false;
+                selectBarangay(brgy, fromMap = false) {
+                    this.addr_barangay = brgy.name;
+                    if (!fromMap) this.geocodeAddress();
+                },
+
+                async geocodeAddress() {
+                    const parts = [];
+                    const barangay = this.addr_barangay;
+                    const city = this.addr_city;
+                    const province = this.addr_province;
+                    const region = this.addr_region;
+                    
+                    if (barangay) parts.push(barangay);
+                    if (city) parts.push(city);
+                    if (province) parts.push(province);
+                    if (region) parts.push(region);
+                    
+                    if (parts.length === 0) return;
+                    
+                    const query = parts.join(', ') + ', Philippines';
+                    try {
+                        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=ph`);
+                        const data = await response.json();
+                        
+                        if (data && data.length > 0) {
+                            const lat = parseFloat(data[0].lat);
+                            const lng = parseFloat(data[0].lon);
+                            
+                            this.addr_lat = lat;
+                            this.addr_lng = lng;
+                            
+                            if (this.map) {
+                                let zoom = 11;
+                                if (barangay) zoom = 16;
+                                else if (city) zoom = 14;
+                                else if (province) zoom = 12;
+                                
+                                this.map.setView([lat, lng], zoom);
+                                if (this.marker) {
+                                    this.marker.setLatLng([lat, lng]);
+                                } else {
+                                    this.marker = L.marker([lat, lng], { icon: this.getCustomPinIcon() }).addTo(this.map);
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Forward geocoding failed:', e);
+                    }
+                },
+
+                async autoMatchLocation(addr) {
+                    const clean = (str) => {
+                        if (!str) return '';
+                        return str.toLowerCase()
+                            .replace(/city of|province of|region|district|barangay|brgy\.?|municipality of/g, '')
+                            .replace(/[^a-z0-9]/g, '')
+                            .trim();
+                    };
+
+                    let rName = addr.region || '';
+                    let pName = addr.state || addr.province || addr.county || '';
+                    let cName = addr.city || addr.town || addr.municipality || '';
+                    let bName = addr.quarter || addr.village || addr.suburb || addr.neighbourhood || '';
+
+                    if (this.loc.region.items.length === 0) await this.loadRegions();
+
+                    let crName = clean(rName);
+                    let cpName = clean(pName);
+                    let matchedR = this.loc.region.items.find(r => {
+                        const target = clean(r.name);
+                        return target === crName || 
+                               (crName.includes('manila') && target.includes('ncr')) ||
+                               (cpName.includes('manila') && target.includes('ncr'));
+                    });
+
+                    if (!matchedR && crName) {
+                        matchedR = this.loc.region.items.find(r => clean(r.name).includes(crName) || crName.includes(clean(r.name)));
+                    }
+
+                    if (!matchedR) return;
+                    await this.selectRegion(matchedR, true);
+
+                    if (pName && this.loc.province.items.length > 0) {
+                        let cppName = clean(pName);
+                        let matchedP = this.loc.province.items.find(p => clean(p.name) === cppName);
+                        if (!matchedP) {
+                            matchedP = this.loc.province.items.find(p => {
+                                const target = clean(p.name).replace('province', '');
+                                const search = cppName.replace('province', '');
+                                return target && search && (target === search || target.includes(search) || search.includes(target));
+                            });
+                        }
+                        if (matchedP) await this.selectProvince(matchedP, true);
+                    }
+
+                    if (cName && this.loc.city.items.length > 0) {
+                        let ccName = clean(cName);
+                        let matchedC = this.loc.city.items.find(c => clean(c.name) === ccName);
+                        if (!matchedC) {
+                            matchedC = this.loc.city.items.find(c => {
+                                const target = clean(c.name).replace('city', '').replace('municipality', '').replace('city of', '');
+                                const search = ccName.replace('city', '').replace('municipality', '').replace('city of', '');
+                                return target && search && (target === search || target.includes(search) || search.includes(target));
+                            });
+                        }
+                        if (matchedC) await this.selectCity(matchedC, true);
+                    }
+
+                    if (bName && this.loc.barangay.items.length > 0) {
+                        let cbName = clean(bName);
+                        let matchedB = this.loc.barangay.items.find(b => clean(b.name) === cbName);
+                        if (!matchedB) {
+                            matchedB = this.loc.barangay.items.find(b => {
+                                const target = clean(b.name).replace('barangay', '').replace('brgy', '').replace('poblacion', '').replace('pob', '');
+                                const search = cbName.replace('barangay', '').replace('brgy', '').replace('poblacion', '').replace('pob', '');
+                                return target && search && (target === search || target.includes(search) || search.includes(target));
+                            });
+                        }
+                        if (matchedB) this.selectBarangay(matchedB, true);
+                    }
                 },
 
                 // ── Map ──
                 map: null,
                 marker: null,
-                initMap() {
-                    if (this.map) {
-                        setTimeout(() => this.map.invalidateSize(), 200);
-                        return;
+                mapTimeout: null,
+                gMapTimeout: null,
+                
+                patchLeaflet() {
+                    if (typeof L === 'undefined' || L._patched) return;
+                    L._patched = true;
+                    
+                    const originalResetGrid = L.GridLayer.prototype._resetGrid;
+                    if (originalResetGrid) {
+                        L.GridLayer.prototype._resetGrid = function() {
+                            if (!this._map) return;
+                            return originalResetGrid.apply(this, arguments);
+                        };
                     }
-                    setTimeout(() => {
-                        const container = document.getElementById('branchMap');
-                        if (!container) return;
-                        
-                        this.map = L.map('branchMap', {
-                            maxBounds: [[13.85, 120.85], [14.65, 121.95]],
-                            maxBoundsViscosity: 1.0,
-                            minZoom: 10
-                        }).setView([14.2189, 121.1672], 11);
-                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                            attribution: '&copy; OpenStreetMap contributors'
-                        }).addTo(this.map);
+                    
+                    const originalSetView = L.GridLayer.prototype._setView;
+                    if (originalSetView) {
+                        L.GridLayer.prototype._setView = function() {
+                            if (!this._map) return;
+                            return originalSetView.apply(this, arguments);
+                        };
+                    }
 
-                        this.map.on('click', (e) => {
-                            if (this.marker) this.marker.setLatLng(e.latlng);
-                            else this.marker = L.marker(e.latlng).addTo(this.map);
-                            this.$wire.set('addr_lat', e.latlng.lat);
-                            this.$wire.set('addr_lng', e.latlng.lng);
-                            this.reverseGeocode(e.latlng.lat, e.latlng.lng);
-                        });
+                    const originalUpdate = L.GridLayer.prototype._update;
+                    if (originalUpdate) {
+                        L.GridLayer.prototype._update = function() {
+                            if (!this._map) return;
+                            return originalUpdate.apply(this, arguments);
+                        };
+                    }
 
-                        // Set existing marker if any
-                        const lat = this.$wire.get('addr_lat');
-                        const lng = this.$wire.get('addr_lng');
-                        if (lat && lng) {
-                            this.marker = L.marker([lat, lng]).addTo(this.map);
-                            this.map.setView([lat, lng], 15);
-                        }
-                    }, 300);
+                    const originalResetView = L.GridLayer.prototype._resetView;
+                    if (originalResetView) {
+                        L.GridLayer.prototype._resetView = function() {
+                            if (!this._map) return;
+                            return originalResetView.apply(this, arguments);
+                        };
+                    }
                 },
 
-                async reverseGeocode(lat, lng) {
-                    try {
-                        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
-                        const data = await res.json();
-                        if (data.address) {
-                            const street = data.address.road || data.address.pedestrian || '';
-                            const num = data.address.house_number || '';
-                            this.$wire.set('addr_street', (num + ' ' + street).trim());
+                initMap() {
+                    if (typeof L === 'undefined') {
+                        if (this.mapTimeout) clearTimeout(this.mapTimeout);
+                        this.mapTimeout = setTimeout(() => this.initMap(), 100);
+                        return;
+                    }
+                    this.patchLeaflet();
+                    const updateMarker = () => {
+                        const lat = parseFloat(this.addr_lat);
+                        const lng = parseFloat(this.addr_lng);
+                        
+                        if (!isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+                            if (this.marker) {
+                                this.marker.setLatLng([lat, lng]);
+                            } else {
+                                this.marker = L.marker([lat, lng], { icon: this.getCustomPinIcon() }).addTo(this.map);
+                            }
+                            this.map.setView([lat, lng], 15);
+                        } else {
+                            if (this.marker) {
+                                this.map.removeLayer(this.marker);
+                                this.marker = null;
+                            }
+                            this.map.setView([14.2189, 121.1672], 11);
                         }
-                    } catch (e) { console.error(e); }
+                    };
+
+                    if (this.map) {
+                        if (this.mapTimeout) clearTimeout(this.mapTimeout);
+                        this.mapTimeout = setTimeout(() => {
+                            this.map.invalidateSize();
+                            updateMarker();
+                        }, 50);
+                        return;
+                    }
+                    if (this.mapTimeout) clearTimeout(this.mapTimeout);
+                    this.mapTimeout = setTimeout(() => {
+                        let container = document.getElementById('branchMap');
+                        if (!container) return;
+                        
+                        if (container._leaflet_id) {
+                            const clone = container.cloneNode(false);
+                            clone.removeAttribute('class');
+                            container.parentNode.replaceChild(clone, container);
+                            container = clone;
+                        }
+                        
+                        const street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            attribution: '&copy; OpenStreetMap contributors'
+                        });
+                        const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                        });
+
+                        this.map = L.map(container, {
+                            maxBounds: [[13.85, 120.85], [14.65, 121.95]],
+                            maxBoundsViscosity: 1.0,
+                            minZoom: 10,
+                            layers: [street]
+                        }).setView([14.2189, 121.1672], 11);
+
+                        L.control.layers({ "Street": street, "Satellite": satellite }).addTo(this.map);
+
+                        this.map.on('click', async (e) => {
+                            if (this.marker) this.marker.setLatLng(e.latlng);
+                            else this.marker = L.marker(e.latlng, { icon: this.getCustomPinIcon() }).addTo(this.map);
+                            this.addr_lat = e.latlng.lat;
+                            this.addr_lng = e.latlng.lng;
+                            
+                            try {
+                                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${e.latlng.lat}&lon=${e.latlng.lng}`);
+                                const data = await response.json();
+                                if (data && data.address) {
+                                    let st = data.address.road || data.address.pedestrian || '';
+                                    let num = data.address.house_number || '';
+                                    let fst = (num + ' ' + st).trim();
+                                    if(fst) this.$wire.set('addr_street', fst);
+                                    
+                                    await this.autoMatchLocation(data.address);
+                                }
+                            } catch (error) { console.error(error); }
+                        });
+
+                        updateMarker();
+                    }, 50);
                 },
 
                 // ── Global Map ──
                 gMap: null,
                 gMarkers: [],
                 initGlobalMap() {
-                    if (this.gMap) {
-                        setTimeout(() => this.gMap.invalidateSize(), 200);
+                    if (typeof L === 'undefined') {
+                        if (this.gMapTimeout) clearTimeout(this.gMapTimeout);
+                        this.gMapTimeout = setTimeout(() => this.initGlobalMap(), 100);
                         return;
                     }
-                    setTimeout(() => {
-                        const container = document.getElementById('globalBranchMap');
+                    this.patchLeaflet();
+                    if (this.gMap) {
+                        if (this.gMapTimeout) clearTimeout(this.gMapTimeout);
+                        this.gMapTimeout = setTimeout(() => {
+                            this.gMap.invalidateSize();
+                            this.updateGlobalBranches();
+                        }, 350);
+                        return;
+                    }
+                    if (this.gMapTimeout) clearTimeout(this.gMapTimeout);
+                    this.gMapTimeout = setTimeout(() => {
+                        let container = document.getElementById('globalBranchMap');
                         if (!container) return;
 
-                        this.gMap = L.map('globalBranchMap', {
+                        if (container._leaflet_id) {
+                            const clone = container.cloneNode(false);
+                            clone.removeAttribute('class');
+                            container.parentNode.replaceChild(clone, container);
+                            container = clone;
+                        }
+
+                        const street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            attribution: '&copy; OpenStreetMap contributors'
+                        });
+                        const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                        });
+
+                        this.gMap = L.map(container, {
                             maxBounds: [[13.85, 120.85], [14.65, 121.95]],
                             maxBoundsViscosity: 1.0,
-                            minZoom: 10
+                            minZoom: 10,
+                            layers: [street]
                         }).setView([14.2189, 121.1672], 11);
-                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.gMap);
+
+                        L.control.layers({ "Street": street, "Satellite": satellite }).addTo(this.gMap);
                         this.updateGlobalBranches();
-                    }, 300);
+                    }, 350);
                 },
 
                 updateGlobalBranches(branches) {
                     if (!this.gMap) return;
-                    const bData = branches || @js(json_decode($plottableBranches));
+                    const rawData = branches || @js(json_decode($plottableBranches));
+                    const bData = rawData.filter(b => {
+                        const lat = parseFloat(b.lat);
+                        const lng = parseFloat(b.lng);
+                        return !isNaN(lat) && !isNaN(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+                    });
+                    
                     this.gMarkers.forEach(m => this.gMap.removeLayer(m));
                     this.gMarkers = [];
                     
+                    let mainBranch = null;
+
                     bData.forEach(b => {
-                        const marker = L.marker([b.lat, b.lng]).addTo(this.gMap)
-                            .bindPopup(`<b>${b.name}</b><br>${b.formatted}<br><span class="text-[10px] font-bold ${b.status ? 'text-green-600' : 'text-red-600'}">${b.status ? 'ACTIVE' : 'INACTIVE'}</span>`);
+                        const branchIcon = L.divIcon({
+                            html: `
+                                \x3cdiv class="relative flex flex-col items-center justify-end w-10 h-10"\x3e
+                                    \x3cspan class="absolute w-4 h-2 ${b.is_main ? 'bg-amber-500/40' : 'bg-indigo-500/40'} rounded-full blur-[2px] ${b.status ? 'animate-ping' : ''} bottom-[-2px] left-1/2 -translate-x-1/2"\x3e\x3c/span\x3e
+                                    \x3cdiv class="relative w-8 h-8 ${b.is_main ? 'bg-amber-500 border-amber-300' : 'bg-indigo-600 border-indigo-400'} rounded-t-full rounded-bl-full rotate-45 border-2 shadow-lg flex items-center justify-center transition-all duration-300"\x3e
+                                        \x3cdiv class="w-3.5 h-3.5 bg-white rounded-full -rotate-45 flex items-center justify-center shadow-inner"\x3e
+                                            \x3cdiv class="w-1.5 h-1.5 ${b.is_main ? 'bg-amber-600' : 'bg-indigo-600'} rounded-full"\x3e\x3c/div\x3e
+                                        \x3c/div\x3e
+                                    \x3c/div\x3e
+                                \x3c/div\x3e
+                            `,
+                            className: 'custom-leaflet-icon',
+                            iconSize: [40, 40],
+                            iconAnchor: [20, 40]
+                        });
+                        const marker = L.marker([b.lat, b.lng], { icon: branchIcon }).addTo(this.gMap)
+                            .bindPopup(`
+                                \x3cdiv class="p-1"\x3e
+                                    \x3cdiv class="flex items-center gap-2 mb-1"\x3e
+                                        \x3cb class="text-[14px] text-slate-900"\x3e${b.name}\x3c/b\x3e
+                                        ${b.is_main ? '\x3cspan class="px-1.5 py-0.5 bg-indigo-600 text-white text-[9px] font-black rounded uppercase tracking-tighter"\x3eMain Hub\x3c/span\x3e' : ''}
+                                    \x3c/div\x3e
+                                    \x3cp class="text-[11px] text-slate-500 mb-2"\x3e${b.formatted}\x3c/p\x3e
+                                    \x3cdiv class="flex items-center gap-1.5 mt-1"\x3e
+                                        \x3cspan class="w-1.5 h-1.5 rounded-full ${b.status ? 'bg-emerald-500' : 'bg-rose-500'} inline-block"\x3e\x3c/span\x3e
+                                        \x3cspan class="text-[11px] font-bold ${b.status ? 'text-emerald-600' : 'text-rose-600'} uppercase"\x3e${b.status ? 'Active' : 'Inactive'}\x3c/span\x3e
+                                    \x3c/div\x3e
+                                \x3c/div\x3e
+                            `);
                         this.gMarkers.push(marker);
+                        if (b.is_main) mainBranch = b;
+                    });
+
+                    const container = document.getElementById('globalBranchMap');
+                    if (container && container.offsetWidth > 0) {
+                        // Center on main branch if found
+                        if (mainBranch) {
+                            this.gMap.setView([mainBranch.lat, mainBranch.lng], 15);
+                        } else if (bData.length > 0) {
+                            // Fallback: fit bounds to all branches if no main
+                            const bounds = L.latLngBounds(bData.map(b => [b.lat, b.lng]));
+                            this.gMap.fitBounds(bounds, { padding: [50, 50] });
+                        }
+                    }
+                },
+
+                init() {
+                    this.$watch('panel', (val) => {
+                        if (val === 'form') {
+                            this.initMap();
+                        } else {
+                            if (this.marker && this.mode === 'create') {
+                                this.map.removeLayer(this.marker);
+                                this.marker = null;
+                            }
+                        }
+                    });
+                    this.$watch('view', (val) => {
+                        if (val === 'map') {
+                            this.initGlobalMap();
+                        }
                     });
                 }
             };
@@ -212,8 +537,8 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <x-input-label for="f_branch_name" value="Branch Name *" />
-                                <x-text-input id="f_branch_name" name="branch_name" wire:model.debounce.500ms="branch_name" type="text" 
-                                    class="mt-1 block w-full" placeholder="e.g. Mister Takoyaki - Makati" 
+                                <x-text-input id="f_branch_name" name="branch_name" wire:model.live.debounce.500ms="branch_name" type="text" 
+                                    class="mt-1 block w-full" placeholder="e.g. {{ \App\Services\ConfigurationService::getBusinessName() }} - Makati" 
                                     inputFilter="name" maxlength="150"
                                     @keydown="FormFilters.nameKeydown($event)" @paste="FormFilters.namePaste($event)"
                                     :hasError="$errors->has('branch_name')" />
@@ -221,7 +546,7 @@
                             </div>
                             <div>
                                 <x-input-label for="f_branch_code" value="Branch Code *" />
-                                <x-text-input id="f_branch_code" name="branch_code" wire:model.debounce.500ms="branch_code" type="text" 
+                                <x-text-input id="f_branch_code" name="branch_code" wire:model.live.debounce.500ms="branch_code" type="text" 
                                     class="mt-1 block w-full uppercase" placeholder="e.g. MAKATI-01" 
                                     maxlength="50"
                                     :hasError="$errors->has('branch_code')" />
@@ -233,7 +558,7 @@
                                     <div class="flex-shrink-0 inline-flex items-center px-3 h-10 rounded-l-lg border border-r-0 border-gray-200 bg-gray-50 text-gray-500 text-[13px] font-bold">
                                         +63
                                     </div>
-                                    <x-text-input id="f_phone" name="phone" wire:model.debounce.500ms="phone" type="text"
+                                    <x-text-input id="f_phone" name="phone" wire:model.live.debounce.500ms="phone" type="text"
                                         class="block w-full rounded-l-none" placeholder="912 345 6789" autocomplete="tel"
                                         inputFilter="number" maxlength="10"
                                         @keydown="FormFilters.numberKeydown($event)" @paste="FormFilters.numberPaste($event)"
@@ -243,7 +568,7 @@
                             </div>
                             <div>
                                 <x-input-label for="f_email" value="Email Address" />
-                                <x-text-input id="f_email" name="email" wire:model.debounce.500ms="email" type="email" 
+                                <x-text-input id="f_email" name="email" wire:model.live.debounce.500ms="email" type="email" 
                                     class="mt-1 block w-full" placeholder="e.g. makati@mistertakoyaki.com" 
                                     autocomplete="email" inputFilter="email" maxlength="255"
                                     @keydown="FormFilters.emailKeydown($event)" @paste="FormFilters.emailPaste($event)"
@@ -266,103 +591,133 @@
                             </button>
                         </div>
 
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {{-- Region --}}
-                            <div>
-                                <x-input-label value="Region *" />
-                                <div class="relative mt-1" @click.outside="loc.region.open = false">
-                                    <button type="button" @click="loc.region.open = !loc.region.open; loadRegions();" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm hover:border-indigo-300 focus:outline-none transition-all h-10">
-                                        <span class="truncate" :class="'{{ $addr_region }}' ? 'text-gray-900 font-medium' : 'text-gray-400'">{{ $addr_region ?: 'Select Region...' }}</span>
-                                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                    </button>
-                                    <div x-show="loc.region.open" class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden" x-cloak>
-                                        <div class="p-2 border-b border-gray-100 bg-gray-50/50">
-                                            <input x-model="loc.region.search" type="text" placeholder="Search..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
-                                        </div>
-                                        <div class="max-h-48 overflow-y-auto">
-                                            <template x-for="r in filtered('region')" :key="r.code">
-                                                <button type="button" @click="selectRegion(r)" class="w-full text-left px-4 py-2 text-[12px] hover:bg-indigo-50 transition-colors" x-text="r.name"></button>
-                                            </template>
-                                        </div>
+                        <div class="flex flex-col gap-5">
+                            {{-- Row 1: Region + Province --}}
+                            <div class="flex flex-col sm:flex-row gap-5">
+                                <div class="flex-1 w-full">
+                                    <x-input-label value="Region *" />
+                                    <div x-on:click.capture="loc.region.search = ''; loadRegions();">
+                                        <x-dropdown align="left" width="full" containerClasses="block w-full mt-1">
+                                            <x-slot name="trigger">
+                                                <button type="button" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm hover:border-indigo-300 focus:outline-none transition-all h-10">
+                                                    <span class="truncate" :class="addr_region ? 'text-gray-900 font-medium' : 'text-gray-400'" x-text="addr_region || 'Select Region...'"></span>
+                                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                                </button>
+                                            </x-slot>
+                                            <x-slot name="content">
+                                                <div class="p-2 border-b border-gray-100 bg-gray-50/50">
+                                                    <input x-model="loc.region.search" type="text" placeholder="Search region..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                                                </div>
+                                                <div class="max-h-48 overflow-y-auto">
+                                                    <template x-for="r in filtered('region')" :key="r.code">
+                                                        <x-dropdown-link href="#" @click.prevent="dropdownOpen = false; selectRegion(r)">
+                                                            <span x-text="r.name"></span>
+                                                        </x-dropdown-link>
+                                                    </template>
+                                                    <template x-if="filtered('region').length === 0">
+                                                        <div class="px-4 py-2 text-[12px] text-gray-400 italic font-medium">No regions found...</div>
+                                                    </template>
+                                                </div>
+                                            </x-slot>
+                                        </x-dropdown>
                                     </div>
+                                    <x-input-error :messages="$errors->get('addr_region')" class="mt-1" />
                                 </div>
-                                <x-input-error :messages="$errors->get('addr_region')" class="mt-1" />
+
+                                <div class="flex-1 w-full">
+                                    <x-input-label value="Province *" />
+                                    <div x-on:click.capture="if(!addr_region || loc.noProvince) { $event.stopPropagation(); } else { loc.province.search = ''; }">
+                                        <x-dropdown align="left" width="full" containerClasses="block w-full mt-1">
+                                            <x-slot name="trigger">
+                                                <button type="button" :disabled="!addr_region || loc.noProvince" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 disabled:opacity-75 disabled:cursor-not-allowed h-10">
+                                                    <span class="truncate" :class="addr_province ? 'text-gray-900 font-medium' : 'text-gray-400'">
+                                                        <template x-if="loc.noProvince"><span>N/A (Direct to City)</span></template>
+                                                        <template x-if="!loc.noProvince"><span x-text="addr_province || 'Select Province...'"></span></template>
+                                                    </span>
+                                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                                </button>
+                                            </x-slot>
+                                            <x-slot name="content">
+                                                <div class="p-2 border-b border-gray-100 bg-gray-50/50">
+                                                    <input x-model="loc.province.search" type="text" placeholder="Search province..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                                                </div>
+                                                <div class="max-h-48 overflow-y-auto">
+                                                    <template x-for="p in filtered('province')" :key="p.code">
+                                                        <x-dropdown-link href="#" @click.prevent="dropdownOpen = false; selectProvince(p)">
+                                                            <span x-text="p.name"></span>
+                                                        </x-dropdown-link>
+                                                    </template>
+                                                </div>
+                                            </x-slot>
+                                        </x-dropdown>
+                                    </div>
+                                    <x-input-error :messages="$errors->get('addr_province')" class="mt-1" />
+                                </div>
                             </div>
 
-                            {{-- Province --}}
-                            <div>
-                                <x-input-label value="Province *" />
-                                <div class="relative mt-1" @click.outside="loc.province.open = false">
-                                    <button type="button" @click="loc.province.open = !loc.province.open" :disabled="!'{{ $addr_region }}' || loc.noProvince" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 h-10">
-                                        <span class="truncate" :class="'{{ $addr_province }}' ? 'text-gray-900 font-medium' : 'text-gray-400'">
-                                            <template x-if="loc.noProvince"><span>N/A (Direct to City)</span></template>
-                                            <template x-if="!loc.noProvince"><span x-text="'{{ $addr_province }}' || 'Select Province...'"></span></template>
-                                        </span>
-                                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                    </button>
-                                    <div x-show="loc.province.open" class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden" x-cloak>
-                                        <div class="p-2 border-b border-gray-100 bg-gray-50/50">
-                                            <input x-model="loc.province.search" type="text" placeholder="Search..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
-                                        </div>
-                                        <div class="max-h-48 overflow-y-auto">
-                                            <template x-for="p in filtered('province')" :key="p.code">
-                                                <button type="button" @click="selectProvince(p)" class="w-full text-left px-4 py-2 text-[12px] hover:bg-indigo-50 transition-colors" x-text="p.name"></button>
-                                            </template>
-                                        </div>
+                            {{-- Row 2: City + Barangay --}}
+                            <div class="flex flex-col sm:flex-row gap-5">
+                                <div class="flex-1 w-full">
+                                    <x-input-label value="City / Municipality *" />
+                                    <div x-on:click.capture="if(!addr_region || (!addr_province && !loc.noProvince)) { $event.stopPropagation(); } else { loc.city.search = ''; }">
+                                        <x-dropdown align="left" width="full" containerClasses="block w-full mt-1">
+                                            <x-slot name="trigger">
+                                                <button type="button" :disabled="!addr_region || (!addr_province && !loc.noProvince)" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 disabled:opacity-75 disabled:cursor-not-allowed h-10">
+                                                    <span class="truncate" :class="addr_city ? 'text-gray-900 font-medium' : 'text-gray-400'" x-text="addr_city || 'Select City...'"></span>
+                                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                                </button>
+                                            </x-slot>
+                                            <x-slot name="content">
+                                                <div class="p-2 border-b border-gray-100 bg-gray-50/50">
+                                                    <input x-model="loc.city.search" type="text" placeholder="Search city..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                                                </div>
+                                                <div class="max-h-48 overflow-y-auto">
+                                                    <template x-for="c in filtered('city')" :key="c.code">
+                                                        <x-dropdown-link href="#" @click.prevent="dropdownOpen = false; selectCity(c)">
+                                                            <span x-text="c.name"></span>
+                                                        </x-dropdown-link>
+                                                    </template>
+                                                </div>
+                                            </x-slot>
+                                        </x-dropdown>
                                     </div>
+                                    <x-input-error :messages="$errors->get('addr_city')" class="mt-1" />
                                 </div>
-                                <x-input-error :messages="$errors->get('addr_province')" class="mt-1" />
+
+                                <div class="flex-1 w-full">
+                                    <x-input-label value="Barangay *" />
+                                    <div x-on:click.capture="if(!addr_city) { $event.stopPropagation(); } else { loc.barangay.search = ''; }">
+                                        <x-dropdown align="left" width="full" containerClasses="block w-full mt-1">
+                                            <x-slot name="trigger">
+                                                <button type="button" :disabled="!addr_city" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 disabled:opacity-75 disabled:cursor-not-allowed h-10">
+                                                    <span class="truncate" :class="addr_barangay ? 'text-gray-900 font-medium' : 'text-gray-400'" x-text="addr_barangay || 'Select Barangay...'"></span>
+                                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                                </button>
+                                            </x-slot>
+                                            <x-slot name="content">
+                                                <div class="p-2 border-b border-gray-100 bg-gray-50/50">
+                                                    <input x-model="loc.barangay.search" type="text" placeholder="Search barangay..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                                                </div>
+                                                <div class="max-h-48 overflow-y-auto">
+                                                    <template x-for="b in filtered('barangay')" :key="b.code">
+                                                        <x-dropdown-link href="#" @click.prevent="dropdownOpen = false; selectBarangay(b)">
+                                                            <span x-text="b.name"></span>
+                                                        </x-dropdown-link>
+                                                    </template>
+                                                </div>
+                                            </x-slot>
+                                        </x-dropdown>
+                                    </div>
+                                    <x-input-error :messages="$errors->get('addr_barangay')" class="mt-1" />
+                                </div>
                             </div>
 
-                            {{-- City --}}
+                            {{-- Row 3: Street --}}
                             <div>
-                                <x-input-label value="City / Municipality *" />
-                                <div class="relative mt-1" @click.outside="loc.city.open = false">
-                                    <button type="button" @click="loc.city.open = !loc.city.open" :disabled="!'{{ $addr_region }}'" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 h-10">
-                                        <span class="truncate" :class="'{{ $addr_city }}' ? 'text-gray-900 font-medium' : 'text-gray-400'">{{ $addr_city ?: 'Select City...' }}</span>
-                                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                    </button>
-                                    <div x-show="loc.city.open" class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden" x-cloak>
-                                        <div class="p-2 border-b border-gray-100 bg-gray-50/50">
-                                            <input x-model="loc.city.search" type="text" placeholder="Search..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
-                                        </div>
-                                        <div class="max-h-48 overflow-y-auto">
-                                            <template x-for="c in filtered('city')" :key="c.code">
-                                                <button type="button" @click="selectCity(c)" class="w-full text-left px-4 py-2 text-[12px] hover:bg-indigo-50 transition-colors" x-text="c.name"></button>
-                                            </template>
-                                        </div>
-                                    </div>
-                                </div>
-                                <x-input-error :messages="$errors->get('addr_city')" class="mt-1" />
+                                <x-input-label value="Street / House No. / Landmark" />
+                                <x-text-input wire:model.live.debounce.400ms="addr_street" class="w-full mt-1 h-10" placeholder="e.g. Unit 123, Rosewood Ave, Phase 1" :hasError="$errors->has('addr_street')" />
+                                <x-input-error :messages="$errors->get('addr_street')" class="mt-1" />
                             </div>
-
-                            {{-- Barangay --}}
-                            <div>
-                                <x-input-label value="Barangay *" />
-                                <div class="relative mt-1" @click.outside="loc.barangay.open = false">
-                                    <button type="button" @click="loc.barangay.open = !loc.barangay.open" :disabled="!'{{ $addr_city }}'" class="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm disabled:bg-gray-50 h-10">
-                                        <span class="truncate" :class="'{{ $addr_barangay }}' ? 'text-gray-900 font-medium' : 'text-gray-400'">{{ $addr_barangay ?: 'Select Barangay...' }}</span>
-                                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                    </button>
-                                    <div x-show="loc.barangay.open" class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden" x-cloak>
-                                        <div class="p-2 border-b border-gray-100 bg-gray-50/50">
-                                            <input x-model="loc.barangay.search" type="text" placeholder="Search..." class="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-[12px] focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
-                                        </div>
-                                        <div class="max-h-48 overflow-y-auto">
-                                            <template x-for="b in filtered('barangay')" :key="b.code">
-                                                <button type="button" @click="selectBarangay(b)" class="w-full text-left px-4 py-2 text-[12px] hover:bg-indigo-50 transition-colors" x-text="b.name"></button>
-                                            </template>
-                                        </div>
-                                    </div>
-                                </div>
-                                <x-input-error :messages="$errors->get('addr_barangay')" class="mt-1" />
-                            </div>
-                        </div>
-
-                        <div class="mt-4">
-                            <x-input-label value="Street / House No. / Landmark" />
-                            <x-text-input wire:model.debounce.500ms="addr_street" type="text" class="mt-1 block w-full h-10" placeholder="e.g. 123 Maple St, Unit 12A" :hasError="$errors->has('addr_street')" />
-                            <x-input-error :messages="$errors->get('addr_street')" class="mt-1" />
                         </div>
                     </div>
                 </div>
@@ -395,7 +750,7 @@
                         <div class="mt-6 pt-6 border-t border-slate-100">
                             <h3 class="text-[12px] font-bold text-slate-800 uppercase tracking-widest mb-4">Operational Status</h3>
                             <label for="f_status" class="flex items-center gap-3 cursor-pointer select-none">
-                                <input type="checkbox" id="f_status" name="status" wire:model.lazy="status"
+                                <input type="checkbox" id="f_status" name="status" wire:model.blur="status"
                                     class="rounded border-gray-300 text-gray-900 shadow-sm focus:ring-indigo-600 h-4 w-4">
                                 <div>
                                     <span class="block text-[13px] font-semibold text-gray-800">Active Node</span>
@@ -462,7 +817,7 @@
                         Analytics
                     </x-secondary-button>
                     @if($this->isSuperAdmin())
-                        <x-primary-button @click="panel = 'form'; mode = 'create'; $wire.resetForm()" class="h-10">
+                        <x-primary-button @click="panel = 'form'; mode = 'create'; $wire.showCreate()" class="h-10">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                             Add Branch
                         </x-primary-button>
@@ -470,50 +825,54 @@
                 </div>
             </div>
 
-            {{-- Fleet Metrics Grid --}}
+            {{-- Fleet Metrics Grid (Matching Dashboard Premium Aesthetic - Compact Footprint) --}}
             <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                {{-- Total Nodes --}}
-                <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm transition-transform group-hover:scale-110">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                {{-- Total Branches --}}
+                <div class="p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Branches</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-indigo-700/60 uppercase tracking-widest leading-none mb-1">Total Branches</span>
-                        <span class="block text-[20px] font-black text-gray-900 leading-none">{{ $systemStats['total'] }}</span>
-                    </div>
+                    <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $systemStats['total'] }}</h3>
+                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Registered branch locations</p>
                 </div>
                 
                 {{-- Operational --}}
-                <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm transition-transform group-hover:scale-110">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <div class="p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-emerald-700/60 uppercase tracking-widest leading-none mb-1">Active</span>
-                        <span class="block text-[20px] font-black text-emerald-600 leading-none">{{ $systemStats['active'] }}</span>
-                    </div>
+                    <h3 class="text-2xl font-black text-emerald-600 tracking-tight leading-none">{{ $systemStats['active'] }}</h3>
+                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Operational store nodes</p>
                 </div>
 
                 {{-- Decommissioned --}}
-                <div class="bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm transition-transform group-hover:scale-110">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                <div class="p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Inactive</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-rose-700/60 uppercase tracking-widest leading-none mb-1">Inactive</span>
-                        <span class="block text-[20px] font-black text-rose-600 leading-none">{{ $systemStats['inactive'] }}</span>
-                    </div>
+                    <h3 class="text-2xl font-black text-rose-600 tracking-tight leading-none">{{ $systemStats['inactive'] }}</h3>
+                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Temporarily closed locations</p>
                 </div>
 
                 {{-- Workforce --}}
-                <div class="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 rounded-2xl p-4 shadow-sm flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm transition-transform group-hover:scale-110">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                <div class="p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Workforce</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-amber-700/60 uppercase tracking-widest leading-none mb-1">Workforce</span>
-                        <span class="block text-[20px] font-black text-gray-900 leading-none">{{ $systemStats['staff'] }}</span>
-                    </div>
+                    <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $systemStats['staff'] }}</h3>
+                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Total employees deployed</p>
                 </div>
             </div>
 
@@ -522,7 +881,7 @@
                 
                 {{-- Left: Search Bar --}}
                 <div class="flex flex-1 w-full lg:w-auto">
-                    <x-search-bar wireModel="search" placeholder="Find nodes..." width="w-full lg:w-72" />
+                    <x-search-bar wireModel="search" placeholder="Find branches..." width="w-full lg:w-72" />
                 </div>
 
                 {{-- Right: Filters & View Toggle --}}
@@ -583,15 +942,17 @@
             <div x-show="view === 'table'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
                 <x-data-table>
                     <x-slot name="header">
-                        <th class="py-3 px-4 text-[11px] font-black text-slate-500 uppercase tracking-widest">Branch Name</th>
-                        <th class="py-3 px-4 text-[11px] font-black text-slate-500 uppercase tracking-widest">Manager</th>
-                        <th class="py-3 px-4 text-[11px] font-black text-slate-500 uppercase tracking-widest">Status</th>
-                        <th class="py-3 px-4 text-right text-[11px] font-black text-slate-500 uppercase tracking-widest">Actions</th>
+                        <th class="py-3 px-4 border-r border-slate-100/50 text-[11px] font-black text-slate-500 uppercase tracking-widest">Branch Name</th>
+                        <th class="py-3 px-4 border-r border-slate-100/50 text-[11px] font-black text-slate-500 uppercase tracking-widest">Manager</th>
+                        <th class="py-3 px-4 border-r border-slate-100/50 text-[11px] font-black text-slate-500 uppercase tracking-widest">Status</th>
+                        @if($this->isSuperAdmin())
+                            <th class="py-3 px-4 text-right text-[11px] font-black text-slate-500 uppercase tracking-widest">Actions</th>
+                        @endif
                     </x-slot>
                     
                     @forelse($branches as $branch)
                         <tr wire:key="branch-row-{{ $branch->id }}" class="hover:bg-slate-50/50 transition-colors group">
-                            <td class="py-4 px-4">
+                            <td class="py-4 px-4 border-r border-slate-100/50">
                                 <div class="flex items-center gap-3">
                                     <div class="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-[13px] group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
                                         {{ strtoupper(substr($branch->branch_name, 0, 1)) }}
@@ -611,7 +972,7 @@
                                     </div>
                                 </div>
                             </td>
-                            <td class="py-4 px-4">
+                            <td class="py-4 px-4 border-r border-slate-100/50">
                                 @if($branch->manager)
                                     <div class="flex items-center gap-2.5">
                                         <div class="w-6 h-6 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-[10px] ring-1 ring-indigo-200">
@@ -623,30 +984,32 @@
                                     <span class="text-[12px] font-bold text-slate-300 italic tracking-wide">UNASSIGNED</span>
                                 @endif
                             </td>
-                            <td class="py-4 px-4">
+                            <td class="py-4 px-4 border-r border-slate-100/50">
                                 @if($this->isSuperAdmin())
                                     <button wire:click="toggleStatus({{ $branch->id }})"
-                                        class="flex items-center gap-2 text-[12px] font-medium text-slate-600 hover:opacity-80 transition-opacity focus:outline-none">
-                                        <span class="w-1.5 h-1.5 rounded-full {{ $branch->status ? 'bg-[#27C93F] shadow-[0_0_4px_rgba(39,201,63,0.5)]' : 'bg-[#FF5F56] shadow-[0_0_4px_rgba(255,95,86,0.5)]' }}"></span>
-                                        {{ $branch->status ? 'Active' : 'Inactive' }}
+                                        class="flex items-center gap-2 hover:opacity-85 transition-opacity focus:outline-none">
+                                        <span class="h-1.5 w-1.5 rounded-full {{ $branch->status ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
+                                        <span class="text-[11px] font-bold {{ $branch->status ? 'text-emerald-600' : 'text-rose-600' }} uppercase">{{ $branch->status ? 'Active' : 'Inactive' }}</span>
                                     </button>
                                 @else
-                                    <div class="flex items-center gap-2 text-[12px] font-medium text-slate-600">
-                                        <span class="w-1.5 h-1.5 rounded-full {{ $branch->status ? 'bg-[#27C93F] shadow-[0_0_4px_rgba(39,201,63,0.5)]' : 'bg-[#FF5F56] shadow-[0_0_4px_rgba(255,95,86,0.5)]' }}"></span>
-                                        {{ $branch->status ? 'Active' : 'Inactive' }}
+                                    <div class="flex items-center gap-2">
+                                        <span class="h-1.5 w-1.5 rounded-full {{ $branch->status ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
+                                        <span class="text-[11px] font-bold {{ $branch->status ? 'text-emerald-600' : 'text-rose-600' }} uppercase">{{ $branch->status ? 'Active' : 'Inactive' }}</span>
                                     </div>
                                 @endif
                             </td>
-                            <td class="py-4 px-4 text-right">
-                                <div class="flex items-center justify-end">
-                                    <x-secondary-button @click="$dispatch('trigger-edit-branch', {id: {{ $branch->id }}})" class="h-8 px-3 inline-flex items-center gap-1.5 text-xs shadow-none border-slate-200">
-                                        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                                        </svg>
-                                        Edit Branch
-                                    </x-secondary-button>
-                                </div>
-                            </td>
+                            @if($this->isSuperAdmin())
+                                <td class="py-4 px-4 text-right">
+                                    <div class="flex items-center justify-end">
+                                        <x-secondary-button @click="$dispatch('trigger-edit-branch', {id: {{ $branch->id }}})" class="h-8 px-3 inline-flex items-center gap-1.5 text-xs shadow-none border-slate-200">
+                                            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                            </svg>
+                                            Edit Branch
+                                        </x-secondary-button>
+                                    </div>
+                                </td>
+                            @endif
                         </tr>
                     @empty
                         <tr>
@@ -671,9 +1034,10 @@
                                     {{ strtoupper(substr($branch->branch_name, 0, 1)) }}
                                 </div>
                                 <div class="flex flex-col items-end gap-2">
-                                    <span class="px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-[0.1em] border {{ $branch->status ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100' }}">
-                                        {{ $branch->status ? 'Active' : 'Inactive' }}
-                                    </span>
+                                    <div class="flex items-center gap-2">
+                                        <span class="h-1.5 w-1.5 rounded-full {{ $branch->status ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
+                                        <span class="text-[11px] font-bold {{ $branch->status ? 'text-emerald-600' : 'text-rose-600' }} uppercase">{{ $branch->status ? 'Active' : 'Inactive' }}</span>
+                                    </div>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2 mb-1">
@@ -693,11 +1057,13 @@
                                     <span class="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em]">Manager</span>
                                     <span class="text-[12px] font-bold text-slate-700">{{ $branch->manager?->first_name ?? '—' }} {{ $branch->manager?->last_name ?? '' }}</span>
                                 </div>
-                                <div class="flex items-center justify-end">
-                                    <button @click="$dispatch('trigger-edit-branch', {id: {{ $branch->id }}})" class="p-2 rounded-xl bg-slate-50 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-all">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
-                                    </button>
-                                </div>
+                                @if($this->isSuperAdmin())
+                                    <div class="flex items-center justify-end">
+                                        <button @click="$dispatch('trigger-edit-branch', {id: {{ $branch->id }}})" class="p-2 rounded-xl bg-slate-50 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-all">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                                        </button>
+                                    </div>
+                                @endif
                             </div>
                         </div>
                     @empty
@@ -709,7 +1075,7 @@
             </div>
 
             {{-- Map View --}}
-            <div x-show="view === 'map'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="mt-6" x-init="initGlobalMap()">
+            <div x-show="view === 'map'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="mt-6">
                 <div class="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200/80 p-2 relative">
                     <div id="globalBranchMap" wire:ignore class="h-[600px] w-full rounded-xl z-10 border border-slate-100"></div>
                 </div>
@@ -747,14 +1113,13 @@
                         @endif
 
                         <div class="flex flex-col gap-3">
-                            <x-date-range-filter startModel="startDate" endModel="endDate" :error="$dateError" :startValue="$startDate" />
-                            <x-quick-date-filter :activeFilter="$activeFilter" class="w-full justify-between h-10 border-gray-200 shadow-sm font-bold" />
+                            <x-date-filter startModel="startDate" endModel="endDate" activeModel="activeFilter" align="left" class="w-full" />
                         </div>
                     </div>
 
                     <div class="bg-white rounded-2xl border border-slate-200/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] flex flex-col" style="max-height: 500px;">
                         <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 rounded-t-2xl shrink-0">
-                            <h3 class="text-[13px] font-bold text-gray-900 uppercase tracking-widest">Target Nodes</h3>
+                            <h3 class="text-[13px] font-bold text-gray-900 uppercase tracking-widest">Target Branch</h3>
                             <button wire:click="{{ count($selectedBranchIds) === $allBranches->count() ? 'clearAllBranches' : 'selectAllBranches' }}" class="text-[10px] font-black text-indigo-600 hover:text-indigo-800 transition-colors uppercase tracking-widest">
                                 {{ count($selectedBranchIds) === $allBranches->count() ? 'Deselect All' : 'Select All' }}
                             </button>
@@ -766,7 +1131,10 @@
                                     <input type="checkbox" wire:click="toggleBranch({{ $b->id }})" class="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300" {{ $included ? 'checked' : '' }}>
                                     <div class="flex flex-col">
                                         <span class="text-[13px] font-bold {{ $included ? 'text-indigo-900' : 'text-gray-700' }} leading-tight">{{ $b->branch_name }}</span>
-                                        <span class="text-[10px] {{ $b->status ? 'text-emerald-500' : 'text-rose-400' }} font-bold uppercase tracking-widest mt-0.5">{{ $b->status ? 'Active' : 'Inactive' }}</span>
+                                        <div class="flex items-center gap-1.5 mt-0.5">
+                                            <span class="h-1 w-1 rounded-full {{ $b->status ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
+                                            <span class="text-[10px] {{ $b->status ? 'text-emerald-600' : 'text-rose-600' }} font-bold uppercase tracking-widest">{{ $b->status ? 'Active' : 'Inactive' }}</span>
+                                        </div>
                                     </div>
                                 </label>
                             @endforeach
@@ -786,7 +1154,7 @@
                                 </div>
                                 <p class="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-100/80">Net Revenue</p>
                                 <h3 class="text-2xl font-black mt-1 tracking-tighter">₱{{ number_format($totals['net'], 2) }}</h3>
-                                <p class="text-[10px] font-bold text-indigo-200/60 mt-1">Excl. Fees & Tax</p>
+                                <p class="text-[10px] font-bold text-indigo-200/60 mt-1">Excl. Fees</p>
                             </div>
                         </div>
 
@@ -869,42 +1237,50 @@
                     <div class="mt-4">
                         <x-data-table>
                             <x-slot name="header">
-                                <th class="py-3 px-4 text-[11px] font-black text-slate-500 uppercase tracking-widest">Rank</th>
-                                <th class="py-3 px-4 text-[11px] font-black text-slate-500 uppercase tracking-widest">Branch Node</th>
-                                <th class="py-3 px-4 text-[11px] font-black text-slate-500 uppercase tracking-widest text-right">Net Revenue</th>
-                                <th class="py-3 px-4 text-[11px] font-black text-slate-500 uppercase tracking-widest text-right">Gross Sales</th>
-                                <th class="py-3 px-4 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center">Volume</th>
-                                <th class="py-3 px-4 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center">Health Index</th>
+                                <th class="py-3 px-4 border-r border-slate-100/50 text-[11px] font-black text-slate-500 uppercase tracking-widest">Rank</th>
+                                <th class="py-3 px-4 border-r border-slate-100/50 text-[11px] font-black text-slate-500 uppercase tracking-widest">Branch Node</th>
+                                <th class="py-3 px-4 border-r border-slate-100/50 text-[11px] font-black text-slate-500 uppercase tracking-widest text-right">Net Revenue</th>
+                                <th class="py-3 px-4 border-r border-slate-100/50 text-[11px] font-black text-slate-500 uppercase tracking-widest text-right">Gross Sales</th>
+                                <th class="py-3 px-4 border-r border-slate-100/50 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center cursor-help group/tooltip relative" title="Total number of transactions">Volume
+                                    <span class="hidden group-hover/tooltip:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 text-white text-[10px] font-normal whitespace-nowrap rounded-lg shadow-lg z-50">Order count</span>
+                                </th>
+                                <th class="py-3 px-4 text-[11px] font-black text-slate-500 uppercase tracking-widest text-center cursor-help group/tooltip relative" title="Percentage share of compared net revenue">Share
+                                    <span class="hidden group-hover/tooltip:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 text-white text-[10px] font-normal whitespace-nowrap rounded-lg shadow-lg z-50 w-max">Net Sales ÷ Total Compared Net Sales × 100</span>
+                                </th>
                             </x-slot>
                             
                             @forelse($matrix as $row)
                                 <tr wire:key="analytics-row-{{ $row['id'] }}" class="hover:bg-slate-50/50 transition-colors group">
-                                    <td class="py-4 px-4">
+                                    <td class="py-4 px-4 border-r border-slate-100/50">
                                         <div class="w-7 h-7 rounded-lg flex items-center justify-center font-black text-[12px] {{ $loop->first ? 'bg-amber-100 text-amber-700 shadow-sm border border-amber-200' : 'bg-slate-50 text-slate-400 border border-slate-100' }}">
                                             {{ $loop->iteration }}
                                         </div>
                                     </td>
-                                    <td class="py-4 px-4 font-bold text-[13px] text-slate-900 group-hover:text-indigo-600 transition-colors">{{ $row['name'] }}</td>
-                                    <td class="py-4 px-4 text-right">
+                                    <td class="py-4 px-4 border-r border-slate-100/50 font-bold text-[13px] text-slate-900 group-hover:text-indigo-600 transition-colors">{{ $row['name'] }}</td>
+                                    <td class="py-4 px-4 border-r border-slate-100/50 text-right">
                                         <span class="font-black text-slate-900 text-[14px]">₱{{ number_format($row['net_sales'], 2) }}</span>
                                     </td>
-                                    <td class="py-4 px-4 text-right">
+                                    <td class="py-4 px-4 border-r border-slate-100/50 text-right">
                                         <span class="font-bold text-slate-500 text-[13px]">₱{{ number_format($row['gross_sales'], 2) }}</span>
                                     </td>
-                                    <td class="py-4 px-4 text-center font-black text-slate-700 text-[13px] tracking-tight">{{ number_format($row['order_count']) }} <span class="text-[10px] text-slate-400 font-bold ml-0.5">TX</span></td>
+                                    <td class="py-4 px-4 border-r border-slate-100/50 text-center font-black text-slate-700 text-[13px] tracking-tight group/vol relative cursor-help">
+                                        {{ number_format($row['order_count']) }}
+                                        <div class="hidden group-hover/vol:block absolute top-full left-1/2 -translate-x-1/2 mt-1 px-2 py-1 bg-slate-900 text-white text-[9px] font-normal rounded shadow-lg z-50 whitespace-nowrap">Total Transactions</div>
+                                    </td>
                                     <td class="py-4 px-4">
-                                        <div class="flex items-center justify-center gap-3">
-                                            <div class="w-20 bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200/50 p-0.5">
-                                                <div class="h-full rounded-full transition-all duration-1000 {{ $row['health_score'] > 80 ? 'bg-emerald-500' : ($row['health_score'] > 40 ? 'bg-amber-400' : 'bg-rose-500') }}" style="width: {{ $row['health_score'] }}%;"></div>
+                                        <div class="flex items-center justify-center gap-3 group/score relative">
+                                            <div class="w-20 bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200/50 p-0.5 cursor-help" title="Percentage share of compared net sales: {{ number_format($row['share_pct'], 1) }}%">
+                                                <div class="h-full rounded-full transition-all duration-1000 bg-indigo-500" style="width: {{ $row['share_pct'] }}%;"></div>
                                             </div>
-                                            <span class="text-[12px] font-black w-8 text-right {{ $row['health_score'] > 80 ? 'text-emerald-600' : ($row['health_score'] > 40 ? 'text-amber-600' : 'text-rose-600') }}">{{ $row['health_score'] }}%</span>
+                                            <span class="text-[12px] font-black w-10 text-right cursor-help text-indigo-600">{{ number_format($row['share_pct'], 1) }}%</span>
+                                            <div class="hidden group-hover/score:block absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-slate-900 text-white text-[10px] font-normal rounded-lg shadow-lg z-50 w-max">Revenue Share of Compared Network: {{ number_format($row['share_pct'], 1) }}%</div>
                                         </div>
                                     </td>
                                 </tr>
                             @empty
                                 <tr>
                                     <td colspan="6" class="py-12">
-                                        <x-empty-state title="No branches selected" description="Select one or more target nodes from the sidebar to view comparison data." />
+                                        <x-empty-state title="No branches selected" description="Select one or more target branch from the sidebar to view comparison data." />
                                     </td>
                                 </tr>
                             @endforelse
@@ -913,6 +1289,7 @@
                 </div>
             </div>
         </div>
+    </div>
 
     {{-- Map Picker Modal --}}
     <x-modal name="map-modal" maxWidth="4xl" focusable>
@@ -1012,7 +1389,7 @@
 
             <div class="mb-6">
                 <label class="flex items-start gap-3 cursor-pointer group p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition-all">
-                    <input type="checkbox" wire:model="confirmMainDesignation" class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4">
+                    <input type="checkbox" wire:model.live="confirmMainDesignation" class="mt-0.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4">
                     <span class="text-[12px] font-bold text-slate-700 leading-relaxed select-none group-hover:text-slate-900 transition-colors">
                         I understand that this will reconfigure the company's logistics hub and transfer all primary procurement privileges.
                     </span>
@@ -1035,3 +1412,4 @@
     </x-modal>
 
 </div>
+

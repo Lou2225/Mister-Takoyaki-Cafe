@@ -145,21 +145,53 @@
 </head>
 <body onload="window.print()">
 
-    <div class="receipt-container">
+    @php
+        $kitchenItems = $order->items->filter(fn($item) => ($item->product->category->production_station ?? 'kitchen') === 'kitchen');
+        $baristaItems = $order->items->filter(fn($item) => ($item->product->category->production_station ?? '') === 'barista');
+        
+        $receipts = [];
+        
+        // 1. Kitchen Slip
+        if ($kitchenItems->count() > 0) {
+            $receipts[] = ['type' => 'kitchen', 'title' => 'KITCHEN SLIP', 'items' => $kitchenItems];
+        }
+        
+        // 2. Barista Slip
+        if ($baristaItems->count() > 0) {
+            $receipts[] = ['type' => 'barista', 'title' => 'BARISTA SLIP', 'items' => $baristaItems];
+        }
+        
+        // 3. Customer Receipt
+        $receipts[] = ['type' => 'customer', 'title' => $settings['business_name'], 'items' => $order->items];
+    @endphp
+
+    @foreach($receipts as $index => $receipt)
+    <div class="receipt-container {{ $index < count($receipts) - 1 ? 'page-break' : '' }}">
         <div class="text-center header">
             @php
                 $logo = \App\Models\SystemSetting::get('business_logo');
             @endphp
-            @if($settings['receipt_logo_enabled'])
-                @if($logo)
-                    <img src="{{ Storage::url($logo) }}" class="logo-img">
-                @else
-                    <div class="logo-placeholder">MTC</div>
+            
+            @if($receipt['type'] === 'customer')
+                @if($settings['receipt_logo_enabled'])
+                    @if($logo)
+                        <img src="{{ Storage::url($logo) }}" class="logo-img">
+                    @else
+                        <div class="logo-placeholder">MTC</div>
+                    @endif
                 @endif
+                <div class="business-name">{{ $receipt['title'] }}</div>
+                <div class="header-info">{{ $settings['business_address'] }}</div>
+                @if(!empty($settings['business_phone']))
+                    <div class="header-info">Tel: +63 {{ ltrim(trim($settings['business_phone']), '+63') }}</div>
+                @endif
+                @if(!empty($settings['business_email']))
+                    <div class="header-info">{{ $settings['business_email'] }}</div>
+                @endif
+            @else
+                <div class="business-name" style="font-size: 18px; border: 2px solid #000; padding: 5px; display: inline-block;">{{ $receipt['title'] }}</div>
+                <div class="header-info" style="margin-top: 5px; font-weight: bold;">Order #{{ $order->reference_no }}</div>
             @endif
-            <div class="business-name">{{ $settings['business_name'] }}</div>
-            <div class="header-info">{{ $settings['business_address'] }}</div>
-            <div class="header-info">Tel: {{ $settings['business_phone'] }}</div>
         </div>
 
         <div class="divider"></div>
@@ -172,78 +204,94 @@
         <div class="divider"></div>
 
         <div class="items-section">
-            @foreach($order->items as $item)
+            @foreach($receipt['items'] as $item)
                 <div class="item-row">
                     <div class="item-main">
-                        <span>{{ $item->quantity }}x {{ $item->product->name }}</span>
-                        <span>{{ $settings['currency_symbol'] ?? '₱' }}{{ number_format($item->subtotal, 2) }}</span>
+                        <span style="{{ $receipt['type'] !== 'customer' ? 'font-size: 14px;' : '' }}">{{ $item->quantity }}x {{ $item->product->name }}</span>
+                        @if($receipt['type'] === 'customer')
+                            <span>{{ $settings['currency_symbol'] ?? '₱' }}{{ number_format($item->subtotal, 2) }}</span>
+                        @endif
                     </div>
                     @foreach($item->options as $opt)
-                        <div class="item-detail">+ {{ $opt->option->name ?? 'Option' }}</div>
+                        <div class="item-detail" style="{{ $receipt['type'] !== 'customer' ? 'font-size: 11px; font-weight: bold;' : '' }}">+ {{ $opt->option->name ?? 'Option' }}</div>
                     @endforeach
                     @foreach($item->modifiers as $mod)
-                        <div class="item-detail">+ {{ $mod->modifier->name ?? 'Modifier' }}</div>
+                        <div class="item-detail" style="{{ $receipt['type'] !== 'customer' ? 'font-size: 11px; font-weight: bold;' : '' }}">+ {{ $mod->modifier->name ?? 'Modifier' }}</div>
                     @endforeach
                 </div>
             @endforeach
         </div>
 
-        <div class="totals-section">
-            <div class="row">
-                <span>Subtotal</span>
-                <span>{{ $settings['currency_symbol'] ?? '₱' }}{{ number_format($order->total_amount - $order->tax_amount + $order->discount_amount, 2) }}</span>
-            </div>
-            
-            @if($settings['receipt_show_vat'] && $order->tax_amount > 0)
+        @if($receipt['type'] === 'customer')
+            <div class="totals-section">
                 <div class="row">
-                    <span>VAT (12%)</span>
-                    <span>{{ $settings['currency_symbol'] ?? '₱' }}{{ number_format($order->tax_amount, 2) }}</span>
+                    <span>Subtotal</span>
+                    <span>{{ $settings['currency_symbol'] ?? '₱' }}{{ number_format($order->total_amount + $order->discount_amount, 2) }}</span>
                 </div>
-            @endif
 
-            @if($order->discount_amount > 0)
-                <div class="row">
-                    <span>Discount</span>
-                    <span>-{{ $settings['currency_symbol'] ?? '₱' }}{{ number_format($order->discount_amount, 2) }}</span>
+                @if($order->discount_amount > 0)
+                    <div class="row">
+                        <span>Discount</span>
+                        <span>-{{ $settings['currency_symbol'] ?? '₱' }}{{ number_format($order->discount_amount, 2) }}</span>
+                    </div>
+                @endif
+
+                <div class="row grand-total">
+                    <span class="bold">TOTAL</span>
+                    <span class="bold">{{ $settings['currency_symbol'] ?? '₱' }}{{ number_format($order->total_amount, 2) }}</span>
                 </div>
-            @endif
 
-            <div class="row grand-total">
-                <span class="bold">TOTAL</span>
-                <span class="bold">{{ $settings['currency_symbol'] ?? '₱' }}{{ number_format($order->total_amount, 2) }}</span>
-            </div>
-
-            <div class="row" style="margin-top: 6px;">
-                <span>{{ $order->payment_method }}</span>
-                <span>{{ $settings['currency_symbol'] ?? '₱' }}{{ number_format($order->total_amount, 2) }}</span>
-            </div>
-        </div>
-
-        @if($order->notes || $order->delivery_notes)
-            <div class="divider"></div>
-            <div style="font-size: 9px;">
-                <div class="bold uppercase">Remarks:</div>
-                <div style="margin-top: 2px;">{{ $order->notes }} {{ $order->delivery_notes }}</div>
+                <div class="row" style="margin-top: 6px;">
+                    <span>{{ $order->payment_method }}</span>
+                    <span>{{ $settings['currency_symbol'] ?? '₱' }}{{ number_format($order->total_amount, 2) }}</span>
+                </div>
             </div>
         @endif
 
-        <div class="footer">
-            <p class="footer-msg">{{ $settings['receipt_footer_message'] }}</p>
-            
-            @if($settings['qr_code'])
-                <div class="divider"></div>
-                <div class="qr-label">Scan to Review</div>
-                <img src="{{ $settings['qr_code'] }}" class="qr-img">
-            @endif
+        @if($order->notes || $order->delivery_notes)
+            <div class="divider"></div>
+            <div style="font-size: {{ $receipt['type'] !== 'customer' ? '12px' : '9px' }};">
+                <div class="bold uppercase">Remarks:</div>
+                <div style="margin-top: 2px; {{ $receipt['type'] !== 'customer' ? 'font-weight: bold;' : '' }}">{{ $order->notes }} {{ $order->delivery_notes }}</div>
+            </div>
+        @endif
 
-            <p style="margin-top: 15px; font-weight: bold; letter-spacing: 2px;">*** THANK YOU ***</p>
-        </div>
+        @if($receipt['type'] === 'customer')
+            <div class="footer">
+                <p class="footer-msg">{{ $settings['receipt_footer_message'] }}</p>
+                
+                @if(!empty($settings['receipt_return_policy']))
+                    <div class="divider"></div>
+                    <p style="font-size: 8px; color: #555; text-align: center;">{{ $settings['receipt_return_policy'] }}</p>
+                @endif
+                
+                @if($settings['qr_code'])
+                    <div class="divider"></div>
+                    <div class="qr-label">Scan to Review</div>
+                    <img src="{{ $settings['qr_code'] }}" class="qr-img">
+                @endif
+
+                <p style="margin-top: 15px; font-weight: bold; letter-spacing: 2px;">*** THANK YOU ***</p>
+            </div>
+        @else
+            <div class="footer">
+                <div class="divider"></div>
+                <p style="font-weight: bold; font-size: 10px;">PREPARATION SLIP</p>
+            </div>
+        @endif
     </div>
+    @endforeach
 
     <div class="no-print-actions">
         <button class="btn" onclick="window.print()">Print Receipt</button>
         <button class="btn" style="background-color: #4b5563;" onclick="window.close()">Close Window</button>
     </div>
 
+    <script>
+        // Auto-close window after printing (improves 'automatic' feel)
+        window.onafterprint = function() {
+            window.close();
+        };
+    </script>
 </body>
 </html>

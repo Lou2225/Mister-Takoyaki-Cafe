@@ -1,10 +1,10 @@
 <x-mail::message>
-# Welcome to Mister Takoyaki Cafe!
+# Welcome to {{ \App\Services\ConfigurationService::getBusinessName() }}!
 
 Hello **{{ $user->first_name }} {{ $user->last_name }}**,
 
 Your system account has been successfully created by the administrator. Welcome to the team!
-Below are your secure auto-generated credentials to access the Mister Takoyaki Management System.
+Below are your secure auto-generated credentials to access the {{ \App\Services\ConfigurationService::getBusinessName() }} Management System.
 
 <x-mail::panel>
 **Employee ID:** `{{ $user->employee_id }}`<br>
@@ -20,3 +20,4 @@ Login to System
 Thanks,<br>
 {{ config('app.name') }} Management
 </x-mail::message>
+

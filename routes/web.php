@@ -18,59 +18,61 @@ Route::get('/', function () {
     return redirect()->route('login');
 });
 
-Route::get('/review/{branch?}', \App\Http\Livewire\CustomerReviewForm::class)->name('customer.review');
+Route::get('/review/{branch?}', \App\Livewire\CustomerReviewForm::class)->name('customer.review');
 
 Route::middleware('auth')->group(function () {
     // Basic account access
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::get('/profile', \App\Livewire\ProfileSettings::class)->name('profile.edit');
 
     // System access for Super Admin, Admin, and Cashier only
     Route::middleware('role:super_admin|admin|cashier')->group(function () {
-        Route::get('/dashboard', \App\Http\Livewire\DashboardOverview::class)->name('dashboard');
+        Route::get('/dashboard', \App\Livewire\DashboardOverview::class)->name('dashboard');
 
         // Stock Ordering
-        Route::get('/stock/orders', \App\Http\Livewire\BranchStockOrdering::class)->name('stock.orders');
-        Route::get('/stock/orders/admin', \App\Http\Livewire\BranchStockOrderAdmin::class)->name('stock.orders.admin');
+        Route::get('/stock/orders', \App\Livewire\BranchStockOrdering::class)->name('stock.orders');
+        Route::get('/stock/orders/admin', \App\Livewire\BranchStockOrderAdmin::class)->name('stock.orders.admin');
 
         // User management
-        Route::get('/users', \App\Http\Livewire\UserManagement::class)->name('users.index');
-        Route::get('/users/create', \App\Http\Livewire\UserManagement::class)->name('users.create');
+        Route::get('/users', \App\Livewire\UserManagement::class)->name('users.index');
+        Route::get('/users/create', \App\Livewire\UserManagement::class)->name('users.create');
 
         // POS Terminal
-        Route::get('/pos', \App\Http\Livewire\PosTerminal::class)->name('pos.index');
+        Route::get('/pos', \App\Livewire\PosTerminal::class)->name('pos.index');
+        // GCash return URL — where GCash redirects the user after payment
+        Route::get('/paymongo/return', [\App\Http\Controllers\PayMongoWebhookController::class, 'returnCallback'])->name('paymongo.return');
         
         // Receipt Printing
         Route::get('/receipts/{order}/thermal', [\App\Http\Controllers\ReceiptController::class, 'thermal'])->name('receipts.thermal');
         
         // Order Management
-        Route::get('/orders', \App\Http\Livewire\OrderManagement::class)->name('orders.index');
+        Route::get('/orders', \App\Livewire\OrderManagement::class)->name('orders.index');
+        
+        // Notifications
+        Route::get('/notifications', \App\Livewire\NotificationHistory::class)->name('notifications.index');
         
         // Sidebar Placeholder Routes
-        Route::get('/kds', \App\Http\Livewire\KitchenDisplay::class)->name('kds.index');
-        Route::get('/menu', \App\Http\Livewire\MenuManagement::class)->name('menu.index');
+        Route::get('/kds', \App\Livewire\KitchenDisplay::class)->name('kds.index');
+        Route::get('/menu', \App\Livewire\MenuManagement::class)->name('menu.index');
         
         // Stock Management (Modular)
-        Route::get('/stock', \App\Http\Livewire\StockManagement::class)->name('stock.index');
-        Route::get('/stock/adjustment', \App\Http\Livewire\StockAdjustment::class)->name('stock.adjustment');
-        Route::get('/stock/expiry', \App\Http\Livewire\StockExpiry::class)->name('stock.expiry');
+        Route::get('/stock', \App\Livewire\StockManagement::class)->name('stock.index');
+        Route::get('/stock/adjustment/{id?}', \App\Livewire\StockAdjustment::class)->name('stock.adjustment');
         
-        Route::get('/branches', \App\Http\Livewire\BranchManagement::class)->name('branches.index');
+        Route::get('/branches', \App\Livewire\BranchManagement::class)->name('branches.index');
         
-        Route::get('/reviews', \App\Http\Livewire\CustomerReviewManagement::class)
+        Route::get('/reviews', \App\Livewire\CustomerReviewManagement::class)
             ->middleware('role:super_admin|admin')
             ->name('customers.index');
         
-        Route::get('/reports', \App\Http\Livewire\BusinessIntelligence::class)->name('reports.index');
-        Route::get('/reports/bi', \App\Http\Livewire\BusinessIntelligence::class)->name('intelligence.index');
+        Route::get('/reports', \App\Livewire\BusinessIntelligence::class)->name('reports.index');
+        Route::get('/reports/bi', \App\Livewire\BusinessIntelligence::class)->name('intelligence.index');
         Route::get('/reports/sales', fn() => redirect()->route('reports.index', ['tab' => 'sales']))->name('reports.sales');
     });
 
     // Specific Restricted Routes
-    Route::get('/management/categories', \App\Http\Livewire\CategoryManagement::class)->name('categories.index')->middleware('role:super_admin');
-    Route::get('/management/library', \App\Http\Livewire\OptionLibraryManagement::class)->name('library.index')->middleware('role:super_admin|admin');
-    Route::get('/settings', \App\Http\Livewire\SystemSettings::class)->name('settings.index')->middleware('role:super_admin');
+    Route::get('/management/categories', \App\Livewire\CategoryManagement::class)->name('categories.index')->middleware('role:super_admin');
+    Route::get('/management/library', \App\Livewire\OptionLibraryManagement::class)->name('library.index')->middleware('role:super_admin|admin');
+    Route::get('/settings', \App\Livewire\SystemSettings::class)->name('settings.index')->middleware('role:super_admin');
 });
 
 require __DIR__ . '/auth.php';

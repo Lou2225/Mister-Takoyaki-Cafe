@@ -41,7 +41,7 @@ class StockManagementTest extends TestCase
     {
         // 10kg should be converted to 10,000g in database
         Livewire::actingAs($this->user)
-            ->test(\App\Http\Livewire\StockManagement::class)
+            ->test(\App\Livewire\StockManagement::class)
             ->set('adjustBranchId', $this->branch->id)
             ->set('adjustIngredientId', $this->ingredient->id)
             ->set('movementType', 'in')
@@ -74,7 +74,7 @@ class StockManagementTest extends TestCase
 
         // Subtract 2kg (2,000g)
         Livewire::actingAs($this->user)
-            ->test(\App\Http\Livewire\StockManagement::class)
+            ->test(\App\Livewire\StockManagement::class)
             ->set('adjustBranchId', $this->branch->id)
             ->set('adjustIngredientId', $this->ingredient->id)
             ->set('movementType', 'waste')

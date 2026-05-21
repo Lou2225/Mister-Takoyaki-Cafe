@@ -35,7 +35,7 @@ trait HandlesExports
     protected function generateCsvReport(string $filename, array $data)
     {
         if (empty($data)) {
-            $this->dispatchBrowserEvent('notify', ['type' => 'error', 'message' => 'No data available for export.']);
+            $this->dispatch('notify', ['type' => 'error', 'message' => 'No data available for export.']);
             return;
         }
 

@@ -1,7 +1,6 @@
 <div
     x-data="{ 
-        panel: $wire.entangle('panel'),
-        search: $wire.entangle('search')
+        panel: $wire.$entangle('panel', true)
     }"
     class="relative overflow-hidden">
 
@@ -39,49 +38,53 @@
             </div>
 
             {{-- ── Adjustment Stats Overview (Matching Menu Items) ── --}}
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
                 {{-- Today's Logs --}}
-                <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200 rounded-2xl p-4 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                <div class="p-3 sm:p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-1 sm:mb-2">
+                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">{{ $startDate ? 'Period Logs' : "Today's Logs" }}</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-indigo-700/60 uppercase tracking-widest leading-none mb-1">Today's Logs</span>
-                        <span class="block text-[20px] font-black text-gray-900 leading-none">{{ number_format($stats['today_count']) }}</span>
-                    </div>
+                    <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($stats['today_count']) }}</h3>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Total changes logged</p>
                 </div>
                 
                 {{-- Waste Count --}}
-                <div class="bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200 rounded-2xl p-4 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                <div class="p-3 sm:p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-1 sm:mb-2">
+                        <span class="text-[10px] sm:text-[11px] font-bold text-rose-600/90 uppercase tracking-wider">{{ $startDate ? 'Waste (Period)' : 'Waste (Today)' }}</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-rose-700/60 uppercase tracking-widest leading-none mb-1">Waste (Today)</span>
-                        <span class="block text-[20px] font-black text-rose-600 leading-none">{{ number_format($stats['waste_count']) }}</span>
-                    </div>
+                    <h3 class="text-xl sm:text-2xl font-black text-rose-600 tracking-tight leading-none">{{ number_format($stats['waste_count']) }}</h3>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Spoiled / discarded stock</p>
                 </div>
 
                 {{-- Restock Value --}}
-                <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-2xl p-4 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <div class="p-3 sm:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-1 sm:mb-2">
+                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">{{ $startDate ? 'Restock (Period)' : 'Restock Value' }}</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-emerald-700/60 uppercase tracking-widest leading-none mb-1">Restock Value</span>
-                        <span class="block text-[20px] font-black text-emerald-600 leading-none">₱{{ number_format($stats['in_value'], 0) }}</span>
-                    </div>
+                    <h3 class="text-xl sm:text-2xl font-black text-emerald-600 tracking-tight leading-none">₱{{ number_format($stats['in_value'], 0) }}</h3>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Cost value of items received</p>
                 </div>
 
                 {{-- Out Count --}}
-                <div class="bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 rounded-2xl p-4 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] flex items-center gap-4 group hover:shadow-md transition-all">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                <div class="p-3 sm:p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-1 sm:mb-2">
+                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">{{ $startDate ? 'Out (Period)' : 'Out (Today)' }}</span>
+                        <div class="w-7 h-7 rounded-lg bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                        </div>
                     </div>
-                    <div>
-                        <span class="block text-[10px] font-black text-amber-700/60 uppercase tracking-widest leading-none mb-1">Out (Today)</span>
-                        <span class="block text-[20px] font-black text-gray-900 leading-none">{{ number_format($stats['out_count']) }}</span>
-                    </div>
+                    <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($stats['out_count']) }}</h3>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Items checked out/reduced</p>
                 </div>
             </div>
 
@@ -95,6 +98,9 @@
 
                 {{-- Right: Filters --}}
                 <div class="flex flex-wrap items-center lg:justify-end gap-2">
+                    {{-- 3-in-1 Date Filter Component --}}
+                    <x-date-filter startModel="startDate" endModel="endDate" activeModel="activeFilter" />
+
                     {{-- Branch Scope Filter (Super Admin only) --}}
                     @if($this->isSuperAdmin())
                         <x-dropdown align="right" width="48" wire:key="filter-branch">
@@ -142,29 +148,29 @@
 
                     @forelse($movements as $mov)
                         @php
-                            $typeColors = [
-                                'in' => 'bg-emerald-50 text-emerald-700 border-emerald-100',
-                                'customer_return' => 'bg-emerald-50 text-emerald-700 border-emerald-100',
-                                'out' => 'bg-slate-50 text-slate-600 border-slate-100',
-                                'waste' => 'bg-rose-50 text-rose-700 border-rose-100',
-                                'waste_expired' => 'bg-rose-50 text-rose-700 border-rose-100',
-                                'adjust' => 'bg-indigo-50 text-indigo-700 border-indigo-100',
-                                'transfer_in' => 'bg-indigo-50 text-indigo-700 border-indigo-100',
-                                'transfer_out' => 'bg-amber-50 text-amber-700 border-amber-100',
-                            ];
-                            $colorClass = $typeColors[$mov->type] ?? 'bg-gray-50 text-gray-600 border-gray-100';
+                            $s = match($mov->type) {
+                                'in', 'customer_return' => ['dot' => 'bg-emerald-500', 'color' => 'emerald', 'label' => str_replace('_', ' ', $mov->type)],
+                                'out' => ['dot' => 'bg-slate-400', 'color' => 'slate', 'label' => str_replace('_', ' ', $mov->type)],
+                                'waste', 'waste_expired' => ['dot' => 'bg-rose-500', 'color' => 'rose', 'label' => str_replace('_', ' ', $mov->type)],
+                                'adjust', 'transfer_in' => ['dot' => 'bg-indigo-500', 'color' => 'indigo', 'label' => str_replace('_', ' ', $mov->type)],
+                                'transfer_out' => ['dot' => 'bg-amber-500', 'color' => 'amber', 'label' => str_replace('_', ' ', $mov->type)],
+                                default => ['dot' => 'bg-slate-400', 'color' => 'slate', 'label' => str_replace('_', ' ', $mov->type)]
+                            };
                         @endphp
-                        <tr wire:key="adj-{{ $mov->reference_id }}-{{ $movements->currentPage() }}" class="hover:bg-slate-50/50 transition-colors border-b border-slate-50 group">
+                        <tr wire:key="adj-{{ $mov->date }}-{{ $mov->type }}-{{ $movements->currentPage() }}" class="hover:bg-slate-50/50 transition-colors border-b border-slate-50 group">
                             <td class="py-3 px-4 whitespace-nowrap">
                                 <div class="flex flex-col">
-                                    <span class="text-[13px] font-bold text-slate-900">{{ $mov->created_at->format('M d, Y') }}</span>
-                                    <span class="text-[11px] text-indigo-500 font-black tracking-tighter uppercase">{{ $mov->reference_id ?: 'NO REF' }}</span>
+                                    <span class="text-[13px] font-bold text-slate-900">{{ \Carbon\Carbon::parse($mov->date)->format('M d, Y') }}</span>
+                                    <span class="text-[11px] text-indigo-500 font-black tracking-tighter uppercase">
+                                        {{ in_array($mov->type, ['order', 'waste', 'out', 'adjust']) ? strtoupper(str_replace('_', ' ', $mov->type)) . ' SUMMARY' : ($mov->reference_id ?: 'BATCH LOG') }}
+                                    </span>
                                 </div>
                             </td>
-                            <td class="py-3 px-4 text-center">
-                                <span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border {{ $colorClass }}">
-                                    {{ str_replace('_', ' ', $mov->type) }}
-                                </span>
+                            <td class="py-3 px-4 text-center whitespace-nowrap">
+                                <div class="flex items-center justify-center gap-2">
+                                    <span class="h-1.5 w-1.5 rounded-full {{ $s['dot'] }}"></span>
+                                    <span class="text-[11px] font-bold text-{{ $s['color'] }}-600 uppercase">{{ $s['label'] }}</span>
+                                </div>
                             </td>
                             <td class="py-3 px-4 text-center">
                                 <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-50 border border-slate-100 text-[11px] font-bold text-slate-600">
@@ -178,16 +184,22 @@
                             <td class="py-3 px-4 text-right">
                                 <div class="flex items-center justify-end gap-2">
                                     <div class="text-right">
-                                        <p class="text-[12px] font-bold text-slate-900 leading-none">{{ $mov->user->first_name }} {{ $mov->user->last_name }}</p>
-                                        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">ID #{{ $mov->user->employee_id ?: $mov->user_id }}</p>
+                                        <p class="text-[12px] font-bold text-slate-900 leading-none">{{ $mov->user?->first_name ?? 'System' }} {{ $mov->user?->last_name ?? 'Attendant' }}</p>
+                                        <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                                            @if($mov->user)
+                                                ID #{{ $mov->user->employee_id ?: $mov->user_id }}
+                                            @else
+                                                AUTO PROCESS
+                                            @endif
+                                        </p>
                                     </div>
                                     <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400 border border-slate-200">
-                                        {{ strtoupper(substr($mov->user->first_name, 0, 1) . substr($mov->user->last_name, 0, 1)) }}
+                                        {{ $mov->user ? strtoupper(substr($mov->user->first_name, 0, 1) . substr($mov->user->last_name, 0, 1)) : 'SYS' }}
                                     </div>
                                 </div>
                             </td>
                             <td class="py-3 px-4 text-right">
-                                <button wire:click="viewAdjustment('{{ $mov->reference_id }}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-[11px] font-bold hover:bg-slate-50 transition-all shadow-sm group-hover:border-indigo-200 group-hover:text-indigo-600">
+                                <button wire:click="viewAdjustment('{{ $mov->date }}', '{{ $mov->type }}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg text-[11px] font-bold hover:bg-slate-50 transition-all shadow-sm group-hover:border-indigo-200 group-hover:text-indigo-600">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                                     View Details
                                 </button>
@@ -249,12 +261,12 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <x-input-label value="Reference *" />
-                                <x-text-input wire:model.debounce.400ms="globalReference" placeholder="e.g. ADJ-{{ now()->format('Ymd') }}-01" class="mt-1.5 h-11 w-full font-medium" :hasError="$errors->has('globalReference')" />
+                                <x-text-input wire:model.live.debounce.400ms="globalReference" placeholder="e.g. ADJ-{{ now()->format('Ymd') }}-01" class="mt-1.5 h-11 w-full font-medium" :hasError="$errors->has('globalReference')" />
                                 <x-input-error :messages="$errors->get('globalReference')" class="mt-1" />
                             </div>
                             <div>
                                 <x-input-label value="Notes" />
-                                <x-text-input wire:model="globalRemarks" placeholder="e.g. Correction for monthly audit..." class="mt-1.5 h-11 w-full font-medium" />
+                                <x-text-input wire:model.live="globalRemarks" placeholder="e.g. Correction for monthly audit..." class="mt-1.5 h-11 w-full font-medium" />
                             </div>
                         </div>
                     </div>
@@ -278,14 +290,18 @@
                                             <div>
                                                 <div class="flex items-center gap-2">
                                                     <span class="text-[14px] font-bold text-slate-900 leading-none">{{ $row['ingredient_name'] }}</span>
-                                                    <span @class([
-                                                        'text-[9px] px-2 py-0.5 rounded-full uppercase tracking-widest font-black',
-                                                        'bg-emerald-50 text-emerald-600 border border-emerald-100' => $row['type'] === 'in',
-                                                        'bg-rose-50 text-rose-600 border border-rose-100' => in_array($row['type'], ['waste', 'out']),
-                                                        'bg-indigo-50 text-indigo-600 border border-indigo-100' => $row['type'] === 'adjust',
-                                                    ])>
-                                                        {{ str_replace('_', ' ', $row['type']) }}
-                                                    </span>
+                                                    @php
+                                                        $rowS = match($row['type']) {
+                                                            'in' => ['dot' => 'bg-emerald-500', 'color' => 'emerald'],
+                                                            'waste', 'out' => ['dot' => 'bg-rose-500', 'color' => 'rose'],
+                                                            'adjust' => ['dot' => 'bg-indigo-500', 'color' => 'indigo'],
+                                                            default => ['dot' => 'bg-slate-400', 'color' => 'slate']
+                                                        };
+                                                    @endphp
+                                                    <div class="flex items-center gap-2">
+                                                        <span class="h-1.5 w-1.5 rounded-full {{ $rowS['dot'] }}"></span>
+                                                        <span class="text-[11px] font-bold text-{{ $rowS['color'] }}-600 uppercase">{{ str_replace('_', ' ', $row['type']) }}</span>
+                                                    </div>
                                                 </div>
                                                 <div class="flex items-center gap-3 mt-1.5">
                                                     <span class="text-[11px] font-black text-slate-900">
@@ -369,7 +385,7 @@
                             <div>
                                 <x-input-label value="Quantity" />
                                 <div class="relative mt-1.5">
-                                    <x-text-input wire:model="newItemQty" class="w-full h-11 pr-14 text-[13px] font-black" placeholder="0.00" x-on:input="restrictInput($event, 'price')" />
+                                    <x-text-input wire:model.live="newItemQty" class="w-full h-11 pr-14 text-[13px] font-black" placeholder="0.00" x-on:input="restrictInput($event, 'price')" />
                                     <span class="absolute inset-y-0 right-4 flex items-center text-[10px] font-black text-slate-400 uppercase pointer-events-none">{{ $newItemSelectedUnit ?: $newItemUnit ?: '—' }}</span>
                                 </div>
                                 <x-input-error :messages="$errors->get('newItemQty')" class="mt-1" />
@@ -443,7 +459,7 @@
                             <div class="animate-fadeIn">
                                 <x-input-label value="Procurement Cost" />
                                 <div class="mt-1.5">
-                                    <x-text-input wire:model="newItemCost" class="h-11 text-[13px] font-bold w-full" placeholder="Cost (₱)" x-on:input="restrictInput($event, 'price')" />
+                                    <x-text-input wire:model.live="newItemCost" class="h-11 text-[13px] font-bold w-full" placeholder="Cost (₱)" x-on:input="restrictInput($event, 'price')" />
                                 </div>
                                 @if($newItemQty > 0 && $newItemCost > 0)
                                     <div class="mt-2 p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between">
@@ -453,7 +469,7 @@
                                 @endif
                                 <div class="mt-3">
                                     <x-input-label value="Expiry Date" />
-                                    <x-text-input type="date" wire:model="newItemExpiry" min="{{ now()->format('Y-m-d') }}" class="mt-1.5 h-11 text-[13px] font-medium w-full" />
+                                    <x-text-input type="date" wire:model.live="newItemExpiry" min="{{ now()->format('Y-m-d') }}" class="mt-1.5 h-11 text-[13px] font-medium w-full" />
                                 </div>
                             </div>
                         @endif
@@ -703,10 +719,44 @@
 
     {{-- ── Adjustment Details Side Panel ── --}}
     <x-side-panel name="view-adjustment-details" width="max-w-md">
-        @if($viewingReferenceId)
+          @if($viewingReferenceId)
             @php
-                $totalValue = $viewingMovements->sum(fn($m) => $m->quantity * $m->unit_cost);
+                // Group viewing movements by ingredient_id to combine identical items
+                $combinedMovements = $viewingMovements->groupBy('ingredient_id')->map(function($movs) {
+                    $first = $movs->first();
+                    $totalQty = $movs->sum('quantity');
+                    $unitCost = $movs->max('unit_cost') ?: ($first->ingredient->cost ?? 0);
+                    
+                    // Clone first movement and set calculated total quantity and unit cost
+                    $combined = clone $first;
+                    $combined->quantity = $totalQty;
+                    $combined->unit_cost = $unitCost;
+                    return $combined;
+                })->values();
+
+                $totalValue = $combinedMovements->sum(fn($m) => $m->quantity * $m->unit_cost);
                 $firstMov = $viewingMovements->first();
+                $type = $firstMov?->type ?? 'adjust';
+                
+                if (in_array($type, ['in', 'customer_return'])) {
+                    $themeBg = 'bg-emerald-600';
+                    $themeShadow = 'shadow-emerald-100';
+                    $themeText = 'text-emerald-600';
+                    $themeBadge = 'bg-emerald-100 text-emerald-700';
+                    $themeTextSec = 'text-emerald-200';
+                } elseif (in_array($type, ['out', 'waste', 'waste_expired', 'return_to_supplier'])) {
+                    $themeBg = 'bg-rose-600';
+                    $themeShadow = 'shadow-rose-100';
+                    $themeText = 'text-rose-600';
+                    $themeBadge = 'bg-rose-100 text-rose-700';
+                    $themeTextSec = 'text-rose-200';
+                } else {
+                    $themeBg = 'bg-indigo-600';
+                    $themeShadow = 'shadow-indigo-100';
+                    $themeText = 'text-indigo-600';
+                    $themeBadge = 'bg-indigo-100 text-indigo-700';
+                    $themeTextSec = 'text-indigo-200';
+                }
             @endphp
             <div class="flex flex-col h-full bg-white max-h-screen overflow-hidden">
                 {{-- Fixed Header --}}
@@ -718,7 +768,7 @@
                         </button>
                     </div>
                     <div class="flex items-center gap-2">
-                        <span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 text-[10px] font-black uppercase tracking-widest">{{ $viewingReferenceId }}</span>
+                        <span class="px-2 py-0.5 rounded {{ $themeBadge }} text-[10px] font-black uppercase tracking-widest">{{ $viewingReferenceId }}</span>
                         <span class="text-[11px] text-slate-400 font-bold">•</span>
                         <span class="text-[11px] text-slate-400 font-bold uppercase tracking-tight">{{ $firstMov?->created_at->format('M d, Y h:i A') }}</span>
                     </div>
@@ -729,22 +779,22 @@
                     <div class="grid grid-cols-2 gap-4">
                         <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
                             <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Items</p>
-                            <p class="text-[20px] font-black text-slate-900">{{ count($viewingMovements) }}</p>
+                            <p class="text-[20px] font-black text-slate-900">{{ count($combinedMovements) }}</p>
                         </div>
                         <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
                             <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Transaction Value</p>
-                            <p class="text-[20px] font-black text-indigo-600">₱{{ number_format($totalValue, 2) }}</p>
+                            <p class="text-[20px] font-black {{ $themeText }}">₱{{ number_format($totalValue, 2) }}</p>
                         </div>
                     </div>
 
-                    <div class="p-4 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-100">
-                        <p class="text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1">Adjustment Logic</p>
+                    <div class="p-4 {{ $themeBg }} rounded-2xl shadow-lg {{ $themeShadow }}">
+                        <p class="text-[10px] font-black {{ $themeTextSec }} uppercase tracking-widest mb-1">Adjustment Logic</p>
                         <p class="text-[15px] font-bold text-white uppercase tracking-tight">{{ str_replace('_', ' ', $firstMov?->type) }}</p>
-                        <p class="text-[11px] text-indigo-100/80 mt-1 font-medium italic">Recorded by {{ $firstMov?->user->first_name }} {{ $firstMov?->user->last_name }}</p>
+                        <p class="text-[11px] {{ $themeTextSec }}/80 mt-1 font-medium italic">Recorded by {{ $firstMov?->user?->first_name ?? 'System' }} {{ $firstMov?->user?->last_name ?? 'Attendant' }}</p>
                     </div>
 
                     <h4 class="text-[11px] font-black text-slate-900 uppercase tracking-widest mt-6 mb-2 flex items-center gap-2">
-                        <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                        <svg class="w-4 h-4 {{ $themeText }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
                         Detailed Breakdown
                     </h4>
                 </div>
@@ -752,11 +802,15 @@
                 {{-- Scrollable Item List --}}
                 <div class="flex-1 overflow-y-auto px-6 py-2">
                     <div class="space-y-4">
-                        @foreach($viewingMovements as $vm)
-                            <div class="p-4 bg-white border border-slate-100 rounded-2xl hover:border-indigo-100 transition-all shadow-sm group">
+                        @foreach($combinedMovements as $vm)
+                            @php
+                                $hoverBorder = in_array($vm->type, ['in', 'customer_return']) ? 'hover:border-emerald-200' : (in_array($vm->type, ['out', 'waste', 'waste_expired', 'return_to_supplier']) ? 'hover:border-rose-200' : 'hover:border-indigo-200');
+                                $hoverText = in_array($vm->type, ['in', 'customer_return']) ? 'group-hover:text-emerald-600' : (in_array($vm->type, ['out', 'waste', 'waste_expired', 'return_to_supplier']) ? 'group-hover:text-rose-600' : 'group-hover:text-indigo-600');
+                            @endphp
+                            <div class="p-4 bg-white border border-slate-100 rounded-2xl {{ $hoverBorder }} transition-all shadow-sm group">
                                 <div class="flex justify-between items-start mb-3">
                                     <div class="flex flex-col">
-                                        <span class="text-[14px] font-black text-slate-900 group-hover:text-indigo-600 transition-colors">{{ $vm->ingredient->name ?? 'Deleted' }}</span>
+                                        <span class="text-[14px] font-black text-slate-900 {{ $hoverText }} transition-colors">{{ $vm->ingredient->name ?? 'Deleted' }}</span>
                                         <span class="text-[11px] text-slate-400 font-bold uppercase tracking-tight">{{ $vm->ingredient->sku ?? 'NO-SKU' }}</span>
                                     </div>
                                     <div @class([
@@ -780,7 +834,7 @@
                                         <p class="text-[12px] font-black text-slate-900">₱{{ number_format($vm->quantity * $vm->unit_cost, 2) }}</p>
                                     </div>
                                 </div>
-
+ 
                                 @if($vm->expiry_date)
                                     <div class="mt-3 flex items-center gap-2 px-3 py-2 bg-amber-50 rounded-xl border border-amber-100">
                                         <svg class="w-3.5 h-3.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -791,19 +845,25 @@
                         @endforeach
                     </div>
                 </div>
-
+ 
                 {{-- Fixed Footer & Remarks --}}
                 <div class="shrink-0 p-6 border-t border-slate-100 bg-white">
                     @if($firstMov?->remarks)
-                        <div class="mb-4 p-4 bg-indigo-50/50 border border-indigo-100 rounded-2xl relative overflow-hidden">
-                            <h4 class="text-[10px] font-black text-indigo-900 uppercase tracking-widest mb-1 flex items-center gap-2">
+                        @php
+                            $remarksBg = in_array($type, ['in', 'customer_return']) ? 'bg-emerald-50/50' : (in_array($type, ['out', 'waste', 'waste_expired', 'return_to_supplier']) ? 'bg-rose-50/50' : 'bg-indigo-50/50');
+                            $remarksBorder = in_array($type, ['in', 'customer_return']) ? 'border-emerald-100' : (in_array($type, ['out', 'waste', 'waste_expired', 'return_to_supplier']) ? 'border-rose-100' : 'border-indigo-100');
+                            $remarksText = in_array($type, ['in', 'customer_return']) ? 'text-emerald-900' : (in_array($type, ['out', 'waste', 'waste_expired', 'return_to_supplier']) ? 'text-rose-900' : 'text-indigo-900');
+                            $remarksSubtext = in_array($type, ['in', 'customer_return']) ? 'text-emerald-700' : (in_array($type, ['out', 'waste', 'waste_expired', 'return_to_supplier']) ? 'text-rose-700' : 'text-indigo-700');
+                        @endphp
+                        <div class="mb-4 p-4 {{ $remarksBg }} border {{ $remarksBorder }} rounded-2xl relative overflow-hidden">
+                            <h4 class="text-[10px] font-black {{ $remarksText }} uppercase tracking-widest mb-1 flex items-center gap-2">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>
                                 Remarks
                             </h4>
-                            <p class="text-[12px] text-indigo-700 font-medium italic">"{{ $firstMov->remarks }}"</p>
+                            <p class="text-[12px] {{ $remarksSubtext }} font-medium italic">"{{ $firstMov->remarks }}"</p>
                         </div>
                     @endif
-
+ 
                     <button @click="$dispatch('close-modal', 'view-adjustment-details')" class="w-full h-12 flex items-center justify-center gap-2 bg-slate-900 text-white text-[13px] font-black rounded-xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-200">
                         <span>Done Reviewing</span>
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>

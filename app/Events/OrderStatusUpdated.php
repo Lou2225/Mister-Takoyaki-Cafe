@@ -26,7 +26,7 @@ class OrderStatusUpdated implements ShouldBroadcast
      */
     public function __construct(Order $order, string $message = null)
     {
-        $this->order = $order->load(['items.product', 'items.options.productOption']);
+        $this->order = $order->load(['items.product', 'items.options.option']);
         $this->message = $message ?? "Order #{$order->reference_no} status updated to {$order->status}";
     }
 
