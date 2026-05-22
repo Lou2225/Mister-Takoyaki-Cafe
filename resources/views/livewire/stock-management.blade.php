@@ -544,7 +544,7 @@
                                         <div class="flex flex-col sm:flex-row items-start sm:items-end gap-3 flex-1">
                                             <div class="w-full sm:w-40">
                                                 <x-input-label value="Packaging Type" class="mb-1 text-[10px]" />
-                                                <x-dropdown align="left" width="48" containerClasses="block w-full">
+                                                <x-dropdown align="left" width="48" containerClasses="block w-full" wireKey="packaging-{{ $i }}">
                                                     <x-slot name="trigger">
                                                         <button type="button" class="flex items-center justify-between w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-[12px] text-slate-700 shadow-sm hover:border-slate-300 focus:outline-none transition-all h-9">
                                                             <span class="font-bold text-slate-700 truncate mr-2">
@@ -572,10 +572,13 @@
                                                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                                                         <span class="text-[10px] font-black uppercase tracking-tighter">Cost ₱</span>
                                                     </div>
-                                                    <x-text-input wire:model.live.debounce.500ms="conversionRows.{{ $i }}.price_per_unit" 
-                                                        class="w-full h-9 pl-14 text-[12px] font-black text-right bg-slate-50 text-slate-400 cursor-not-allowed" 
-                                                        placeholder="0.00" 
-                                                        readonly 
+                                                    <x-text-input wire:model.live.debounce.500ms="conversionRows.{{ $i }}.price_per_unit"
+                                                        class="w-full h-9 pl-16 text-[12px] font-black text-right"
+                                                        placeholder="0.00"
+                                                        inputFilter="price"
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
                                                     />
                                                 </div>
                                             </div>
@@ -604,11 +607,13 @@
                                             <div class="w-20 shrink-0 relative group/hint">
                                                 <x-input-label value="Pack Size" class="mb-1 text-[10px]" />
                                                 <x-text-input 
-                                                    wire:model.live.debounce.500ms="conversionRows.{{ $i }}.chain_multiplier" 
+                                                    wire:model.live="conversionRows.{{ $i }}.chain_multiplier" 
+                                                    wire:change="updateConversionMultiplier({{ $i }})"
                                                     class="w-full h-8 text-[12px] font-black text-center border-indigo-100 bg-indigo-50/30" 
                                                     placeholder="Size" 
                                                     type="number"
                                                     min="0"
+                                                    step="0.0001"
                                                     oninput="this.value = !!this.value && Math.abs(this.value) >= 0 ? Math.abs(this.value) : null"
                                                     onkeypress="return (event.charCode >= 48 && event.charCode <= 57) || event.charCode == 46"
                                                 />
@@ -639,7 +644,7 @@
                                                             }
                                                         }
                                                     @endphp
-                                                    <x-dropdown align="left" width="full" containerClasses="block w-full">
+                                                    <x-dropdown align="left" width="full" containerClasses="block w-full" wireKey="linked-to-{{ $i }}">
                                                         <x-slot name="trigger">
                                                             <button type="button" class="flex items-center justify-between w-full px-2.5 py-1 bg-slate-50/50 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-600 shadow-sm hover:border-slate-300 focus:outline-none transition-all h-8">
                                                                 <span class="truncate mr-2">{{ $chainDisplay }}</span>
@@ -649,12 +654,12 @@
                                                         <x-slot name="content">
                                                             <div class="p-1.5">
                                                                 <div class="max-h-60 overflow-y-auto custom-scrollbar">
-                                                                    <x-dropdown-link href="#" wire:click.prevent="$set('conversionRows.{{ $i }}.chain_from_index', 'base')">
+                                                                    <x-dropdown-link href="#" wire:click="setConversionLink({{ $i }}, 'base')">
                                                                         <span class="text-[11px] font-bold text-slate-600">1 {{ strtoupper($ingredientUnit) }}</span>
                                                                     </x-dropdown-link>
                                                                     @foreach($conversionRows as $j => $prevRow)
                                                                         @if($j < $i && ($prevRow['unit_name'] ?? ''))
-                                                                            <x-dropdown-link href="#" wire:click.prevent="$set('conversionRows.{{ $i }}.chain_from_index', '{{ $j }}')">
+                                                                            <x-dropdown-link href="#" wire:click="setConversionLink({{ $i }}, {{ $j }})">
                                                                                 <span class="text-[11px] font-bold text-slate-600">{{ strtoupper($prevRow['unit_name'] ?? '') }} ({{ number_format((float)($prevRow['qty_in_base'] ?? 0), 2) }} {{ strtoupper($ingredientUnit) }})</span>
                                                                             </x-dropdown-link>
                                                                         @endif

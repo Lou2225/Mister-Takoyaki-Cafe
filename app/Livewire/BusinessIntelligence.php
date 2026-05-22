@@ -29,6 +29,7 @@ class BusinessIntelligence extends Component
     public int $perPage = 5;
     public string $seasonalityMode = 'weekly'; // weekly | monthly
     public string $activeFilter = 'All Time';
+    public string $dateError = '';
 
     public bool $showBreakdown = false;
     public string $selectedMetric = 'Gross Revenue';
@@ -44,48 +45,37 @@ class BusinessIntelligence extends Component
     ];
 
     public function mount()
-    {
-        $user = auth()->user();
-        
-        // RBAC: Only Owners (1) and Managers (2) can access BI
-        if ($user->role_id === 3) {
-            abort(403, 'Unauthorized access to Business Intelligence.');
-        }
-
-        // Set active tab if provided via query string (e.g., /reports?tab=sales)
-        $this->activeTab = request()->query('tab', 'performance');
-
-        // Initialize dates if not set via query string
-        if (!$this->startDate) {
-            $this->startDate = Carbon::parse(
-                Order::when($this->selectedBranchId !== 'all', fn($q) => $q->where('branch_id', $this->selectedBranchId))
-                    ->min('created_at')
-                ?? now()
-            )->format('Y-m-d');
-            $this->activeFilter = 'All Time';
-        }
-        if (!$this->endDate) {
-            $this->endDate = Carbon::now()->format('Y-m-d');
-        }
-        
-        // Default all roles to their own branch; Super Admins default to their branch or first branch
-        if ($user->role_id !== 1) {
-            $this->selectedBranchId = (string) $user->branch_id;
-        } else {
-            // Super Admin: default to their own branch if set, otherwise first branch
-            if (!$this->selectedBranchId || $this->selectedBranchId === 'all') {
-                $this->selectedBranchId = $user->branch_id
-                    ? (string) $user->branch_id
-                    : (string) (Branch::orderBy('id')->value('id') ?? 'all');
-            }
-        }
-
-        $this->updateHeader();
+{
+    $user = auth()->user();
+    
+    if ($user->role_id === 3) {
+        abort(403, 'Unauthorized access to Business Intelligence.');
     }
 
+    $this->activeTab = request()->query('tab', 'performance');
+
+    // Default branch logic
+    if ($user->role_id !== 1) {
+        $this->selectedBranchId = (string) $user->branch_id;
+    } else {
+        if (!$this->selectedBranchId || $this->selectedBranchId === 'all') {
+            $this->selectedBranchId = $user->branch_id
+                ? (string) $user->branch_id
+                : (string) (Branch::orderBy('id')->value('id') ?? 'all');
+        }
+    }
+
+    // Initialize dates to All Time on first load
+    $this->startDate = '';
+    $this->endDate = '';
+    $this->activeFilter = 'All Time';
+
+    $this->updateHeader();
+}
     public function applyQuickDateFilter(?string $filter = null)
     {
         if (!$filter) {
+            $this->dateError = '';
             $this->resetPage();
             return;
         }
@@ -107,17 +97,19 @@ class BusinessIntelligence extends Component
                 $this->activeFilter = 'Last 30 Days';
                 break;
             case 'all':
-                $this->startDate = Carbon::parse(
-                    Order::when($this->selectedBranchId !== 'all', fn($q) => $q->where('branch_id', $this->selectedBranchId))
-                        ->min('created_at')
-                    ?? now()
-                )->format('Y-m-d');
-                $this->endDate = Carbon::now()->format('Y-m-d');
+                $this->startDate = '';
+                $this->endDate = '';
                 $this->activeFilter = 'All Time';
                 break;
+            default:
+                // Preserve manually-selected range or custom range.
+                break;
         }
+
+        $this->dateError = '';
         $this->resetPage();
     }
+    
 
     public function redirectToOrdering(int $ingredientId)
     {
@@ -136,7 +128,7 @@ class BusinessIntelligence extends Component
 
     public function updated(string $propertyName)
     {
-        if (in_array($propertyName, ['selectedBranchId', 'search', 'perPage', 'startDate', 'endDate', 'seasonalityMode'])) {
+        if (in_array($propertyName, ['selectedBranchId', 'search', 'perPage'])) {
             $this->resetPage();
             if ($propertyName === 'perPage') {
                 $this->resetPage('branchPage');
@@ -144,19 +136,85 @@ class BusinessIntelligence extends Component
         }
     }
 
+    public function updatedStartDate(): void
+    {
+        $this->validateDateRange();
+        if (!$this->dateError) {
+            $this->resetPage();
+        }
+    }
+
+    public function updatedEndDate(): void
+    {
+        $this->validateDateRange();
+        if (!$this->dateError) {
+            $this->resetPage();
+        }
+    }
+
+    private function validateDateRange(): void
+    {
+        $this->dateError = '';
+
+        if ($this->startDate && !\DateTime::createFromFormat('Y-m-d', $this->startDate)) {
+            $this->dateError = 'Invalid start date format.';
+            return;
+        }
+
+        if ($this->endDate && !\DateTime::createFromFormat('Y-m-d', $this->endDate)) {
+            $this->dateError = 'Invalid end date format.';
+            return;
+        }
+
+        if ($this->startDate && $this->endDate) {
+            $start = new \DateTime($this->startDate);
+            $end = new \DateTime($this->endDate);
+            $today = new \DateTime('today');
+
+            if ($start > $today) {
+                $this->dateError = 'Start date cannot be in the future.';
+                return;
+            }
+
+            if ($end > $today) {
+                $this->dateError = 'End date cannot be in the future.';
+                return;
+            }
+
+            if ($start > $end) {
+                $this->dateError = 'Start date cannot be after end date.';
+                return;
+            }
+        }
+    }
+
+    public function resetDates(): void
+    {
+        $this->applyQuickDateFilter('all');
+    }
+
     public function render()
     {
         $analytics = $this->getAnalytics();
         $isActionable = $this->selectedBranchId !== 'all';
         
-        $trendData = $analytics['sales_trend'] ?? ['categories' => [], 'gross' => [], 'net_sales' => []];
-        
-        // Dispatch browser event after Livewire renders, with chart payload
-        $this->dispatch('refresh-bi-charts', $trendData);
+        // Build performance array from analytics (avoid duplication)
+        $performance = [
+            'gross_sales'     => $analytics['gross_sales'],
+            'net_sales'       => $analytics['net_sales'],
+            'order_count'     => $analytics['order_count'],
+            'avg_order_value' => $analytics['avg_order_value'],
+            'total_discounts' => $analytics['total_discounts'],
+            'delivery_fees'   => $analytics['delivery_fees'],
+            'refunds'         => $analytics['refunds'],
+            'waste_cost'      => $analytics['waste_cost'],
+            'gross_profit'    => $analytics['gross_profit'],
+        ];
         
         return view('livewire.business-intelligence', [
             'branches'       => Branch::all(),
-            'performance'    => $analytics['performance'],
+            'performance'    => $performance,
+            'forecasting'    => $this->getForecastingData(),
             'productInsights'=> $this->getProductInsights($analytics),
             'operations'     => $this->getOperationalData($analytics),
             'recentOrders'   => $this->getRecentOrders(),
@@ -167,13 +225,12 @@ class BusinessIntelligence extends Component
 
     private function getAnalytics(): array
     {
-        $start    = Carbon::parse($this->startDate)->startOfDay();
-        $end      = Carbon::parse($this->endDate)->endOfDay();
         $branchId = $this->selectedBranchId === 'all' ? null : $this->selectedBranchId;
 
         // 1. Single eager-loaded query for all orders in range
         $orders = Order::whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
-            ->whereBetween('created_at', [$start, $end])
+            ->when($this->startDate, fn($q) => $q->where('created_at', '>=', Carbon::parse($this->startDate)->startOfDay()))
+            ->when($this->endDate, fn($q) => $q->where('created_at', '<=', Carbon::parse($this->endDate)->endOfDay()))
             ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->with([
                 'items.product.recipes.ingredient',
@@ -184,6 +241,9 @@ class BusinessIntelligence extends Component
             ->get();
 
         $completedOrders = $orders->where('status', Order::STATUS_COMPLETED);
+
+        $start = $this->startDate ? Carbon::parse($this->startDate)->startOfDay() : ($orders->min('created_at') ? Carbon::parse($orders->min('created_at'))->startOfDay() : Carbon::now()->startOfDay());
+        $end = $this->endDate ? Carbon::parse($this->endDate)->endOfDay() : ($orders->max('created_at') ? Carbon::parse($orders->max('created_at'))->endOfDay() : Carbon::now()->endOfDay());
 
         // 2. Sales Metrics
         $totalCollected = $completedOrders->sum('total_amount');
@@ -200,7 +260,8 @@ class BusinessIntelligence extends Component
         
         // 4. Calculate Waste Cost from stock movements
         $wasteCost = StockMovement::where('type', 'waste')
-            ->whereBetween('created_at', [$start, $end])
+            ->when($this->startDate, fn($q) => $q->where('created_at', '>=', Carbon::parse($this->startDate)->startOfDay()))
+            ->when($this->endDate, fn($q) => $q->where('created_at', '<=', Carbon::parse($this->endDate)->endOfDay()))
             ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->get()
             ->sum(function($movement) {
@@ -208,9 +269,8 @@ class BusinessIntelligence extends Component
             });
 
         $grossProfit = $netSales - $totalCogs - $wasteCost;
-
+        $trendData   = $this->buildTrendData($completedOrders, $start, $end);
         $breakdown   = $this->buildSalesBreakdown($completedOrders);
-        $salesTrend  = $this->buildSalesTrend($completedOrders);
 
         return [
             'gross_sales'     => $grossSales,
@@ -224,21 +284,11 @@ class BusinessIntelligence extends Component
             'total_cogs'      => $totalCogs,
             'waste_cost'      => $wasteCost,
             'gross_profit'    => $grossProfit,
-            'performance' => [
-                'gross_sales'     => $grossSales,
-                'net_sales'       => $netSales,
-                'order_count'     => $orderCount,
-                'avg_order_value' => $avgOrderValue,
-                'total_discounts' => $totalDiscounts,
-                'delivery_fees'   => $deliveryFees,
-                'refunds'         => $refunds,
-                'waste_cost'      => $wasteCost,
-                'gross_profit'    => $grossProfit,
-            ],
-            'payment_methods'  => $breakdown['payment_methods'],
-            'order_sources'    => $breakdown['order_sources'],
-            'top_items'        => $breakdown['top_items'],
-            'sales_trend'      => $salesTrend,
+            'trend'           => $trendData,
+            'sales_trend'     => $trendData,
+            'payment_methods' => $breakdown['payment_methods'],
+            'order_sources'   => $breakdown['order_sources'],
+            'top_items'       => $breakdown['top_items'],
             'orders'           => $orders,
             'completed_orders' => $completedOrders,
         ];
@@ -301,6 +351,36 @@ class BusinessIntelligence extends Component
     }
 
     /**
+     * Build a day-by-day trend array for the given date range, filling gaps with 0.
+     */
+    private function buildTrendData(Collection $completedOrders, Carbon $start, Carbon $end): array
+    {
+        $daily = $completedOrders
+            ->groupBy(fn($o) => $o->created_at->format('Y-m-d'))
+            ->map(fn($g) => $g->sum('total_amount'));
+
+        $categories = [];
+        $gross = [];
+        $netSales = [];
+
+        $cursor = $start->copy();
+        while ($cursor->lte($end)) {
+            $key = $cursor->format('Y-m-d');
+            $categories[] = $cursor->format('M d');
+            $gross[] = (float)($daily[$key] ?? 0);
+            $netSales[] = (float)($daily[$key] ?? 0);
+            $cursor->addDay();
+        }
+
+        return [
+            'categories' => $categories,
+            'gross' => $gross,
+            'net_sales' => $netSales,
+            'has_data' => count($gross) > 0 && array_sum($gross) > 0,
+        ];
+    }
+
+    /**
      * Build payment method breakdown, order source breakdown, and top-selling items
      * from an already-fetched collection of completed orders.
      */
@@ -339,35 +419,154 @@ class BusinessIntelligence extends Component
 
     }
 
-    private function buildSalesTrend(Collection $completedOrders): array
+
+    private function getForecastingData()
     {
-        $startDate = Carbon::parse($this->startDate)->startOfDay();
-        $endDate = Carbon::parse($this->endDate)->endOfDay();
+        return [
+            'short_term' => $this->calculateRegression('daily', 60, 7),
+            'long_term'  => $this->calculateRegression('monthly', 12, 6),
+            'restock_insights' => $this->getIngredientDemandForecast(),
+        ];
+    }
 
-        $groupedByDate = $completedOrders->groupBy(fn($order) => $order->created_at->format('Y-m-d'));
+    private function calculateRegression(string $type, int $historyCount, int $predictCount)
+    {
+        $query = Order::whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
+            ->when($this->selectedBranchId !== 'all', fn($q) => $q->where('branch_id', $this->selectedBranchId))
+            ->when($this->startDate, fn($q) => $q->where('created_at', '>=', Carbon::parse($this->startDate)->startOfDay()))
+            ->when($this->endDate, fn($q) => $q->where('created_at', '<=', Carbon::parse($this->endDate)->endOfDay()));
 
-        $categories = [];
-        $grossRevenue = [];
-        $netSales = [];
+        if ($type === 'daily') {
+            $data = (clone $query)
+                ->selectRaw('DATE(created_at) as label, SUM(total_amount) as total')
+                ->groupBy('label')
+                ->orderBy('label', 'asc')
+                ->get();
+        } else {
+            $data = (clone $query)
+                ->selectRaw('DATE_FORMAT(created_at, "%Y-%m") as label, SUM(total_amount) as total')
+                ->groupBy('label')
+                ->orderBy('label', 'asc')
+                ->get();
+        }
 
-        $cursor = $startDate->copy();
-        while ($cursor->lte($endDate)) {
-            $key = $cursor->format('Y-m-d');
-            $ordersForDay = $groupedByDate->get($key, collect());
 
-            $grossRevenue[] = (float) $ordersForDay->sum(fn($order) => $order->total_amount + $order->discount_amount);
-            $netSales[]     = (float) $ordersForDay->sum(fn($order) => $order->total_amount - $order->delivery_fee);
-            $categories[]   = $cursor->format('M d');
 
-            $cursor->addDay();
+        $n = $data->count();
+        $sumX = 0; $sumY = 0; $sumXY = 0; $sumX2 = 0;
+        foreach ($data as $index => $row) {
+            $x = $index + 1;
+            $y = (float)$row->total;
+            $sumX += $x; $sumY += $y; $sumXY += ($x * $y); $sumX2 += ($x * $x);
+        }
+
+        $denominator = ($n * $sumX2) - ($sumX * $sumX);
+        if ($denominator == 0) return ['forecast' => [], 'trend' => 'Neutral', 'growth_rate' => 0.0, 'confidence' => 'Low'];
+
+        $slope = (($n * $sumXY) - ($sumX * $sumY)) / $denominator;
+        $intercept = ($sumY - ($slope * $sumX)) / $n;
+
+        // Calculate a 'Baseline' (Average of the last 7 active days)
+        $avgDailySales = $data->take(-7)->avg('total') ?: 0;
+
+        $forecast = [];
+        $startDate = $type === 'daily' ? Carbon::tomorrow() : Carbon::now()->addMonth()->startOfMonth();
+
+        for ($i = 0; $i < $predictCount; $i++) {
+            $predictedDate = $type === 'daily' ? $startDate->copy()->addDays($i) : $startDate->copy()->addMonths($i);
+            $predictedX = $n + $i + 1;
+            
+            // Pure Linear Regression result
+            $predictedY = ($slope * $predictedX) + $intercept;
+
+            $forecast[] = [
+                'date' => $type === 'daily' ? $predictedDate->format('M d') : $predictedDate->format('M Y'),
+                'day'  => strtoupper($predictedDate->format('D')),
+                'predicted' => max(0, $predictedY),
+            ];
         }
 
         return [
-            'categories' => $categories,
-            'gross'      => $grossRevenue,
-            'net_sales'  => $netSales,
-            'has_data'   => $completedOrders->isNotEmpty(),
+            'forecast' => $forecast,
+            'trend' => $slope > ($type === 'daily' ? 50 : 1000) ? 'Upward' : ($slope < ($type === 'daily' ? -50 : -1000) ? 'Downward' : 'Stable'),
+            'growth_rate' => round($slope, 2),
+            'confidence' => ($type === 'daily' ? ($n >= 45 ? 'High' : ($n >= 20 ? 'Medium' : 'Low')) : ($n >= 8 ? 'High' : ($n >= 4 ? 'Medium' : 'Low'))),
+            'baseline_avg' => round($avgDailySales, 2),
+            'peak_day' => collect($forecast)->sortByDesc('predicted')->first()['day'] ?? 'N/A',
         ];
+    }
+
+    private function getIngredientDemandForecast()
+    {
+        $start = $this->startDate ? Carbon::parse($this->startDate)->startOfDay() : null;
+        $end = $this->endDate ? Carbon::parse($this->endDate)->endOfDay() : null;
+
+        if (!$start || !$end) {
+            $rangeQuery = Order::where('status', 'Completed')
+                ->when($this->selectedBranchId !== 'all', fn($q) => $q->where('branch_id', $this->selectedBranchId));
+
+            $start = $start ?: ($rangeQuery->min('created_at') ? Carbon::parse($rangeQuery->min('created_at'))->startOfDay() : Carbon::now()->subDays(30)->startOfDay());
+            $end = $end ?: ($rangeQuery->max('created_at') ? Carbon::parse($rangeQuery->max('created_at'))->endOfDay() : Carbon::now()->endOfDay());
+        }
+
+        $daysInRange = max(1, $start->diffInDays($end) + 1);
+
+        $forecast = $this->calculateRegression('daily', 60, 7);
+        $forecastedTotal = collect($forecast['forecast'])->sum('predicted');
+        $baselineTotal = max(1, ($forecast['baseline_avg'] ?? 0) * 7);
+        $forecastGrowthFactor = min(max($forecastedTotal / $baselineTotal, 0.85), 1.35);
+
+        $topProducts = OrderItem::whereHas('order', function($q) use ($start, $end) {
+                $q->where('status', 'Completed')
+                  ->when($this->selectedBranchId !== 'all', fn($q) => $q->where('branch_id', $this->selectedBranchId))
+                  ->when($start, fn($q) => $q->where('created_at', '>=', $start))
+                  ->when($end, fn($q) => $q->where('created_at', '<=', $end));
+            })
+            ->select('product_id', DB::raw('SUM(quantity) / ' . $daysInRange . ' as daily_avg'))
+            ->groupBy('product_id')
+            ->orderBy('daily_avg', 'desc')
+            ->with('product.recipes.ingredient')
+            ->get();
+
+        $ingredientDemand = [];
+
+        foreach ($topProducts as $tp) {
+            if (!$tp->product || !$tp->product->recipes) continue;
+
+            // Simple 14-day projection: daily_avg * 14 adjusted by the predicted sales trend.
+            // Use a safety buffer for fluctuations.
+            $projectedUnits = $tp->daily_avg * 14 * $forecastGrowthFactor * 1.15;
+
+            foreach ($tp->product->recipes as $recipe) {
+                if (!$recipe->ingredient) continue;
+                
+                $id = $recipe->ingredient_id;
+                if (!isset($ingredientDemand[$id])) {
+                    $ingredientDemand[$id] = [
+                        'id' => $id,
+                        'name' => $recipe->ingredient->name,
+                        'unit' => $recipe->ingredient->unit,
+                        'amount' => 0,
+                        'priority' => 'Medium'
+                    ];
+                }
+                $ingredientDemand[$id]['amount'] += ($recipe->quantity * $projectedUnits);
+            }
+        }
+
+        // Sort by amount descending and take top 15 "Must Stock" ingredients
+        return collect($ingredientDemand)
+            ->sortByDesc('amount')
+            ->take(15)
+            ->map(function($item) {
+                // Round to whole number
+                $item['amount'] = ceil($item['amount']);
+                // Heuristic: If amount is significant, mark as High priority
+                if ($item['amount'] > 25) $item['priority'] = 'High';
+                return $item;
+            })
+            ->values()
+            ->toArray();
     }
 
     private function getProductInsights(array $analytics): array
@@ -412,13 +611,23 @@ class BusinessIntelligence extends Component
 
     private function getProductSeasonalityWeekly()
     {
-        $startDate = Carbon::parse($this->startDate)->startOfDay();
-        $endDate = Carbon::parse($this->endDate)->endOfDay();
+        $startDate = $this->startDate ? Carbon::parse($this->startDate)->startOfDay() : null;
+        $endDate = $this->endDate ? Carbon::parse($this->endDate)->endOfDay() : null;
+
+        $orderRange = Order::where('payment_status', 'Paid')
+            ->when($this->selectedBranchId !== 'all', fn($q) => $q->where('branch_id', $this->selectedBranchId));
+
+        if (!$startDate) {
+            $startDate = $orderRange->min('created_at') ? Carbon::parse($orderRange->min('created_at'))->startOfDay() : Carbon::now()->startOfDay();
+        }
+        if (!$endDate) {
+            $endDate = $orderRange->max('created_at') ? Carbon::parse($orderRange->max('created_at'))->endOfDay() : Carbon::now()->endOfDay();
+        }
 
         $topProductIds = OrderItem::whereHas('order', function($q) use ($startDate, $endDate) {
-                $q->whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
+                $q->where('payment_status', 'Paid')
                   ->when($this->selectedBranchId !== 'all', fn($q) => $q->where('branch_id', $this->selectedBranchId))
-                  ->whereBetween('created_at', [$startDate, $endDate]);
+                  ->when($startDate, fn($q) => $q->whereBetween('created_at', [$startDate, $endDate]));
             })
             ->select('product_id', DB::raw('SUM(quantity) as total_sold'))
             ->groupBy('product_id')
@@ -434,9 +643,10 @@ class BusinessIntelligence extends Component
 
             $dowSales = OrderItem::join('orders', 'order_items.order_id', '=', 'orders.id')
                 ->where('order_items.product_id', $pid)
-                ->whereIn('orders.status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
+                ->where('orders.payment_status', 'Paid')
                 ->when($this->selectedBranchId !== 'all', fn($q) => $q->where('orders.branch_id', $this->selectedBranchId))
-                ->whereBetween('orders.created_at', [$startDate, $endDate])
+                ->when($startDate, fn($q) => $q->where('orders.created_at', '>=', $startDate))
+                ->when($endDate, fn($q) => $q->where('orders.created_at', '<=', $endDate))
                 ->selectRaw('DAYOFWEEK(orders.created_at) as dow, SUM(order_items.quantity) as total')
                 ->groupBy('dow')
                 ->pluck('total', 'dow');
@@ -459,13 +669,23 @@ class BusinessIntelligence extends Component
 
     private function getProductSeasonalityMonthly()
     {
-        $startDate = Carbon::parse($this->startDate)->startOfDay();
-        $endDate   = Carbon::parse($this->endDate)->endOfDay();
+        $startDate = $this->startDate ? Carbon::parse($this->startDate)->startOfDay() : null;
+        $endDate   = $this->endDate ? Carbon::parse($this->endDate)->endOfDay() : null;
+
+        $orderRange = Order::where('payment_status', 'Paid')
+            ->when($this->selectedBranchId !== 'all', fn($q) => $q->where('branch_id', $this->selectedBranchId));
+
+        if (!$startDate) {
+            $startDate = $orderRange->min('created_at') ? Carbon::parse($orderRange->min('created_at'))->startOfDay() : Carbon::now()->startOfDay();
+        }
+        if (!$endDate) {
+            $endDate = $orderRange->max('created_at') ? Carbon::parse($orderRange->max('created_at'))->endOfDay() : Carbon::now()->endOfDay();
+        }
 
         $topProductIds = OrderItem::whereHas('order', function($q) use ($startDate, $endDate) {
-                $q->whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
+                $q->where('payment_status', 'Paid')
                   ->when($this->selectedBranchId !== 'all', fn($q) => $q->where('branch_id', $this->selectedBranchId))
-                  ->whereBetween('created_at', [$startDate, $endDate]);
+                  ->when($startDate, fn($q) => $q->whereBetween('created_at', [$startDate, $endDate]));
             })
             ->select('product_id', DB::raw('SUM(quantity) as total_sold'))
             ->groupBy('product_id')
@@ -492,9 +712,10 @@ class BusinessIntelligence extends Component
 
             $monthlySales = OrderItem::join('orders', 'order_items.order_id', '=', 'orders.id')
                 ->where('order_items.product_id', $pid)
-                ->whereIn('orders.status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
+                ->where('orders.payment_status', 'Paid')
                 ->when($this->selectedBranchId !== 'all', fn($q) => $q->where('orders.branch_id', $this->selectedBranchId))
-                ->whereBetween('orders.created_at', [$startDate, $endDate])
+                ->when($startDate, fn($q) => $q->where('orders.created_at', '>=', $startDate))
+                ->when($endDate, fn($q) => $q->where('orders.created_at', '<=', $endDate))
                 ->selectRaw('MONTH(orders.created_at) as month_num, SUM(order_items.quantity) as total')
                 ->groupBy('month_num')
                 ->pluck('total', 'month_num');
@@ -525,6 +746,22 @@ class BusinessIntelligence extends Component
                 'revenue' => $group->sum('total_amount'),
             ])->values();
 
+        // Build an hours intensity payload (0-23) for charting
+        $hoursMap = collect(range(0,23))->mapWithKeys(fn($h) => [str_pad((string)$h, 2, '0', STR_PAD_LEFT) => 0])->toArray();
+        foreach ($hourlySales as $hs) {
+            $key = str_pad((string)$hs->hour, 2, '0', STR_PAD_LEFT);
+            $hoursMap[$key] = $hs->count;
+        }
+
+        $categories = array_map(fn($h) => $h . ':00', array_keys($hoursMap));
+        $counts = array_values($hoursMap);
+
+        $hoursIntensity = [
+            'categories' => $categories,
+            'counts' => $counts,
+            'has_data' => array_sum($counts) > 0,
+        ];
+
 
         $branchPerformance = [];
         $globalNetworkTotal = 0;
@@ -541,6 +778,7 @@ class BusinessIntelligence extends Component
 
         return [
             'hourly_sales' => $hourlySales,
+            'hours_intensity' => $hoursIntensity,
             'branch_performance' => $branchPerformance,
             'global_network_total' => $globalNetworkTotal ?: 1,
         ];
@@ -551,7 +789,8 @@ class BusinessIntelligence extends Component
     {
         return Order::with(['branch', 'user'])
             ->when($this->selectedBranchId !== 'all', fn($q) => $q->where('branch_id', $this->selectedBranchId))
-            ->whereBetween('created_at', [Carbon::parse($this->startDate)->startOfDay(), Carbon::parse($this->endDate)->endOfDay()])
+            ->when($this->startDate, fn($q) => $q->where('created_at', '>=', Carbon::parse($this->startDate)->startOfDay()))
+            ->when($this->endDate, fn($q) => $q->where('created_at', '<=', Carbon::parse($this->endDate)->endOfDay()))
             ->where('reference_no', 'like', '%' . $this->search . '%')
             ->orderBy('created_at', 'desc')
             ->paginate($this->perPage);

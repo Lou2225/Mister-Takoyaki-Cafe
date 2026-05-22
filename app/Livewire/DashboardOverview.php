@@ -357,8 +357,6 @@ class DashboardOverview extends Component
                 $this->dateError = 'Date range cannot exceed 90 days.';
                 return;
             }
-
-            $this->activeFilter = 'All Time';
         }
     }
 
