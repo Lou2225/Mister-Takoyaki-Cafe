@@ -1,11 +1,19 @@
 {
   "resources/js/app.js": {
+<<<<<<< HEAD
     "file": "assets/app-WRxxGZCO.js",
+=======
+    "file": "assets/app-g36N4jkR.js",
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
     "css": [
+<<<<<<< HEAD
       "assets/app-Bll4SRjx.css"
+=======
+      "assets/app-76EY2P_W.css"
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
     ]
   }
 }

@@ -614,6 +614,7 @@
                                         <div class="flex flex-col sm:flex-row items-start sm:items-end gap-3 flex-1">
                                                                                         <div class="w-full sm:w-40">
                                                 <x-input-label value="Packaging Type" class="mb-1 text-[10px]" />
+<<<<<<< HEAD
                                                 <div class="relative"
                                                     x-data="{
                                                         open: false,
@@ -692,6 +693,19 @@
                                                             x-transition:leave-end="opacity-0"
                                                             :style="`position:absolute; top:${top}px; left:${left}px; width:${panelWidth}px;`"
                                                             class="z-[9999] bg-white rounded-xl shadow-lg ring-1 ring-black ring-opacity-5 p-2">
+=======
+                                                <x-dropdown align="left" width="48" containerClasses="block w-full" wireKey="packaging-{{ $i }}">
+                                                    <x-slot name="trigger">
+                                                        <button type="button" class="flex items-center justify-between w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-[12px] text-slate-700 shadow-sm hover:border-slate-300 focus:outline-none transition-all h-9">
+                                                            <span class="font-bold text-slate-700 truncate mr-2">
+                                                                {{ !empty($row['unit_name']) && isset($availableBulkUnits[$row['unit_name']]) ? $availableBulkUnits[$row['unit_name']] : 'Select Packaging...' }}
+                                                            </span>
+                                                            <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
+                                                        </button>
+                                                    </x-slot>
+                                                    <x-slot name="content">
+                                                        <div class="p-2">
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                                                             <div class="max-h-60 overflow-y-auto custom-scrollbar">
                                                                 <a href="#" wire:click.prevent="$set('conversionRows.{{ $i }}.unit_name', '')" @click="closeDropdown()"
                                                                     class="block px-4 py-2 text-[12px] rounded-lg hover:bg-slate-50 transition-colors text-slate-700">
@@ -715,10 +729,20 @@
                                                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                                                         <span class="text-[10px] font-black uppercase tracking-tighter">Cost ₱</span>
                                                     </div>
+<<<<<<< HEAD
                                                     <x-text-input value="{{ number_format((float)($row['price_per_unit'] ?? 0), 2) }}" 
                                                         class="w-full h-9 pl-14 text-[12px] font-black text-right bg-slate-50 text-slate-400 cursor-not-allowed" 
                                                         placeholder="0.00" 
                                                         readonly 
+=======
+                                                    <x-text-input wire:model.live.debounce.500ms="conversionRows.{{ $i }}.price_per_unit"
+                                                        class="w-full h-9 pl-16 text-[12px] font-black text-right"
+                                                        placeholder="0.00"
+                                                        inputFilter="price"
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                                                     />
                                                 </div>
                                             </div>
@@ -784,6 +808,7 @@
                                                             }
                                                         }
                                                     @endphp
+<<<<<<< HEAD
                                                                                                         <div class="relative"
                                                         x-data="{
                                                             open: false,
@@ -857,12 +882,29 @@
                                                                 <div class="max-h-60 overflow-y-auto custom-scrollbar">
                                                                     <a href="#" wire:click.prevent="setConversionLink({{ $i }}, 'base')" @click="closeDropdown()"
                                                                         class="block px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">
+=======
+                                                    <x-dropdown align="left" width="full" containerClasses="block w-full" wireKey="linked-to-{{ $i }}">
+                                                        <x-slot name="trigger">
+                                                            <button type="button" class="flex items-center justify-between w-full px-2.5 py-1 bg-slate-50/50 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-600 shadow-sm hover:border-slate-300 focus:outline-none transition-all h-8">
+                                                                <span class="truncate mr-2">{{ $chainDisplay }}</span>
+                                                                <svg class="w-3 h-3 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
+                                                            </button>
+                                                        </x-slot>
+                                                        <x-slot name="content">
+                                                            <div class="p-1.5">
+                                                                <div class="max-h-60 overflow-y-auto custom-scrollbar">
+                                                                    <x-dropdown-link href="#" wire:click="setConversionLink({{ $i }}, 'base')">
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                                                                         <span class="text-[11px] font-bold text-slate-600">1 {{ strtoupper($ingredientUnit) }}</span>
                                                                     </a>
                                                                     @foreach($conversionRows as $j => $prevRow)
                                                                         @if($j < $i && ($prevRow['unit_name'] ?? ''))
+<<<<<<< HEAD
                                                                             <a href="#" wire:click.prevent="setConversionLink({{ $i }}, {{ $j }})" @click="closeDropdown()"
                                                                                 class="block px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">
+=======
+                                                                            <x-dropdown-link href="#" wire:click="setConversionLink({{ $i }}, {{ $j }})">
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                                                                                 <span class="text-[11px] font-bold text-slate-600">{{ strtoupper($prevRow['unit_name'] ?? '') }} ({{ number_format((float)($prevRow['qty_in_base'] ?? 0), 2) }} {{ strtoupper($ingredientUnit) }})</span>
                                                                             </a>
                                                                         @endif

@@ -6,7 +6,10 @@
 @endphp
 <div
     x-data="slidingTabs($wire.entangle('activeTab').live, 'activeTab')"
+<<<<<<< HEAD
     wire:ignore.self
+=======
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
     class="relative overflow-hidden">
 
     <div class="px-1">
@@ -14,9 +17,15 @@
         <div class="mb-4 flex items-center justify-between gap-3">
             <div class="min-w-0 shrink">
                 <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Business Reports</h2>
+<<<<<<< HEAD
                 <p class="hidden sm:block text-[12px] text-gray-500 font-medium whitespace-nowrap overflow-hidden text-ellipsis">Consolidated analytics and <span class="{{ $primaryText }} font-bold">forecasting insights</span></p>
             </div>
             <div class="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2 shrink-0">
+=======
+                <p class="text-[12px] text-gray-500 font-medium whitespace-nowrap overflow-hidden text-ellipsis">Consolidated analytics and <span class="{{ $primaryText }} font-bold">forecasting insights</span></p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                 <x-date-filter startModel="startDate" endModel="endDate" activeModel="activeFilter" refreshAction="applyQuickDateFilter" />
                 <x-report-dropdown module="BI Report" />
 
@@ -24,6 +33,7 @@
                 @if(auth()->user()->role_id === 1)
                     <x-dropdown align="right" width="48">
                         <x-slot name="trigger">
+<<<<<<< HEAD
                             <button type="button" class="inline-flex items-center gap-0 sm:gap-1.5 lg:gap-2 px-2.5 sm:px-3 lg:px-4 text-[11px] lg:text-[12px] font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:border-gray-300 focus:outline-none shadow-sm transition-colors h-10 shrink-0">
                                 <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
                                 <span class="hidden sm:inline whitespace-nowrap max-w-[90px] lg:max-w-none truncate">{{ $selectedBranchId === 'all' ? 'All Branches' : ($branches->firstWhere('id', $selectedBranchId)?->branch_name ?? 'Select Branch') }}</span>
@@ -34,6 +44,16 @@
                             <x-dropdown-link href="#" wire:click.prevent="$set('selectedBranchId', 'all')">
                                 All Branches
                             </x-dropdown-link>
+=======
+                            <button type="button" class="inline-flex items-center gap-2 px-4 py-1.5 text-[12px] font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:border-gray-300 focus:outline-none shadow-sm transition-colors h-10">
+                                <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                                <span>{{ $selectedBranchId === 'all' ? 'All Branches' : ($branches->firstWhere('id', $selectedBranchId)?->branch_name ?? 'Select Branch') }}</span>
+                                <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                            </button>
+                        </x-slot>
+                        <x-slot name="content">
+
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                             
                             @foreach($branches as $branch)
                                 <x-dropdown-link href="#" wire:click.prevent="$set('selectedBranchId', {{ $branch->id }})">
@@ -263,6 +283,7 @@
         </div>
     </div>
 
+<<<<<<< HEAD
     <div x-cloak x-show="activeTab === 'forecasting'" class="space-y-6">
 
         {{-- Reference Guide --}}
@@ -351,12 +372,33 @@
                 <div>
                     <p class="text-[10px] font-black uppercase tracking-[0.22em] text-gray-400">Benchmarking</p>
                     <h4 class="mt-1 text-[15px] font-bold text-gray-900 tracking-tight">Forecast accuracy vs. baseline</h4>
+=======
+    <div x-cloak x-show="activeTab === 'forecasting'" class="space-y-6 animate-fadeIn">
+        @php
+            $fc = $forecasting ?? ['short_term' => ['forecast' => []], 'long_term' => ['forecast' => []], 'restock_insights' => []];
+            $restock = $fc['restock_insights'] ?? [];
+        @endphp
+
+        <div class="grid grid-cols-1 xl:grid-cols-[1.75fr_1fr] gap-6">
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+                    <div class="flex-1">
+                        <h4 class="text-[15px] font-bold text-gray-900 tracking-tight">Forecasting Analytics</h4>
+                        <p class="text-[11px] text-gray-400 font-medium">Short-term sales forecast for the selected period and branch.</p>
+                    </div>
+
+                    <div class="hidden sm:flex items-center gap-2">
+                        <button x-on:click.prevent="$dispatch('set-forecast-metric', { metric: 'Volume' })" class="px-3 py-1 rounded-lg text-[11px] font-black uppercase tracking-widest bg-white shadow-sm">Volume</button>
+                        <button x-on:click.prevent="$dispatch('set-forecast-metric', { metric: 'Profit' })" class="px-3 py-1 rounded-lg text-[11px] font-black uppercase tracking-widest bg-white shadow-sm">Profit</button>
+                    </div>
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                 </div>
                 <div class="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700">
                     {{ number_format($accuracy['model_improvement_pct'] ?? 0, 1) }}% better
                 </div>
             </div>
 
+<<<<<<< HEAD
             <div class="grid grid-cols-2 xl:grid-cols-4 gap-3">
                 <div class="rounded-2xl border border-gray-100 bg-indigo-50 p-4">
                     <p class="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-500">MAE</p>
@@ -393,14 +435,75 @@
                     <div class="flex-1">
                         <div class="h-2.5 rounded-full bg-indigo-100 overflow-hidden">
                             <div class="h-full rounded-full bg-indigo-500" style="width: {{ min(100, max(10, (float)($accuracy['mape'] ?? 0) * 3.5)) }}%"></div>
+=======
+                {{-- Forecast summary: trend / confidence / baseline vs predicted --}}
+                @php
+                    $summary = $fc['short_term'] ?? ['trend'=>'N/A','growth_rate'=>0,'confidence'=>'Low','baseline_avg'=>0];
+                    $predicted_sum = collect($fc['short_term']['forecast'] ?? [])->sum('predicted');
+                    $baseline_week = ($summary['baseline_avg'] ?? 0) * 7;
+                @endphp
+                <div class="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="bg-gray-50/50 rounded-xl p-3 flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center border border-gray-100">
+                            <svg class="w-5 h-5 text-{{ $primaryColor }}-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3v18h18"/></svg>
+                        </div>
+                        <div>
+                            <div class="text-[11px] text-gray-500">Trend</div>
+                            <div class="text-[14px] font-black text-gray-900">{{ $summary['trend'] ?? 'N/A' }} <span class="text-[12px] font-bold text-gray-400">({{ $summary['confidence'] ?? 'Low' }})</span></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50/50 rounded-xl p-3 flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center border border-gray-100">
+                            <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v8m4-4H8"/></svg>
+                        </div>
+                        <div>
+                            <div class="text-[11px] text-gray-500">Baseline vs Predicted (7d)</div>
+                            <div class="text-[14px] font-black text-gray-900">₱{{ number_format($baseline_week,0) }} → ₱{{ number_format($predicted_sum,0) }}</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50/50 rounded-xl p-3 flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center border border-gray-100">
+                            <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        </div>
+                        <div>
+                            <div class="text-[11px] text-gray-500">Growth Rate</div>
+                            <div class="text-[14px] font-black text-gray-900">{{ round($summary['growth_rate'] ?? 0,2) }}</div>
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                         </div>
                     </div>
                     <div class="w-16 text-right text-[12px] font-black text-indigo-700">
                         {{ number_format($accuracy['mape'] ?? 0, 1) }}%
                     </div>
                 </div>
+
+                @php
+                    $short = $fc['short_term']['forecast'] ?? [];
+                    $categories = collect($short)->pluck('date')->all();
+                    $predicted = collect($short)->pluck('predicted')->map(fn($v) => round($v, 2))->all();
+                @endphp
+
+                @if(count($predicted) > 0)
+                    <script type="application/json" id="bi-forecast-short-data">
+                        {!! json_encode(['categories' => $categories, 'predicted' => $predicted], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!}
+                    </script>
+
+                    <div x-data="forecastingChart(JSON.parse(document.getElementById('bi-forecast-short-data').textContent))"
+                         wire:ignore
+                         wire:key="bi-forecast-short-{{ $selectedBranchId }}-{{ $startDate }}-{{ $endDate }}-{{ str_replace(' ', '-', $activeFilter) }}"
+                         x-init="init()"
+                         class="w-full">
+                        <div x-ref="forecastChart" class="w-full h-[320px]"></div>
+                    </div>
+                @else
+                    <div class="p-6">
+                        <x-empty-state title="No Forecast Data" description="Not enough historical data to compute a forecast for this selection." />
+                    </div>
+                @endif
             </div>
 
+<<<<<<< HEAD
             <p class="mt-4 text-[11px] leading-relaxed text-gray-500">
                 Benchmark uses the previous-period average as the simple baseline. The model is evaluated using MAE, RMSE, and MAPE, then compared against that baseline to show whether the forecasting logic adds practical value.
             </p>
@@ -584,15 +687,24 @@
         {{-- Restock Insight — sits to the right of the flip card, filling the space instead of leaving it empty --}}
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-col h-full overflow-hidden">
                 <div class="flex items-center justify-between gap-3 mb-4 shrink-0">
+=======
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                <div class="flex items-center justify-between gap-3 mb-4">
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                     <div>
                         <h4 class="text-[15px] font-bold text-gray-900 tracking-tight">Restock Insight</h4>
                         <p class="text-[11px] text-gray-400 font-medium">Ingredient demand recommendations based on the forecasted sales trend.</p>
                     </div>
+<<<<<<< HEAD
                     <span class="inline-flex items-center rounded-full bg-{{ $primaryColor }}-50 text-{{ $primaryColor }}-700 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 shrink-0">
+=======
+                    <span class="inline-flex items-center rounded-full bg-{{ $primaryColor }}-50 text-{{ $primaryColor }}-700 text-[10px] font-black uppercase tracking-widest px-2.5 py-1">
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                         Forecast-driven
                     </span>
                 </div>
 
+<<<<<<< HEAD
                 <div class="relative flex-1 min-h-0">
                     @if(count($restock) > 0)
                         <div class="absolute inset-0 space-y-3 overflow-y-auto custom-scrollbar pr-2">
@@ -623,6 +735,36 @@
                         </div>
                     @endif
                 </div>
+=======
+                @if(count($restock) > 0)
+                    <div class="space-y-3">
+                        @foreach($restock as $item)
+                            <div class="rounded-3xl border border-gray-100 p-4 flex items-center justify-between gap-4">
+                                <div class="min-w-0">
+                                    <p class="text-[13px] font-bold text-gray-900 truncate">{{ $item['name'] }} <span class="text-[10px] uppercase tracking-widest font-black text-gray-400">({{ $item['unit'] }})</span></p>
+                                    @php
+                                        $p = strtolower($item['priority'] ?? 'medium');
+                                        $badge = match($p) {
+                                            'high' => 'bg-red-50 text-red-700',
+                                            'medium' => 'bg-amber-50 text-amber-700',
+                                            default => 'bg-gray-50 text-gray-600'
+                                        };
+                                    @endphp
+                                    <p class="text-[11px] text-gray-500 mt-1">Priority: <span class="font-black px-2 py-0.5 rounded-full text-[11px] {{ $badge }}">{{ $item['priority'] }}</span></p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-[16px] font-black text-gray-900">{{ number_format($item['amount'], 0) }}</p>
+                                    <p class="text-[10px] uppercase text-gray-400 tracking-widest">Next 14 days</p>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="p-6">
+                        <x-empty-state title="No restock insight" description="Not enough historical order data to generate ingredient demand recommendations." />
+                    </div>
+                @endif
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
             </div>
         </div>
         </div>
@@ -826,7 +968,11 @@
     </div>{{-- end products tab --}}
 
     {{-- ── Operations Tab ── --}}
+<<<<<<< HEAD
     <div x-cloak x-show="activeTab === 'operations'" class="space-y-6">
+=======
+    <div x-cloak x-show="activeTab === 'operations'" class="space-y-6 animate-fadeIn">
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
         {{-- Hours Intensity Chart (above Network Performance) --}}
         <div class="mx-1">
             <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
@@ -854,8 +1000,12 @@
                          wire:key="hours-intensity-top-{{ $selectedBranchId }}-{{ $startDate }}-{{ $endDate }}-{{ str_replace(' ', '-', $activeFilter) }}"
                          x-init="init()"
                          class="w-full">
+<<<<<<< HEAD
                         <div x-ref="hoursChartTop" class="w-full h-[380px]"></div>
                         <div x-ref="hoursHeatmapTop" class="w-full h-[48px] mt-2"></div>
+=======
+                        <div x-ref="hoursChartTop" class="w-full h-[320px]"></div>
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                     </div>
                 @else
                     <div class="p-6">
@@ -926,7 +1076,11 @@
 
 
     {{-- ── Sales Report Tab ── --}}
+<<<<<<< HEAD
     <div x-cloak x-show="activeTab === 'sales'" class="space-y-6">
+=======
+    <div x-cloak x-show="activeTab === 'sales'" class="space-y-6 animate-fadeIn">
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
         <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <div>
@@ -1205,9 +1359,13 @@
 
     <div id="bi-chart-data" style="display:none;" data-state='{{ $biChartDataState }}'></div>
 
+<<<<<<< HEAD
 </div>{{-- ← THIS closes x-data="slidingTabs(...)" --}}
 
 @push('scripts')
+=======
+    @push('scripts')
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
     <script>
         function salesReportTrend(initialData) {
             return {
@@ -1231,6 +1389,7 @@
                             zoom: { enabled: false },
                             animations: {
                                 enabled: true,
+<<<<<<< HEAD
                                 easing: 'easeout',
                                 speed: 900,
                                 animateGradually: {
@@ -1241,6 +1400,12 @@
                                     enabled: true,
                                     speed: 500,
                                 }
+=======
+                                easing: 'easeinout',
+                                speed: 800,
+                                animateGradually: { enabled: false },
+                                dynamicAnimation: { enabled: false }
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                             }
                         },
                         dataLabels: { enabled: false },
@@ -1350,6 +1515,7 @@
                             type: 'area',
                             height: 320,
                             toolbar: { show: false },
+<<<<<<< HEAD
                             zoom: { enabled: false },
                             animations: {
                                 enabled: true,
@@ -1358,6 +1524,9 @@
                                 animateGradually: { enabled: true, delay: 100 },
                                 dynamicAnimation: { enabled: true, speed: 450 }
                             }
+=======
+                            zoom: { enabled: false }
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                         },
                         dataLabels: { enabled: false },
                         stroke: { curve: 'smooth', width: 3 },
@@ -1420,22 +1589,35 @@
             };
         }
 
+<<<<<<< HEAD
         function forecastingChart(initialData, color) {
             return {
                 chartRef: null,
                 chartData: initialData || { categories: [], predicted: [] },
                 chartColor: color || '#6366F1',
+=======
+        function forecastingChart(initialData) {
+            return {
+                chartRef: null,
+                chartData: initialData || { categories: [], predicted: [] },
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
 
                 init() {
                     if (typeof window.ApexCharts === 'undefined' || !this.$refs.forecastChart) return;
 
+<<<<<<< HEAD
                     const self = this;
                     const options = {
                         series: [{ name: 'Forecast', data: self.chartData.predicted }],
+=======
+                    const options = {
+                        series: [{ name: 'Forecast', data: this.chartData.predicted }],
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                         chart: {
                             type: 'area',
                             height: 320,
                             toolbar: { show: false },
+<<<<<<< HEAD
                             zoom: { enabled: false },
                             animations: {
                                 enabled: true,
@@ -1507,8 +1689,28 @@
 
                     self.chartRef = new ApexCharts(self.$refs.forecastChart, options);
                     self.chartRef.render();
+=======
+                            zoom: { enabled: false }
+                        },
+                        dataLabels: { enabled: false },
+                        stroke: { curve: 'smooth', width: 3 },
+                        fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.28, opacityTo: 0.03, stops: [0,80,100] } },
+                        xaxis: { categories: this.chartData.categories, labels: { rotate: -45, style: { fontSize: '11px', colors: '#9CA3AF' } } },
+                        yaxis: { labels: { formatter: (val) => Math.round(val) } },
+                        colors: ['#6366F1'],
+                        tooltip: { y: { formatter: (val) => '₱ ' + Number(val).toLocaleString() } },
+                        grid: { borderColor: '#f8fafc' }
+                    };
+
+                    this.chartRef = new ApexCharts(this.$refs.forecastChart, options);
+                    this.chartRef.render();
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                 }
             };
         }
     </script>
     @endpush
+<<<<<<< HEAD
+=======
+</div>
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2

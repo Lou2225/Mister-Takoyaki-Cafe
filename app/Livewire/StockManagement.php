@@ -420,12 +420,21 @@ public $filterCategoryId = '';
             // Check if this row chains from a previous row
             foreach ($this->conversionRows as $j => $prevRow) {
                 $prevQty = (float) $prevRow['qty_in_base'];
+<<<<<<< HEAD
                 if ($prevQty > 0) {
                     $ratio = $c->qty_in_base / $prevQty;
                     $rounded = round($ratio, 4);
                     if ($ratio > 0.9999 && abs($ratio - $rounded) < 0.0001 && $rounded == round($rounded, 0)) {
                         $chainFromIndex = $j;
                         $chainMultiplier = $rounded;
+=======
+                if ($prevQty > 0 && $c->qty_in_base % $prevQty == 0) {
+                    // This row might chain from the previous one
+                    $potentialMultiplier = $c->qty_in_base / $prevQty;
+                    if ($potentialMultiplier > 0) {
+                        $chainFromIndex = $j;
+                        $chainMultiplier = $potentialMultiplier;
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                         break;
                     }
                 }
@@ -565,7 +574,11 @@ public $filterCategoryId = '';
     {
         for ($i = $startIndex; $i < count($this->conversionRows); $i++) {
             $fromIndex = $this->conversionRows[$i]['chain_from_index'] ?? null;
+<<<<<<< HEAD
             if ($fromIndex !== null && $fromIndex !== '') {
+=======
+            if ($fromIndex !== null && $fromIndex !== '' && $fromIndex !== 'base') {
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                 $this->computeQtyInBase($i);
             }
         }

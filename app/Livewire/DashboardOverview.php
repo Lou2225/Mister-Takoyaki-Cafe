@@ -450,7 +450,16 @@ if ($refunds > 0) {
                 return;
             }
 
+<<<<<<< HEAD
             $this->activeFilter = 'Custom Range';
+=======
+            // Maximum range validation (e.g., 90 days)
+            $diff = $start->diff($end)->days;
+            if ($diff > 90) {
+                $this->dateError = 'Date range cannot exceed 90 days.';
+                return;
+            }
+>>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
         }
     }
 
