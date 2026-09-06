@@ -929,9 +929,11 @@ class ThermalBluetoothPrinter {
                     push(CMD.boldOff());
                     ln(this.divider('='));
 
-                    if ((order.payment_method || '').toLowerCase() === 'cash' && Number(order.amount_tendered) > 0) {
+                    if ((order.payment_method || '').toLowerCase() === 'cash' && Number(order.amount_tendered) > 0 && settings.show_receipt_tendered !== false) {
                         ln(this.twoColumns('Cash Tendered', this.money(order.amount_tendered, sym)));
-                        ln(this.twoColumns('Change', this.money(order.change_amount ?? 0, sym)));
+                        if (settings.show_receipt_change !== false) {
+                            ln(this.twoColumns('Change', this.money(order.change_amount ?? 0, sym)));
+                        }
                         ln(this.divider('-'));
                     }
 

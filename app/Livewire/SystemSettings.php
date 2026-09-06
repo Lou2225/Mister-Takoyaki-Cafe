@@ -66,6 +66,8 @@ class SystemSettings extends Component
     public $customerReceiptTitle;
     public $showReceiptQrCode;
     public $showReceiptFooter;
+    public $showReceiptTendered;
+    public $showReceiptChange;
 
     // Inventory Settings
     public $lowStockThreshold;
@@ -205,6 +207,8 @@ class SystemSettings extends Component
         $this->customerReceiptTitle = SystemSetting::get('customer_receipt_title', 'Customer Receipt & Invoice');
         $this->showReceiptQrCode    = SystemSetting::get('show_receipt_qr_code', true);
         $this->showReceiptFooter    = SystemSetting::get('show_receipt_footer', true);
+        $this->showReceiptTendered = SystemSetting::get('show_receipt_tendered', true);
+        $this->showReceiptChange   = SystemSetting::get('show_receipt_change', true);
 
         $this->lowStockThreshold      = SystemSetting::get('low_stock_threshold', 10);
         $this->criticalStockThreshold = SystemSetting::get('critical_stock_threshold', 5);
@@ -660,6 +664,8 @@ class SystemSettings extends Component
         SystemSetting::set('customer_receipt_title', $this->customerReceiptTitle);
         SystemSetting::set('show_receipt_qr_code', (bool) $this->showReceiptQrCode);
         SystemSetting::set('show_receipt_footer', (bool) $this->showReceiptFooter);
+        SystemSetting::set('show_receipt_tendered', (bool) $this->showReceiptTendered);
+        SystemSetting::set('show_receipt_change', (bool) $this->showReceiptChange);
         $this->regenerateQrCode();
     }
 

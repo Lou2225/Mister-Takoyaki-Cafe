@@ -73,8 +73,14 @@ public $amountTendered = 0;
     public bool $gcashPolling = false;
     public bool $isManualGcash = false; // To distinguish verification types
 
-public function updatedPaymentMethod()
+public function updatedPaymentMethod(): void
 {
+    if ($this->gcashVerified && $this->paymentMethod !== 'GCash') {
+        $this->paymentMethod = 'GCash';
+        $this->dispatch('notify', type: 'warning', message: 'Verified GCash payment is locked to GCash.');
+        return;
+    }
+
     $this->resetGCashState();
 }
 
@@ -326,6 +332,7 @@ public function openPaymentModal(): void
     
     // ─── Computed: Products ────────────────────────────────────────────────
     protected ?Collection $productsCache = null;
+    protected array $posStocks = [];
     public function getProductsProperty()
     {
         if ($this->productsCache !== null) return $this->productsCache;
@@ -390,17 +397,18 @@ public function openPaymentModal(): void
             })->unique();
 
             $stocks = Product::getUnexpiredStocks((int)$this->branchId, $ingredientIds);
+            $this->posStocks = $stocks->toArray();
 
             foreach ($products as $product) {
                 // Pre-calculate availability for the instant modal
                 $product->option_availability = $product->getOptionAvailability((int)$this->branchId, $stocks);
                 $product->modifier_availability = $product->getModifierAvailability((int)$this->branchId, $stocks);
-                $product->prefetched_stocks = $stocks;
+                $product->max_available = $product->getMaxAvailableQuantity((int)$this->branchId, $stocks);
             }
 
 // SORT: Available items first, then Out of Stock
             $products = $products->sortBy(function($product) {
-                $isAvailable = $product->getMaxAvailableQuantity((int)$this->branchId, $product->prefetched_stocks) > 0;
+                $isAvailable = $product->max_available > 0;
                 return [
                     $isAvailable ? 0 : 1, // Available (0) first, OOS (1) last
                     $product->category->sort_order ?? 0,
@@ -412,9 +420,9 @@ public function openPaymentModal(): void
 
         // Tag max_available onto each product for Alpine stock limiting
         foreach ($products as $product) {
-            $product->max_available = $this->branchId
-                ? $product->getMaxAvailableQuantity((int)$this->branchId, $product->prefetched_stocks ?? null)
-                : 999;
+            if (!$this->branchId) {
+                $product->max_available = 999;
+            }
         }
 
         return $this->productsCache = $products;
@@ -1102,6 +1110,12 @@ public function change(): float
     {
         $this->resetErrorBag('gcashCancel');
 
+        if ($this->gcashVerified && $this->paymentMethod !== 'GCash') {
+            $this->paymentMethod = 'GCash';
+            $this->addError('gcashVerified', 'This payment was verified through GCash and must be completed as GCash.');
+            return;
+        }
+
         if (empty($this->cart)) {
             $this->dispatch('notify', type: 'error', message: 'Cart is empty.');
             return;
@@ -1310,6 +1324,7 @@ public function change(): float
             'serviceChargeAmount' => $this->serviceChargeAmount,
             'taxAmount'           => $this->taxAmount,
             'change'              => $this->change,
+            'stockData'           => $this->posStocks,
         ])->layout('layouts.app', ['noPadding' => true]);
     }
 }

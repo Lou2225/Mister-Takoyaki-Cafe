@@ -386,6 +386,17 @@
                                     </label>
                                 </div>
 
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <label class="flex items-center gap-3 p-3 bg-gray-50 border border-gray-100 rounded-xl cursor-pointer hover:bg-white transition-all shadow-sm">
+                                        <input type="checkbox" wire:model.live="showReceiptTendered" class="rounded border-gray-300 text-gray-900 shadow-sm focus:ring-gray-900 h-4 w-4">
+                                        <span class="text-[13px] font-semibold text-gray-800">Show Tendered Amount</span>
+                                    </label>
+                                    <label class="flex items-center gap-3 p-3 bg-gray-50 border border-gray-100 rounded-xl cursor-pointer hover:bg-white transition-all shadow-sm">
+                                        <input type="checkbox" wire:model.live="showReceiptChange" class="rounded border-gray-300 text-gray-900 shadow-sm focus:ring-gray-900 h-4 w-4">
+                                        <span class="text-[13px] font-semibold text-gray-800">Show Change</span>
+                                    </label>
+                                </div>
+
                                                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                                         <div>
                                         <x-input-label for="receiptCopies" value="Print Copies (1–3)" />
@@ -489,6 +500,8 @@
                                      policy: @entangle('receiptReturnPolicy').live,
                                      showFooter: @entangle('showReceiptFooter').live,
                                      showQrCode: @entangle('showReceiptQrCode').live,
+                                     showTendered: @entangle('showReceiptTendered').live,
+                                     showChange: @entangle('showReceiptChange').live,
                                      customerTitle: @entangle('customerReceiptTitle').live
                                  }"
                                  @businessconfigupdated.window="logoUrl = $event.detail.logo_url; businessName = $event.detail.business_name">
@@ -528,6 +541,15 @@
                                     <div class="flex justify-between font-bold text-[10px] pt-1 mt-1 border-t border-gray-100">
                                         <span>TOTAL</span>
                                         <span x-text="currency + (subtotal + serviceCharge).toFixed(2)"></span>
+                                    </div>
+
+                                    <div x-show="showTendered" class="flex justify-between text-[9px] text-gray-500">
+                                        <span>Cash Tendered</span>
+                                        <span x-text="currency + '500.00'"></span>
+                                    </div>
+                                    <div x-show="showChange" class="flex justify-between text-[9px] text-gray-500">
+                                        <span>Change</span>
+                                        <span x-text="currency + '164.00'"></span>
                                     </div>
                                 </div>
 

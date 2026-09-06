@@ -167,6 +167,8 @@ class PosReceiptController extends Controller
                 'customer_receipt_title' => \App\Models\SystemSetting::get('customer_receipt_title', 'Customer Receipt & Invoice'),
                 'show_receipt_qr_code'   => (bool) \App\Models\SystemSetting::get('show_receipt_qr_code', true),
                 'show_receipt_footer'    => (bool) \App\Models\SystemSetting::get('show_receipt_footer', true),
+                'show_receipt_tendered'  => (bool) \App\Models\SystemSetting::get('show_receipt_tendered', true),
+                'show_receipt_change'    => (bool) \App\Models\SystemSetting::get('show_receipt_change', true),
             ],
             'receipts' => $receipts,
         ]);

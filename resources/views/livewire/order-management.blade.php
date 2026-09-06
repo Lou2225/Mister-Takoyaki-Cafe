@@ -585,10 +585,28 @@
                                             <span class="font-bold text-slate-700">₱{{ number_format($order->delivery_fee, 2) }}</span>
                                         </div>
                                     @endif
+                                    @if($order->service_charge > 0)
+                                        <div class="flex justify-between text-[12px] font-medium text-slate-500">
+                                            <span>Service Charge</span>
+                                            <span class="font-bold text-slate-700">₱{{ number_format($order->service_charge, 2) }}</span>
+                                        </div>
+                                    @endif
                                     <div class="pt-3 mt-3 border-t border-slate-200 flex justify-between items-baseline">
                                         <span class="text-[13px] font-black text-slate-900 uppercase tracking-tight">Grand Total</span>
                                         <span class="text-[24px] font-black text-slate-900 tracking-tighter">₱{{ number_format($order->total_amount, 2) }}</span>
                                     </div>
+                                    @if($order->amount_tendered !== null && \App\Models\SystemSetting::get('show_receipt_tendered', true))
+                                        <div class="flex justify-between text-[12px] font-medium text-slate-500">
+                                            <span>Tendered Amount</span>
+                                            <span class="font-bold text-slate-700">₱{{ number_format($order->amount_tendered, 2) }}</span>
+                                        </div>
+                                    @endif
+                                    @if($order->change_amount !== null && \App\Models\SystemSetting::get('show_receipt_change', true))
+                                        <div class="flex justify-between text-[12px] font-medium text-slate-500">
+                                            <span>Change</span>
+                                            <span class="font-bold text-emerald-600">₱{{ number_format($order->change_amount, 2) }}</span>
+                                        </div>
+                                    @endif
                                     
                                     @if($order->refunded_amount > 0)
                                         <div class="mt-3 pt-3 border-t border-red-100 flex justify-between text-[12px] font-bold text-red-600">
@@ -1003,10 +1021,29 @@
                             </div>
                         @endif
 
+                        @if($order->service_charge > 0)
+                            <div class="flex justify-between text-[9px] text-gray-500">
+                                <span>Service Charge</span>
+                                <span>₱{{ number_format($order->service_charge, 2) }}</span>
+                            </div>
+                        @endif
+
                         <div class="flex justify-between font-bold text-[10px] pt-1 mt-1 border-t border-gray-100">
                             <span>TOTAL</span>
                             <span>₱{{ number_format($order->total_amount, 2) }}</span>
                         </div>
+                        @if($order->amount_tendered !== null && \App\Models\SystemSetting::get('show_receipt_tendered', true))
+                            <div class="flex justify-between text-[9px] text-gray-500">
+                                <span>Tendered</span>
+                                <span>₱{{ number_format($order->amount_tendered, 2) }}</span>
+                            </div>
+                        @endif
+                        @if($order->change_amount !== null && \App\Models\SystemSetting::get('show_receipt_change', true))
+                            <div class="flex justify-between text-[9px] text-gray-500">
+                                <span>Change</span>
+                                <span>₱{{ number_format($order->change_amount ?? 0, 2) }}</span>
+                            </div>
+                        @endif
                     </div>
 
                     @if($order->refunded_amount > 0)

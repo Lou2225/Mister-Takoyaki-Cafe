@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class Product extends Model
 {
@@ -22,7 +23,7 @@ class Product extends Model
 
     public function getImageUrlAttribute()
     {
-        return $this->image 
+        return $this->image && Storage::disk('public')->exists($this->image)
             ? asset('storage/' . $this->image) 
             : asset('images/placeholder-product.png');
     }

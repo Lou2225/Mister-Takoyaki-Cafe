@@ -43,7 +43,7 @@ class SecurityHeaders
             "style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com https://fonts.bunny.net",
             "font-src 'self' https://fonts.gstatic.com https://fonts.bunny.net",
             "img-src 'self' data: https:",
-            "connect-src 'self' https://psgc.cloud https://nominatim.openstreetmap.org https://api.paymongo.com https://api.qrserver.com",
+            "connect-src 'self' https://unpkg.com https://psgc.cloud https://nominatim.openstreetmap.org https://api.paymongo.com https://api.qrserver.com",
             "frame-ancestors 'none'",
             "upgrade-insecure-requests",
         ]));

@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('order_items', function (Blueprint $table) {
-            $table->text('special_instructions')->nullable()->after('subtotal');
-        });
+        if (!Schema::hasColumn('order_items', 'special_instructions')) {
+            Schema::table('order_items', function (Blueprint $table) {
+                $table->text('special_instructions')->nullable()->after('subtotal');
+            });
+        }
     }
 
     /**

@@ -42,6 +42,7 @@
             return (this.subtotal - this.discountTotal) + this.serviceCharge;
         },
                 productsData: {},
+            stockData: @js($stockData),
         activeProduct: null,
         selectedOptions: {},
         selectedModifierIds: [],
@@ -178,7 +179,7 @@
             if (!product) return 0;
 
             const recipes = this.getProductRecipes(product);
-            const stock = product.prefetched_stocks || {};
+            const stock = this.stockData || {};
             const usage = this.getCartIngredientUsage(pid);
 
             if (recipes.length === 0) {
@@ -210,7 +211,7 @@
             const recipes = (product?.recipes || []).filter(recipe => Number(recipe.product_option_id) === Number(optionId));
             if (recipes.length === 0) return 0;
 
-            const stock = product.prefetched_stocks || {};
+            const stock = this.stockData || {};
             const usage = this.getCartIngredientUsage();
             return Math.max(0, recipes.reduce((maximum, recipe) => {
                 const recipeQuantity = Number(recipe.quantity);
@@ -225,7 +226,7 @@
             const recipes = (product?.recipes || []).filter(recipe => Number(recipe.modifier_id) === Number(modifierId));
             if (recipes.length === 0) return 0;
 
-            const stock = product.prefetched_stocks || {};
+            const stock = this.stockData || {};
             const usage = this.getCartIngredientUsage();
             return Math.max(0, recipes.reduce((maximum, recipe) => {
                 const recipeQuantity = Number(recipe.quantity);
@@ -696,10 +697,9 @@
                     @foreach($products as $product)
                         @php
                             $pid      = $product->id;
-                            $stocks   = $product->prefetched_stocks ?? null;
-                            $availability = $branchId ? $product->availabilityAt((int)$branchId, $stocks) : 'available';
+                            $maxAvailable = $branchId ? (int)($product->max_available ?? 0) : 999;
+                            $availability = $maxAvailable <= 0 ? 'unavailable' : ($maxAvailable <= 10 ? 'low_stock' : 'available');
                             $isAvailable  = in_array($availability, ['available', 'low_stock']);
-                            $maxAvailable = $branchId ? $product->getMaxAvailableQuantity((int)$branchId, $stocks) : 0;
                             $hasOptions   = count($product->optionGroups) > 0 || count($product->modifiers) > 0;
                             $clickAction  = "openQuickOptions($pid)";
                         @endphp
@@ -1152,7 +1152,7 @@
 <x-modal name="pos-payment" maxWidth="4xl" focusable>
     <div class="h-1 w-full bg-gradient-to-r from-gray-800 to-gray-600 rounded-t-xl"></div>
     
-    <div class="p-6">
+    <div class="p-6" x-data="{ paymentLocked: @entangle('gcashVerified') }">
         <h2 class="text-[18px] font-bold text-gray-900 mb-6">Confirm Payment</h2>
         
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6">
@@ -1236,8 +1236,10 @@
                         <div class="grid grid-cols-2 gap-2">
                             @foreach($paymentMethods as $method)
                                 <button type="button"
-                                    @click="paymentMethod = '{{ $method }}'"
-                                    :class="paymentMethod === '{{ $method }}' ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'"
+                                    data-payment-method="{{ $method }}"
+                                    @click="(!gcashVerified || $el.dataset.paymentMethod === 'GCash') && (paymentMethod = $el.dataset.paymentMethod)"
+                                    :disabled="gcashVerified && $el.dataset.paymentMethod !== 'GCash'"
+                                    :class="paymentMethod === $el.dataset.paymentMethod ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : (gcashVerified ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50')"
                                     id="pos_pay_method_{{ strtolower($method) }}"
                                     class="flex-1 justify-center py-2 px-4 text-[13px] font-bold rounded-lg border transition-all">
                                     {{ $method }}
@@ -1453,7 +1455,11 @@
 
         {{-- Action Buttons --}}
         <div class="flex gap-3">
-            <x-secondary-button type="button" wire:click="cancelPaymentModal" wire:loading.attr="disabled" class="flex-1 justify-center">
+            <x-secondary-button type="button"
+                @click="if (!paymentLocked) $dispatch('close-modal', 'pos-payment')"
+                wire:click="cancelPaymentModal"
+                wire:loading.attr="disabled"
+                class="flex-1 justify-center">
                 Cancel
             </x-secondary-button>
             <x-primary-button type="button" @click.capture="if (!window.thermalBluetoothPrinter?.characteristic) window.prepareThermalReceiptWindow?.()" wire:click.prevent="confirmPayment" wire:loading.attr="disabled" id="pos_submit_payment_btn" class="flex-1 justify-center">

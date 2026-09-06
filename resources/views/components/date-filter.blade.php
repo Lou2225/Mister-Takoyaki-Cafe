@@ -371,7 +371,7 @@
         this.tempEndDate   = this.endDate   || '';
         this.isOpen        = false;
     }
-}" @click.outside="cancel()" class="relative select-none">
+}" @click.outside="cancel()" class="relative select-none" wire:ignore>
 
     {{-- Trigger Button --}}
     <button type="button" x-ref="trigger" @click.stop="isOpen = !isOpen"
