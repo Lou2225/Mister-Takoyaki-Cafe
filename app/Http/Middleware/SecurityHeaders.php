@@ -40,8 +40,8 @@ class SecurityHeaders
         $response->headers->set('Content-Security-Policy', implode('; ', [
             "default-src 'self'",
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://unpkg.com",
-            "style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com",
-            "font-src 'self' https://fonts.gstatic.com",
+            "style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com https://fonts.bunny.net",
+            "font-src 'self' https://fonts.gstatic.com https://fonts.bunny.net",
             "img-src 'self' data: https:",
             "connect-src 'self' https://psgc.cloud https://nominatim.openstreetmap.org https://api.paymongo.com https://api.qrserver.com",
             "frame-ancestors 'none'",

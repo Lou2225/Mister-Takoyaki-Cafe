@@ -371,17 +371,11 @@
         this.tempEndDate   = this.endDate   || '';
         this.isOpen        = false;
     }
-<<<<<<< HEAD
 }" @click.outside="cancel()" class="relative select-none">
 
     {{-- Trigger Button --}}
     <button type="button" x-ref="trigger" @click.stop="isOpen = !isOpen"
     class="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 text-[11px] sm:text-[13px] font-black text-gray-700 bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-gray-50 h-10 transition-all select-none">
-=======
-}" @click.away="cancel()" class="relative select-none" wire:ignore>
-    {{-- Collapsed Trigger Button --}}
-    <button type="button" @click="isOpen = !isOpen" class="inline-flex items-center gap-2 px-4 py-2 text-[13px] font-black text-gray-700 bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-gray-50 h-10 transition-all select-none">
->>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
         <svg class="w-4 h-4 text-indigo-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
         </svg>

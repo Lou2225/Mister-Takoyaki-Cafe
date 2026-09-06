@@ -26,21 +26,13 @@ switch ($width) {
         break;
 }
 @endphp
-<<<<<<< HEAD
 <div
      {{ $wireKey ? 'wire:key='.$wireKey : '' }}
-=======
-<div 
-    {{ $wireKey ? 'wire:key='.$wireKey : '' }}
->>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
      x-data="{ dropdownOpen: false }" 
      :class="dropdownOpen ? 'z-40' : ''"
      @click.away="dropdownOpen = false" 
      @close.stop="dropdownOpen = false" 
-<<<<<<< HEAD
-=======
      data-has-alpine-state="true"
->>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
      {{ $attributes->merge(['class' => 'relative ' . $containerClasses . ' text-left']) }} >
     <div @click="dropdownOpen = !dropdownOpen" x-ref="trigger" class="relative z-0 w-full">
         {{ $trigger }}
