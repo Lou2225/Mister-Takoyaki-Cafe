@@ -1142,7 +1142,7 @@ public function getOwnerLabel(string $owner): string
     // ── Render ────────────────────────────────────────────────────
     public function render()
     {
-        $query = $this->getBaseProductQuery()->with(['category', 'branches']);
+        $query = $this->getBaseProductQuery()->with('category');
 
         if ($this->selectedCategoryId) {
             $query->where('category_id', $this->selectedCategoryId);

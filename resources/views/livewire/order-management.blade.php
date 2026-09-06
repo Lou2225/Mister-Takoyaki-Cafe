@@ -348,8 +348,9 @@
 
         </div>
         <x-side-panel name="view-order-detail" width="max-w-md">
-            @foreach($allLoadedOrders as $order)
-                <div x-show="selectedOrderId === {{ $order->id }}" x-cloak class="flex flex-col h-full bg-white relative"
+            @if($selectedOrder)
+                @php($order = $selectedOrder)
+                <div class="flex flex-col h-full bg-white relative"
                     x-data="{ 
                         ...slidingTabs('summary', 'activeTab'), 
                         activeTab: 'summary' 
@@ -745,7 +746,7 @@
                         @endif
                     </div>
                 </div>
-            @endforeach
+            @endif
         </x-side-panel>
 
     </div>{{-- end relative wrapper --}}
@@ -898,8 +899,9 @@
             </div>
         </div>
 
-        @foreach($allLoadedOrders as $order)
-            <div x-show="selectedOrderId === {{ $order->id }}" x-cloak class="flex justify-center bg-gray-50 rounded-xl p-6 border border-gray-100 shadow-inner overflow-hidden mb-4">
+        @if($selectedOrder)
+            @php($order = $selectedOrder)
+            <div class="flex justify-center bg-gray-50 rounded-xl p-6 border border-gray-100 shadow-inner overflow-hidden mb-4">
                 <div id="receipt_paper_{{ $order->id }}" class="w-full max-w-[260px] bg-white shadow-md p-4 pt-6 pb-8 font-mono text-[10px] text-gray-800 relative receipt-paper border border-gray-100">
                     @php
                         $address = \App\Models\SystemSetting::get('business_address', '');
@@ -1070,7 +1072,7 @@
                     </div>
                 </div>
             </div>
-        @endforeach
+        @endif
 
         <div class="flex items-center justify-end gap-2 px-6 py-4 bg-gray-50 text-right -mx-6 -mb-6 mt-6 rounded-b-lg border-t border-gray-100">
             <x-secondary-button @click="$dispatch('close-modal', 'receipt-modal')" class="h-11">

@@ -180,7 +180,9 @@ class OrderManagement extends Component
 
     private function buildOrdersQuery($sourceTab)
     {
-        $query = Order::with(['branch', 'user', 'items.product', 'customer', 'refundedBy', 'rider']);
+        // The list only needs branch data. Full order relationships are loaded
+        // on demand when a user opens an order detail or receipt.
+        $query = Order::with(['branch']);
 
         // Must match the 1-hour void/refund window used by Order::canBeVoided()/canBeRefunded()
         $voidRefundCutoff = now()->subHour();
@@ -717,22 +719,11 @@ class OrderManagement extends Component
             }
         }
 
-        $allLoadedOrders = collect($this->appOrders->items())
-            ->merge($this->posOrders->items())
-            ->merge($this->historyOrders->items());
-
-        if ($this->selectedOrder) {
-            $allLoadedOrders->push($this->selectedOrder);
-        }
-
-        $allLoadedOrders = $allLoadedOrders->unique('id');
-
         return view('livewire.order-management', [
             'orders' => $this->orders,
             'appOrders' => $this->appOrders,
             'posOrders' => $this->posOrders,
             'historyOrders' => $this->historyOrders,
-            'allLoadedOrders' => $allLoadedOrders,
             'statuses' => $filteredStatuses,
         ])->layout('layouts.app');
     }

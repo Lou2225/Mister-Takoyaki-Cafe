@@ -66,7 +66,9 @@ window.addEventListener('connect-thermal-bluetooth', async () => {
 });
 
 // Thermal Receipt Printing (Automatic - no user interaction)
-window.addEventListener('send-thermal-print', async (e) => {
+if (!window.__thermalPrintListenerAttached) {
+    window.__thermalPrintListenerAttached = true;
+    window.addEventListener('send-thermal-print', async (e) => {
     const orderId = e.detail?.order_id || e.detail?.orderId || e.detail;
     const receiptType = e.detail?.receipt_type || 'all';
 
@@ -123,7 +125,8 @@ window.addEventListener('send-thermal-print', async (e) => {
     } catch (popupErr) {
         console.warn('Fallback popup could not be opened:', popupErr);
     }
-});
+    });
+}
 
 // Receipt Pop-up (Legacy - kept for manual receipt viewing)
 window.addEventListener('open-receipt', (e) => {

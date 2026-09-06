@@ -1314,8 +1314,46 @@ public function change(): float
     // ─── Render ────────────────────────────────────────────────────────────
     public function render()
     {
+        $products = $this->products;
+        $productData = $products->mapWithKeys(function ($product) {
+            return [$product->id => [
+                'id' => $product->id,
+                'name' => $product->name,
+                'category_id' => $product->category_id,
+                'image_url' => $product->image_url,
+                'max_available' => (int) ($product->max_available ?? 999),
+                'option_availability' => $product->option_availability ?? [],
+                'modifier_availability' => $product->modifier_availability ?? [],
+                'recipes' => $product->recipes->map(fn ($recipe) => [
+                    'ingredient_id' => $recipe->ingredient_id,
+                    'quantity' => (float) $recipe->quantity,
+                    'product_option_id' => $recipe->product_option_id,
+                    'modifier_id' => $recipe->modifier_id,
+                ])->values()->all(),
+                'option_groups' => $product->optionGroups->map(fn ($group) => [
+                    'id' => $group->id,
+                    'name' => $group->name,
+                    'is_required' => (bool) $group->is_required,
+                    'price_mode' => $group->price_mode,
+                    'no_recipe_required' => (bool) $group->no_recipe_required,
+                    'options' => $group->options->map(fn ($option) => [
+                        'id' => $option->id,
+                        'name' => $option->name,
+                        'price' => (float) $option->price,
+                        'is_default' => (bool) $option->is_default,
+                    ])->values()->all(),
+                ])->values()->all(),
+                'modifiers' => $product->modifiers->map(fn ($modifier) => [
+                    'id' => $modifier->id,
+                    'name' => $modifier->name,
+                    'price' => (float) $modifier->price,
+                ])->values()->all(),
+            ]];
+        })->all();
+
         return view('livewire.pos-terminal', [
-            'products'            => $this->products,
+            'products'            => $products,
+            'productData'         => $productData,
             'categories'          => $this->categories,
             'branchId'            => $this->branchId,
             'subtotal'            => $this->subtotal,

@@ -999,6 +999,7 @@
             </div>
 
             {{-- Board View --}}
+            <template x-if="tableView === 'board'">
             <div x-show="tableView === 'board'"
                  x-transition:enter="transition ease-out duration-300"
                  x-transition:enter-start="opacity-0 translate-y-4"
@@ -1133,6 +1134,7 @@
                     </template>
                 </div>
             </div>
+            </template>
             </div>
         </div>
         </div>

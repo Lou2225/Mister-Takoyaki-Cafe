@@ -408,7 +408,7 @@
     const el = document.getElementById('hidden-products-data');
     if (el) {
         try {
-            this.productsData = JSON.parse(el.getAttribute('data-products'));
+            this.productsData = JSON.parse(el.textContent || '{}');
         } catch (e) {
             console.error('Failed to parse products data', e);
         }
@@ -471,7 +471,7 @@
     @cart-reset.window="cartExpanded = false"
 >
         <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
-    <div id="hidden-products-data" class="hidden" data-products="{{ $products->keyBy('id')->toJson() }}"></div>
+    <script id="hidden-products-data" type="application/json">@json($productData)</script>
 
         <script>
         window.thermalReceiptPopupFeatures = window.thermalReceiptPopupFeatures || 'width=450,height=700,menubar=no,toolbar=no,location=no,status=no';
