@@ -18,3 +18,7 @@ yarn-error.log
 /.vscode
 
 COM4
+dist/
+build/
+*.exe
+*.apk
