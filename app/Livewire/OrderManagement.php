@@ -304,12 +304,12 @@ class OrderManagement extends Component
         }
     }
 
-    public function openOrderDetail(Order $order)
+    public function openOrderDetail($orderId)
     {
         // Reload order with all necessary relationships
         $this->selectedOrder = Order::with(['branch', 'user', 'items.product', 'customer', 'refundedBy', 'rider'])
-            ->find($order->id);
-        $this->selectedOrderId = $order->id;
+            ->findOrFail($orderId);
+        $this->selectedOrderId = $this->selectedOrder->id;
         $this->activeTab = 'summary';
         $this->dispatch('open-modal', name: 'view-order-detail');
         $this->dispatch('update-active-tab', activeTab: 'summary');
