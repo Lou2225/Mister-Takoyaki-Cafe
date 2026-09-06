@@ -112,17 +112,14 @@ class UserManagement extends Component
 
     // ── Real-time validation hooks ───────────────────────────────
     public function updatedFirstName() { 
-        $this->firstName = ucwords($this->firstName);
-        $this->validateFieldLive('firstName', ValidationHelper::rulesName(), ValidationHelper::nameMessages()); 
-    }
-    public function updatedMiddleName() { 
-        $this->middleName = ucwords($this->middleName);
-        $this->validateFieldLive('middleName', ValidationHelper::rulesOptionalName(), ValidationHelper::nameMessages()); 
-    }
-    public function updatedLastName() { 
-        $this->lastName = ucwords($this->lastName);
-        $this->validateFieldLive('lastName', ValidationHelper::rulesName(), ValidationHelper::nameMessages()); 
-    }
+    $this->validateFieldLive('firstName', ValidationHelper::rulesName(), ValidationHelper::nameMessages()); 
+}
+public function updatedMiddleName() { 
+    $this->validateFieldLive('middleName', ValidationHelper::rulesOptionalName(), ValidationHelper::nameMessages()); 
+}
+public function updatedLastName() { 
+    $this->validateFieldLive('lastName', ValidationHelper::rulesName(), ValidationHelper::nameMessages()); 
+}
 
     public function updatedEmail()
     {
@@ -197,10 +194,20 @@ class UserManagement extends Component
 
     // ── Show edit form ────────────────────────────────────────────
     public function showEdit($userId, $mode = 'edit')
-    {
-        $user = User::findOrFail($userId);
+{
+    $user = User::findOrFail($userId);
 
-        $this->panel = 'form';
+    // Admins may only view/edit Staff accounts within their own branch —
+    // without this, showEdit() is directly callable via $wire.call() with
+    // any user ID, letting an Admin load (and, via updateUser(), silently
+    // demote) a Super Admin or another branch's staff.
+    if (auth()->user()->isAdmin() && ($user->role_id !== 3 || $user->branch_id !== auth()->user()->branch_id)) {
+        abort(403, 'Unauthorized to access this profile.');
+    }
+
+    $this->skipValidation = true; // suppress live validation while populating fields
+
+    $this->panel = 'form';
         $this->mode = $mode;
         $this->editUserId = $user->id;
         $this->firstName = $user->first_name;
@@ -245,6 +252,7 @@ class UserManagement extends Component
             $this->addr_lng = $user->longitude;
         }
 
+         $this->skipValidation = false;
         $this->resetValidation();
         $this->updateGlobalHeader($mode);
     }
@@ -332,7 +340,22 @@ class UserManagement extends Component
 
     public function viewOrder($orderId)
     {
-        $this->viewingOrder = Order::with(['items.product', 'items.options.option', 'branch', 'rider', 'user'])->findOrFail($orderId);
+        $order = Order::with(['items.product', 'items.options.option', 'branch', 'rider', 'user'])->findOrFail($orderId);
+
+        // This is only ever meant to show an order from the currently
+        // loaded profile's own history — without this check, viewOrder()
+        // is directly callable with any order ID, disclosing another
+        // branch's order/customer details regardless of which profile is
+        // open.
+        $belongsToLoadedProfile = $this->editUserId
+            && ($order->user_id === $this->editUserId || $order->rider_id === $this->editUserId);
+
+        if (!$belongsToLoadedProfile) {
+            $this->dispatch('notify', type: 'error', message: 'Unauthorized to view this order.');
+            return;
+        }
+
+        $this->viewingOrder = $order;
         $this->dispatch('open-modal', name: 'view-order-detail');
     }
 
@@ -437,7 +460,7 @@ class UserManagement extends Component
     }
 
     // ── Save (create) ─────────────────────────────────────────────
-    public function saveUser()
+        public function saveUser()
     {
         $this->firstName = ucwords($this->normalizeString($this->firstName));
         $this->middleName = ucwords($this->normalizeString($this->middleName));
@@ -472,15 +495,20 @@ class UserManagement extends Component
 
         // Data is already sanitized in validateBeforeCreate()
         $plainPassword = \Illuminate\Support\Str::random(10);
-        $nextId = (User::max('id') ?? 0) + 1;
-        $generatedEmployeeId = 'MT-' . str_pad($nextId, 4, '0', STR_PAD_LEFT);
+
+        $attempts = 0;
+        do {
+            $nextId = (User::max('id') ?? 0) + 1 + $attempts;
+            $generatedEmployeeId = 'MT-' . str_pad($nextId, 4, '0', STR_PAD_LEFT);
+            $attempts++;
+        } while (User::where('employee_id', $generatedEmployeeId)->exists() && $attempts < 20);
 
         // Manager conflict check
         if ($this->formRoleId == 2 && $this->formBranchId && !$this->forceReplaceManager) {
             $branch = Branch::with('manager')->find($this->formBranchId);
             if ($branch && $branch->user_id) {
                 $this->conflictingManagerName = $branch->manager->first_name . ' ' . $branch->manager->last_name;
-                // Standardize: always dispatch as object for robust event handling
+                $this->dispatch('close-modal', name: 'confirm-save-user');
                 $this->dispatch('open-modal', name: 'confirm-manager-replace');
                 return;
             }
@@ -537,13 +565,19 @@ class UserManagement extends Component
             'longitude' => $this->addr_lng,
         ]);
 
-        // Sync: If Admin, update the branch manager
+        // Sync: If this user is a Branch Manager, update the branch record.
         if ($user->role_id == 2 && $user->branch_id) {
-            // Clear their previous manager status elsewhere if any
-            Branch::where('user_id', $user->id)->update(['user_id' => null]);
-            // Set as manager for new branch
             $branch = Branch::find($user->branch_id);
             if ($branch) {
+                // If this branch already had a different manager (the one
+                // just replaced via the conflict-confirmation modal), clear
+                // their branch_id — otherwise they stay stuck pointing at a
+                // branch they no longer manage.
+                if ($branch->user_id && $branch->user_id != $user->id) {
+                    User::where('id', $branch->user_id)->update(['branch_id' => null]);
+                }
+                // Clear this user's manager status on any other branch first
+                Branch::where('user_id', $user->id)->update(['user_id' => null]);
                 $branch->update(['user_id' => $user->id]);
             }
         }
@@ -552,8 +586,7 @@ class UserManagement extends Component
         $this->dispatch('notify', type: 'success', message: $message);
         $this->dispatch('close-modal', name: 'confirm-save-user');
         $this->dispatch('close-modal', name: 'confirm-manager-replace');
-        
-        // Dispatch email after response to prevent blocking the UI
+
         dispatch(function () use ($user, $plainPassword) {
             try {
                 \Illuminate\Support\Facades\Mail::to($user->email)
@@ -562,24 +595,26 @@ class UserManagement extends Component
                 \Illuminate\Support\Facades\Log::error('Failed to send credential email: ' . $e->getMessage());
             }
         })->afterResponse();
-        
+
         $this->backToList();
     }
 
-    // ── Update (edit) ─────────────────────────────────────────────
-    public function updateUser()
+       public function updateUser()
     {
         $user = User::findOrFail($this->editUserId);
 
-        // Admins can only update Staff roles within their own branch
         if (auth()->user()->isAdmin()) {
+            if ($user->role_id !== 3 || $user->branch_id !== auth()->user()->branch_id) {
+                $this->dispatch('notify', type: 'error', message: 'Unauthorized to modify this account.');
+                $this->dispatch('close-modal', name: 'confirm-save-user');
+                return;
+            }
             if (!in_array($this->formRoleId, [3])) {
                 $this->formRoleId = 3; // Force back to Staff
             }
             $this->formBranchId = auth()->user()->branch_id; // Force own branch
         }
 
-        // Sanitize inputs: trim outer whitespace AND collapse internal multiple spaces
         $this->firstName = ucwords($this->normalizeString($this->firstName));
         $this->middleName = ucwords($this->normalizeString($this->middleName));
         $this->lastName = ucwords($this->normalizeString($this->lastName));
@@ -610,6 +645,7 @@ class UserManagement extends Component
             $branch = Branch::with('manager')->find($this->formBranchId);
             if ($branch && $branch->user_id && $branch->user_id != $user->id) {
                 $this->conflictingManagerName = $branch->manager->first_name . ' ' . $branch->manager->last_name;
+                $this->dispatch('close-modal', name: 'confirm-save-user');
                 $this->dispatch('open-modal', name: 'confirm-manager-replace');
                 return;
             }
@@ -618,7 +654,6 @@ class UserManagement extends Component
         $oldRoleId = $user->role_id;
         $oldBranchId = $user->branch_id;
 
-        // Enforce position requirement: only Staff (role_id 3) needs a position
         if (!in_array($this->formRoleId, [3])) {
             $this->position = null;
         }
@@ -641,7 +676,6 @@ class UserManagement extends Component
         $user->date_hired = $this->dateHired ?: null;
         $user->is_active = $this->formIsActive;
 
-        // Compose address JSON from PSGC sub-fields
         $parts = array_filter([
             $this->addr_street,
             $this->addr_barangay,
@@ -670,20 +704,36 @@ class UserManagement extends Component
 
         // Sync manager status
         if ($user->role_id == 2) {
-            // If branch changed OR user just became an admin
             if ($oldBranchId != $user->branch_id || $oldRoleId != 2) {
-                // Clear their previous manager status elsewhere if any
                 Branch::where('user_id', $user->id)->update(['user_id' => null]);
 
                 if ($user->branch_id) {
                     $branch = Branch::find($user->branch_id);
                     if ($branch) {
+                        // If this branch already had a different manager
+                        // (the one just replaced via the conflict modal),
+                        // clear their branch_id — otherwise they stay stuck
+                        // pointing at a branch they no longer manage.
+                        if ($branch->user_id && $branch->user_id != $user->id) {
+                            User::where('id', $branch->user_id)->update(['branch_id' => null]);
+                        }
                         $branch->update(['user_id' => $user->id]);
                     }
                 }
+            } elseif ($user->branch_id) {
+                // Same branch, same role — but this branch might still point
+                // to a stale different manager if it was reassigned to THIS
+                // user via the conflict-replace flow while branch/role didn't
+                // change on the user side. Ensure it's pointed correctly.
+                $branch = Branch::find($user->branch_id);
+                if ($branch && $branch->user_id != $user->id) {
+                    if ($branch->user_id) {
+                        User::where('id', $branch->user_id)->update(['branch_id' => null]);
+                    }
+                    $branch->update(['user_id' => $user->id]);
+                }
             }
         } else {
-            // No longer an admin, clear any branch they were managing
             if ($oldRoleId == 2) {
                 Branch::where('user_id', $user->id)->update(['user_id' => null]);
             }
@@ -711,6 +761,12 @@ class UserManagement extends Component
     public function toggleStatus($userId)
     {
         $user = User::findOrFail($userId);
+
+        if (auth()->user()->isAdmin() && ($user->role_id !== 3 || $user->branch_id !== auth()->user()->branch_id)) {
+            $this->dispatch('notify', type: 'error', message: 'Unauthorized to change this account\'s status.');
+            return;
+        }
+
         $user->is_active = !$user->is_active;
         $user->save();
 
@@ -724,6 +780,15 @@ class UserManagement extends Component
         if (!$idToDelete) return;
 
         $user = User::findOrFail($idToDelete);
+
+        // Admins may only delete Staff accounts within their own branch —
+        // without this, deleteUser() is directly callable with any user
+        // ID, letting an Admin permanently delete a Super Admin or another
+        // branch's staff account.
+        if (auth()->user()->isAdmin() && ($user->role_id !== 3 || $user->branch_id !== auth()->user()->branch_id)) {
+            $this->dispatch('notify', type: 'error', message: 'Unauthorized to delete this account.');
+            return;
+        }
 
         // Nullify foreign key references before deletion to avoid constraint violations
         \App\Models\Order::where('rider_id', $idToDelete)->update(['rider_id' => null]);
@@ -743,6 +808,12 @@ class UserManagement extends Component
 
     public function confirmDelete($id, $name)
     {
+        $user = User::find($id);
+        if ($user && auth()->user()->isAdmin() && ($user->role_id !== 3 || $user->branch_id !== auth()->user()->branch_id)) {
+            $this->dispatch('notify', type: 'error', message: 'Unauthorized.');
+            return;
+        }
+
         $this->deleteTargetId = $id;
         $this->deleteTargetName = $name;
         $this->dispatch('open-modal', name: 'delete-user');

@@ -30,7 +30,7 @@ class BranchManagement extends Component
     public $is_active = '';
     
     // Insights / Comparison state
-    public $comparisonDateRange = 'last_30';
+    public $comparisonDateRange = 'all';
     public $selectedBranchIds = [];
     public $startDate = '';
     public $endDate = '';
@@ -48,8 +48,10 @@ class BranchManagement extends Component
     public bool $status = true;
     public bool $is_main = false;
     public bool $confirmMainDesignation = false;
+    public bool $skipValidation = false;
     public ?int $deleteTargetId = null;
     public string $deleteTargetName = '';
+    public string $pendingManagerName = '';
 
     // PSGC address sub-fields (bound by Alpine PSGC dropdowns + map picker)
     public string $addr_region   = '';
@@ -90,6 +92,7 @@ class BranchManagement extends Component
 
     public function updatedBranchName(string $value)
     {
+        if ($this->skipValidation) return;
         $rules = [
             'required', 'string', 'min:3', 'max:150',
             'regex:' . ValidationHelper::REGEX_NAME,
@@ -120,6 +123,7 @@ class BranchManagement extends Component
 
     public function updatedBranchCode()
     {
+        if ($this->skipValidation) return;
         $rules = [
             'required', 'string', 'max:50',
             Rule::unique('branches', 'branch_code')->ignore($this->branch_id),
@@ -129,11 +133,13 @@ class BranchManagement extends Component
 
     public function updatedPhone()
     {
+        if ($this->skipValidation) return;
         $this->validateFieldLive('phone', ['nullable', 'string', 'regex:~^[0-9]{10}$~'], ['phone.regex' => 'Enter 10-digit mobile number.']);
     }
 
     public function updatedEmail()
     {
+        if ($this->skipValidation) return;
         $rules = array_merge(ValidationHelper::rulesEmail(false), [
             $this->branch_id ? Rule::unique('branches', 'email')->ignore($this->branch_id) : 'unique:branches,email'
         ]);
@@ -142,26 +148,31 @@ class BranchManagement extends Component
 
     public function updatedAddrStreet()
     {
+        if ($this->skipValidation) return;
         $this->validateFieldLive('addr_street', ['nullable', 'string', 'max:255'], ValidationHelper::commonMessages());
     }
 
     public function updatedAddrBarangay()
     {
+        if ($this->skipValidation) return;
         $this->validateFieldLive('addr_barangay', ['nullable', 'string'], ValidationHelper::commonMessages());
     }
 
     public function updatedAddrCity()
     {
+        if ($this->skipValidation) return;
         $this->validateFieldLive('addr_city', ['nullable', 'string'], ValidationHelper::commonMessages());
     }
 
     public function updatedAddrProvince()
     {
+        if ($this->skipValidation) return;
         $this->validateFieldLive('addr_province', ['nullable', 'string'], ValidationHelper::commonMessages());
     }
 
     public function updatedAddrRegion()
     {
+        if ($this->skipValidation) return;
         $this->validateFieldLive('addr_region', ['nullable', 'string'], ValidationHelper::commonMessages());
     }
 
@@ -209,6 +220,9 @@ class BranchManagement extends Component
 
     public function showEdit(int $id)
     {
+        if (!$this->isSuperAdmin()) return;
+
+        $this->skipValidation = true; // suppress hooks while populating
         $this->panel = 'form';
         $this->mode = 'edit';
         $branch = Branch::findOrFail($id);
@@ -235,6 +249,7 @@ class BranchManagement extends Component
         $this->addr_lat      = $addr['lat']       ?? null;
         $this->addr_lng      = $addr['lng']       ?? null;
 
+        $this->skipValidation = false;
         $this->resetValidation();
         $this->updateGlobalHeader('edit');
     }
@@ -251,18 +266,18 @@ class BranchManagement extends Component
         if (!$this->isSuperAdmin()) return;
 
         $branch = Branch::findOrFail($id);
-        
-        // Safety Check 1: Is there an active manager?
-        if ($branch->user_id) {
-            $this->dispatch('notify', 
-                type: 'error',
-                message: "Safety Lock: '{$branch->branch_name}' currently has an active Branch Manager assigned. Reassign or remove the manager before deleting."
-            );
-            return;
-        }
 
-        // Safety Check 2: Are there active staff members?
-        $staffCount = User::where('branch_id', $id)->count();
+        // Safety Check 1: Are there active staff members (excluding the
+        // branch's own manager, who is handled separately below)? This
+        // still hard-blocks, since staff can't be auto-reassigned safely
+        // from this modal.
+        $staffCount = User::where('branch_id', $id)
+            ->where(function ($q) use ($branch) {
+                if ($branch->user_id) {
+                    $q->where('id', '!=', $branch->user_id);
+                }
+            })
+            ->count();
         if ($staffCount > 0) {
             $this->dispatch('notify', 
                 type: 'error',
@@ -273,7 +288,61 @@ class BranchManagement extends Component
 
         $this->deleteTargetId = $id;
         $this->deleteTargetName = $branch->branch_name;
+
+        // Safety Check 2: Is there an active manager? Offer to unassign + delete
+        // instead of just blocking with an error.
+        if ($branch->user_id) {
+            $manager = User::find($branch->user_id);
+            $this->pendingManagerName = $manager
+                ? trim($manager->first_name . ' ' . $manager->last_name)
+                : 'the assigned manager';
+            $this->dispatch('open-modal', 'confirm-delete-with-manager');
+            return;
+        }
+
         $this->dispatch('open-modal', 'delete-branch');
+    }
+
+    public function deleteBranchAndUnassignManager(int $id)
+    {
+        if (!$this->isSuperAdmin()) return;
+
+        $branch = Branch::findOrFail($id);
+
+        // Re-validate staff safety condition at the moment of deletion,
+        // excluding the manager we're about to unassign in this same flow.
+        $staffCount = User::where('branch_id', $id)
+            ->where(function ($q) use ($branch) {
+                if ($branch->user_id) {
+                    $q->where('id', '!=', $branch->user_id);
+                }
+            })
+            ->count();
+        if ($staffCount > 0) {
+            $this->dispatch('notify', type: 'error', message: "Integrity Guard: '{$branch->branch_name}' has {$staffCount} staff members registered. Transfer these users before decommissioning the node.");
+            $this->dispatch('close-modal', 'confirm-delete-with-manager');
+            return;
+        }
+
+        if ($branch->user_id) {
+            User::where('id', $branch->user_id)->update(['branch_id' => null]);
+            $branch->update(['user_id' => null]);
+        }
+
+        DB::transaction(function () use ($branch) {
+            DB::table('branch_ingredient_stocks')->where('branch_id', $branch->id)->delete();
+            $branch->delete();
+        });
+
+        $this->dispatch('notify', type: 'success', message: 'Manager unassigned and branch node decommissioned successfully.');
+        $this->dispatch('refresh-global-map', branches: json_decode($this->buildPlottableBranches(), true));
+        $this->dispatch('refreshTopbar');
+        $this->dispatch('branchContextUpdated');
+        $this->dispatch('close-modal', 'confirm-delete-with-manager');
+        $this->deleteTargetId = null;
+        $this->deleteTargetName = '';
+        $this->pendingManagerName = '';
+        $this->backToList();
     }
 
     public function deleteBranch(int $id)
@@ -281,7 +350,29 @@ class BranchManagement extends Component
         if (!$this->isSuperAdmin()) return;
 
         $branch = Branch::findOrFail($id);
-        
+
+        // Re-validate safety conditions at the moment of deletion — state may
+        // have changed since confirmDeleteBranch() first checked, and this
+        // method is reachable directly regardless of that earlier check.
+        if ($branch->user_id) {
+            $this->dispatch('notify', type: 'error', message: "Safety Lock: '{$branch->branch_name}' currently has an active Branch Manager assigned. Reassign or remove the manager before deleting.");
+            $this->dispatch('close-modal', 'delete-branch');
+            return;
+        }
+
+        $staffCount = User::where('branch_id', $id)
+            ->where(function ($q) use ($branch) {
+                if ($branch->user_id) {
+                    $q->where('id', '!=', $branch->user_id);
+                }
+            })
+            ->count();
+        if ($staffCount > 0) {
+            $this->dispatch('notify', type: 'error', message: "Integrity Guard: '{$branch->branch_name}' has {$staffCount} staff members registered. Transfer these users before decommissioning the node.");
+            $this->dispatch('close-modal', 'delete-branch');
+            return;
+        }
+
         DB::transaction(function () use ($branch) {
             // Clean up related branch stocks
             DB::table('branch_ingredient_stocks')->where('branch_id', $branch->id)->delete();
@@ -310,10 +401,10 @@ class BranchManagement extends Component
                 Rule::unique('branches', 'branch_code')->ignore($this->branch_id),
             ],
             'phone' => ['nullable', 'string', 'regex:~^[0-9]{10}$~'],
-            'email' => array_merge(ValidationHelper::rulesEmail(false), [
+                        'email' => array_merge(ValidationHelper::rulesEmail(false), [
                 $this->branch_id ? Rule::unique('branches', 'email')->ignore($this->branch_id) : 'unique:branches,email'
             ]),
-            'user_id' => ['nullable', Rule::exists('users', 'id')->where('role_id', 2)->where('is_active', 1)],
+            'user_id' => ['nullable', Rule::exists('users', 'id')->whereIn('role_id', [1, 2])->where('is_active', 1)],
             'status'  => ['boolean'],
             'addr_street' => ['nullable', 'string', 'max:255'],
             'addr_barangay' => ['required', 'string'],
@@ -341,9 +432,13 @@ class BranchManagement extends Component
                 Rule::unique('branches', 'branch_code'),
             ],
             'phone' => ['nullable', 'string', 'regex:~^[0-9]{10}$~'],
-            'email' => array_merge(ValidationHelper::rulesEmail(false), ['unique:branches,email']),
-            'user_id' => ['nullable', Rule::exists('users', 'id')->where('role_id', 2)->where('is_active', 1)],
+                        'email' => array_merge(ValidationHelper::rulesEmail(false), ['unique:branches,email']),
+            'user_id' => ['nullable', Rule::exists('users', 'id')->whereIn('role_id', [1, 2])->where('is_active', 1)],
             'status'  => ['boolean'],
+            'addr_barangay' => ['required', 'string'],
+            'addr_city' => ['required', 'string'],
+            'addr_province' => ['required', 'string'],
+            'addr_region' => ['required', 'string'],
         ], ValidationHelper::commonMessages());
 
         // Compose address JSON from PSGC sub-fields
@@ -373,6 +468,20 @@ class BranchManagement extends Component
         if ($mainBranch && $this->addr_lat && $this->addr_lng) {
             $mainAddr = is_array($mainBranch->address) ? $mainBranch->address : json_decode($mainBranch->address, true);
             $distance = $this->calculateDistance($mainAddr['lat'] ?? 0, $mainAddr['lng'] ?? 0, $this->addr_lat, $this->addr_lng);
+        }
+
+        // A branch cannot go live as Active without someone accountable
+        // for it — block registration in that state rather than allowing
+        // it and merely warning after the fact.
+        if ($this->status && !$this->user_id) {
+            $this->dispatch('notify', type: 'error', message: 'Cannot register branch as Active without an assigned manager.');
+            return;
+        }
+
+        if ($this->user_id) {
+            // Clear any other branch that currently claims this manager,
+            // so a manager is never referenced by more than one branch.
+            Branch::where('user_id', $this->user_id)->update(['user_id' => null]);
         }
 
         $branch = Branch::create([
@@ -413,11 +522,15 @@ class BranchManagement extends Component
                 Rule::unique('branches', 'branch_code')->ignore($this->branch_id),
             ],
             'phone' => ['nullable', 'string', 'regex:~^[0-9]{10}$~'],
-            'email' => array_merge(ValidationHelper::rulesEmail(false), [
+                        'email' => array_merge(ValidationHelper::rulesEmail(false), [
                 Rule::unique('branches', 'email')->ignore($this->branch_id)
             ]),
-            'user_id' => ['nullable', Rule::exists('users', 'id')->where('role_id', 2)->where('is_active', 1)],
+            'user_id' => ['nullable', Rule::exists('users', 'id')->whereIn('role_id', [1, 2])->where('is_active', 1)],
             'status'  => ['boolean'],
+            'addr_barangay' => ['required', 'string'],
+            'addr_city' => ['required', 'string'],
+            'addr_province' => ['required', 'string'],
+            'addr_region' => ['required', 'string'],
         ], ValidationHelper::commonMessages());
 
         // Compose address JSON from PSGC sub-fields
@@ -444,6 +557,19 @@ class BranchManagement extends Component
         $branch = Branch::findOrFail($this->branch_id);
         $oldManagerId = $branch->user_id;
         $newManagerId = $this->user_id ?: null;
+
+        // A branch cannot remain/become Active without an assigned manager.
+        if ($this->status && !$newManagerId) {
+            $this->dispatch('notify', type: 'error', message: 'Cannot save as Active without an assigned manager.');
+            return;
+        }
+
+        // If the incoming manager currently manages a different branch,
+        // clear that branch's stale user_id reference so it doesn't end up
+        // pointing at a manager who has moved elsewhere.
+        if ($newManagerId) {
+            Branch::where('user_id', $newManagerId)->where('id', '!=', $branch->id)->update(['user_id' => null]);
+        }
 
         // Recalculate distance
         $mainBranch = Branch::where('is_main', true)->where('id', '!=', $this->branch_id)->first();
@@ -491,6 +617,16 @@ class BranchManagement extends Component
     {
         if (!$this->isSuperAdmin()) return;
         $branch = Branch::findOrFail($id);
+
+        // A branch cannot operate without someone accountable for it — do
+        // not allow activation without an assigned manager. Deactivating
+        // is always allowed regardless of manager status.
+        $activating = !$branch->status;
+        if ($activating && !$branch->user_id) {
+            $this->dispatch('notify', type: 'error', message: "Cannot activate '{$branch->branch_name}': assign a manager first.");
+            return;
+        }
+
         $branch->status = !$branch->status;
         $branch->save();
         $this->dispatch('notify', type: 'success', message: "Operational status for {$branch->branch_name} updated.");
@@ -593,7 +729,8 @@ class BranchManagement extends Component
             if (strtotime($this->startDate) > strtotime($this->endDate)) {
                 $this->dateError = 'Start date cannot be after end date.';
             } else {
-                $this->activeFilter = 'All Time';
+                $this->activeFilter = 'Custom Range';
+                $this->comparisonDateRange = '';
             }
         }
     }
@@ -616,7 +753,7 @@ class BranchManagement extends Component
             'total'    => Branch::count(),
             'active'   => Branch::where('status', 1)->count(),
             'inactive' => Branch::where('status', 0)->count(),
-            'staff'    => User::whereIn('role_id', [2, 3])->count(),
+            'staff'    => User::whereIn('role_id', [3, 5])->count(),
         ];
     }
 
@@ -634,7 +771,7 @@ class BranchManagement extends Component
 
         return view('livewire.branch-management', [
             'branches' => $filteredBranches,
-            'managers' => User::where('role_id', 2)->where('is_active', 1)->get(),
+                        'managers' => User::whereIn('role_id', [1, 2])->where('is_active', 1)->get(),
             'systemStats' => $this->systemStats,
             'matrix' => $matrix,
             'maxNetSales' => $maxNetSales,
@@ -654,76 +791,90 @@ class BranchManagement extends Component
             ->paginate($this->perPage);
     }
 
+    /**
+     * One grouped aggregate query across all selected branches, instead of
+     * one Order query per branch. Also caches the result for this request
+     * so getComparisonTotals() (called separately in render()) doesn't
+     * redo the same aggregation a second time.
+     */
+    private ?\Illuminate\Support\Collection $comparisonMatrixCache = null;
+
     private function getComparisonMatrix()
     {
-        if ($this->panel !== 'insights' || empty($this->selectedBranchIds)) return collect([]);
+        if ($this->comparisonMatrixCache !== null) return $this->comparisonMatrixCache;
+
+        if ($this->panel !== 'insights' || empty($this->selectedBranchIds)) {
+            return $this->comparisonMatrixCache = collect([]);
+        }
 
         $range = $this->getDateRange();
+        $branches = Branch::whereIn('id', $this->selectedBranchIds)->get()->keyBy('id');
 
-        $matrix = Branch::whereIn('id', $this->selectedBranchIds)
+        $stats = Order::whereIn('branch_id', $this->selectedBranchIds)
+            ->whereBetween('created_at', [$range['start'], $range['end']])
+            ->where('status', Order::STATUS_COMPLETED)
+            ->selectRaw('
+                branch_id,
+                SUM(total_amount) as total_collected,
+                SUM(delivery_fee) as delivery_fees,
+                SUM(discount_amount) as total_discounts,
+                COUNT(*) as order_count
+            ')
+            ->groupBy('branch_id')
             ->get()
-            ->map(function ($branch) use ($range) {
-                $orders = Order::where('branch_id', $branch->id)
-                    ->whereBetween('created_at', [$range['start'], $range['end']])
-                    ->whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
-                    ->get();
+            ->keyBy('branch_id');
 
-                $completedOrders = $orders->where('status', Order::STATUS_COMPLETED);
-                
-                $totalCollected = $completedOrders->sum('total_amount');
-                $deliveryFees   = $completedOrders->sum('delivery_fee');
-                $totalDiscounts = $completedOrders->sum('discount_amount');
-                
-                $netSales = $totalCollected - $deliveryFees;
-                $grossSales = $netSales + $totalDiscounts;
-                
-                $orderCount = $completedOrders->count();
-                $atv = $orderCount > 0 ? $totalCollected / $orderCount : 0;
+        $matrix = $branches->map(function ($branch) use ($stats) {
+            $s = $stats->get($branch->id);
 
-                return [
-                    'id' => $branch->id,
-                    'name' => $branch->branch_name,
-                    'order_count' => $orderCount,
-                    'gross_sales' => $grossSales,
-                    'net_sales' => $netSales,
-                    'atv' => $atv,
-                ];
-            });
+            $totalCollected = (float) ($s->total_collected ?? 0);
+            $deliveryFees   = (float) ($s->delivery_fees ?? 0);
+            $totalDiscounts = (float) ($s->total_discounts ?? 0);
+            $orderCount     = (int) ($s->order_count ?? 0);
+
+            $netSales   = $totalCollected - $deliveryFees;
+            $grossSales = $netSales + $totalDiscounts;
+            $atv        = $orderCount > 0 ? $totalCollected / $orderCount : 0;
+
+            return [
+                'id'              => $branch->id,
+                'name'            => $branch->branch_name,
+                'order_count'     => $orderCount,
+                'gross_sales'     => $grossSales,
+                'net_sales'       => $netSales,
+                'atv'             => $atv,
+                'total_collected' => $totalCollected,
+            ];
+        });
 
         $totalNetSales = $matrix->sum('net_sales');
 
-        return $matrix->map(function ($b) use ($totalNetSales) {
+        $matrix = $matrix->map(function ($b) use ($totalNetSales) {
             $b['share_pct'] = $totalNetSales > 0 ? round(($b['net_sales'] / $totalNetSales) * 100, 2) : 0;
             return $b;
         })->sortByDesc('net_sales');
+
+        return $this->comparisonMatrixCache = $matrix;
     }
 
     private function getComparisonTotals()
     {
-        if ($this->panel !== 'insights' || empty($this->selectedBranchIds)) return ['gross' => 0, 'net' => 0, 'orders' => 0, 'atv' => 0];
+        if ($this->panel !== 'insights' || empty($this->selectedBranchIds)) {
+            return ['gross' => 0, 'net' => 0, 'orders' => 0, 'atv' => 0];
+        }
 
-        $range = $this->getDateRange();
-        $orders = Order::whereIn('branch_id', $this->selectedBranchIds)
-            ->whereBetween('created_at', [$range['start'], $range['end']])
-            ->whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
-            ->get();
+        $matrix = $this->getComparisonMatrix();
 
-        $completedOrders = $orders->where('status', Order::STATUS_COMPLETED);
-        
-        $totalCollected = $completedOrders->sum('total_amount');
-        $deliveryFees   = $completedOrders->sum('delivery_fee');
-        $totalDiscounts = $completedOrders->sum('discount_amount');
-        
-        $netSales = $totalCollected - $deliveryFees;
-        $grossSales = $netSales + $totalDiscounts;
-        
-        $orderCount = $completedOrders->count();
+        $grossSales     = $matrix->sum('gross_sales');
+        $netSales       = $matrix->sum('net_sales');
+        $orderCount     = $matrix->sum('order_count');
+        $totalCollected = $matrix->sum('total_collected');
 
         return [
-            'gross' => $grossSales,
-            'net' => $netSales,
+            'gross'  => $grossSales,
+            'net'    => $netSales,
             'orders' => $orderCount,
-            'atv' => $orderCount > 0 ? ($totalCollected / $orderCount) : 0,
+            'atv'    => $orderCount > 0 ? ($totalCollected / $orderCount) : 0,
         ];
     }
 
@@ -742,6 +893,7 @@ class BranchManagement extends Component
             'week'  => Carbon::now()->subDays(7)->startOfDay(),
             'month' => Carbon::now()->subDays(30)->startOfDay(),
             'last_7' => Carbon::now()->subDays(7)->startOfDay(), // Legacy support
+            'all'   => Carbon::createFromTimestamp(0)->startOfDay(),
             default => Carbon::now()->subDays(30)->startOfDay(),
         };
 
@@ -868,7 +1020,12 @@ class BranchManagement extends Component
             ->map(fn($b) => [
                 $b->branch_name,
                 $b->branch_code ?? 'N/A',
-                $b->manager?->first_name . ' ' . ($b->manager?->last_name ?? '') ?: 'Unassigned',
+                // Concatenating first + ' ' + last before falling back to
+                // 'Unassigned' via ?: was buggy: with no manager, the
+                // expression evaluates to a single space (' '), which PHP
+                // treats as truthy, so ?: never triggered and the report
+                // printed a blank cell instead of "Unassigned".
+                $b->manager ? trim($b->manager->first_name . ' ' . $b->manager->last_name) : 'Unassigned',
                 $b->status ? 'Active' : 'Inactive',
                 $b->phone ?? 'N/A',
             ])->toArray();

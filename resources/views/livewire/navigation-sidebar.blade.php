@@ -3,11 +3,10 @@
     id="main-sidebar"
     x-ref="sidebar"
     :class="[
-        isMobile ? 'fixed inset-y-0 left-0 z-[110] transform w-[280px]' : 'relative z-30 flex-shrink-0',
+        isMobile ? 'fixed inset-y-0 left-0 z-[110] transform w-[280px] h-screen' : 'relative z-30 flex-shrink-0 h-full',
         isMobile ? (sidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full') : (sidebarOpen ? 'w-[280px]' : 'w-16')
     ]"
-    class="bg-white border-r border-gray-200 shadow-sm flex flex-col transition-all duration-300 ease-in-out"
-    style="min-height: 100vh;"
+    class="bg-white border-r border-gray-200 shadow-sm flex flex-col transition-all duration-300 ease-in-out min-h-0"
 >
 
     {{-- ── Branding ── --}}
@@ -128,7 +127,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h7" />
                         </svg>
                         <span class="transition-opacity duration-300 whitespace-nowrap"
-                            :class="sidebarOpen ? 'opacity-100' : 'opacity-0 hidden'">Menu Items</span>
+                            :class="sidebarOpen ? 'opacity-100' : 'opacity-0 hidden'">Menu Management</span>
                     </a>
 
                     @if($user->isSuperAdmin())
@@ -156,57 +155,62 @@
                     @endif
                 @endif
 
-                {{-- Stock & Ingredients (role ≤ 3) --}}
+                {{-- Inventory & Ingredients (role ≤ 3) --}}
                 @if($user->role_id <= 3)
                     @php
                         $isStockPage      = request()->routeIs('stock.index');
                         $isAdjustmentPage = request()->routeIs('stock.adjustment');
                         $isOrderingPage   = request()->routeIs('stock.orders') || request()->routeIs('stock.orders.admin');
                         $stockActive      = $isStockPage || $isAdjustmentPage || $isOrderingPage;
+
+                        $activeBranchForOrdering = \App\Services\BranchContext::getActiveBranch();
+                        $isSubBranch = $activeBranchForOrdering && !$activeBranchForOrdering->is_main;
+                        $showOrderInbox = ($user->isSuperAdmin() || ($user->branch && $user->branch->is_main))
+                            && (!$activeBranchForOrdering || $activeBranchForOrdering->is_main);
                     @endphp
 
-                    <div x-data="{ stockOpen: {{ $stockActive ? 'true' : 'false' }} }">
-                        <div class="flex items-center mt-0.5">
-                            <a href="{{ route('stock.index') }}" wire:navigate
-                                class="flex flex-1 items-center gap-3 px-3 py-1.5 rounded-lg transition-colors
-                                    {{ $isStockPage ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
+                    @if($user->role_id <= 2)
+                        {{-- Staff Manager+: full expandable section --}}
+                        <div x-data="{ stockOpen: {{ $stockActive ? 'true' : 'false' }} }">
+                            <button type="button" @click="stockOpen = !stockOpen"
+                                class="w-full flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
+                                    {{ $stockActive ? 'bg-[#F3F4F6] text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' }}">
                                 <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                         d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                                 </svg>
-                                <span class="flex-1 transition-opacity duration-300 whitespace-nowrap"
-                                    :class="sidebarOpen ? 'opacity-100' : 'opacity-0 hidden'">Stock &amp; Ingredients</span>
-                            </a>
+                                <span class="flex-1 text-left transition-opacity duration-300 whitespace-nowrap"
+                                    :class="sidebarOpen ? 'opacity-100' : 'opacity-0 hidden'">Inventory Management</span>
+                                <svg x-show="sidebarOpen" class="w-3 h-3 shrink-0 text-gray-400 transition-transform duration-200" :class="stockOpen ? 'rotate-180' : ''"
+                                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </button>
 
-                            @if($user->role_id <= 2)
-                                <button type="button" @click="stockOpen = !stockOpen" x-show="sidebarOpen"
-                                    class="p-1.5 rounded-md hover:bg-gray-100 text-gray-400 transition-colors flex-shrink-0 mr-1">
-                                    <svg class="w-3 h-3 transition-transform duration-200" :class="stockOpen ? 'rotate-180' : ''"
-                                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
-                                    </svg>
-                                </button>
-                            @endif
-                        </div>
-
-                        @if($user->role_id <= 2)
                             <div x-show="stockOpen && sidebarOpen" x-cloak x-transition.opacity
                                 class="mt-0.5 ml-7 pl-3 border-l-2 border-gray-100 space-y-0.5">
+
+                                {{-- 1. Inventory Overview --}}
+                                <a href="{{ route('stock.index') }}" wire:navigate
+                                    class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors
+                                        {{ $isStockPage ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800' }}">
+                                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m6 10V7M4 21h16a1 1 0 001-1V4a1 1 0 00-1-1H4a1 1 0 00-1 1v16a1 1 0 001 1z" />
+                                    </svg>
+                                    <span class="whitespace-nowrap">Inventory Overview</span>
+                                </a>
+
+                                {{-- 2. Stock Adjustments --}}
                                 <a href="{{ route('stock.adjustment') }}" wire:navigate
                                     class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors
-                                        {{ request()->routeIs('stock.adjustment') ? 'bg-purple-50 text-purple-700' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800' }}">
+                                        {{ $isAdjustmentPage ? 'bg-purple-50 text-purple-700' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800' }}">
                                     <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                                     </svg>
-                                    <span class="whitespace-nowrap">Inventory Adjustments</span>
+                                    <span class="whitespace-nowrap">Stock Adjustments</span>
                                 </a>
 
-                                {{-- NEW: Stock Ordering (Hide if Main Branch or HQ) --}}
-                                @php
-                                    $activeBranchForOrdering = \App\Services\BranchContext::getActiveBranch();
-                                    $isSubBranch = $activeBranchForOrdering && !$activeBranchForOrdering->is_main;
-                                @endphp
-
+                                {{-- 3. Request Supplies (sub-branch) or Branch Requests (HQ/main) --}}
                                 @if($isSubBranch)
                                     <a href="{{ route('stock.orders') }}" wire:navigate
                                         class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors
@@ -214,45 +218,48 @@
                                         <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                                         </svg>
-                                        <span class="whitespace-nowrap">Branch Ordering</span>
+                                        <span class="whitespace-nowrap">Request Supplies</span>
                                     </a>
-                                @endif
-
-                                {{-- Only show Order Inbox to Super Admin or Main Branch Admins, AND only when in HQ or Main context --}}
-                                @php
-                                    $showOrderInbox = ($user->isSuperAdmin() || ($user->branch && $user->branch->is_main)) 
-                                        && (!$activeBranchForOrdering || $activeBranchForOrdering->is_main);
-                                @endphp
-
-                                @if($showOrderInbox)
+                                @elseif($showOrderInbox)
                                     <a href="{{ route('stock.orders.admin') }}" wire:navigate
                                         class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors
                                             {{ request()->routeIs('stock.orders.admin') ? 'bg-amber-50 text-amber-700' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800' }}">
                                         <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                                         </svg>
-                                        <span class="flex-1 whitespace-nowrap">Order Inbox</span>
+                                        <span class="flex-1 whitespace-nowrap">Branch Requests</span>
                                         @if($this->pending_orders_count > 0)
-                                            <span class="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-amber-500 text-[9px] font-black text-white shadow-lg shadow-amber-200/40 {{ $this->pending_orders_count > 0 ? 'animate-pulse' : '' }}">
+                                            <span class="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-amber-500 text-[9px] font-black text-white shadow-lg shadow-amber-200/40 animate-pulse">
                                                 {{ $this->pending_orders_count }}
                                             </span>
                                         @endif
                                     </a>
                                 @endif
                             </div>
-                        @endif
-                    </div>
+                        </div>
+                    @else
+                        {{-- Staff (role 3): plain link, no submenu --}}
+                        <a href="{{ route('stock.index') }}" wire:navigate
+                            class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
+                                {{ $isStockPage ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
+                            <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                    d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                            </svg>
+                            <span class="transition-opacity duration-300 whitespace-nowrap"
+                                :class="sidebarOpen ? 'opacity-100' : 'opacity-0 hidden'">Stock &amp; Ingredients</span>
+                        </a>
+                    @endif
                 @endif
             </div>
 
             {{-- ── III. ADMINISTRATION (Organization) ── --}}
+            @if($user->role_id <= 2)
             <div class="mb-5">
                 <h3 class="px-3 mb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider transition-opacity duration-300"
                     :class="sidebarOpen ? 'opacity-100' : 'opacity-0 h-0 overflow-hidden hidden'">
                     Administration
                 </h3>
-
-                @if($user->role_id <= 2)
                     <a href="{{ route('branches.index') }}" wire:navigate
                         class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
                             {{ request()->routeIs('branches.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
@@ -285,10 +292,10 @@
                                 d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.54 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.784.57-1.838-.196-1.539-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
                         </svg>
                         <span class="transition-opacity duration-300 whitespace-nowrap"
-                            :class="sidebarOpen ? 'opacity-100' : 'opacity-0 hidden'">Customer Reviews</span>
+                            :class="sidebarOpen ? 'opacity-100' : 'opacity-0 hidden'">Customer Feedbacks</span>
                     </a>
-                @endif
             </div>
+            @endif
 
             {{-- ── IV. SYSTEM (Configuration) ── --}}
             @if($user->isSuperAdmin() || $user->isAdmin())

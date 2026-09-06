@@ -1,6 +1,6 @@
 <div
     x-data="branchManagementData($wire, @js($panel), @js($view))"
-    x-on:refresh-global-map.window="updateGlobalBranches($event.detail.branches || $event.detail[0]?.branches)"
+    x-on:refresh-global-map.window="latestBranches = ($event.detail.branches || $event.detail[0]?.branches) || latestBranches; updateGlobalBranches(latestBranches)"
     @trigger-edit-branch.window="$wire.showEdit($event.detail.id)"
     class="relative">
 
@@ -18,7 +18,13 @@
                 addr_province: @entangle('addr_province'),
                 addr_city: @entangle('addr_city'),
                 addr_barangay: @entangle('addr_barangay'),
-                
+
+                // Live copy of branch pin data, kept in sync by every
+                // refresh-global-map dispatch (save/update/delete/set-main) —
+                // updated even while Map View isn't open, so opening it later
+                // always shows current data instead of the page's initial snapshot.
+                latestBranches: @js(json_decode($plottableBranches)),
+
                 // ── Location ──
                 loc: {
                     region: { items: [], search: '', loading: false },
@@ -329,6 +335,11 @@
                         this.mapTimeout = setTimeout(() => {
                             this.map.invalidateSize();
                             updateMarker();
+                            // Same safety net as first-time creation: the modal's
+                            // open transition may still be running when this fires,
+                            // so re-check the size shortly after it settles.
+                            setTimeout(() => { if (this.map) this.map.invalidateSize(); }, 250);
+                            setTimeout(() => { if (this.map) this.map.invalidateSize(); }, 500);
                         }, 50);
                         return;
                     }
@@ -381,6 +392,12 @@
                         });
 
                         updateMarker();
+
+                        // The modal's show transition may still be in flight when the
+                        // map is constructed above, which locks Leaflet into a 0x0 size.
+                        // Force a couple of recalculations after the transition settles.
+                        setTimeout(() => { if (this.map) this.map.invalidateSize(); }, 250);
+                        setTimeout(() => { if (this.map) this.map.invalidateSize(); }, 500);
                     }, 50);
                 },
 
@@ -434,8 +451,9 @@
                 },
 
                 updateGlobalBranches(branches) {
+                    if (branches) this.latestBranches = branches;
                     if (!this.gMap) return;
-                    const rawData = branches || @js(json_decode($plottableBranches));
+                    const rawData = this.latestBranches;
                     const bData = rawData.filter(b => {
                         const lat = parseFloat(b.lat);
                         const lng = parseFloat(b.lng);
@@ -494,12 +512,73 @@
                     }
                 },
 
+                async initializeExistingAddress() {
+                    if (this.loc.region.items.length === 0) await this.loadRegions();
+                    if (!this.addr_region) return;
+
+                    const region = this.loc.region.items.find(r => r.name === this.addr_region);
+                    if (!region) return;
+
+                    try {
+                        const data = await this.fetchWithRetry(`https://psgc.cloud/api/regions/${region.code}/provinces`);
+                        this.loc.province.items = data.sort((a, b) => a.name.localeCompare(b.name));
+                        if (this.loc.province.items.length === 0) {
+                            this.loc.noProvince = true;
+                            const data2 = await this.fetchWithRetry(`https://psgc.cloud/api/regions/${region.code}/cities-municipalities`);
+                            this.loc.city.items = data2.sort((a, b) => a.name.localeCompare(b.name));
+                        }
+                    } catch (e) { console.error('Preload provinces failed', e); }
+
+                    if (this.addr_province && this.loc.province.items.length > 0) {
+                        const province = this.loc.province.items.find(p => p.name === this.addr_province);
+                        if (province) {
+                            try {
+                                const data = await this.fetchWithRetry(`https://psgc.cloud/api/provinces/${province.code}/cities-municipalities`);
+                                this.loc.city.items = data.sort((a, b) => a.name.localeCompare(b.name));
+                            } catch (e) { console.error('Preload cities failed', e); }
+                        }
+                    }
+
+                    if (this.addr_city && this.loc.city.items.length > 0) {
+                        const city = this.loc.city.items.find(c => c.name === this.addr_city);
+                        if (city) {
+                            try {
+                                const data = await this.fetchWithRetry(`https://psgc.cloud/api/cities-municipalities/${city.code}/barangays`);
+                                this.loc.barangay.items = data.sort((a, b) => a.name.localeCompare(b.name));
+                            } catch (e) { console.error('Preload barangays failed', e); }
+                        }
+                    }
+                },
+
                 init() {
+                    this.initializeExistingAddress();
+                    this.$watch('mode', (val) => {
+        if (val === 'create') {
+            this.loc.province.items = [];
+            this.loc.city.items     = [];
+            this.loc.barangay.items = [];
+            this.loc.noProvince     = false;
+        } else if (val === 'edit') {
+            // Every edit can target a different branch, so the cascade
+            // lists must be reloaded for that branch's saved address —
+            // they don't refresh automatically just because addr_region/
+            // addr_province/etc changed via the wire entangle.
+            this.loc.province.items = [];
+            this.loc.city.items     = [];
+            this.loc.barangay.items = [];
+            this.loc.noProvince     = false;
+            this.initializeExistingAddress();
+        }
+    });
                     this.$watch('panel', (val) => {
-                        if (val === 'form') {
-                            this.initMap();
-                        } else {
-                            if (this.marker && this.mode === 'create') {
+                        // The map picker only lives inside its modal and is
+                        // initialized when that modal is explicitly opened
+                        // (see the "Open Map Picker" button's @click). Calling
+                        // initMap() here too — while the modal is still closed
+                        // and its container has zero size — was locking Leaflet
+                        // into a 0x0 box that never recovered on next open.
+                        if (val !== 'form') {
+                            if (this.marker && this.map && this.mode === 'create') {
                                 this.map.removeLayer(this.marker);
                                 this.marker = null;
                             }
@@ -537,19 +616,19 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <x-input-label for="f_branch_name" value="Branch Name *" />
-                                <x-text-input id="f_branch_name" name="branch_name" wire:model.live.debounce.500ms="branch_name" type="text" 
+                                <x-text-input id="f_branch_name" name="branch_name" wire:model.blur="branch_name" type="text" 
                                     class="mt-1 block w-full" placeholder="e.g. {{ \App\Services\ConfigurationService::getBusinessName() }} - Makati" 
                                     inputFilter="name" maxlength="150"
                                     @keydown="FormFilters.nameKeydown($event)" @paste="FormFilters.namePaste($event)"
-                                    :hasError="$errors->has('branch_name')" />
+                                    hasError="{{ $errors->has('branch_name') }}" />
                                 <x-input-error :messages="$errors->get('branch_name')" class="mt-1" />
                             </div>
                             <div>
                                 <x-input-label for="f_branch_code" value="Branch Code *" />
-                                <x-text-input id="f_branch_code" name="branch_code" wire:model.live.debounce.500ms="branch_code" type="text" 
+                                <x-text-input id="f_branch_code" name="branch_code" wire:model.blur="branch_code" type="text" 
                                     class="mt-1 block w-full uppercase" placeholder="e.g. MAKATI-01" 
                                     maxlength="50"
-                                    :hasError="$errors->has('branch_code')" />
+                                    hasError="{{ $errors->has('branch_code') }}" />
                                 <x-input-error :messages="$errors->get('branch_code')" class="mt-1" />
                             </div>
                             <div>
@@ -558,21 +637,21 @@
                                     <div class="flex-shrink-0 inline-flex items-center px-3 h-10 rounded-l-lg border border-r-0 border-gray-200 bg-gray-50 text-gray-500 text-[13px] font-bold">
                                         +63
                                     </div>
-                                    <x-text-input id="f_phone" name="phone" wire:model.live.debounce.500ms="phone" type="text"
+                                    <x-text-input id="f_phone" name="phone" wire:model.blur="phone" type="text"
                                         class="block w-full rounded-l-none" placeholder="912 345 6789" autocomplete="tel"
                                         inputFilter="number" maxlength="10"
                                         @keydown="FormFilters.numberKeydown($event)" @paste="FormFilters.numberPaste($event)"
-                                        :hasError="$errors->has('phone')" />
+                                        hasError="{{ $errors->has('phone') }}" />
                                 </div>
                                 <x-input-error :messages="$errors->get('phone')" class="mt-1" />
                             </div>
                             <div>
                                 <x-input-label for="f_email" value="Email Address" />
-                                <x-text-input id="f_email" name="email" wire:model.live.debounce.500ms="email" type="email" 
+                                <x-text-input id="f_email" name="email" wire:model.blur="email" type="email" 
                                     class="mt-1 block w-full" placeholder="e.g. makati@mistertakoyaki.com" 
                                     autocomplete="email" inputFilter="email" maxlength="255"
                                     @keydown="FormFilters.emailKeydown($event)" @paste="FormFilters.emailPaste($event)"
-                                    :hasError="$errors->has('email')" />
+                                    hasError="{{ $errors->has('email') }}" />
                                 <x-input-error :messages="$errors->get('email')" class="mt-1" />
                             </div>
                         </div>
@@ -715,7 +794,7 @@
                             {{-- Row 3: Street --}}
                             <div>
                                 <x-input-label value="Street / House No. / Landmark" />
-                                <x-text-input wire:model.live.debounce.400ms="addr_street" class="w-full mt-1 h-10" placeholder="e.g. Unit 123, Rosewood Ave, Phase 1" :hasError="$errors->has('addr_street')" />
+                                <x-text-input wire:model.blur="addr_street" class="w-full mt-1 h-10" placeholder="e.g. Unit 123, Rosewood Ave, Phase 1" hasError="{{ $errors->has('addr_street') }}" />
                                 <x-input-error :messages="$errors->get('addr_street')" class="mt-1" />
                             </div>
                         </div>
@@ -811,91 +890,91 @@
                     <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Branch Management</h2>
                     <p class="text-[12px] text-gray-500 font-medium">Total Branches: <span class="text-indigo-600 font-bold">{{ $systemStats['total'] }}</span></p>
                 </div>
-                <div class="flex items-center gap-2">
-                    <x-secondary-button wire:click="showInsights" class="h-10">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2-2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                        Analytics
+                <div class="flex items-center gap-1.5 sm:gap-2">
+                    <x-secondary-button wire:click="showInsights" class="h-10 !px-2.5 sm:!px-4">
+                        <svg class="w-4 h-4 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2-2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                        <span class="hidden sm:inline">Analytics</span>
                     </x-secondary-button>
                     @if($this->isSuperAdmin())
-                        <x-primary-button @click="panel = 'form'; mode = 'create'; $wire.showCreate()" class="h-10">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                            Add Branch
+                        <x-primary-button @click="panel = 'form'; mode = 'create'; $wire.showCreate()" class="h-10 !px-2.5 sm:!px-4">
+                            <svg class="w-4 h-4 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            <span class="hidden sm:inline">Add Branch</span>
                         </x-primary-button>
                     @endif
                 </div>
             </div>
 
             {{-- Fleet Metrics Grid (Matching Dashboard Premium Aesthetic - Compact Footprint) --}}
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
                 {{-- Total Branches --}}
-                <div class="p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Branches</span>
+                <div class="p-3 sm:p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-1 sm:mb-2">
+                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Branches</span>
                         <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                         </div>
                     </div>
-                    <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $systemStats['total'] }}</h3>
-                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Registered branch locations</p>
+                    <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $systemStats['total'] }}</h3>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Registered branch locations</p>
                 </div>
                 
                 {{-- Operational --}}
-                <div class="p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active</span>
+                <div class="p-3 sm:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-1 sm:mb-2">
+                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active</span>
                         <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </div>
                     </div>
-                    <h3 class="text-2xl font-black text-emerald-600 tracking-tight leading-none">{{ $systemStats['active'] }}</h3>
-                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Operational store nodes</p>
+                    <h3 class="text-xl sm:text-2xl font-black text-emerald-600 tracking-tight leading-none">{{ $systemStats['active'] }}</h3>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Operational store nodes</p>
                 </div>
 
                 {{-- Decommissioned --}}
-                <div class="p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Inactive</span>
+                <div class="p-3 sm:p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-1 sm:mb-2">
+                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Inactive</span>
                         <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
                         </div>
                     </div>
-                    <h3 class="text-2xl font-black text-rose-600 tracking-tight leading-none">{{ $systemStats['inactive'] }}</h3>
-                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Temporarily closed locations</p>
+                    <h3 class="text-xl sm:text-2xl font-black text-rose-600 tracking-tight leading-none">{{ $systemStats['inactive'] }}</h3>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Temporarily closed locations</p>
                 </div>
 
                 {{-- Workforce --}}
-                <div class="p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Workforce</span>
+                <div class="p-3 sm:p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-1 sm:mb-2">
+                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Workforce</span>
                         <div class="w-7 h-7 rounded-lg bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                         </div>
                     </div>
-                    <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $systemStats['staff'] }}</h3>
-                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Total employees deployed</p>
+                    <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $systemStats['staff'] }}</h3>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Total employees deployed</p>
                 </div>
             </div>
 
             {{-- Unified Toolbar --}}
-            <div class="relative z-20 flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
+            <div class="relative z-20 flex flex-row items-center justify-between mb-6 gap-2 sm:gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
                 
                 {{-- Left: Search Bar --}}
-                <div class="flex flex-1 w-full lg:w-auto">
+                <div class="flex flex-1 min-w-0 lg:flex-initial">
                     <x-search-bar wireModel="search" placeholder="Find branches..." width="w-full lg:w-72" />
                 </div>
 
                 {{-- Right: Filters & View Toggle --}}
-                <div class="flex flex-wrap items-center lg:justify-end gap-2">
+                <div class="flex flex-nowrap items-center justify-end gap-1.5 sm:gap-2 shrink-0">
 
                     {{-- Status Filter --}}
                     <x-dropdown align="right" width="48" wire:key="filter-status">
                         <x-slot name="trigger">
-                            <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
+                            <x-secondary-button type="button" class="gap-0 sm:gap-1.5 h-10 !px-2.5 sm:!px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
                                 <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                                 </svg>
-                                <span class="text-[12px] whitespace-nowrap">{{ $is_active === '1' ? 'Active Only' : ($is_active === '0' ? 'Inactive Only' : 'All Status') }}</span>
-                                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <span class="hidden sm:inline text-[12px] whitespace-nowrap">{{ $is_active === '1' ? 'Active Only' : ($is_active === '0' ? 'Inactive Only' : 'All Status') }}</span>
+                                <svg class="hidden sm:block w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                                 </svg>
                             </x-secondary-button>
@@ -912,7 +991,7 @@
 
                     {{-- View Toggle: Map (Separate) --}}
                     <button type="button" @click="view = (view === 'map' ? 'table' : 'map')"
-                        class="w-9 h-9 flex items-center justify-center rounded-lg transition-colors focus:outline-none shrink-0"
+                        class="w-10 h-10 flex items-center justify-center rounded-lg transition-colors focus:outline-none shrink-0"
                         :class="view === 'map' ? 'bg-indigo-50 text-indigo-600 border border-indigo-100 shadow-sm' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'"
                         title="Toggle Map View">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -923,7 +1002,7 @@
 
                     {{-- View Toggle (Seamless Single Icon matching User Management) --}}
                     <button type="button" @click="view = (view === 'table' ? 'board' : 'table')"
-                        class="w-9 h-9 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors focus:outline-none shrink-0"
+                        class="w-10 h-10 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors focus:outline-none shrink-0"
                         :title="view === 'table' ? 'Switch to Board View' : 'Switch to Table View'">
                         
                         {{-- Show Board Icon (when in table or map, click to switch to Board) --}}
@@ -1071,6 +1150,9 @@
                             <x-empty-state title="No branches found" description="Try adjusting your filters or search criteria." />
                         </div>
                     @endforelse
+                </div>
+                <div class="mt-4">
+                    <x-pagination :paginator="$branches" />
                 </div>
             </div>
 
@@ -1328,6 +1410,30 @@
         </div>
     </x-modal>
 
+    {{-- Manager-Assigned Delete Modal --}}
+    <x-modal name="confirm-delete-with-manager" maxWidth="sm" focusable>
+        <div class="h-1 w-full bg-amber-400 rounded-t-lg"></div>
+        <div class="p-6 text-left">
+            <div class="flex items-start gap-4 mb-4">
+                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-500">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" stroke-width="2" /></svg>
+                </div>
+                <div>
+                    <h3 class="text-[15px] font-bold text-gray-900 leading-tight">Manager Assigned</h3>
+                    <p class="mt-1 text-[13px] text-gray-500 leading-relaxed">
+                        <b>{{ $deleteTargetName }}</b> currently has <b>{{ $pendingManagerName }}</b> assigned as its manager. Remove this manager assignment and proceed with deleting the branch?
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center justify-end gap-2">
+                <x-secondary-button @click="$dispatch('close-modal', 'confirm-delete-with-manager')">Cancel</x-secondary-button>
+                <x-danger-button wire:click="deleteBranchAndUnassignManager({{ $deleteTargetId ?? 0 }})" @click="$dispatch('close-modal', 'confirm-delete-with-manager')">
+                    Remove Manager &amp; Delete
+                </x-danger-button>
+            </div>
+        </div>
+    </x-modal>
+
     {{-- Save Confirm Modal --}}
     <x-modal name="confirm-save-branch" maxWidth="sm" focusable>
         <div class="h-1 w-full bg-gradient-to-r from-indigo-400 to-blue-500 rounded-t-lg"></div>
@@ -1397,12 +1503,12 @@
             </div>
 
             <div class="flex justify-end gap-3 pt-2">
-                <x-secondary-button x-on:click="$dispatch('close')" class="h-11 px-6">
+                <x-secondary-button x-on:click="$dispatch('close-modal', 'confirm-set-main')" class="h-11 px-6">
                     Cancel
                 </x-secondary-button>
                 <x-primary-button 
                     wire:click="setMainBranch({{ $branch_id ?? 0 }})" 
-                    x-on:click="$dispatch('close')" 
+                    x-on:click="$dispatch('close-modal', 'confirm-set-main')" 
                     class="h-11 px-6 bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200 disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed"
                     :disabled="!$confirmMainDesignation">
                     Confirm & Set as Main

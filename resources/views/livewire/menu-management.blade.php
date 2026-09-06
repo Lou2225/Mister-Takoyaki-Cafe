@@ -159,6 +159,7 @@
                                     Use <span class="font-bold text-indigo-900">Groups</span> to organize variations. 
                                     <span class="font-bold text-indigo-900">Additive</span> mode adds the option price to the base price, while 
                                     <span class="font-bold text-indigo-900">Fixed</span> mode replaces the base price entirely when selected.
+                                    Use the <span class="font-bold text-indigo-900">↻ sync</span> icon to pull in any new options or ingredients from a matching Library template, and the <span class="font-bold text-indigo-900">💾 save</span> icon to push this group's current options and ingredients back to the Library for reuse on other products.
                                 </p>
                             </div>
                         </div>
@@ -188,14 +189,24 @@
                                 @foreach($optionGroups as $idx => $group)
                                     <div class="border border-slate-100 rounded-2xl overflow-hidden shadow-sm" wire:key="opt-group-{{ $idx }}">
                                         <div class="flex items-center justify-between p-4 bg-slate-50/50 border-b border-slate-100">
-                                            <div class="flex items-center gap-3">
+                                                                                        <div class="flex items-center gap-3">
                                                 <span class="text-[13px] font-bold text-slate-900 uppercase tracking-tight">{{ $group['name'] }}</span>
                                                 <span class="px-2 py-0.5 bg-white border border-slate-200 rounded text-[9px] font-black text-slate-400 uppercase tracking-widest">{{ $group['price_mode'] }}</span>
                                                 @if($group['is_required'])
                                                     <span class="text-[9px] font-black text-rose-500 uppercase tracking-widest animate-pulse">Required</span>
                                                 @endif
+                                                @if($group['no_recipe_required'] ?? false)
+                                                    <span class="text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded uppercase tracking-widest">No Recipe</span>
+                                                @endif
                                             </div>
                                             <div class="flex items-center gap-1.5">
+                                                <label class="flex items-center gap-1.5 cursor-pointer mr-2" title="Options in this group skip ingredient tracking and are always available">
+                                                    <input type="checkbox" wire:model.live="optionGroups.{{ $idx }}.no_recipe_required" class="w-3.5 h-3.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+                                                    <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">No Recipe</span>
+                                                </label>
+                                                <button type="button" wire:click="syncGroupFromLibrary({{ $idx }})" class="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all" title="Sync ingredients from Library">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                                </button>
                                                 <button type="button" wire:click="saveGroupToLibrary({{ $idx }})" class="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="Save as Template">
                                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
                                                 </button>
@@ -248,7 +259,8 @@
                                 <h4 class="text-[12px] font-black text-amber-900 uppercase tracking-tight">Recipe & Stock Link</h4>
                                 <p class="text-[11px] text-amber-700/80 leading-relaxed font-medium">
                                     Ingredients assigned to <span class="font-bold text-amber-900">Base</span> are deducted on every sale. 
-                                    Ingredients linked to <span class="font-bold text-amber-900">Options</span> are only deducted when that specific variation is chosen.
+                                    Ingredients linked to <span class="font-bold text-amber-900">Options</span> are only deducted when that specific variation is chosen. 
+                                    An ingredient can only be added once per Base/Option — adding the same one again will be blocked.
                                 </p>
                             </div>
                         </div>
@@ -270,38 +282,93 @@
                                 <div class="p-5 bg-slate-50/50 border border-slate-100 rounded-2xl space-y-4">
                                     <div>
                                         <x-input-label value="Select Ingredient" />
-                                        <div class="mt-1.5">
-                                            <x-dropdown align="left" width="full" containerClasses="block w-full">
-                                                <x-slot name="trigger">
-                                                    <button type="button" class="flex items-center justify-between w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-[13px] text-slate-700 shadow-sm hover:border-slate-300 focus:outline-none transition-all h-11">
-                                                        <span class="font-bold truncate">{{ $selectedIngredientName }}</span>
-                                                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
-                                                    </button>
-                                                </x-slot>
-                                                <x-slot name="content">
-                                                    <div class="p-2">
-                                                        <div class="px-2 pb-2 mb-2 border-b border-slate-50">
-                                                            <div class="relative">
-                                                                <svg class="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                                                                <input wire:model.live.debounce.300ms="ingredientSearch" type="text" placeholder="Search ingredients..." 
-                                                                       class="w-full pl-9 pr-4 py-2 bg-slate-50 border-none rounded-lg text-[12px] font-medium focus:ring-1 focus:ring-indigo-500 placeholder-slate-400">
-                                                            </div>
-                                                        </div>
-                                                        <div class="max-h-60 overflow-y-auto custom-scrollbar">
-                                                            @forelse($allIngredients as $ing)
-                                                                <x-dropdown-link href="#" wire:click.prevent="$set('newIngredientId', {{ $ing->id }})">
-                                                                    <div class="flex items-center justify-between">
-                                                                        <span class="font-medium text-slate-700">{{ $ing->name }}</span>
-                                                                        <span class="text-[10px] font-black text-slate-300 uppercase tracking-widest">{{ $ing->unit }}</span>
-                                                                    </div>
-                                                                </x-dropdown-link>
-                                                            @empty
-                                                                <div class="px-4 py-2 text-[12px] text-slate-400 italic">No ingredients found</div>
-                                                            @endforelse
+                                                                                <div class="relative mt-1.5"
+                                            x-data="{
+                                                open: false,
+                                                openUpward: false,
+                                                top: 0, left: 0, width: 0,
+                                                position() {
+                                                    const trigger = this.$refs.ingredientTrigger;
+                                                    const panel = this.$refs.ingredientPanel;
+                                                    if (!trigger || !panel) return;
+
+                                                    const r = trigger.getBoundingClientRect();
+                                                    const gap = 6;
+                                                    const panelHeight = panel.offsetHeight;
+                                                    const spaceBelow = window.innerHeight - r.bottom;
+                                                    const spaceAbove = r.top;
+
+                                                    // Flip above the field only if there truly isn't room
+                                                    // below AND there's more room above than below.
+                                                    this.openUpward = spaceBelow < (panelHeight + gap) && spaceAbove > spaceBelow;
+
+                                                    this.top = this.openUpward
+                                                        ? (r.top + window.scrollY - panelHeight - gap)
+                                                        : (r.bottom + window.scrollY + gap);
+
+                                                    let left = r.left + window.scrollX;
+                                                    const maxLeft = window.scrollX + window.innerWidth - r.width - 8;
+                                                    this.left = Math.max(8, Math.min(left, maxLeft));
+                                                    this.width = r.width;
+                                                },
+                                                async openDropdown() {
+                                                    this.open = true;
+                                                    // Render first (off-position), measure the real panel
+                                                    // height, THEN place it — this is what lets us decide
+                                                    // up vs down correctly instead of guessing a height.
+                                                    await this.$nextTick();
+                                                    this.position();
+                                                    this.$refs.ingredientSearchInput?.focus();
+                                                }
+                                            }"
+                                            @click.outside="open = false"
+                                            @keydown.escape.window="open = false"
+                                            @scroll.window="open && position()"
+                                            @resize.window="open && position()">
+
+                                            <button type="button" x-ref="ingredientTrigger" @click="open ? (open = false) : openDropdown()"
+                                                class="flex items-center justify-between w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-[13px] text-slate-700 shadow-sm hover:border-slate-300 focus:outline-none transition-all h-11">
+                                                <span class="font-bold truncate">{{ $selectedIngredientName }}</span>
+                                                <svg class="w-4 h-4 text-slate-400 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+                                            </button>
+
+                                            {{-- Teleported to <body>: this panel no longer lives inside any
+                                                 overflow-y-auto ancestor, so opening it can never add a
+                                                 scrollbar to the surrounding card/tab/modal, and it can
+                                                 never be clipped by one either. --}}
+                                            <template x-teleport="body">
+                                                <div x-show="open" x-cloak x-ref="ingredientPanel"
+                                                    x-transition:enter="transition ease-out duration-100"
+                                                    :x-transition:enter-start="openUpward ? 'opacity-0 translate-y-1' : 'opacity-0 -translate-y-1'"
+                                                    x-transition:enter-end="opacity-100 translate-y-0"
+                                                    x-transition:leave="transition ease-in duration-75"
+                                                    x-transition:leave-start="opacity-100"
+                                                    x-transition:leave-end="opacity-0"
+                                                    :style="`position:absolute; top:${top}px; left:${left}px; width:${width}px;`"
+                                                    class="z-[9999] bg-white rounded-xl shadow-lg ring-1 ring-black ring-opacity-5 p-2">
+                                                    <div class="px-2 pb-2 mb-2 border-b border-slate-50">
+                                                        <div class="relative">
+                                                            <svg class="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                                            <input x-ref="ingredientSearchInput" wire:model.live.debounce.300ms="ingredientSearch" type="text" placeholder="Search ingredients..."
+                                                                   class="w-full pl-9 pr-4 py-2 bg-slate-50 border-none rounded-lg text-[12px] font-medium focus:ring-1 focus:ring-indigo-500 placeholder-slate-400">
                                                         </div>
                                                     </div>
-                                                </x-slot>
-                                            </x-dropdown>
+                                                    {{-- Own max-height + own scroll — this scrolling is
+                                                         local to the panel and never bubbles to the page. --}}
+                                                    <div class="max-h-60 overflow-y-auto custom-scrollbar">
+                                                        @forelse($allIngredients as $ing)
+                                                            <x-dropdown-link href="#" wire:click.prevent="$set('newIngredientId', {{ $ing->id }})" @click="open = false">
+                                                                <div class="flex items-center justify-between">
+                                                                    <span class="font-medium text-slate-700">{{ $ing->name }}</span>
+                                                                    <span class="text-[10px] font-black text-slate-300 uppercase tracking-widest">{{ $ing->unit }}</span>
+                                                                </div>
+                                                            </x-dropdown-link>
+                                                        @empty
+                                                            <div class="px-4 py-2 text-[12px] text-slate-400 italic">No ingredients found</div>
+                                                        @endforelse
+                                                    </div>
+                                                </div>
+                                            </template>
                                         </div>
                                         <x-input-error :messages="$errors->get('newIngredientId')" class="mt-1" />
                                     </div>
@@ -338,12 +405,14 @@
                                                         </button>
                                                     </x-slot>
                                                     <x-slot name="content" class="max-h-64 overflow-y-auto">
-                                                        <x-dropdown-link href="#" wire:click.prevent="$set('newIngredientOwner', 'base')">Base Product</x-dropdown-link>
+                                                                                                        <x-dropdown-link href="#" wire:click.prevent="$set('newIngredientOwner', 'base')">Base Product</x-dropdown-link>
                                                         @foreach($optionGroups as $gIdx => $group)
-                                                            <div class="px-4 py-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-50/50">{{ $group['name'] }}</div>
-                                                            @foreach($group['options'] as $oIdx => $option)
-                                                                <x-dropdown-link href="#" wire:click.prevent="$set('newIngredientOwner', 'option:{{ $gIdx }}_{{$oIdx}}')">{{ $option['name'] }}</x-dropdown-link>
-                                                            @endforeach
+                                                            @if(!($group['no_recipe_required'] ?? false))
+                                                                <div class="px-4 py-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-50/50">{{ $group['name'] }}</div>
+                                                                @foreach($group['options'] as $oIdx => $option)
+                                                                    <x-dropdown-link href="#" wire:click.prevent="$set('newIngredientOwner', 'option:{{ $gIdx }}_{{$oIdx}}')">{{ $option['name'] }}</x-dropdown-link>
+                                                                @endforeach
+                                                            @endif
                                                         @endforeach
                                                     </x-slot>
                                                 </x-dropdown>
@@ -375,7 +444,7 @@
                                                     <div>
                                                         <div class="flex items-center gap-2">
                                                             <span class="text-[14px] font-bold text-slate-900 leading-none">{{ $ri['name'] }}</span>
-                                                            <span class="text-[9px] font-black {{ $ri['owner'] === 'base' ? 'text-indigo-600 bg-indigo-50' : 'text-amber-600 bg-amber-50' }} px-2 py-0.5 rounded-full uppercase tracking-widest">{{ $ri['owner'] === 'base' ? 'Base' : 'Option' }}</span>
+                                                            <span class="text-[9px] font-black {{ $ri['owner'] === 'base' ? 'text-indigo-600 bg-indigo-50' : 'text-amber-600 bg-amber-50' }} px-2 py-0.5 rounded-full uppercase tracking-widest">{{ $this->getOwnerLabel($ri['owner']) }}</span>
                                                         </div>
                                                         <div class="flex items-center gap-3 mt-1.5">
                                                             <span class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Cost: <span class="text-rose-500">₱{{ number_format(($ri['cost'] ?? 0) * ($ri['quantity'] ?? 0), 2) }}</span></span>
@@ -567,7 +636,14 @@
                         <div class="space-y-1.5 opacity-60">
                             @foreach($tmpl->items->take(3) as $tItem)
                                 <div class="flex items-center justify-between text-[11px] font-medium text-slate-500">
-                                    <span>{{ $tItem->name }}</span>
+                                    <span class="flex items-center gap-1.5">
+                                        {{ $tItem->name }}
+                                        @if($tItem->ingredients->count() > 0)
+                                            <span class="inline-flex items-center gap-0.5 text-[9px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full" title="{{ $tItem->ingredients->pluck('ingredient.name')->join(', ') }}">
+                                                🧪 {{ $tItem->ingredients->count() }}
+                                            </span>
+                                        @endif
+                                    </span>
                                     @if($tItem->price > 0)
                                         <span class="font-bold">+₱{{ number_format($tItem->price, 2) }}</span>
                                     @endif
@@ -665,21 +741,21 @@
             </div>
 
         {{-- macOS Style Unified Toolbar --}}
-        <div class="flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
+        <div class="flex flex-row items-center justify-between mb-6 gap-2 sm:gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
             
             {{-- Left: Search Bar --}}
-            <div class="w-full lg:w-auto flex-1">
+            <div class="flex-1 min-w-0 lg:flex-initial">
                 <x-search-bar x-model.debounce.50ms="searchQuery" placeholder="Find product..." width="w-full lg:w-80" />
             </div>
 
             {{-- Right: Filters & View Toggle --}}
-            <div class="flex flex-wrap items-center lg:justify-end gap-2">
+            <div class="flex flex-nowrap items-center justify-end gap-1.5 sm:gap-2 shrink-0">
                 <x-dropdown align="right" width="48" containerClasses="block w-full lg:w-auto">
                     <x-slot name="trigger">
-                        <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
+                        <x-secondary-button type="button" class="gap-0 sm:gap-1.5 h-10 !px-2.5 sm:!px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
                             <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 0 1 3 12V7a4 4 0 0 1 4-4z" /></svg>
-                            <span class="text-[12px] whitespace-nowrap">{{ $selectedFilterCategoryName }}</span>
-                            <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
+                            <span class="hidden sm:inline text-[12px] whitespace-nowrap">{{ $selectedFilterCategoryName }}</span>
+                            <svg class="hidden sm:block w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
                         </x-secondary-button>
                     </x-slot>
                     <x-slot name="content">
@@ -714,10 +790,10 @@
                 @if($this->isSuperAdmin())
                     <x-dropdown align="right" width="48" containerClasses="block w-full lg:w-auto">
                         <x-slot name="trigger">
-                            <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
-                                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                                <span class="text-[12px] whitespace-nowrap">{{ $selectedBranchId ? $branches->firstWhere('id', $selectedBranchId)?->branch_name : 'All Branches' }}</span>
-                                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                            <x-secondary-button type="button" class="gap-0 sm:gap-1.5 h-10 !px-2.5 sm:!px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
+                            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                            <span class="hidden sm:inline text-[12px] whitespace-nowrap">{{ $selectedBranchId ? $branches->firstWhere('id', $selectedBranchId)?->branch_name : 'All Branches' }}</span>
+                                <svg class="hidden sm:block w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                             </x-secondary-button>
                         </x-slot>
                         <x-slot name="content">
@@ -736,24 +812,24 @@
 
                 <x-dropdown align="right" width="48" containerClasses="block w-full lg:w-auto">
                     <x-slot name="trigger">
-                        <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
+                        <x-secondary-button type="button" class="gap-0 sm:gap-1.5 h-10 !px-2.5 sm:!px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
                             <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                            <span class="text-[12px] whitespace-nowrap">{{ $isActive === '1' ? 'Active Only' : ($isActive === '0' ? 'Hidden Only' : 'All Status') }}</span>
-                            <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
+                            <span class="hidden sm:inline text-[12px] whitespace-nowrap">{{ $statusFilter === '1' ? 'Active Only' : ($statusFilter === '0' ? 'Hidden Only' : 'All Status') }}</span>
+                            <svg class="hidden sm:block w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
                         </x-secondary-button>
                     </x-slot>
                     <x-slot name="content">
-                        <x-dropdown-link href="#" wire:click.prevent="$set('isActive', '')">All Status</x-dropdown-link>
+                        <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', '')">All Status</x-dropdown-link>
                         <hr class="border-slate-50">
-                        <x-dropdown-link href="#" wire:click.prevent="$set('isActive', '1')">Active Only</x-dropdown-link>
-                        <x-dropdown-link href="#" wire:click.prevent="$set('isActive', '0')">Hidden Only</x-dropdown-link>
+                        <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', '1')">Active Only</x-dropdown-link>
+                        <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', '0')">Hidden Only</x-dropdown-link>
                     </x-slot>
                 </x-dropdown>
 
                 <div class="hidden lg:block w-px h-6 bg-slate-200 mx-2"></div>
 
                 <button type="button" @click="tableView = (tableView === 'table' ? 'board' : 'table')"
-                    class="w-9 h-9 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors focus:outline-none shrink-0"
+                    class="w-10 h-10 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors focus:outline-none shrink-0"
                     :title="tableView === 'table' ? 'Board View' : 'Table View'">
                     <svg x-cloak x-show="tableView === 'table'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
                     <svg x-cloak x-show="tableView === 'board'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
@@ -801,8 +877,8 @@
                                 </td>
                                 <td class="py-4 px-6 border-r border-slate-100/50 text-center whitespace-nowrap">
                                     <button type="button" wire:click.stop="toggleStatus({{ $product->id }})" class="flex items-center justify-center gap-2 hover:opacity-85 transition-opacity focus:outline-none mx-auto">
-                                        <span class="h-1.5 w-1.5 rounded-full {{ $product->is_active ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
-                                        <span class="text-[11px] font-bold {{ $product->is_active ? 'text-emerald-600' : 'text-rose-600' }} uppercase">{{ $product->is_active ? 'Active' : 'Hidden' }}</span>
+                                        <span class="h-1.5 w-1.5 rounded-full {{ $product->effective_is_active ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
+                                        <span class="text-[11px] font-bold {{ $product->effective_is_active ? 'text-emerald-600' : 'text-rose-600' }} uppercase">{{ $product->effective_is_active ? 'Active' : 'Hidden' }}</span>
                                     </button>
                                 </td>
                                 <td class="py-4 px-6 border-r border-slate-100/50 text-right whitespace-nowrap">
@@ -853,7 +929,7 @@
                                             </x-slot>
                                             <x-slot name="content">
                                                 <template x-for="option in [5, 10, 15, 30, 50, 100]">
-                                                    <x-dropdown-link href="#" @click.prevent="perPage = option; currentPage = 1;">
+                                                    <x-dropdown-link href="#" x-on:click.prevent="perPage = option; currentPage = 1; dropdownOpen = false;">
                                                         <span x-text="option"></span>
                                                     </x-dropdown-link>
                                                 </template>
@@ -930,7 +1006,7 @@
                  x-cloak>
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     @forelse($products as $product)
-                        <div wire:key="prod-card-{{ $product->id }}" x-show="isItemVisible({{ $product->id }})" x-cloak class="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm hover:shadow-md transition-all group/card relative cursor-pointer" wire:click="showEdit({{ $product->id }})">
+                        <div wire:key="prod-card-{{ $product->id }}" x-show="isItemVisible({{ $product->id }})" x-cloak class="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm hover:shadow-md transition-all group/card relative {{ $this->isSuperAdmin() ? 'cursor-pointer' : '' }}" @if($this->isSuperAdmin()) wire:click="showEdit({{ $product->id }})" @endif>
                             <div class="aspect-[4/3] rounded-xl bg-slate-50 border border-slate-100 overflow-hidden mb-4 relative shadow-inner">
                                 @if($product->image)
                                     <img src="{{ Storage::url($product->image) }}" class="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-110">
@@ -941,8 +1017,8 @@
                                     <span class="px-2 py-1 bg-white/90 backdrop-blur-md border border-white/20 rounded-lg text-[11px] font-black text-slate-900 shadow-sm font-mono tracking-tighter italic">₱{{ number_format($product->price, 2) }}</span>
                                 </div>
                                 <div class="absolute bottom-2 left-2 bg-white/95 backdrop-blur-sm rounded-lg px-2.5 py-1 shadow-sm border border-slate-100/50 flex items-center justify-center gap-1.5">
-                                    <span class="h-1.5 w-1.5 rounded-full {{ $product->is_active ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
-                                    <span class="text-[10px] font-bold {{ $product->is_active ? 'text-emerald-600' : 'text-rose-600' }} uppercase tracking-wider">{{ $product->is_active ? 'Active' : 'Hidden' }}</span>
+                                    <span class="h-1.5 w-1.5 rounded-full {{ $product->effective_is_active ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
+                                    <span class="text-[10px] font-bold {{ $product->effective_is_active ? 'text-emerald-600' : 'text-rose-600' }} uppercase tracking-wider">{{ $product->effective_is_active ? 'Active' : 'Hidden' }}</span>
                                 </div>
                             </div>
                             <div class="flex items-start justify-between gap-3">
@@ -989,7 +1065,7 @@
                                             </x-slot>
                                             <x-slot name="content">
                                                 <template x-for="option in [5, 10, 15, 30, 50, 100]">
-                                                    <x-dropdown-link href="#" @click.prevent="perPage = option; currentPage = 1;">
+                                                    <x-dropdown-link href="#" x-on:click.prevent="perPage = option; currentPage = 1; dropdownOpen = false;">
                                                         <span x-text="option"></span>
                                                     </x-dropdown-link>
                                                 </template>
@@ -1193,6 +1269,10 @@
                             </x-slot>
                         </x-dropdown>
                     </div>
+                </div>
+                                <div class="flex items-center gap-3 p-3 bg-amber-50/50 rounded-xl border border-amber-100 transition-all hover:bg-amber-50">
+                    <input type="checkbox" wire:model.live="newGroupNoRecipeRequired" id="no_recipe_group" class="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+                    <label for="no_recipe_group" class="text-[12px] font-medium text-slate-700 cursor-pointer">No Recipe Required (options always available, skip ingredient tracking)</label>
                 </div>
                 <div class="flex items-center gap-3 p-3 bg-slate-50/50 rounded-xl border border-slate-100 transition-all hover:bg-indigo-50/30">
                     <input type="checkbox" wire:model.live="newGroupIsRequired" id="is_req_group" class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">

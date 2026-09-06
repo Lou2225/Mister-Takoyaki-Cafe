@@ -1,4 +1,5 @@
-<div wire:poll.10s>
+<div>
+    <div wire:poll.10s="$refresh" style="display:none;"></div>
     <!-- ApexCharts Library -->
 
 
@@ -15,12 +16,14 @@
         $bannerConfig = $roleTheme;
     @endphp
 
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
 
     <div
-        x-data="{ show: true }"
-        wire:ignore.self
-        wire:key="welcome-banner-wrapper"
-    >
+    x-data="{ show: true }"
+    wire:key="welcome-banner-wrapper"
+>
         {{-- Welcome Banner --}}
         <div
             x-show="show"
@@ -80,14 +83,14 @@
             
             {{-- Primary Branch Selection --}}
             <div class="w-full sm:w-auto">
-                <div class="w-full sm:w-max sm:min-w-[250px] sm:max-w-md min-w-0">
+                <div class="w-full sm:w-auto min-w-0">
                     @if($isSuperAdmin)
-                        <x-dropdown align="left" width="96" wire:key="dashboard-branch-filter" containerClasses="w-full">
+                        <x-dropdown align="left" width="96" wire:key="dashboard-branch-filter" containerClasses="w-full sm:w-auto">
                             <x-slot name="trigger">
-                                <x-secondary-button type="button" class="gap-2 w-full justify-between sm:justify-start min-h-[2.5rem] h-auto py-2">
-                                    <div class="flex items-center gap-2">
+                                <x-secondary-button type="button" class="gap-2 w-full sm:w-auto justify-between sm:justify-start h-10 !py-0 whitespace-nowrap">
+                                    <div class="flex items-center gap-2 min-w-0">
                                         <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                                        <span class="whitespace-normal text-left leading-snug text-[13px] sm:text-[14px]">{{ $branches->firstWhere('id', $selectedBranchId)?->branch_name ?? 'Enterprise Overview' }}</span>
+                                        <span class="truncate max-w-[220px] text-left text-[13px] sm:text-[14px]" wire:key="branch-label-{{ $selectedBranchId }}">{{ $branches->firstWhere('id', $selectedBranchId)?->branch_name ?? 'Enterprise Overview' }}</span>
                                     </div>
                                     <svg class="w-3.5 h-3.5 text-gray-400 shrink-0 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                                 </x-secondary-button>
@@ -109,9 +112,9 @@
                     @else
                         @php $adminBranch = auth()->user()->branch; @endphp
                         @if($adminBranch)
-                        <div class="inline-flex items-center gap-2 px-4 py-2 text-[12px] font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-sm min-h-[2.5rem] w-full sm:w-auto sm:min-w-[250px] sm:max-w-md">
+                        <div class="inline-flex items-center gap-2 px-4 h-10 text-[12px] font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-sm w-full sm:w-auto">
                             <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                            <span class="text-left leading-snug whitespace-normal text-[13px] sm:text-[14px]">{{ $adminBranch->branch_name }}</span>
+                            <span class="text-left whitespace-nowrap truncate max-w-[220px] text-[13px] sm:text-[14px]">{{ $adminBranch->branch_name }}</span>
                         </div>
                         @endif
                     @endif
@@ -120,9 +123,9 @@
 
             {{-- 3-in-1 Datepicker & Report Dropdown --}}
             <div class="flex items-center gap-2 w-full sm:w-auto">
-                <x-date-filter startModel="startDate" endModel="endDate" activeModel="activeFilter" refreshAction="refreshChart" />
-                <x-report-dropdown module="Dashboard" />
-            </div>
+    <x-date-filter startModel="startDate" endModel="endDate" activeModel="activeFilter" refreshAction="refreshChart" />
+    <x-report-dropdown module="Dashboard" />
+</div>
 
         </div>
     </div>
@@ -172,11 +175,11 @@
                         <div class="flex flex-col justify-between h-full">
                             <div>
                                 <div class="flex items-center justify-between mb-2">
-                                    <span class="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Net Profit</span>
+                                    <span class="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Gross Profit</span>
                                     <span class="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 transition-colors">View &rarr;</span>
                                 </div>
                                 <h3 class="text-2xl font-black text-slate-900 tracking-tight">₱ {{ number_format($kpi['gross_profit'], 2) }}</h3>
-                                <p class="text-[11px] text-slate-500 font-semibold mt-0.5">Net profit margin of {{ $kpi['profit_margin_pct'] }}%</p>
+                                <p class="text-[11px] text-slate-500 font-semibold mt-0.5">Gross profit margin of {{ $kpi['profit_margin_pct'] }}%</p>
                             </div>
 
                             {{-- Double Indicators (Inflow & Outflow) --}}
@@ -186,7 +189,7 @@
                                     <div class="flex items-center justify-between text-[11px] font-bold">
                                         <span class="text-emerald-600 uppercase tracking-wider flex items-center gap-1">
                                             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                            Sales intake
+                                            Revenue Collected
                                         </span>
                                         <span class="text-slate-700">₱ {{ number_format($kpi['net_sales'], 2) }}</span>
                                     </div>
@@ -240,7 +243,7 @@
                                 <span class="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 transition-colors">View</span>
                             </div>
                             <h3 class="text-2xl font-black text-slate-900 tracking-tight">₱ {{ number_format($kpi['aov'], 2) }}</h3>
-                            <p class="text-[11px] text-slate-500 font-semibold mt-0.5">Sales intensity per ticket</p>
+                            <p class="text-[11px] text-slate-500 font-semibold mt-0.5">Average spend per order</p>
                         </div>
                         {{-- Small Sparkline bottom --}}
                         <div class="w-full h-[35px] mt-4" wire:ignore>
@@ -252,11 +255,11 @@
                     <div wire:click="openBreakdown('COGS')" class="p-5 sm:p-6 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between relative overflow-hidden group">
                         <div>
                             <div class="flex items-center justify-between mb-2">
-                                <span class="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Resource Costs</span>
+                                <span class="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Ingredient Costs</span>
                                 <span class="text-[11px] font-bold text-rose-600 hover:text-rose-700 transition-colors">View</span>
                             </div>
                             <h3 class="text-2xl font-black text-slate-900 tracking-tight">₱ {{ number_format($kpi['total_cogs'], 2) }}</h3>
-                            <p class="text-[11px] text-slate-500 font-semibold mt-0.5">Raw material consumption</p>
+                            <p class="text-[11px] text-slate-500 font-semibold mt-0.5">Cost of goods sold this period</p>
                         </div>
                         {{-- Small Sparkline bottom --}}
                         <div class="w-full h-[35px] mt-4" wire:ignore>
@@ -276,37 +279,37 @@
                 </div>
                 
                 <div class="grid grid-cols-2 gap-y-8 gap-x-6 flex-grow">
-                    {{-- Master Catalog --}}
+                    {{-- Menu Items --}}
                     <div class="group">
-                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Master Catalog</span>
+                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Menu Items</span>
                         <h3 class="text-3xl font-black text-gray-900 tracking-tighter">{{ $kpi['active_products'] }}</h3>
-                        <p class="text-[11px] font-bold text-gray-500 mt-1 uppercase tracking-wider">Active Items</p>
+                        <p class="text-[11px] font-bold text-gray-500 mt-1 uppercase tracking-wider">Currently Active</p>
                     </div>
 
-                    {{-- Materials --}}
+                    {{-- Ingredients --}}
                     <div class="group">
-                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Materials</span>
+                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Ingredients</span>
                         <h3 class="text-3xl font-black text-gray-900 tracking-tighter">{{ $kpi['total_ingredients'] }}</h3>
-                        <p class="text-[11px] font-bold text-gray-500 mt-1 uppercase tracking-wider">Raw Resources</p>
+                        <p class="text-[11px] font-bold text-gray-500 mt-1 uppercase tracking-wider">Tracked Items</p>
                     </div>
 
-                    {{-- System Alerts --}}
+                    {{-- Inventory Alerts --}}
                     <div class="group">
-                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">System Alerts</span>
+                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Inventory Alerts</span>
                         <h3 @class(['text-3xl font-black tracking-tighter', ($kpi['low_stock_count'] > 0 || count($expirationAlerts) > 0) ? 'text-red-600' : 'text-gray-900'])>
                             {{ $kpi['low_stock_count'] + count($expirationAlerts) }}
                         </h3>
-                        <p class="text-[11px] font-bold text-gray-500 mt-1 uppercase tracking-wider">Stock Threats</p>
+                        <p class="text-[11px] font-bold text-gray-500 mt-1 uppercase tracking-wider">Low Stock & Expiring</p>
                     </div>
 
-                    {{-- Workforce --}}
+                    {{-- Staff --}}
                     <div class="group">
-                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Workforce</span>
+                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Staff</span>
                         <div class="flex items-baseline gap-1">
                             <h3 class="text-3xl font-black text-gray-900 tracking-tighter">{{ explode(' / ', $kpi['staff_active'])[0] }}</h3>
                             <span class="text-[12px] font-bold text-gray-300">/ {{ explode(' / ', $kpi['staff_active'])[1] }}</span>
                         </div>
-                        <p class="text-[11px] font-bold text-gray-500 mt-1 uppercase tracking-wider">On-Duty Staff</p>
+                        <p class="text-[11px] font-bold text-gray-500 mt-1 uppercase tracking-wider">Active Accounts</p>
                     </div>
                 </div>
             </div>
@@ -353,7 +356,7 @@
                                             @elseif($selectedMetric === 'AOV')
                                                 Total Revenue ÷ Order Count
                                             @elseif($selectedMetric === 'Profit')
-                                                Revenue - Total Costs (COGS)
+    Net Sales - COGS - Waste
                                             @elseif($selectedMetric === 'Margin')
                                                 (Net Profit ÷ Revenue) × 100
                                             @endif
@@ -405,7 +408,7 @@
                                 <div class="flex justify-between items-end bg-slate-900 p-6 rounded-2xl shadow-xl shadow-slate-200 overflow-hidden relative">
                                     <div class="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full -mr-16 -mt-16"></div>
                                     <div class="relative z-10">
-                                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-1">Net Earnings Result</span>
+                                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-1">Gross Profit Result</span>
                                         <p class="text-3xl font-black text-white">₱ {{ number_format($kpi['gross_profit'], 2) }}</p>
                                     </div>
                                     <div class="relative z-10 text-right">
@@ -470,7 +473,7 @@
         </x-side-panel>
 
         {{-- ─── Main Analytical Layer ────────────────────────────────────────── --}}
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6" x-data="dashboardCharts()" @update-sales-chart.window="handleChartUpdate($event.detail)" wire:ignore.self wire:key="dashboard-charts-container">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6" x-data="dashboardCharts()" @update-sales-chart.window="handleChartUpdate($event.detail)" wire:key="dashboard-charts-container">
             {{-- 1: Financial Overview (Line Chart) --}}
             <div class="lg:col-span-8 rounded-2xl bg-white border border-gray-200/80 shadow-sm p-5 sm:p-6 overflow-hidden h-[400px] relative flex flex-col justify-between">
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
@@ -502,6 +505,7 @@
 
             {{-- 2: Branch Pin Locations Map Card (1/3 width) --}}
             <div class="lg:col-span-4 rounded-2xl bg-white border border-gray-200/80 shadow-sm p-5 sm:p-6 flex flex-col justify-between h-[400px] overflow-hidden" 
+                 wire:key="dashboard-branch-map"
                  x-data='window.branchMapWidget(@json($branchMapData))'>
                  
                 <!-- Leaflet assets loaded globally in app layout -->
@@ -543,6 +547,17 @@
                     <div class="flex items-center justify-between mb-1">
                         <h2 class="text-[14px] font-bold text-gray-900 tracking-tight">Branch Live Map</h2>
                         
+                        <div class="flex items-center gap-1.5">
+                        {{-- Expand Button --}}
+                        <button type="button"
+                                @click="$dispatch('open-modal', 'branch-map-expanded')"
+                                class="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-500 hover:text-gray-800 transition-all shrink-0"
+                                title="Expand map">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+                            </svg>
+                        </button>
+
                         {{-- Dropdown Switcher --}}
                         <div class="relative" @click.away="mapModeOpen = false">
                             <button @click="mapModeOpen = !mapModeOpen" 
@@ -581,6 +596,7 @@
                                 </button>
                             </div>
                         </div>
+                        </div>
                     </div>
                     <p class="text-[11px] text-gray-400 font-medium mb-3">Laguna Branch network sales footprint</p>
                 </div>
@@ -615,6 +631,40 @@
                     @endforelse
                 </div>
             </div>
+        </div>
+
+        {{-- ─── Branch Map Expanded Modal ─────────────────── --}}
+        <div x-data='window.branchMapExpandedWidget(@json($branchMapData))' x-init="
+            window.addEventListener('open-modal', (e) => {
+                if (e.detail === 'branch-map-expanded') $nextTick(() => initExpandedMap());
+            });
+        ">
+        <x-modal name="branch-map-expanded" maxWidth="4xl" focusable wire:key="modal-branch-map-expanded">
+            <div class="p-5 sm:p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 class="text-[16px] font-black text-slate-900 tracking-tight">Branch Live Map</h3>
+                        <p class="text-[12px] text-gray-400 font-medium mt-0.5">Laguna branch network sales footprint</p>
+                    </div>
+                    <button type="button" @click="$dispatch('close-modal', 'branch-map-expanded')" class="text-slate-400 hover:text-slate-600 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+
+                <div class="relative w-full rounded-xl overflow-hidden shadow-inner border border-slate-200/80" style="height: 520px;" wire:ignore>
+                    <div id="branchMapExpanded" class="w-full h-full z-0"></div>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+                    @foreach($branchMapData as $branch)
+                        <div class="p-3 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-between text-[11px]">
+                            <span class="font-bold {{ $branch['is_highest'] ? 'text-gray-900' : 'text-gray-500' }}">{{ $branch['clean_name'] }}</span>
+                            <span class="font-black text-gray-900">₱{{ number_format($branch['total_sales'], 2) }}</span>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        </x-modal>
         </div>
 
         {{-- ─── Secondary Analytical Grid ────────────────── --}}
@@ -692,36 +742,38 @@
             </div>
 
             {{-- 2: Usage Velocity (Linear Items) --}}
-            <div class="lg:col-span-4 p-6 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col h-[400px]">
-                <div class="flex items-center justify-between mb-8">
-                    <h2 class="text-[14px] font-black text-gray-900 uppercase tracking-widest">Usage Velocity</h2>
+            <div class="lg:col-span-4 p-6 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col h-[400px] min-h-0">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-[14px] font-black text-gray-900 uppercase tracking-widest">Ingredient Consumption</h2>
                 </div>
-                <div class="space-y-4 flex-1 pr-2">
-                    @forelse($inventoryIntel['velocity'] as $v)
-                        <div class="space-y-1.5 p-3 rounded-lg bg-gray-50 border border-gray-100 transition-all hover:border-{{ $user->role_id === 1 ? 'indigo' : ($user->role_id === 2 ? 'rose' : 'emerald') }}-300 text-left">
-                            <div class="flex justify-between items-end">
-                                <span class="text-[12px] font-black text-gray-800 tracking-tight">{{ $v['name'] }}</span>
-                                <span class="text-[10px] font-black text-{{ $user->role_id === 1 ? 'indigo' : ($user->role_id === 2 ? 'rose' : 'emerald') }}-600 uppercase tracking-widest">{{ $v['daily'] }} / DAY</span>
+                <div class="flex-1 min-h-0 overflow-hidden">
+                    <div class="h-full overflow-y-auto pr-2 pb-2 space-y-4 min-h-0 custom-scrollbar">
+                        @forelse($inventoryIntel['velocity'] as $v)
+                            <div class="space-y-1.5 p-3 rounded-lg bg-gray-50 border border-gray-100 transition-all hover:border-{{ $user->role_id === 1 ? 'indigo' : ($user->role_id === 2 ? 'rose' : 'emerald') }}-300 text-left">
+                                <div class="flex justify-between items-end gap-3 min-w-0">
+                                    <span class="text-[12px] font-black text-gray-800 tracking-tight truncate">{{ $v['name'] }}</span>
+                                    <span class="text-[10px] font-black text-{{ $user->role_id === 1 ? 'indigo' : ($user->role_id === 2 ? 'rose' : 'emerald') }}-600 uppercase tracking-widest whitespace-nowrap">{{ $v['daily'] }} / DAY</span>
+                                </div>
+                                <div class="h-1 w-full bg-white rounded-full overflow-hidden border border-gray-100">
+                                    <div class="h-full bg-{{ $user->role_id === 1 ? 'indigo' : ($user->role_id === 2 ? 'rose' : 'emerald') }}-500" style="width: {{ $v['progress'] }}%"></div>
+                                </div>
                             </div>
-                            <div class="h-1 w-full bg-white rounded-full overflow-hidden border border-gray-100">
-                                <div class="h-full bg-{{ $user->role_id === 1 ? 'indigo' : ($user->role_id === 2 ? 'rose' : 'emerald') }}-500" style="width: {{ $v['progress'] }}%"></div>
+                        @empty
+                            <div class="flex-1 flex flex-col items-center justify-center p-8 bg-gray-50/50 rounded-xl border border-dashed border-gray-100 py-12">
+                                <div class="w-10 h-10 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-300 mb-3">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                                </div>
+                                <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">No Consumption Velocity</p>
                             </div>
-                        </div>
-                    @empty
-                        <div class="flex-1 flex flex-col items-center justify-center p-8 bg-gray-50/50 rounded-xl border border-dashed border-gray-100 py-12">
-                            <div class="w-10 h-10 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-300 mb-3">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
-                            </div>
-                            <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">No Consumption Velocity</p>
-                        </div>
-                    @endforelse
+                        @endforelse
+                    </div>
                 </div>
             </div>
 
             {{-- 3: Efficiency Audit (New Level Indicator Design) --}}
             <div class="lg:col-span-4 p-6 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col h-[400px]">
                 <div class="flex items-center justify-between mb-6">
-                    <h2 class="text-[14px] font-black text-gray-900 uppercase tracking-widest">Health Index</h2>
+                    <h2 class="text-[14px] font-black text-gray-900 uppercase tracking-widest">Inventory Health</h2>
                 </div>
                 <div class="flex-1 flex gap-10 items-center px-4">
                     {{-- Premium High-Tech Segmented Battery Indicator --}}
@@ -756,11 +808,11 @@
                     </div>
                     <div class="flex-1 space-y-6">
                         <div>
-                            <span class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] block mb-1">Operational Rating</span>
+                            <span class="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] block mb-1">Efficiency Score</span>
                             <h3 class="text-4xl font-black text-gray-900 tracking-tighter">{{ $inventoryIntel['health_score'] }}%</h3>
                         </div>
                         <div class="pt-4 border-t border-gray-100">
-                            <p class="text-[11px] font-bold mb-1 uppercase tracking-widest {{ $inventoryIntel['health_score'] > 80 ? 'text-emerald-600' : ($inventoryIntel['health_score'] > 50 ? 'text-amber-600' : 'text-red-600') }}">Variance Loss</p>
+                            <p class="text-[11px] font-bold mb-1 uppercase tracking-widest {{ $inventoryIntel['health_score'] > 80 ? 'text-emerald-600' : ($inventoryIntel['health_score'] > 50 ? 'text-amber-600' : 'text-red-600') }}">Waste Loss</p>
                             <p class="text-[16px] font-black text-gray-900">{{ $financialConfig['currency_symbol'] ?? '₱' }} {{ number_format($inventoryIntel['waste_value'], 2) }} <span class="text-[12px] font-bold text-gray-400">VALUE</span></p>
                             <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">{{ number_format($inventoryIntel['variance_pct'], 2) }}% of consumed stock value</p>
                         </div>
@@ -823,9 +875,9 @@
             </div>
 
             {{-- Enhanced Stock Intelligence (col-span-4) --}}
-            <div class="lg:col-span-4 rounded-xl bg-white border border-gray-200 shadow-sm overflow-hidden flex flex-col h-[400px]" x-data="slidingTabs(@entangle('stockTab').live, 'stockTab')" wire:ignore.self wire:key="stock-intelligence-tabs">
+            <div class="lg:col-span-4 rounded-xl bg-white border border-gray-200 shadow-sm overflow-hidden flex flex-col h-[400px] min-h-0" x-data="slidingTabs($wire.entangle('stockTab').live, 'stockTab')" wire:key="stock-intelligence-tabs">
                 <div class="px-6 py-5 flex items-center justify-between bg-white sticky top-0 z-20 shrink-0">
-                    <h2 class="text-[14px] font-black text-gray-900 uppercase tracking-widest">Stock Intelligence</h2>
+                    <h2 class="text-[14px] font-black text-gray-900 uppercase tracking-widest">Stock Alerts</h2>
                 </div>
                 <div class="px-2 shrink-0">
                     <x-sliding-tabs model="stockTab" class="mb-4">
@@ -843,7 +895,7 @@
                     </x-sliding-tabs>
                 </div>
 
-                <div class="flex-1 p-4 pt-0 space-y-3 overflow-y-auto custom-scrollbar">
+                <div class="flex-1 p-4 pt-0 space-y-3 overflow-y-auto custom-scrollbar min-h-0 pb-3">
                     {{-- Deficiency Tab --}}
                     <div x-show="stockTab === 'deficiency'"
                         x-cloak
@@ -853,22 +905,22 @@
                         x-transition:leave="transition ease-in duration-150"
                         x-transition:leave-start="opacity-100 translate-y-0"
                         x-transition:leave-end="opacity-0 -translate-y-1"
-                        class="space-y-0">
+                        class="space-y-3">
                         @forelse($lowStockAlerts as $alert)
-                            <div class="p-3 rounded-2xl bg-red-50/30 border border-red-50 flex items-center justify-between group hover:border-red-200 transition-all mb-2">
-                                <div>
-                                    <h3 class="text-[13px] font-black text-gray-900">{{ $alert['ingredient'] }}</h3>
-                                    <p class="text-[10px] font-bold text-gray-400 mt-1">{{ $alert['branch'] }}</p>
+                            <div class="p-3 rounded-2xl bg-red-50/30 border border-red-50 flex items-center justify-between group hover:border-red-200 transition-all">
+                                <div class="min-w-0">
+                                    <h3 class="text-[13px] font-black text-gray-900 truncate">{{ $alert['ingredient'] }}</h3>
+                                    <p class="text-[10px] font-bold text-gray-400 mt-1 truncate">{{ $alert['branch'] }}</p>
                                 </div>
-                                <div class="text-right">
-                                    <span class="px-2.5 py-1 rounded-lg text-red-700 text-[12px] font-black bg-red-100/50">
+                                <div class="text-right flex-shrink-0">
+                                    <span class="px-2.5 py-1 rounded-lg text-red-700 text-[12px] font-black bg-red-100/50 whitespace-nowrap">
                                         {{ explode(' ', $alert['current'])[0] }}
                                     </span>
                                 </div>
                             </div>
                         @empty
-                            <div class="flex flex-col items-center justify-center py-10 text-center">
-                                <div class="w-10 h-10 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-500 mb-3">
+                            <div class="flex flex-col items-center justify-center py-10 text-center space-y-3">
+                                <div class="w-10 h-10 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-500">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                 </div>
                                 <p class="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Stock Secured</p>
@@ -886,16 +938,16 @@
                         x-transition:leave="transition ease-in duration-150"
                         x-transition:leave-start="opacity-100 translate-y-0"
                         x-transition:leave-end="opacity-0 -translate-y-1"
-                        class="space-y-0">
+                        class="space-y-3">
                         @forelse($expirationAlerts as $exp)
-                            <div class="p-3 rounded-2xl bg-amber-50/30 border border-amber-50 flex items-center justify-between group hover:border-amber-200 transition-all mb-2">
-                                <div>
-                                    <h3 class="text-[13px] font-black text-gray-900">{{ $exp['ingredient'] }}</h3>
-                                    <p class="text-[10px] font-bold text-gray-400 mt-1">{{ $exp['expiry'] }}</p>
+                            <div class="p-3 rounded-2xl bg-amber-50/30 border border-amber-50 flex items-center justify-between group hover:border-amber-200 transition-all">
+                                <div class="min-w-0">
+                                    <h3 class="text-[13px] font-black text-gray-900 truncate">{{ $exp['ingredient'] }}</h3>
+                                    <p class="text-[10px] font-bold text-gray-400 mt-1 truncate">{{ $exp['expiry'] }}</p>
                                 </div>
-                                <div class="text-right">
+                                <div class="text-right flex-shrink-0">
                                     <span @class([
-                                        'px-2.5 py-1 rounded-lg text-[12px] font-black',
+                                        'px-2.5 py-1 rounded-lg text-[12px] font-black whitespace-nowrap',
                                         $exp['days_left'] < 0 ? 'bg-red-500 text-white' : 'bg-amber-100/50 text-amber-700'
                                     ])>
                                         {{ $exp['days_left'] < 0 ? 'EXPIRED' : $exp['days_left'] . 'd' }}
@@ -903,8 +955,8 @@
                                 </div>
                             </div>
                         @empty
-                            <div class="flex flex-col items-center justify-center py-10 text-center">
-                                <div class="w-10 h-10 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-500 mb-3">
+                            <div class="flex flex-col items-center justify-center py-10 text-center space-y-3">
+                                <div class="w-10 h-10 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-500">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                 </div>
                                 <p class="text-[10px] font-black text-emerald-700 uppercase tracking-widest">No Expirations</p>
@@ -926,7 +978,7 @@
                 <div class="px-5 py-4 border-b border-gray-800 flex items-center justify-between bg-gray-900 sticky top-0 z-20 shrink-0">
                     <h2 class="text-[11px] font-black text-gray-200 uppercase tracking-widest flex items-center gap-2">
                         <div class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.8)] animate-pulse"></div>
-                        Remote POS
+                        Live Order Feed
                     </h2>
                 </div>
                 
@@ -947,8 +999,8 @@
                             <div class="w-12 h-12 rounded-full border-2 border-gray-800 flex items-center justify-center text-gray-700 mb-4 bg-gray-900/50">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 1.343-3 3s1.343 3 3 3 3-1.343 3-3-1.343-3-3-3zM12 8V6m0 8v2m4-4H8m8 0a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                             </div>
-                            <p class="text-[11px] font-black text-gray-500 uppercase tracking-[0.2em]">Silence on POS</p>
-                            <p class="text-[10px] font-bold text-gray-700 uppercase mt-1">Listening for incoming orders...</p>
+                            <p class="text-[11px] font-black text-gray-500 uppercase tracking-[0.2em]">No Recent Orders</p>
+                            <p class="text-[10px] font-bold text-gray-700 uppercase mt-1">New orders will appear here</p>
                         </div>
                     @endforelse
                 </div>
@@ -970,6 +1022,8 @@
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
     </style>
 
+        </div>{{-- close dashboard-real-content wrapper --}}
+
     @push('scripts')
 <script>
         function dashboardCharts() {
@@ -987,16 +1041,16 @@
                 init() {
                     this.initSales();
                     this.initSparklines();
-                    
-                    if (this.$cleanup) {
-                        this.$cleanup(() => {
-                            if (this.salesChart) { try { this.salesChart.destroy(); } catch(e) {} }
-                            if (this.sparklineSalesChart) { try { this.sparklineSalesChart.destroy(); } catch(e) {} }
-                            if (this.sparklineNetSalesChart) { try { this.sparklineNetSalesChart.destroy(); } catch(e) {} }
-                            if (this.sparklineAovChart) { try { this.sparklineAovChart.destroy(); } catch(e) {} }
-                            if (this.sparklineCogsChart) { try { this.sparklineCogsChart.destroy(); } catch(e) {} }
-                        });
-                    }
+
+                    const cleanup = () => {
+                        if (this.salesChart) { try { this.salesChart.destroy(); } catch(e) {} }
+                        if (this.sparklineSalesChart) { try { this.sparklineSalesChart.destroy(); } catch(e) {} }
+                        if (this.sparklineNetSalesChart) { try { this.sparklineNetSalesChart.destroy(); } catch(e) {} }
+                        if (this.sparklineAovChart) { try { this.sparklineAovChart.destroy(); } catch(e) {} }
+                        if (this.sparklineCogsChart) { try { this.sparklineCogsChart.destroy(); } catch(e) {} }
+                    };
+
+                    this.$el.addEventListener('alpine:destroy', cleanup);
                 },
 
                 initSparklines() {
@@ -1084,7 +1138,7 @@
                         this.selectedMetric = metric;
 
                         // Silent background sync to Livewire without triggering redrawing lag
-                        this.$wire.set('selectedChartMetric', metric, false);
+                        this.$wire.set('selectedChartMetric', metric);
 
                         let seriesData = [];
                         let colors = [];
@@ -1104,30 +1158,31 @@
                             colors = ['#10B981', '#F43F5E'];
                             strokeWidths = [3, 3];
                         } else if (metric === 'Volume') {
-                            seriesData = [
-                                {
-                                    name: "Order Volume",
-                                    data: this.metrics['Volume'] ?? []
-                                },
-                                {
-                                    name: "Predictive Forecast",
-                                    data: this.metricForecasts['Volume'] ?? []
-                                }
-                            ];
-                            colors = ['#6366F1', '#A5B4FC'];
-                        } else { // Profit
-                            seriesData = [
-                                {
-                                    name: "Net Profit",
-                                    data: this.metrics['Profit'] ?? []
-                                },
-                                {
-                                    name: "Predictive Forecast",
-                                    data: this.metricForecasts['Profit'] ?? []
-                                }
-                            ];
-                            colors = ['#10B981', '#6EE7B7'];
-                        }
+    seriesData = [
+        {
+            name: "Order Volume",
+            data: this.metrics['Volume'] ?? []
+        },
+        {
+            name: "Period Average",
+            data: this.metricForecasts['Volume'] ?? []
+        }
+    ];
+    colors = ['#6366F1', '#A5B4FC'];
+}
+                        else { // Profit
+    seriesData = [
+        {
+            name: "Gross Profit",
+            data: this.metrics['Profit'] ?? []
+        },
+        {
+            name: "Period Average",
+            data: this.metricForecasts['Profit'] ?? []
+        }
+    ];
+    colors = ['#10B981', '#6EE7B7'];
+}
 
                         this.salesChart.updateOptions({ 
                             xaxis: { 
@@ -1186,18 +1241,18 @@
                         ];
                         colors = ['#6366F1', '#A5B4FC'];
                     } else { // Profit
-                        seriesData = [
-                            {
-                                name: "Net Profit",
-                                data: this.metrics['Profit'] ?? []
-                            },
-                            {
-                                name: "Predictive Forecast",
-                                data: this.metricForecasts['Profit'] ?? []
-                            }
-                        ];
-                        colors = ['#10B981', '#6EE7B7'];
-                    }
+    seriesData = [
+        {
+            name: "Gross Profit",
+            data: this.metrics['Profit'] ?? []
+        },
+        {
+            name: "Period Average",
+            data: this.metricForecasts['Profit'] ?? []
+        }
+    ];
+    colors = ['#10B981', '#6EE7B7'];
+}
 
                     var options = {
                         series: seriesData,
@@ -1425,7 +1480,7 @@
                     });
                 },
 
-                renderMarkers() {
+                                renderMarkers() {
                     this.markers.forEach(m => {
                         if (m) {
                             try {
@@ -1439,29 +1494,16 @@
                     });
                     this.markers = [];
 
-                    // Real GPS coordinates mapping for Laguna branches
-                    const coordinates = {
-                        'calauan': [14.1500, 121.3167],
-                        'bay': [14.1818, 121.2858],
-                        'pila': [14.2333, 121.3667],
-                        'calamba': [14.2136, 121.1649]
-                     };
-
                     this.branchMapData.forEach(branch => {
-                        const cleanNameLower = (branch.clean_name || '').toLowerCase();
-                        let coords = null;
-                        
-                        for (const [key, value] of Object.entries(coordinates)) {
-                            if (cleanNameLower.includes(key)) {
-                                coords = value;
-                                break;
-                            }
-                        }
-                        
-                        if (!coords) {
-                            coords = [14.19 + (Math.random() - 0.5) * 0.05, 121.28 + (Math.random() - 0.5) * 0.05];
-                        }
-                        
+                        const lat = parseFloat(branch.lat);
+                        const lng = parseFloat(branch.lng);
+
+                        // Skip branches with no saved pin instead of guessing —
+                        // showing a wrong location is worse than showing none.
+                        if (isNaN(lat) || isNaN(lng)) return;
+
+                        const coords = [lat, lng];
+
                         let iconHtml = '';
                         if (branch.is_highest) {
                             iconHtml = `
@@ -1530,6 +1572,71 @@
                         const group = new L.featureGroup(this.markers);
                         this.map.fitBounds(group.getBounds().pad(0.2));
                     }
+                }
+            };
+        };
+    </script>
+    <script>
+        window.branchMapExpandedWidget = function(branchMapData) {
+            return {
+                expandedMap: null,
+                expandedMarkers: [],
+                branchMapData: branchMapData,
+
+                initExpandedMap() {
+                    if (typeof L === 'undefined') {
+                        setTimeout(() => this.initExpandedMap(), 100);
+                        return;
+                    }
+                    const container = document.getElementById('branchMapExpanded');
+                    if (!container) {
+                        setTimeout(() => this.initExpandedMap(), 50);
+                        return;
+                    }
+
+                    if (this.expandedMap) {
+                        setTimeout(() => this.expandedMap.invalidateSize(), 150);
+                        return;
+                    }
+
+                    if (container._leaflet_id) container._leaflet_id = null;
+                    container.innerHTML = '';
+
+                    this.expandedMap = L.map('branchMapExpanded', {
+                        center: [14.2189, 121.1672],
+                        zoom: 12,
+                        minZoom: 10,
+                        maxBounds: [[13.85, 120.85], [14.65, 121.95]],
+                        maxBoundsViscosity: 1.0,
+                        zoomControl: true,
+                        attributionControl: false
+                    });
+
+                    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                        maxZoom: 19
+                    }).addTo(this.expandedMap);
+
+                                        this.branchMapData.forEach(branch => {
+                        const lat = parseFloat(branch.lat);
+                        const lng = parseFloat(branch.lng);
+
+                        if (isNaN(lat) || isNaN(lng)) return;
+
+                        const coords = [lat, lng];
+
+                        const marker = L.marker(coords)
+                            .addTo(this.expandedMap)
+                            .bindPopup(`<strong>${branch.name}</strong><br>₱${Number(branch.total_sales).toLocaleString(undefined, {minimumFractionDigits: 2})} (${branch.sales_pct}%)`);
+
+                        this.expandedMarkers.push(marker);
+                    });
+
+                    if (this.expandedMarkers.length > 0) {
+                        const group = new L.featureGroup(this.expandedMarkers);
+                        this.expandedMap.fitBounds(group.getBounds().pad(0.2));
+                    }
+
+                    setTimeout(() => this.expandedMap.invalidateSize(), 150);
                 }
             };
         };

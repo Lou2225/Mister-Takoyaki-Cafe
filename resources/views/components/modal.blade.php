@@ -25,8 +25,8 @@ $maxWidth = [
     x-data="modal({ name: '{{ $name }}', show: @js($show) })"
     x-on:open-modal.window="open($event.detail)"
     x-on:close-modal.window="close($event.detail)"
-    x-on:close.stop="isModalOpen = false"
-    x-on:keydown.escape.window="isModalOpen = false"
+    x-on:close.stop="typeof isModalOpen !== 'undefined' && (isModalOpen = false)"
+    x-on:keydown.escape.window="typeof isModalOpen !== 'undefined' && (isModalOpen = false)"
     x-on:keydown.tab.prevent="$event.shiftKey || nextFocusable()?.focus()"
     x-on:keydown.shift.tab.prevent="prevFocusable()?.focus()"
     x-show="isModalOpen"
@@ -35,18 +35,18 @@ $maxWidth = [
     style="display: none;"
 >
     <div
-        x-show="isModalOpen"
-        class="fixed inset-0 transform transition-all"
-        x-on:click="isModalOpen = false"
-        x-transition:enter="ease-out duration-300"
-        x-transition:enter-start="opacity-0"
-        x-transition:enter-end="opacity-100"
-        x-transition:leave="ease-in duration-200"
-        x-transition:leave-start="opacity-100"
-        x-transition:leave-end="opacity-0"
-    >
-        <div class="absolute inset-0 bg-gray-900/40" style="backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);"></div>
-    </div>
+    x-show="isModalOpen"
+    class="fixed inset-0 transform transition-all"
+    x-on:click.self="isModalOpen = false"
+    x-transition:enter="ease-out duration-300"
+    x-transition:enter-start="opacity-0"
+    x-transition:enter-end="opacity-100"
+    x-transition:leave="ease-in duration-200"
+    x-transition:leave-start="opacity-100"
+    x-transition:leave-end="opacity-0"
+>
+    <div class="absolute inset-0 bg-gray-900/40 pointer-events-none" style="backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);"></div>
+</div>
 
     <div
         x-show="isModalOpen"

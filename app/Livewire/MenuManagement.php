@@ -30,7 +30,7 @@ class MenuManagement extends Component
 
     public function importOptionTemplate(int $templateId)
     {
-        $template = OptionTemplate::with('items')->find($templateId);
+        $template = OptionTemplate::with('items.ingredients.ingredient')->find($templateId);
         if (!$template) return;
 
         // Duplicate check
@@ -52,15 +52,180 @@ class MenuManagement extends Component
             ];
         }
 
-        $this->optionGroups[] = [
+                $this->optionGroups[] = [
             'name'        => $template->name,
             'price_mode'  => $template->price_mode,
             'is_required' => $template->is_required,
+            'no_recipe_required' => (bool) $template->no_recipe_required,
             'options'     => $options
         ];
 
+        // The group we just pushed sits at the end of optionGroups — carry
+        // over each item's saved ingredient recipe into recipeIngredients,
+        // tagged with the same "option:{groupIndex}_{optionIndex}" owner
+        // key the rest of the form already uses (see showEdit()). This is
+        // the whole point of the feature: importing a template no longer
+        // means re-typing every ingredient mapping by hand.
+        $groupIndex = count($this->optionGroups) - 1;
+        $addedIngredientCount = 0;
+
+        if (!$template->no_recipe_required) {
+            foreach ($template->items as $optIndex => $item) {
+                foreach ($item->ingredients as $ri) {
+                    $owner = "option:{$groupIndex}_{$optIndex}";
+
+                    $alreadyPresent = collect($this->recipeIngredients)
+                        ->contains(fn($existing) => $existing['owner'] === $owner && $existing['id'] == $ri->ingredient_id);
+                    if ($alreadyPresent) continue;
+
+                    $this->recipeIngredients[] = [
+                        'id'       => $ri->ingredient_id,
+                        'name'     => $ri->ingredient->name,
+                        'unit'     => $ri->ingredient->unit,
+                        'quantity' => (float) $ri->quantity,
+                        'cost'     => $ri->ingredient->cost,
+                        'owner'    => $owner,
+                    ];
+                    $addedIngredientCount++;
+                }
+            }
+        }
+
         $this->dispatch('close-modal', name: 'import-template-library');
-        $this->dispatch('notify', type: 'success', message: "Imported '{$template->name}' template.");
+        $msg = "Imported '{$template->name}' template.";
+        if ($addedIngredientCount > 0) {
+            $msg .= " {$addedIngredientCount} recipe ingredient(s) auto-mapped — review under the Recipe tab.";
+        }
+        $this->dispatch('notify', type: 'success', message: $msg);
+    }
+    
+public function getOwnerLabel(string $owner): string
+    {
+        if ($owner === 'base') return 'Base';
+
+        $ref = str_replace('option:', '', $owner);
+
+        // Unsaved/new format: "{groupIndex}_{optionIndex}"
+        if (str_contains($ref, '_')) {
+            [$gIdx, $oIdx] = explode('_', $ref);
+            if (isset($this->optionGroups[$gIdx]['options'][$oIdx])) {
+                return $this->optionGroups[$gIdx]['options'][$oIdx]['name'];
+            }
+        }
+
+        // Saved format: real option ID
+        if (is_numeric($ref)) {
+            foreach ($this->optionGroups as $group) {
+                foreach ($group['options'] as $opt) {
+                    if (($opt['id'] ?? null) == $ref) {
+                        return $opt['name'];
+                    }
+                }
+            }
+        }
+
+        return 'Option';
+    }
+    /**
+     * Pulls ingredient mappings from the Library into an option group
+     * already on this product, matched by group name + option name. This
+     * covers the case importOptionTemplate() can't: a group that was
+     * added to the product BEFORE its ingredients were defined (or
+     * edited) in the Library. Only fills in missing ingredients — never
+     * touches prices, defaults, or ingredients already present.
+     */
+    public function syncGroupFromLibrary(int $groupIndex)
+    {
+                $groupData = $this->optionGroups[$groupIndex] ?? null;
+        if (!$groupData) return;
+        $noRecipe = (bool)($groupData['no_recipe_required'] ?? false);
+
+        $template = OptionTemplate::with('items.ingredients.ingredient')
+            ->whereRaw('LOWER(name) = ?', [strtolower($groupData['name'])])
+            ->first();
+
+        if (!$template) {
+            $this->dispatch('notify', type: 'error', message: "No Library template named '{$groupData['name']}' found to sync from.");
+            return;
+        }
+
+        $addedIngredientCount = 0;
+        $addedOptionCount = 0;
+        $matchedItemIds = [];
+
+        // 1) Sync ingredients into options that already exist on this product.
+        foreach ($this->optionGroups[$groupIndex]['options'] as $optIndex => $option) {
+            $templateItem = $template->items->first(
+                fn($ti) => strtolower($ti->name) === strtolower($option['name'])
+            );
+                        if (!$templateItem) continue;
+            $matchedItemIds[] = $templateItem->id;
+
+            if ($noRecipe) continue;
+
+            $owner = "option:{$groupIndex}_{$optIndex}";
+            $legacyOwner = !empty($option['id']) ? "option:{$option['id']}" : null;
+
+            foreach ($templateItem->ingredients as $ri) {
+                $alreadyPresent = collect($this->recipeIngredients)->contains(
+                    fn($existing) => $existing['id'] == $ri->ingredient_id
+                        && ($existing['owner'] === $owner || ($legacyOwner && $existing['owner'] === $legacyOwner))
+                );
+                if ($alreadyPresent) continue;
+
+                $this->recipeIngredients[] = [
+                    'id'       => $ri->ingredient_id,
+                    'name'     => $ri->ingredient->name,
+                    'unit'     => $ri->ingredient->unit,
+                    'quantity' => (float) $ri->quantity,
+                    'cost'     => $ri->ingredient->cost,
+                    'owner'    => $legacyOwner ?? $owner,
+                ];
+                $addedIngredientCount++;
+            }
+        }
+
+        // 2) Pull in template items that aren't options on this product yet.
+        foreach ($template->items as $templateItem) {
+            if (in_array($templateItem->id, $matchedItemIds)) continue;
+
+            $alreadyExistsByName = collect($this->optionGroups[$groupIndex]['options'])
+                ->contains(fn($o) => strtolower($o['name']) === strtolower($templateItem->name));
+            if ($alreadyExistsByName) continue;
+
+            $newOptIndex = count($this->optionGroups[$groupIndex]['options']);
+            $this->optionGroups[$groupIndex]['options'][] = [
+                'id'         => null,
+                'name'       => $templateItem->name,
+                'price'      => $templateItem->price == 0 ? '' : $templateItem->price,
+                'is_default' => $templateItem->is_default,
+            ];
+                        $addedOptionCount++;
+
+            if (!$noRecipe) {
+                $owner = "option:{$groupIndex}_{$newOptIndex}";
+                foreach ($templateItem->ingredients as $ri) {
+                    $this->recipeIngredients[] = [
+                        'id'       => $ri->ingredient_id,
+                        'name'     => $ri->ingredient->name,
+                        'unit'     => $ri->ingredient->unit,
+                        'quantity' => (float) $ri->quantity,
+                        'cost'     => $ri->ingredient->cost,
+                        'owner'    => $owner,
+                    ];
+                    $addedIngredientCount++;
+                }
+            }
+        }
+
+        if ($addedIngredientCount > 0 || $addedOptionCount > 0) {
+            $parts = [];
+            if ($addedOptionCount > 0) $parts[] = "{$addedOptionCount} option(s)";
+            if ($addedIngredientCount > 0) $parts[] = "{$addedIngredientCount} ingredient(s)";
+            $this->dispatch('notify', type: 'success', message: 'Synced ' . implode(' and ', $parts) . " from the '{$template->name}' template.");
+        } else {
+            $this->dispatch('notify', type: 'info', message: 'Already up to date — nothing new to sync.');
+        }
     }
 
     public function saveGroupToLibrary(int $index)
@@ -68,29 +233,102 @@ class MenuManagement extends Component
         $groupData = $this->optionGroups[$index] ?? null;
         if (!$groupData) return;
 
-        // Duplicate check in Library
-        if (OptionTemplate::where('name', $groupData['name'])->exists()) {
-            $this->dispatch('notify', type: 'error', message: "A template named '{$groupData['name']}' already exists in the library.");
-            return;
-        }
+        $existingTemplate = OptionTemplate::where('name', $groupData['name'])->first();
 
-        DB::transaction(function () use ($groupData) {
-            $template = OptionTemplate::create([
-                'name'        => $groupData['name'],
-                'price_mode'  => $groupData['price_mode'],
-                'is_required' => $groupData['is_required'],
-            ]);
+        try {
+        DB::transaction(function () use ($groupData, $index, $existingTemplate) {
+                        $noRecipe = (bool)($groupData['no_recipe_required'] ?? false);
 
-            foreach ($groupData['options'] as $oData) {
-                $template->items()->create([
-                    'name'       => $oData['name'],
-                    'price'      => $oData['price'],
-                    'is_default' => $oData['is_default'],
+            if ($existingTemplate) {
+                // Update in place, rather than blocking — this is the
+                // path that lets ingredients added on a product's Recipe
+                // tab flow back into an already-existing Library
+                // template, matching options by name (same convention
+                // syncGroupFromLibrary uses going the other direction).
+                $template = $existingTemplate;
+                $template->update([
+                    'price_mode'  => $groupData['price_mode'],
+                    'is_required' => $groupData['is_required'],
+                    'no_recipe_required' => $noRecipe,
+                ]);
+            } else {
+                $template = OptionTemplate::create([
+                    'name'        => $groupData['name'],
+                    'price_mode'  => $groupData['price_mode'],
+                    'is_required' => $groupData['is_required'],
+                    'no_recipe_required' => $noRecipe,
                 ]);
             }
+
+            $keepItemIds = [];
+
+            foreach ($groupData['options'] as $oIdx => $oData) {
+                $item = $existingTemplate
+                    ? $template->items()->whereRaw('LOWER(name) = ?', [strtolower($oData['name'])])->first()
+                    : null;
+
+                if ($item) {
+                    $item->update([
+                        'price'      => (float)($oData['price'] ?: 0),
+                        'is_default' => $oData['is_default'],
+                    ]);
+                } else {
+                    $item = $template->items()->create([
+                        'name'       => $oData['name'],
+                        'price'      => (float)($oData['price'] ?: 0),
+                        'is_default' => $oData['is_default'],
+                    ]);
+                }
+                $keepItemIds[] = $item->id;
+
+                $owner = "option:{$index}_{$oIdx}";
+                $legacyOwner = !empty($oData['id']) ? "option:{$oData['id']}" : null;
+
+                // Ingredients can be keyed either by the unsaved
+                // "{groupIndex}_{optionIndex}" reference or, for options
+                // that already exist in the DB, by their real option ID
+                // (see showEdit()). Match against both so ingredients
+                // aren't lost when saving an already-saved group.
+                $matchingIngredients = collect($this->recipeIngredients)
+                    ->filter(fn($ri) => $ri['owner'] === $owner || ($legacyOwner && $ri['owner'] === $legacyOwner))
+                    // Same ingredient can appear twice here — once under the
+                    // index-based owner key, once under the legacy real-ID
+                    // owner key — if both got added before the row was fully
+                    // normalized. Keep one row per ingredient_id so the
+                    // insert below never collides with the unique index.
+                    ->unique('id');
+
+                // Rebuild this item's ingredients from what's currently on
+                // the product, so updates (additions AND removals on the
+                // product side) are reflected in the template.
+                                $item->ingredients()->delete();
+                if (!$noRecipe) {
+                    foreach ($matchingIngredients as $ri) {
+                        $item->ingredients()->create([
+                            'ingredient_id' => $ri['id'],
+                            'quantity'      => $ri['quantity'],
+                        ]);
+                    }
+                }
+            }
+
+            // Don't delete template items whose names simply don't appear
+            // in this product's current option list (e.g. this product
+            // only uses a subset of a shared template) — only cleanup
+            // makes sense when this product is genuinely the template's
+            // source of truth, which we can't reliably assume here. Skip
+            // deletion to avoid destroying items other products may
+            // still rely on.
         });
 
-        $this->dispatch('notify', type: 'success', message: "Group '{$groupData['name']}' saved to library.");
+        $msg = $existingTemplate
+            ? "Template '{$groupData['name']}' updated in library."
+            : "Group '{$groupData['name']}' saved to library.";
+        $this->dispatch('notify', type: 'success', message: $msg);
+        } catch (\Exception $e) {
+            Log::error('MenuManagement.saveGroupToLibrary failed: ' . $e->getMessage());
+            $this->dispatch('notify', type: 'error', message: 'Failed to save group to library. Please check option prices and try again.');
+        }
     }
 
     // ── Filters & Display ─────────────────────────────────────────
@@ -99,6 +337,7 @@ class MenuManagement extends Component
     public $selectedBranchId = '';
     public $perPage = 5;
     public $view = 'table';
+    public $statusFilter = '';
     public string $newCategoryStation = 'kitchen'; // Default
     public string $categorySearch = '';
     public string $categoryFilterSearch = '';
@@ -126,9 +365,10 @@ class MenuManagement extends Component
 
     // ── Option Groups ─────────────────────────────────────────────
     public $optionGroups = [];
-    public $newGroupName = '';
+        public $newGroupName = '';
     public $newGroupPriceMode = 'additive';
     public $newGroupIsRequired = false;
+    public $newGroupNoRecipeRequired = false;
     public $activeGroupIndex = 0;
 
     // ── Recipe ────────────────────────────────────────────────────
@@ -144,6 +384,7 @@ class MenuManagement extends Component
         'search'             => ['except' => '', 'as' => 'm_search'],
         'selectedCategoryId' => ['except' => '', 'as' => 'm_cat'],
         'selectedBranchId'   => ['except' => '', 'as' => 'm_branch'],
+        'statusFilter'       => ['except' => '', 'as' => 'm_status'],
         'view'               => ['except' => 'table', 'as' => 'm_view'],
         'perPage'            => ['except' => 5, 'as' => 'm_pp'],
     ];
@@ -268,11 +509,12 @@ class MenuManagement extends Component
         $this->existingImage     = $product->image;
         $this->activeTab         = 'basic';
 
-        $this->optionGroups = $product->optionGroups->map(fn($g) => [
+                $this->optionGroups = $product->optionGroups->map(fn($g) => [
             'id'          => $g->id,
             'name'        => $g->name,
             'price_mode'  => $g->price_mode,
             'is_required' => (bool)$g->is_required,
+            'no_recipe_required' => (bool)$g->no_recipe_required,
             'options'     => $g->options->map(fn($o) => [
                 'id'         => $o->id,
                 'name'       => $o->name,
@@ -314,37 +556,150 @@ class MenuManagement extends Component
     {
         if (!$this->isSuperAdmin() && !$this->isAdmin()) return;
         $product = Product::findOrFail($id);
-        $product->is_active = !$product->is_active;
-        $product->save();
-        $this->dispatch('notify', type: 'success', message: "Product '{$product->name}' status updated.");
+
+        // Resolve which branch this toggle should apply to:
+        // 1) the active branch filter, if one is selected
+        // 2) otherwise, the acting user's own assigned branch
+        // Only when neither exists do we fall back to a global toggle.
+        $operatingBranchId = $this->getOperatingBranchId();
+
+        if ($operatingBranchId) {
+            // Toggle availability for THIS branch only, without touching
+            // the product's global is_active flag or other branches.
+            $pivot = DB::table('branch_product')
+                ->where('branch_id', $operatingBranchId)
+                ->where('product_id', $product->id)
+                ->first();
+
+            $currentlyActive = $pivot ? (bool)$pivot->is_active : (bool)$product->is_active;
+            $newStatus = !$currentlyActive;
+
+            DB::table('branch_product')->updateOrInsert(
+                ['branch_id' => $operatingBranchId, 'product_id' => $product->id],
+                ['is_active' => $newStatus, 'updated_at' => now()]
+            );
+
+            $branchName = Branch::find($operatingBranchId)?->branch_name ?? 'this branch';
+            $this->dispatch('notify', type: 'success', message: "Product '{$product->name}' " . ($newStatus ? 'enabled' : 'hidden') . " for {$branchName}.");
+        } else {
+            // No branch context at all (user has no assigned branch and
+            // no filter is active) — toggle the product's global default.
+            $product->is_active = !$product->is_active;
+            $product->save();
+            $this->dispatch('notify', type: 'success', message: "Product '{$product->name}' global status updated.");
+        }
     }
 
     public function getActiveCountProperty()
     {
-        return $this->getBaseProductQuery()->where('is_active', true)->count();
+        return $this->getBaseProductQuery()->whereRaw($this->effectiveActiveExpr() . ' = 1')->count();
     }
 
     public function getHiddenCountProperty()
     {
-        return $this->getBaseProductQuery()->where('is_active', false)->count();
+        return $this->getBaseProductQuery()->whereRaw($this->effectiveActiveExpr() . ' = 0')->count();
     }
 
     public function getOptionTemplatesProperty()
     {
-        return OptionTemplate::with('items')->get();
+        return OptionTemplate::with('items.ingredients')->get();
+    }
+/**
+     * The branch this session is currently acting on: the active filter
+     * if one is selected, otherwise the logged-in user's own branch.
+     */
+    private function getOperatingBranchId()
+    {
+        return $this->selectedBranchId ?: auth()->user()?->branch_id;
     }
 
+    /**
+     * Canonical owner key for a given group/option index — prefers the
+     * real saved option ID when one exists, falling back to the
+     * index-based key for options not yet saved. Used to normalize
+     * whatever the form submits so duplicate checks and storage stay
+     * consistent regardless of when a given row was added.
+     */
+        private function resolveOwnerKey(string $rawOwner): string
+    {
+        if (!str_starts_with($rawOwner, 'option:')) return $rawOwner; // 'base'
+        $ref = str_replace('option:', '', $rawOwner);
+        if (!str_contains($ref, '_')) return $rawOwner; // already a real-ID owner
+        [$gIdx, $oIdx] = explode('_', $ref);
+        $optionId = $this->optionGroups[$gIdx]['options'][$oIdx]['id'] ?? null;
+        return $optionId ? "option:{$optionId}" : $rawOwner;
+    }
+
+    private function ownerBelongsToNoRecipeGroup(string $rawOwner): bool
+    {
+        if (!str_starts_with($rawOwner, 'option:')) return false;
+        $ref = str_replace('option:', '', $rawOwner);
+
+        if (str_contains($ref, '_')) {
+            [$gIdx, ] = explode('_', $ref);
+            return (bool)($this->optionGroups[$gIdx]['no_recipe_required'] ?? false);
+        }
+
+        foreach ($this->optionGroups as $group) {
+            foreach ($group['options'] as $opt) {
+                if (($opt['id'] ?? null) == $ref) {
+                    return (bool)($group['no_recipe_required'] ?? false);
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * If a group's "No Recipe Required" flag is switched on live in the
+     * form, strip out any ingredients already staged for its options so
+     * the UI and eventual save can't disagree with the flag.
+     */
+    public function updated($propertyName, $value = null)
+    {
+        if (preg_match('/^optionGroups\.(\d+)\.no_recipe_required$/', $propertyName, $m) && $value) {
+            $gIdx = (int)$m[1];
+            foreach ($this->optionGroups[$gIdx]['options'] ?? [] as $oIdx => $opt) {
+                $ownerIndexed = "option:{$gIdx}_{$oIdx}";
+                $ownerReal = !empty($opt['id']) ? "option:{$opt['id']}" : null;
+                $this->recipeIngredients = collect($this->recipeIngredients)
+                    ->reject(fn($ri) => $ri['owner'] === $ownerIndexed || ($ownerReal && $ri['owner'] === $ownerReal))
+                    ->values()->all();
+            }
+        }
+    }
     private function getBaseProductQuery()
     {
         $query = Product::query();
-        if ($this->selectedBranchId) {
-            $bid = $this->selectedBranchId;
+        $bid = $this->getOperatingBranchId();
+
+        if ($bid) {
             $query->where(function ($q) use ($bid) {
                 $q->where('scope', 'global')
                   ->orWhereHas('branches', fn($b) => $b->where('branches.id', $bid));
             });
+
+            // Per-branch availability override, falling back to the
+            // product's global is_active flag when no override exists.
+            $query->leftJoin('branch_product', function ($join) use ($bid) {
+                $join->on('products.id', '=', 'branch_product.product_id')
+                     ->where('branch_product.branch_id', '=', $bid);
+            })->addSelect(DB::raw('COALESCE(branch_product.is_active, products.is_active) as effective_is_active'));
+        } else {
+            $query->addSelect(DB::raw('products.is_active as effective_is_active'));
         }
         return $query;
+    }
+
+    /**
+     * SQL fragment for the currently-effective availability flag —
+     * branch-specific override if a branch is selected, otherwise global.
+     */
+    private function effectiveActiveExpr(): string
+    {
+        return $this->getOperatingBranchId()
+            ? 'COALESCE(branch_product.is_active, products.is_active)'
+            : 'products.is_active';
     }
 
     // ── Option Group Actions ──────────────────────────────────────
@@ -360,15 +715,17 @@ class MenuManagement extends Component
             }
         }
 
-        $this->optionGroups[] = [
+                $this->optionGroups[] = [
             'id' => null, 'name' => $this->newGroupName,
             'price_mode' => $this->newGroupPriceMode,
             'is_required' => (bool)$this->newGroupIsRequired,
+            'no_recipe_required' => (bool)$this->newGroupNoRecipeRequired,
             'options' => [],
         ];
         $this->newGroupName = '';
         $this->newGroupPriceMode = 'additive';
         $this->newGroupIsRequired = false;
+        $this->newGroupNoRecipeRequired = false;
 
         $this->dispatch('close-modal', name: 'add-option-group');
     }
@@ -411,11 +768,18 @@ class MenuManagement extends Component
             'newIngredientOwner' => 'required',
         ], ['newIngredientQty.min' => 'Quantity must be at least 0.01.']);
 
+                if ($this->ownerBelongsToNoRecipeGroup($this->newIngredientOwner)) {
+            $this->dispatch('notify', type: 'error', message: 'This option belongs to a "No Recipe Required" group and cannot have ingredients.');
+            return;
+        }
+
         $ing = Ingredient::find($this->newIngredientId);
         if (!$ing) return;
 
+        $owner = $this->resolveOwnerKey($this->newIngredientOwner);
+
         foreach ($this->recipeIngredients as $ri) {
-            if ($ri['id'] == $this->newIngredientId && $ri['owner'] == $this->newIngredientOwner) {
+            if ($ri['id'] == $this->newIngredientId && $ri['owner'] == $owner) {
                 $this->dispatch('notify', type: 'error', message: 'Ingredient already added for this option.');
                 return;
             }
@@ -425,7 +789,7 @@ class MenuManagement extends Component
             'id' => $ing->id, 'name' => $ing->name, 'unit' => $ing->unit,
             'quantity' => (float)$this->newIngredientQty, 
             'cost' => $ing->cost,
-            'owner' => $this->newIngredientOwner,
+            'owner' => $owner,
         ];
         $this->newIngredientId = '';
         $this->newIngredientQty = '';
@@ -578,12 +942,19 @@ class MenuManagement extends Component
                 // Ensure branch assignments are detached as it's now global
                 $product->branches()->detach();
 
-                // Sync Option Groups & Options
+                                // Sync Option Groups & Options
                 $optionIdMap = [];
                 $keepGroupIds = [];
+                $noRecipeOptionIds = [];
                 foreach ($this->optionGroups as $gIdx => $gData) {
                     $group = !empty($gData['id']) ? $product->optionGroups()->find($gData['id']) : null;
-                    $groupPayload = ['name' => $gData['name'], 'price_mode' => $gData['price_mode'], 'is_required' => (bool)$gData['is_required'], 'sort_order' => $gIdx];
+                    $groupPayload = [
+                        'name' => $gData['name'],
+                        'price_mode' => $gData['price_mode'],
+                        'is_required' => (bool)$gData['is_required'],
+                        'no_recipe_required' => (bool)($gData['no_recipe_required'] ?? false),
+                        'sort_order' => $gIdx,
+                    ];
                     $group = $group ? tap($group, fn($g) => $g->update($groupPayload)) : $product->optionGroups()->create($groupPayload);
                     $keepGroupIds[] = $group->id;
 
@@ -600,6 +971,10 @@ class MenuManagement extends Component
                         $keepOptionIds[] = $option->id;
                         $optionIdMap["option:{$gIdx}_{$oIdx}"] = $option->id;
                         if (!empty($oData['id'])) $optionIdMap["option:{$oData['id']}"] = $option->id;
+
+                        if (!empty($gData['no_recipe_required'])) {
+                            $noRecipeOptionIds[$option->id] = true;
+                        }
                     }
                     $group->options()->whereNotIn('id', $keepOptionIds)->delete();
                 }
@@ -620,7 +995,14 @@ class MenuManagement extends Component
                             if (count($parts) === 2) $optionId = $optionIdMap["option:{$parts[0]}_{$parts[1]}"] ?? null;
                         }
                     }
-                    if ($optionId && !ProductOption::find($optionId)) $optionId = null;
+                                        if ($optionId && !ProductOption::find($optionId)) $optionId = null;
+
+                    // A "No Recipe Required" group is authoritative — never
+                    // persist a stock requirement for its options, even if
+                    // stale form state still carries an ingredient row.
+                    if ($optionId && isset($noRecipeOptionIds[$optionId])) {
+                        continue;
+                    }
 
                     Recipe::create([
                         'product_id'        => $product->id,
@@ -725,9 +1107,10 @@ class MenuManagement extends Component
         $this->sortOrder         = 0;
         $this->recipeIngredients = [];
         $this->optionGroups      = [];
-        $this->newGroupName      = '';
+                $this->newGroupName      = '';
         $this->newGroupPriceMode = 'additive';
         $this->newGroupIsRequired = false;
+        $this->newGroupNoRecipeRequired = false;
         $this->newIngredientId   = '';
         $this->newIngredientQty  = '';
         $this->newIngredientOwner = 'base';
@@ -764,12 +1147,12 @@ class MenuManagement extends Component
         if ($this->selectedCategoryId) {
             $query->where('category_id', $this->selectedCategoryId);
         }
-        if ($this->isActive !== null && $this->isActive !== '') {
-            $query->where('is_active', $this->isActive === '1' || $this->isActive === 1 || $this->isActive === true);
+        if ($this->statusFilter !== null && $this->statusFilter !== '') {
+            $query->whereRaw($this->effectiveActiveExpr() . ' = ?', [$this->statusFilter === '1' ? 1 : 0]);
         }
 
         $products = $query->leftJoin('product_categories', 'products.category_id', '=', 'product_categories.id')
-            ->select('products.*')
+            ->addSelect('products.*')
             ->orderBy('product_categories.sort_order', 'asc')
             ->orderBy('products.name', 'asc')
             ->get();

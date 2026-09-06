@@ -100,9 +100,9 @@ class BranchApiController extends Controller
         // Branch-specific products
         $branch = Branch::findOrFail($branchId);
         $branchProducts = $branch->products()
-            ->with(['category', 'optionGroups.options', 'modifiers'])
-            ->where('is_active', 1)
-            ->get();
+        ->with(['category', 'optionGroups.options', 'modifiers'])
+        ->where('products.is_active', 1)
+        ->get();
 
         // Merge and ensure uniqueness
         $allProducts = $globalProducts->merge($branchProducts)->unique('id');

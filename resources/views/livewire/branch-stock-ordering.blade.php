@@ -3,7 +3,7 @@
     <div class="px-1 pt-2">
         <div class="mb-4 flex items-center justify-between">
             <div>
-                <h2 class="text-[17px] font-bold text-gray-900 tracking-tight leading-none mb-1">Stock Requests</h2>
+                <h2 class="text-[17px] font-bold text-gray-900 tracking-tight leading-none mb-1">Request Supplies</h2>
                 <p class="text-[11px] text-gray-500 font-medium">Branch Logistics: <span class="text-indigo-600 font-bold">{{ $kpis['pending'] + $kpis['approved'] + $kpis['in_transit'] }} active</span></p>
             </div>
             <div x-show="panel === 'requests' || panel === 'history'" class="animate-fadeIn">
@@ -248,40 +248,61 @@
             </div>
         </div>
 
-        {{-- SHARED TOOLBAR: Search + Status Filter --}}
-        <div x-show="panel === 'requests' || panel === 'history'" class="flex flex-col lg:flex-row lg:items-center justify-between mb-4 gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
-            <div class="flex flex-1 w-full lg:w-auto">
+        {{-- TOOLBAR: Active Requests --}}
+        <div x-show="panel === 'requests'" x-cloak class="flex flex-row items-center justify-between mb-4 gap-2 sm:gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
+            <div class="flex flex-1 min-w-0 lg:flex-initial">
                 <x-search-bar wireModel="search" placeholder="Reference..." width="w-full lg:w-64" />
             </div>
-            <div class="flex flex-wrap items-center lg:justify-end gap-3">
-                @if($panel === 'history')
-                    <x-date-filter startModel="startDate" endModel="endDate" activeModel="activeFilter" />
-                @endif
+            <div class="flex flex-nowrap items-center justify-end gap-1.5 sm:gap-3 shrink-0">
                 <x-dropdown align="right" width="48">
                     <x-slot name="trigger">
-                        <x-secondary-button type="button" class="gap-1.5 h-10 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none text-[13px] font-black">
+                        <x-secondary-button type="button" class="gap-0 sm:gap-1.5 h-10 !px-2.5 sm:!px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none text-[13px] font-black">
                             <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                            <span class="whitespace-nowrap">
+                            <span class="hidden sm:inline whitespace-nowrap">
                                 @if($statusFilter === 'all') All Status
                                 @elseif($statusFilter === 'in_transit') In Transit
                                 @else {{ ucfirst($statusFilter) }}
                                 @endif
                             </span>
-                            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                            <svg class="hidden sm:block w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                         </x-secondary-button>
                     </x-slot>
                     <x-slot name="content">
                         <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', 'all')">All Status</x-dropdown-link>
-                        @if($panel === 'requests')
-                            <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', 'pending')">Pending</x-dropdown-link>
-                            <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', 'approved')">Approved</x-dropdown-link>
-                            <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', 'preparing')">Preparing</x-dropdown-link>
-                            <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', 'in_transit')">In Transit</x-dropdown-link>
-                        @else
-                            <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', 'delivered')">Delivered</x-dropdown-link>
-                            <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', 'rejected')">Rejected</x-dropdown-link>
-                            <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', 'cancelled')">Cancelled</x-dropdown-link>
-                        @endif
+                        <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', 'pending')">Pending</x-dropdown-link>
+                        <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', 'approved')">Approved</x-dropdown-link>
+                        <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', 'preparing')">Preparing</x-dropdown-link>
+                        <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', 'in_transit')">In Transit</x-dropdown-link>
+                    </x-slot>
+                </x-dropdown>
+            </div>
+        </div>
+
+        {{-- TOOLBAR: History (date filter lives ONLY here) --}}
+        <div x-show="panel === 'history'" x-cloak class="flex flex-row items-center justify-between mb-4 gap-2 sm:gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
+            <div class="flex flex-1 min-w-0 lg:flex-initial">
+                <x-search-bar wireModel="search" placeholder="Reference..." width="w-full lg:w-64" />
+            </div>
+            <div class="flex flex-nowrap items-center justify-end gap-1.5 sm:gap-3 shrink-0">
+                <x-date-filter startModel="startDate" endModel="endDate" activeModel="activeFilter" />
+                <x-dropdown align="right" width="48">
+                    <x-slot name="trigger">
+                        <x-secondary-button type="button" class="gap-0 sm:gap-1.5 h-10 !px-2.5 sm:!px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none text-[13px] font-black">
+                            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                            <span class="hidden sm:inline whitespace-nowrap">
+                                @if($statusFilter === 'all') All Status
+                                @elseif($statusFilter === 'in_transit') In Transit
+                                @else {{ ucfirst($statusFilter) }}
+                                @endif
+                            </span>
+                            <svg class="hidden sm:block w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                        </x-secondary-button>
+                    </x-slot>
+                    <x-slot name="content">
+                        <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', 'all')">All Status</x-dropdown-link>
+                        <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', 'delivered')">Delivered</x-dropdown-link>
+                        <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', 'rejected')">Rejected</x-dropdown-link>
+                        <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', 'cancelled')">Cancelled</x-dropdown-link>
                     </x-slot>
                 </x-dropdown>
             </div>

@@ -21,11 +21,11 @@
                                 </button>
                             </x-slot>
                             <x-slot name="content">
-                                @foreach ($perPageOptions as $option)
-                                    <x-dropdown-link href="#" wire:click.prevent="$set('perPage', {{ $option }})" wire:loading.attr="disabled">
-                                        {{ $option }}
-                                    </x-dropdown-link>
-                                @endforeach
+                               @foreach ($perPageOptions as $option)
+    <x-dropdown-link href="#" x-on:click.prevent="$wire.set('perPage', {{ $option }}); dropdownOpen = false;">
+        {{ $option }}
+    </x-dropdown-link>
+@endforeach
                             </x-slot>
                         </x-dropdown>
                     </div>

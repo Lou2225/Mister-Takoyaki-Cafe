@@ -29,25 +29,35 @@ class AutoRejectOrders extends Command
      * @return int
      */
     public function handle()
-    {
-        $cutoff = Carbon::now()->subHour();
+{
+    $cutoff = Carbon::now()->subHour();
 
-        $orders = Order::where('status', Order::STATUS_PENDING)
-            ->where('created_at', '<=', $cutoff)
-            ->get();
+    // Only auto-reject delivery/App orders — a POS order left "Pending"
+    // is typically a parked in-person transaction a cashier will resume,
+    // not an unacknowledged delivery request. Auto-rejecting those was
+    // likely causing orders to vanish out from under the POS Orders tab.
+    $orders = Order::where('source', 'App')
+        ->where('status', Order::STATUS_PENDING)
+        ->where('created_at', '<=', $cutoff)
+        ->get();
 
-        $count = $orders->count();
-
-        foreach ($orders as $order) {
+    $count = 0;
+    foreach ($orders as $order) {
+        try {
             $order->reject("Automatically rejected: Not accepted within 1 hour.");
+            $count++;
+        } catch (\Exception $e) {
+            \Log::error("AutoRejectOrders failed for order #{$order->id}: " . $e->getMessage());
         }
-
-        if ($count > 0) {
-            $this->info("Successfully rejected {$count} pending orders.");
-        } else {
-            $this->info("No pending orders to reject.");
-        }
-
-        return 0;
     }
+
+    if ($count > 0) {
+        \Log::info("AutoRejectOrders: rejected {$count} stale pending orders.");
+        $this->info("Successfully rejected {$count} pending orders.");
+    } else {
+        $this->info("No pending orders to reject.");
+    }
+
+    return 0;
+}
 }

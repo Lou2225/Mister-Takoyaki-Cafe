@@ -10,7 +10,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\DB;
+use App\Models\User;
 
 class Order extends Model
 {
@@ -21,28 +23,36 @@ class Order extends Model
      */
     protected static function booted()
     {
-        static::created(function ($order) {
-            if ($order->payment_status === 'Paid') {
-                // POS orders should be COMPLETED immediately when paid (not Preparing/Delivering)
-                if ($order->source === 'POS' && $order->status !== self::STATUS_COMPLETED) {
-                    $order->update(['status' => self::STATUS_COMPLETED]);
-                }
-                
-                $order->recordFinancialTransaction();
-            }
-        });
+              static::updated(function ($order) {
 
-        static::updated(function ($order) {
-            // Trigger recording if payment status transitions to 'Paid'
-            if ($order->wasChanged('payment_status') && $order->payment_status === 'Paid') {
-                // POS orders should be COMPLETED immediately when paid (not Preparing/Delivering)
-                if ($order->source === 'POS' && $order->status !== self::STATUS_COMPLETED) {
-                    $order->update(['status' => self::STATUS_COMPLETED]);
-                }
-                
-                $order->recordFinancialTransaction();
-            }
-        });
+    // Trigger recording if payment status transitions to 'Paid'
+    if ($order->wasChanged('payment_status') && $order->payment_status === 'Paid') {
+
+        // POS orders should be COMPLETED immediately when paid
+        if ($order->source === 'POS' && $order->status !== self::STATUS_COMPLETED) {
+            $order->update([
+                'status' => self::STATUS_COMPLETED
+            ]);
+        }
+
+        $order->recordFinancialTransaction();
+    }
+
+    
+
+    // Update rider details when rider is assigned
+if ($order->wasChanged('rider_id') && $order->rider_id) {
+
+    $rider = User::find($order->rider_id);
+
+    if ($rider) {
+        $order->updateQuietly([   // ← CHANGED: updateQuietly skips model events
+            'rider_name'  => $rider->name,
+            'rider_phone' => $rider->phone,
+        ]);
+    }
+}
+});
     }
 
     protected $fillable = [
@@ -57,6 +67,8 @@ class Order extends Model
         'refunded_amount',
         'payment_method',
         'payment_status',
+        'amount_tendered',
+'change_amount',
         'payment_reference',
         'order_type',
         'status',
@@ -69,14 +81,20 @@ class Order extends Model
         'prepared_at',
         'dispatched_at',
         'delivered_at',
-        
         // Delivery Fields
         'customer_name',
         'customer_phone',
         'delivery_address',
+        'delivery_latitude',   // ADD
+        'delivery_longitude',  // ADD
         'delivery_fee',
         'delivery_notes',
         'rider_id',
+        'rider_name',      
+        'rider_phone',
+        'rider_latitude',      // ADD
+        'rider_longitude',     // ADD
+        'location_updated_at', // ADD
         'source',
     ];
 
@@ -89,10 +107,15 @@ class Order extends Model
         'refunded_at' => 'datetime',
         'accepted_at' => 'datetime',
         'prepared_at' => 'datetime',
+        'delivery_latitude' => 'float',   // ADD
+        'delivery_longitude' => 'float',  // ADD
         'dispatched_at' => 'datetime',
         'delivered_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'rider_latitude' => 'float',        // ADD
+        'rider_longitude' => 'float',       // ADD
+        'location_updated_at' => 'datetime',// ADD
         'payment_status' => 'string',
     ];
 
@@ -153,6 +176,16 @@ class Order extends Model
         return $this->belongsTo(User::class, 'rider_id');
     }
 
+    /**
+     * Proof of Delivery record for this order (added for the POD feature).
+     * Nullable in practice — only present once the order has been Completed
+     * through the rider "Mark Delivered" + POD flow.
+     */
+    public function proofOfDelivery(): HasOne
+    {
+        return $this->hasOne(ProofOfDelivery::class);
+    }
+
     // ─── Accessors & Attributes ───
 
     public function getNetAmountAttribute()
@@ -196,7 +229,7 @@ class Order extends Model
 
     public function canBeRefunded(): bool
     {
-        return in_array($this->status, [self::STATUS_COMPLETED]) 
+        return in_array($this->status, [self::STATUS_COMPLETED, self::STATUS_PARTIALLY_REFUNDED]) 
             && $this->refundable_amount > 0 
             && $this->created_at->diffInHours(now()) < 1;
     }
@@ -274,6 +307,10 @@ class Order extends Model
             StockDeductionService::reverseDeduction($this->branch_id, $item->id);
         }
 
+        // Reverse the original sale entry in the ledger so reports don't
+        // keep counting revenue from a voided order.
+        FinancialLedger::recordVoid($this, $this->branch_id, $userId ?? auth()->id());
+
         return $this;
     }
 
@@ -293,6 +330,10 @@ class Order extends Model
             'refunded_by' => $userId ?? auth()->id(),
             'refunded_at' => now(),
         ]);
+
+        // Record the refunded portion in the ledger so reports reflect the
+        // real net revenue, not the original full sale amount.
+        FinancialLedger::recordRefund($this, $amount, $this->branch_id, $userId ?? auth()->id());
 
         return $this;
     }
@@ -421,4 +462,3 @@ class Order extends Model
         return $query->where('created_at', '>=', now()->subDays($days));
     }
 }
-

@@ -31,73 +31,73 @@
         </div>
 
         {{-- Library Metrics Grid --}}
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             {{-- Total Templates --}}
-            <div class="p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Templates</span>
+            <div class="p-3 sm:p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                <div class="flex items-center justify-between mb-1 sm:mb-2">
+                    <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Templates</span>
                     <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
                     </div>
                 </div>
-                <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $totalTemplates }}</h3>
-                <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Configured library items</p>
+                <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $totalTemplates }}</h3>
+                <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Configured library items</p>
             </div>
 
             {{-- Required Fields --}}
-            <div class="p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Required Fields</span>
+            <div class="p-3 sm:p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                <div class="flex items-center justify-between mb-1 sm:mb-2">
+                    <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Required</span>
                     <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm shrink-0">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                     </div>
                 </div>
-                <h3 class="text-2xl font-black text-rose-600 tracking-tight leading-none">{{ $requiredTemplates }}</h3>
-                <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Mandatory input fields</p>
+                <h3 class="text-xl sm:text-2xl font-black text-rose-600 tracking-tight leading-none">{{ $requiredTemplates }}</h3>
+                <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Mandatory input fields</p>
             </div>
 
             {{-- Total Variations --}}
-            <div class="p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Variations</span>
+            <div class="p-3 sm:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                <div class="flex items-center justify-between mb-1 sm:mb-2">
+                    <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Variations</span>
                     <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </div>
                 </div>
-                <h3 class="text-2xl font-black text-emerald-600 tracking-tight leading-none">{{ $totalItems }}</h3>
-                <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Individual option choices</p>
+                <h3 class="text-xl sm:text-2xl font-black text-emerald-600 tracking-tight leading-none">{{ $totalItems }}</h3>
+                <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Individual option choices</p>
             </div>
 
             {{-- Fixed Pricing --}}
-            <div class="p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fixed Pricing</span>
+            <div class="p-3 sm:p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                <div class="flex items-center justify-between mb-1 sm:mb-2">
+                    <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fixed Price</span>
                     <div class="w-7 h-7 rounded-lg bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm shrink-0">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     </div>
                 </div>
-                <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $fixedTemplates }}</h3>
-                <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Templates using set prices</p>
+                <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $fixedTemplates }}</h3>
+                <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Templates using set prices</p>
             </div>
         </div>
 
         {{-- macOS Style Unified Toolbar --}}
-        <div class="relative z-20 flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
+        <div class="relative z-20 flex flex-row items-center justify-between mb-6 gap-2 sm:gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
             
             {{-- Left: Search Bar --}}
-            <div class="flex flex-1 w-full lg:w-auto">
+            <div class="flex flex-1 min-w-0 lg:flex-initial">
                 <x-search-bar x-model="searchQuery" placeholder="Search templates..." width="w-full lg:w-72" />
             </div>
 
             {{-- Right: Filters & View Toggle --}}
-            <div class="flex flex-wrap items-center lg:justify-end gap-2">
+            <div class="flex flex-nowrap items-center justify-end gap-1.5 sm:gap-2 shrink-0">
                 {{-- Price Mode Filter --}}
                 <x-dropdown align="right" width="48">
                     <x-slot name="trigger">
-                        <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
+                        <x-secondary-button type="button" class="gap-0 sm:gap-1.5 h-10 !px-2.5 sm:!px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
                             <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            <span class="text-[12px] whitespace-nowrap" x-text="priceModeFilter === '' ? 'Filter: All Logic' : (priceModeFilter === 'additive' ? 'Filter: Additive' : 'Filter: Fixed')"></span>
-                            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                            <span class="hidden sm:inline text-[12px] whitespace-nowrap" x-text="priceModeFilter === '' ? 'Filter: All Logic' : (priceModeFilter === 'additive' ? 'Filter: Additive' : 'Filter: Fixed')"></span>
+                            <svg class="hidden sm:block w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                         </x-secondary-button>
                     </x-slot>
                     <x-slot name="content">
@@ -112,7 +112,7 @@
 
                 {{-- View Toggle --}}
                 <button type="button" @click="tableView = (tableView === 'table' ? 'board' : 'table')"
-                    class="w-9 h-9 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors focus:outline-none shrink-0"
+                    class="w-10 h-10 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors focus:outline-none shrink-0"
                     :title="tableView === 'table' ? 'Switch to Board View' : 'Switch to Table View'">
                     <svg x-cloak x-show="tableView === 'table'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
                     <svg x-cloak x-show="tableView === 'board'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
@@ -265,7 +265,7 @@
                                     </x-slot>
                                     <x-slot name="content">
                                         <template x-for="option in [5, 10, 15, 30, 50, 100]">
-                                            <x-dropdown-link href="#" @click.prevent="perPage = option; currentPage = 1;">
+                                            <x-dropdown-link href="#" x-on:click.prevent="perPage = option; currentPage = 1; dropdownOpen = false;">
                                                 <span x-text="option"></span>
                                             </x-dropdown-link>
                                         </template>
@@ -351,7 +351,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {{-- Main Content: Variation Items --}}
             <div class="lg:col-span-2 space-y-6">
-                <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] h-[560px] flex flex-col">
+                                    <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] h-[560px] flex flex-col">
                     <div class="flex items-center justify-between mb-6 pb-4 border-b border-slate-50">
                         <div>
                             <h3 class="text-[13px] font-semibold text-gray-700 uppercase tracking-wider">Variation Options</h3>
@@ -363,37 +363,178 @@
                         </button>
                     </div>
 
+                    {{-- Height-limited + scrollable again. Because this is an
+                         overflow-y-auto ancestor, the Ingredient dropdown below
+                         is teleported to <body> instead of using <x-dropdown>,
+                         so it can't be clipped by this box. --}}
                     <div class="space-y-4 overflow-y-auto flex-1 min-h-0 max-h-[400px] pr-2 custom-scrollbar">
                         @foreach($templateItems as $idx => $item)
-                            <div class="flex items-center gap-4 p-4 rounded-xl bg-slate-50/50 border border-slate-100 hover:bg-white hover:border-indigo-100 hover:shadow-sm transition-all group animate-fadeIn">
-                                <div class="flex-1">
-                                    <x-input-label value="Option Name" class="text-[10px] mb-1 ml-1" />
-                                    <x-text-input type="text" wire:model.live="templateItems.{{ $idx }}.name" 
-                                        class="w-full h-10 text-[13px] font-bold text-slate-800 placeholder-slate-300" 
-                                        placeholder="e.g. Regular Size" />
-                                </div>
-                                <div class="w-40">
-                                    <x-input-label value="Extra Price" class="text-[10px] mb-1 ml-1" />
-                                    <div class="relative">
-                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <span class="text-[12px] font-black text-slate-400">₱</span>
+                            <div class="p-4 rounded-xl bg-slate-50/50 border border-slate-100 hover:bg-white hover:border-indigo-100 hover:shadow-sm transition-all group animate-fadeIn" x-data="{ showRecipe: {{ !empty($item['ingredients']) ? 'true' : 'false' }} }">
+                                <div class="flex items-center gap-4">
+                                    <div class="flex-1">
+                                        <x-input-label value="Option Name" class="text-[10px] mb-1 ml-1" />
+                                        <x-text-input type="text" wire:model.live="templateItems.{{ $idx }}.name" 
+                                            class="w-full h-10 text-[13px] font-bold text-slate-800 placeholder-slate-300" 
+                                            placeholder="e.g. Regular Size" />
+                                    </div>
+                                    <div class="w-40">
+                                        <x-input-label value="Extra Price" class="text-[10px] mb-1 ml-1" />
+                                        <div class="relative">
+                                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <span class="text-[12px] font-black text-slate-400">₱</span>
+                                            </div>
+                                            <x-text-input type="text" wire:model.live="templateItems.{{ $idx }}.price" 
+                                                class="w-full h-10 pl-7 text-[13px] font-black text-slate-800 text-right" 
+                                                placeholder="0.00" />
                                         </div>
-                                        <x-text-input type="text" wire:model.live="templateItems.{{ $idx }}.price" 
-                                            class="w-full h-10 pl-7 text-[13px] font-black text-slate-800 text-right" 
-                                            placeholder="0.00" />
+                                    </div>
+                                                                        <div class="flex items-center gap-2 pt-5">
+                                        @if(!$noRecipeRequired)
+                                        <button type="button" @click="showRecipe = !showRecipe"
+                                            class="w-9 h-9 flex items-center justify-center rounded-lg border-2 transition-all"
+                                            :class="showRecipe ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-100' : 'bg-white border-slate-100 text-slate-300 hover:text-amber-500 hover:border-amber-100'"
+                                            title="Toggle recipe ingredients">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18 18.247 18.477 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                                        </button>
+                                        @endif
+                                        <button wire:click="toggleItemDefault({{ $idx }})"
+                                            class="w-9 h-9 flex items-center justify-center rounded-lg border-2 transition-all {{ $item['is_default'] ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-white border-slate-100 text-slate-300 hover:text-emerald-500 hover:border-emerald-100' }}" 
+                                            title="Toggle system default">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                                        </button>
+                                        <button wire:click="removeItem({{ $idx }})" 
+                                            class="w-9 h-9 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-300 hover:text-rose-500 hover:border-rose-100 hover:bg-rose-50 transition-all">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                                        </button>
                                     </div>
                                 </div>
-                                <div class="flex items-center gap-2 pt-5">
-                                    <button wire:click="toggleItemDefault({{ $idx }})" 
-                                        class="w-9 h-9 flex items-center justify-center rounded-lg border-2 transition-all {{ $item['is_default'] ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-white border-slate-100 text-slate-300 hover:text-emerald-500 hover:border-emerald-100' }}" 
-                                        title="Toggle system default">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
-                                    </button>
-                                    <button wire:click="removeItem({{ $idx }})" 
-                                        class="w-9 h-9 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-300 hover:text-rose-500 hover:border-rose-100 hover:bg-rose-50 transition-all">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
-                                    </button>
+
+                                                                {{-- Per-item recipe: ingredients attached here travel with the
+                                     template on import, so a product doesn't need them re-typed. --}}
+                                @if(!$noRecipeRequired)
+                                <div x-show="showRecipe" x-collapse class="mt-4 pt-4 border-t border-slate-100/80" wire:key="item-recipe-{{ $idx }}">
+                                    <div class="flex items-end gap-2 mb-3">
+                                                                                    <div class="flex-1">
+                                            <x-input-label value="Ingredient" class="text-[10px] mb-1 ml-1" />
+                                            <div class="relative"
+                                                x-data="{
+                                                    open: false,
+                                                    openUpward: false,
+                                                    query: '',
+                                                    ingredients: @js(\App\Models\Ingredient::orderBy('name')->get(['id', 'name', 'unit'])),
+                                                    get filteredIngredients() {
+                                                        const q = this.query.toLowerCase().trim();
+                                                        if (!q) return this.ingredients;
+                                                        return this.ingredients.filter(i => i.name.toLowerCase().includes(q));
+                                                    },
+                                                    // Decides flip direction only — no fixed top/left, since
+                                                    // this panel stays a normal DOM child of the trigger's
+                                                    // wrapper (position: relative) instead of being
+                                                    // teleported. It opens as `top-full` (below) or
+                                                    // `bottom-full` (above) via Tailwind classes.
+                                                    checkDirection() {
+                                                        const trigger = this.$refs.ingredientTrigger;
+                                                        const panel = this.$refs.ingredientPanel;
+                                                        if (!trigger || !panel) return;
+
+                                                        const r = trigger.getBoundingClientRect();
+                                                        const gap = 6;
+                                                        const panelHeight = panel.offsetHeight;
+                                                        const spaceBelow = window.innerHeight - r.bottom;
+                                                        const spaceAbove = r.top;
+
+                                                        this.openUpward = spaceBelow < (panelHeight + gap) && spaceAbove > spaceBelow;
+                                                    },
+                                                    async openDropdown() {
+                                                        this.open = true;
+                                                        this.query = '';
+                                                        // Render first (off-screen via x-cloak) so the panel
+                                                        // has a real height to measure, then decide up/down.
+                                                        await this.$nextTick();
+                                                        this.checkDirection();
+                                                        this.$refs.ingredientSearchInput?.focus();
+                                                    },
+                                                    closeDropdown() {
+                                                        this.open = false;
+                                                    }
+                                                }"
+                                                @click.outside="closeDropdown()"
+                                                @keydown.escape.window="closeDropdown()">
+
+                                                <button type="button" x-ref="ingredientTrigger"
+                                                    @click="open ? closeDropdown() : openDropdown()"
+                                                    class="flex items-center justify-between w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[12px] text-slate-700 shadow-sm h-9">
+                                                    <span class="font-medium truncate">{{ !empty($item['new_ingredient_id']) ? (\App\Models\Ingredient::find($item['new_ingredient_id'])?->name ?? 'Choose...') : 'Choose ingredient...' }}</span>
+                                                    <svg class="w-3.5 h-3.5 text-slate-400 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+                                                </button>
+
+                                                {{-- Stays inline (no teleport). Positioned absolutely
+                                                     relative to the wrapper above; flips to open upward
+                                                     via :class when there isn't room below. Note: because
+                                                     this still lives inside the Variation Options list's
+                                                     overflow-y-auto/max-h-[400px] box, it remains subject
+                                                     to that container's clipping if the trigger sits near
+                                                     the container's own visible edge. --}}
+                                                <div x-show="open" x-cloak x-ref="ingredientPanel"
+                                                    x-transition:enter="transition ease-out duration-100"
+                                                    x-transition:enter-start="opacity-0"
+                                                    x-transition:enter-end="opacity-100"
+                                                    x-transition:leave="transition ease-in duration-75"
+                                                    x-transition:leave-start="opacity-100"
+                                                    x-transition:leave-end="opacity-0"
+                                                    :class="openUpward ? 'bottom-full mb-1.5' : 'top-full mt-1.5'"
+                                                    class="absolute left-0 w-full z-50 bg-white rounded-xl shadow-lg ring-1 ring-black ring-opacity-5 p-2">
+                                                    <div class="px-2 pb-2 mb-2 border-b border-slate-50">
+                                                        <div class="relative">
+                                                            <svg class="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                                            <input x-ref="ingredientSearchInput" x-model="query" type="text" placeholder="Search ingredients..."
+                                                                class="w-full pl-9 pr-4 py-2 bg-slate-50 border-none rounded-lg text-[12px] font-medium focus:ring-1 focus:ring-indigo-500 placeholder-slate-400">
+                                                        </div>
+                                                    </div>
+                                                    {{-- Panel's own height limit + own scroll --}}
+                                                    <div class="max-h-48 overflow-y-auto custom-scrollbar">
+                                                        <template x-for="ing in filteredIngredients" :key="ing.id">
+                                                            <a href="#"
+                                                                @click.prevent="$wire.set('templateItems.{{ $idx }}.new_ingredient_id', ing.id); closeDropdown()"
+                                                                class="flex items-center justify-between px-4 py-2 text-[12px] rounded-lg hover:bg-slate-50 transition-colors">
+                                                                <span class="font-medium text-slate-700" x-text="ing.name"></span>
+                                                                <span class="text-slate-300 text-[10px]" x-text="'(' + ing.unit + ')'"></span>
+                                                            </a>
+                                                        </template>
+                                                        <div x-show="filteredIngredients.length === 0" class="px-4 py-2 text-[12px] text-slate-400 italic">No ingredients found</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="w-28">
+                                            <x-input-label value="Qty" class="text-[10px] mb-1 ml-1" />
+                                            <div class="relative">
+                                                <x-text-input wire:model.live="templateItems.{{ $idx }}.new_ingredient_qty" class="w-full h-9 pr-12 text-[12px] font-bold" placeholder="0.00" inputFilter="price" />
+                                                <span class="absolute inset-y-0 right-2 flex items-center text-[9px] font-black text-slate-400 uppercase">{{ !empty($item['new_ingredient_id']) ? (\App\Helpers\StockHelper::getAbbreviation(\App\Models\Ingredient::find($item['new_ingredient_id'])?->unit ?? '') ?: '—') : '—' }}</span>
+                                            </div>
+                                        </div>
+                                        <x-secondary-button type="button" wire:click="addItemIngredient({{ $idx }})" class="h-9 px-3 text-[10px] font-black uppercase">Add</x-secondary-button>
+                                    </div>
+
+                                    @if(!empty($item['ingredients']))
+                                        <div class="space-y-1.5">
+                                            @foreach($item['ingredients'] as $ingIdx => $ri)
+                                                <div class="flex items-center justify-between px-3 py-1.5 bg-white border border-slate-100 rounded-lg" wire:key="item-{{ $idx }}-ing-{{ $ingIdx }}">
+                                                    <span class="text-[11px] font-bold text-slate-700">{{ $ri['name'] }}</span>
+                                                    <div class="flex items-center gap-2">
+                                                        <span class="text-[10px] font-bold text-slate-400 uppercase">{{ $ri['quantity'] }} {{ $ri['unit'] }}</span>
+                                                        <button type="button" wire:click="removeItemIngredient({{ $idx }}, {{ $ingIdx }})" class="text-slate-300 hover:text-rose-500 transition-colors">
+                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                                                       @else
+                                        <p class="text-[11px] text-slate-400 italic">No ingredients mapped yet for this option.</p>
+                                    @endif
                                 </div>
+                                @endif
                             </div>
                         @endforeach
 
@@ -437,7 +578,15 @@
                             </div>
                         </div>
 
-                        <div class="pt-5 border-t border-slate-50">
+                                                <div class="pt-5 border-t border-slate-50 space-y-4">
+                            <label class="flex items-center gap-3 cursor-pointer group">
+                                <input type="checkbox" wire:model.live="noRecipeRequired" class="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+                                <div>
+                                    <span class="text-[13px] font-bold text-slate-800 group-hover:text-amber-600 transition-colors">No Recipe Required</span>
+                                    <p class="text-[11px] text-slate-400 font-medium leading-none mt-1">Options skip ingredient tracking and are always available</p>
+                                </div>
+                            </label>
+
                             <label class="flex items-center gap-3 cursor-pointer group">
                                 <input type="checkbox" wire:model.live="isRequired" class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
                                 <div>

@@ -38,7 +38,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div>
                                 <x-input-label for="f_first_name" value="First Name *" />
-                                <x-text-input id="f_first_name" name="first_name" wire:model.live.debounce.500ms="firstName"
+                                <x-text-input id="f_first_name" name="first_name" wire:model.blur="firstName"
                                     type="text" class="mt-1 block w-full" placeholder="Juan"
                                     autocomplete="given-name" inputFilter="nameStrict" maxlength="100"
                                     @keydown="FormFilters.nameStrictKeydown($event)" @paste="FormFilters.nameStrictPaste($event)"
@@ -47,7 +47,7 @@
                             </div>
                             <div>
                                 <x-input-label for="f_middle_name" value="Middle Name" />
-                                <x-text-input id="f_middle_name" name="middle_name" wire:model.live.debounce.500ms="middleName"
+                                <x-text-input id="f_middle_name" name="middle_name" wire:model.blur="middleName"
                                     type="text" class="mt-1 block w-full" placeholder="Dela"
                                     autocomplete="additional-name" inputFilter="nameStrict" maxlength="100"
                                     @keydown="FormFilters.nameStrictKeydown($event)" @paste="FormFilters.nameStrictPaste($event)"
@@ -56,7 +56,7 @@
                             </div>
                             <div>
                                 <x-input-label for="f_last_name" value="Last Name *" />
-                                <x-text-input id="f_last_name" name="last_name" wire:model.live.debounce.500ms="lastName" type="text"
+                                <x-text-input id="f_last_name" name="last_name" wire:model.blur="lastName" type="text"
                                     class="mt-1 block w-full" placeholder="Cruz" autocomplete="family-name" 
                                     inputFilter="nameStrict" maxlength="100"
                                     @keydown="FormFilters.nameStrictKeydown($event)" @paste="FormFilters.nameStrictPaste($event)"
@@ -67,7 +67,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                             <div>
                                 <x-input-label for="f_email" value="Email Address *" />
-                                <x-text-input id="f_email" name="email" wire:model.live.debounce.500ms="email" type="email"
+                                <x-text-input id="f_email" name="email" wire:model.blur="email" type="email"
                                     class="mt-1 block w-full" placeholder="juan.cruz@company.com"
                                     autocomplete="email" inputFilter="email" maxlength="255"
                                     @keydown="FormFilters.emailKeydown($event)" @paste="FormFilters.emailPaste($event)"
@@ -80,7 +80,7 @@
                                     <div class="flex-shrink-0 inline-flex items-center px-3 h-10 rounded-l-lg border border-r-0 border-gray-200 bg-gray-50 text-gray-500 text-[13px] font-bold">
                                         +63
                                     </div>
-                                    <x-text-input id="f_phone" name="phone" wire:model.live.debounce.500ms="phone" type="text"
+                                    <x-text-input id="f_phone" name="phone" wire:model.blur="phone" type="text"
                                         class="block w-full rounded-l-none" placeholder="912 345 6789" autocomplete="tel"
                                         inputFilter="number" maxlength="10"
                                         @keydown="FormFilters.numberKeydown($event)" @paste="FormFilters.numberPaste($event)"
@@ -108,8 +108,8 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="{{ $formRoleId == 3 ? 'block' : 'hidden' }}">
-                                <x-input-label for="f_position">Staff Role <span class="text-red-500">*</span></x-input-label>
+                            <div x-show="$wire.formRoleId == 3" x-cloak>
+    <x-input-label for="f_position">Staff Role <span class="text-red-500">*</span></x-input-label>
                                 <div wire:key="role-dropdown-container">
                                     <x-dropdown align="left" width="full" containerClasses="block w-full">
                                         <x-slot name="trigger">
@@ -123,10 +123,10 @@
                                         </x-slot>
                                         <x-slot name="content" class="max-h-60 overflow-y-auto">
                                             @forelse($availablePositions as $pos)
-                                                <x-dropdown-link href="#" @click.prevent="$dispatch('trigger-set-position', '{{ $pos }}')">
-                                                    {{ $pos }}
-                                                </x-dropdown-link>
-                                            @empty
+    <x-dropdown-link href="#" @click.prevent="dropdownOpen = false; $dispatch('trigger-set-position', '{{ $pos }}')">
+        {{ $pos }}
+    </x-dropdown-link>
+@empty
                                                 <div class="px-4 py-2 text-[12px] text-gray-400 italic font-medium">No roles configured...</div>
                                             @endforelse
                                         </x-slot>
@@ -282,7 +282,7 @@
                             {{-- Row 3: Street --}}
                             <div>
                                 <x-input-label value="House # / Street / Subdivision" />
-                                <x-text-input wire:model.live.debounce.400ms="addr_street" class="w-full mt-1 h-10" placeholder="e.g. Unit 123, Rosewood Ave, Phase 1" :hasError="$errors->has('addr_street')" />
+                                <x-text-input wire:model.blur="addr_street" class="w-full mt-1 h-10" placeholder="e.g. Unit 123, Rosewood Ave, Phase 1" :hasError="$errors->has('addr_street')" />
                                 <x-input-error :messages="$errors->get('addr_street')" class="mt-1" />
                             </div>
                         </div>
@@ -310,10 +310,10 @@
                                     </x-slot>
                                     <x-slot name="content">
                                         @forelse($roles as $r)
-                                            <x-dropdown-link href="#" @click.prevent="$dispatch('trigger-set-formrole', '{{ $r->id }}')">
-                                                {{ ucfirst($r->name) }}
-                                            </x-dropdown-link>
-                                        @empty
+    <x-dropdown-link href="#" @click.prevent="dropdownOpen = false; $dispatch('trigger-set-formrole', '{{ $r->id }}')">
+        {{ ucfirst($r->name) }}
+    </x-dropdown-link>
+@empty
                                             <div class="px-4 py-2 text-[12px] text-gray-400 italic font-medium">No roles available...</div>
                                         @endforelse
                                     </x-slot>
@@ -326,7 +326,7 @@
                                     <x-slot name="trigger">
                                         <button id="f_branch_id" type="button"
                                             class="mt-1 flex items-center justify-between w-full px-3 py-2 bg-white border rounded-lg text-[13px] text-gray-700 shadow-sm hover:border-gray-300 focus:outline-none transition-all h-10 {{ $errors->has('formBranchId') ? 'border-red-400 bg-red-50/30' : 'border-gray-200' }}">
-                                            <span>{{ $formBranchId ? $branches->firstWhere('id', $formBranchId)?->branch_name : 'Select work location...' }}</span>
+                                            <span>{{ $formBranchId ? ($branches->firstWhere('id', $formBranchId)?->branch_name ?? 'Select work location...') : 'Select work location...' }}</span>
                                             <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor"
                                                 viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -336,10 +336,10 @@
                                     </x-slot>
                                     <x-slot name="content" class="max-h-60 overflow-y-auto">
                                         @forelse($branches as $branch)
-                                            <x-dropdown-link href="#" @click.prevent="$dispatch('trigger-set-formbranch', '{{ $branch->id }}')">
-                                                {{ $branch->branch_name }}
-                                            </x-dropdown-link>
-                                        @empty
+    <x-dropdown-link href="#" @click.prevent="dropdownOpen = false; $dispatch('trigger-set-formbranch', '{{ $branch->id }}')">
+        {{ $branch->branch_name }}
+    </x-dropdown-link>
+@empty
                                             <div class="px-4 py-2 text-[12px] text-gray-400 italic font-medium">No branches defined...</div>
                                         @endforelse
                                     </x-slot>
@@ -398,9 +398,47 @@
                 </div>
             </div>
             </div>
+{{-- ════════════════ DASHBOARD (VIEW MODE) — SKELETON PRELOAD ════════════════ --}}
+            <div x-show="mode === 'view' && viewProfileLoading" x-cloak class="animate-pulse">
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    <div class="col-span-1 space-y-6">
+                        <div class="bg-white rounded-3xl border border-slate-200/60 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.05)] p-8">
+                            <div class="w-24 h-24 rounded-2xl bg-slate-200 mx-auto mb-6"></div>
+                            <div class="h-4 bg-slate-200 rounded-full w-2/3 mx-auto mb-2"></div>
+                            <div class="h-3 bg-slate-100 rounded-full w-1/2 mx-auto mb-8"></div>
+                            <div class="pt-8 border-t border-slate-100 space-y-5">
+                                @for ($i = 0; $i < 6; $i++)
+                                    <div class="flex items-center justify-between">
+                                        <div class="h-3 bg-slate-100 rounded-full w-1/3"></div>
+                                        <div class="h-4 bg-slate-200 rounded-lg w-1/4"></div>
+                                    </div>
+                                @endfor
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-span-1 lg:col-span-3">
+                        <div class="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-6">
+                            <div class="flex items-center justify-between mb-6">
+                                <div class="h-4 bg-slate-200 rounded-full w-1/4"></div>
+                                <div class="h-8 bg-slate-100 rounded-lg w-32"></div>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                                @for ($i = 0; $i < 4; $i++)
+                                    <div class="p-5 rounded-2xl bg-slate-100 h-28"></div>
+                                @endfor
+                            </div>
+                            <div class="h-40 bg-slate-50 rounded-2xl"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             {{-- ════════════════ DASHBOARD (VIEW MODE) ════════════════ --}}
-            <div x-show="mode === 'view'" x-cloak x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
+            {{-- No enter transition here on purpose: once the skeleton above
+                 clears, the real content should appear instantly rather than
+                 fading in — a second animation right after the skeleton reads
+                 as a duplicate "loading" moment. --}}
+            <div x-show="mode === 'view' && !viewProfileLoading" x-cloak>
                 <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     {{-- Profile Card (Left side) --}}
                     <div class="col-span-1 space-y-6">
@@ -453,10 +491,25 @@
                                     <div class="pt-5 border-t border-slate-50">
                                         <span class="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1.5">Residential Address</span>
                                         <p class="text-[12px] font-bold text-slate-700 leading-relaxed">
-                                            @if($addr_street || $addr_barangay || $addr_city)
-                                                {{ $addr_street }}{{ $addr_barangay ? ', ' . $addr_barangay : '' }}<br>
-                                                {{ $addr_city }}{{ $addr_province ? ', ' . $addr_province : '' }}<br>
-                                                <span class="text-[11px] text-slate-500">{{ $addr_region }}</span>
+                                            @php
+                                                // Building each line by filtering out empty parts and imploding
+                                                // avoids a stray leading ", " whenever street (or another
+                                                // upstream part) is blank — the old version always prefixed
+                                                // barangay/province with a separator regardless of whether the
+                                                // field before it actually had a value.
+                                                $line1 = implode(', ', array_filter([$addr_street, $addr_barangay]));
+                                                $line2 = implode(', ', array_filter([$addr_city, $addr_province]));
+                                            @endphp
+                                            @if($line1 || $line2 || $addr_region)
+                                                @if($line1)
+                                                    {{ $line1 }}<br>
+                                                @endif
+                                                @if($line2)
+                                                    {{ $line2 }}<br>
+                                                @endif
+                                                @if($addr_region)
+                                                    <span class="text-[11px] text-slate-500">{{ $addr_region }}</span>
+                                                @endif
                                             @else
                                                 <span class="text-slate-400 font-medium italic">No address provided</span>
                                             @endif
@@ -516,48 +569,48 @@
                                 @php
                                     $stats = $this->historyStats;
                                 @endphp
-                                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                    <div class="p-5 rounded-2xl bg-indigo-600 shadow-[0_12px_24px_-8px_rgba(79,70,229,0.3)] relative overflow-hidden group">
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                                    <div class="p-3 sm:p-5 rounded-2xl bg-indigo-600 shadow-[0_12px_24px_-8px_rgba(79,70,229,0.3)] relative overflow-hidden group">
                                         <div class="absolute -bottom-6 -right-6 w-20 h-20 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
                                         <div class="relative">
-                                            <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center mb-3 backdrop-blur-md">
+                                            <div class="w-8 h-8 sm:w-9 sm:h-9 bg-white/20 rounded-xl flex items-center justify-center mb-2 sm:mb-3 backdrop-blur-md">
                                                 <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                             </div>
-                                            <p class="text-[9px] text-indigo-100 uppercase font-black tracking-widest opacity-80">Total Revenue</p>
-                                            <p class="text-[19px] font-black text-white mt-0.5">₱{{ number_format($stats['total_sales'] ?? 0, 2) }}</p>
+                                            <p class="text-[8px] sm:text-[9px] text-indigo-100 uppercase font-black tracking-widest opacity-80">Total Revenue</p>
+                                            <p class="text-[16px] sm:text-[19px] font-black text-white mt-0.5">₱{{ number_format($stats['total_sales'] ?? 0, 2) }}</p>
                                         </div>
                                     </div>
 
-                                    <div class="p-5 rounded-2xl bg-white border border-slate-100 shadow-sm relative overflow-hidden group">
+                                    <div class="p-3 sm:p-5 rounded-2xl bg-white border border-slate-100 shadow-sm relative overflow-hidden group">
                                         <div class="absolute -bottom-6 -right-6 w-20 h-20 bg-slate-50 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
                                         <div class="relative">
-                                            <div class="w-9 h-9 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center mb-3">
+                                            <div class="w-8 h-8 sm:w-9 sm:h-9 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center mb-2 sm:mb-3">
                                                 <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
                                             </div>
-                                            <p class="text-[9px] text-slate-400 uppercase font-black tracking-widest">Total Orders</p>
-                                            <p class="text-[19px] font-black text-slate-900 mt-0.5">{{ number_format($stats['total_orders'] ?? 0) }}</p>
+                                            <p class="text-[8px] sm:text-[9px] text-slate-400 uppercase font-black tracking-widest">Total Orders</p>
+                                            <p class="text-[16px] sm:text-[19px] font-black text-slate-900 mt-0.5">{{ number_format($stats['total_orders'] ?? 0) }}</p>
                                         </div>
                                     </div>
 
-                                    <div class="p-5 rounded-2xl bg-white border border-slate-100 shadow-sm relative overflow-hidden group">
+                                    <div class="p-3 sm:p-5 rounded-2xl bg-white border border-slate-100 shadow-sm relative overflow-hidden group">
                                         <div class="absolute -bottom-6 -right-6 w-20 h-20 bg-slate-50 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
                                         <div class="relative">
-                                            <div class="w-9 h-9 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center mb-3">
+                                            <div class="w-8 h-8 sm:w-9 sm:h-9 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center mb-2 sm:mb-3">
                                                 <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
                                             </div>
-                                            <p class="text-[9px] text-slate-400 uppercase font-black tracking-widest">Avg. Order Value</p>
-                                            <p class="text-[19px] font-black text-slate-900 mt-0.5">₱{{ number_format($stats['avg_order_value'] ?? 0, 2) }}</p>
+                                            <p class="text-[8px] sm:text-[9px] text-slate-400 uppercase font-black tracking-widest">Avg. Order Value</p>
+                                            <p class="text-[16px] sm:text-[19px] font-black text-slate-900 mt-0.5">₱{{ number_format($stats['avg_order_value'] ?? 0, 2) }}</p>
                                         </div>
                                     </div>
 
-                                    <div class="p-5 rounded-2xl bg-white border border-slate-100 shadow-sm relative overflow-hidden group">
+                                    <div class="p-3 sm:p-5 rounded-2xl bg-white border border-slate-100 shadow-sm relative overflow-hidden group">
                                         <div class="absolute -bottom-6 -right-6 w-20 h-20 bg-slate-50 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
                                         <div class="relative">
-                                            <div class="w-9 h-9 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center mb-3">
+                                            <div class="w-8 h-8 sm:w-9 sm:h-9 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center mb-2 sm:mb-3">
                                                 <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                             </div>
-                                            <p class="text-[9px] text-slate-400 uppercase font-black tracking-widest">Completion Rate</p>
-                                            <p class="text-[19px] font-black text-slate-900 mt-0.5">{{ number_format($stats['completion_rate'] ?? 0, 1) }}%</p>
+                                            <p class="text-[8px] sm:text-[9px] text-slate-400 uppercase font-black tracking-widest">Completion Rate</p>
+                                            <p class="text-[16px] sm:text-[19px] font-black text-slate-900 mt-0.5">{{ number_format($stats['completion_rate'] ?? 0, 1) }}%</p>
                                         </div>
                                     </div>
                                 </div>
@@ -640,92 +693,92 @@
                     <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">{{ auth()->user()->isSuperAdmin() ? 'User Management' : 'Staff Management' }}</h2>
                     <p class="text-[12px] text-gray-500 font-medium">System Overview: <span class="text-indigo-600 font-bold">{{ $totalUsers }} members</span></p>
                 </div>
-                <x-primary-button @click="panel = 'form'; mode = 'create'; $wire.showCreate()" class="h-10">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <x-primary-button @click="panel = 'form'; mode = 'create'; $wire.showCreate()" class="h-10 !px-2.5 sm:!px-4">
+                    <svg class="w-4 h-4 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                     </svg>
-                    Register New User
+                    <span class="hidden sm:inline">Register New User</span>
                 </x-primary-button>
             </div>
 
             {{-- System Metrics Grid (Matching Dashboard Premium Aesthetic - Compact Footprint) --}}
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
                 @php
                     $sysStats = $this->systemStats;
                     $primaryColor = auth()->user()->getRoleTheme()['primary'];
                 @endphp
                 
                 {{-- Total Users --}}
-                <div class="p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Users</span>
+                <div class="p-3 sm:p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-1 sm:mb-2">
+                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Users</span>
                         <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
                         </div>
                     </div>
-                    <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($sysStats['total']) }}</h3>
-                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Registered accounts in database</p>
+                    <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($sysStats['total']) }}</h3>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Registered accounts in database</p>
                 </div>
 
                 {{-- Active Status --}}
-                <div class="p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active Now</span>
+                <div class="p-3 sm:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-1 sm:mb-2">
+                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active Now</span>
                         <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         </div>
                     </div>
-                    <h3 class="text-2xl font-black text-emerald-600 tracking-tight leading-none">{{ number_format($sysStats['active']) }}</h3>
-                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Accounts with active access</p>
+                    <h3 class="text-xl sm:text-2xl font-black text-emerald-600 tracking-tight leading-none">{{ number_format($sysStats['active']) }}</h3>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Accounts with active access</p>
                 </div>
 
                 {{-- Inactive Accounts --}}
-                <div class="p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Inactive</span>
+                <div class="p-3 sm:p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-1 sm:mb-2">
+                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Inactive</span>
                         <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
                         </div>
                     </div>
-                    <h3 class="text-2xl font-black text-rose-600 tracking-tight leading-none">{{ number_format($sysStats['inactive']) }}</h3>
-                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Deactivated user profiles</p>
+                    <h3 class="text-xl sm:text-2xl font-black text-rose-600 tracking-tight leading-none">{{ number_format($sysStats['inactive']) }}</h3>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Deactivated user profiles</p>
                 </div>
 
                 {{-- Workforce --}}
-                <div class="p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Staff Members</span>
+                <div class="p-3 sm:p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                    <div class="flex items-center justify-between mb-1 sm:mb-2">
+                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Staff Members</span>
                         <div class="w-7 h-7 rounded-lg bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                         </div>
                     </div>
-                    <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($sysStats['staff']) }}</h3>
-                    <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Operational store employees</p>
+                    <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($sysStats['staff']) }}</h3>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Operational store employees</p>
                 </div>
             </div>
 
             {{-- macOS Style Unified Toolbar --}}
-            <div class="relative z-20 flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
+            <div class="relative z-20 flex flex-row items-center justify-between mb-6 gap-2 sm:gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
                 
                 {{-- Left: Search Bar --}}
-                <div class="flex flex-1 w-full lg:w-auto">
+                <div class="flex flex-1 min-w-0 lg:flex-initial">
                     <x-search-bar wireModel="search" placeholder="Find records..." width="w-full lg:w-72" />
                 </div>
 
                 {{-- Right: Filters & View Toggle --}}
-                <div class="flex flex-wrap items-center lg:justify-end gap-2">
+                <div class="flex flex-nowrap items-center justify-end gap-1.5 sm:gap-2 shrink-0">
 
                     {{-- Role Filter (Super Admin only) --}}
                     @if(auth()->user()->role_id === 1)
                         <x-dropdown align="right" width="48" wire:key="filter-role">
                             <x-slot name="trigger">
-                                <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
+                                <x-secondary-button type="button" class="gap-0 sm:gap-1.5 h-10 !px-2.5 sm:!px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
                                     <svg class="w-3.5 h-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                         <circle cx="12" cy="7" r="4" stroke-width="1.5" />
                                         <path d="M4 21v-2a4 4 0 014-4h8a4 4 0 014 4v2" stroke-width="1.5" />
                                     </svg>
-                                    <span class="text-[12px] whitespace-nowrap">{{ $role_id ? ucfirst($roles->firstWhere('id', $role_id)?->name) : 'All Roles' }}</span>
-                                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <span class="hidden sm:inline text-[12px] whitespace-nowrap">{{ $role_id ? ucfirst($roles->firstWhere('id', $role_id)?->name) : 'All Roles' }}</span>
+                                    <svg class="hidden sm:block w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                                     </svg>
                                 </x-secondary-button>
@@ -747,12 +800,12 @@
                     @if(auth()->user()->role_id === 1)
                         <x-dropdown align="right" width="48" wire:key="filter-branch">
                             <x-slot name="trigger">
-                                <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
+                                <x-secondary-button type="button" class="gap-0 sm:gap-1.5 h-10 !px-2.5 sm:!px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
                                     <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                     </svg>
-                                    <span class="text-[12px] whitespace-nowrap">{{ $branch_id ? $branches->firstWhere('id', $branch_id)?->branch_name : 'All Branches' }}</span>
-                                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <span class="hidden sm:inline text-[12px] whitespace-nowrap">{{ $branch_id ? $branches->firstWhere('id', $branch_id)?->branch_name : 'All Branches' }}</span>
+                                    <svg class="hidden sm:block w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                                     </svg>
                                 </x-secondary-button>
@@ -773,12 +826,12 @@
                     {{-- Status Filter --}}
                     <x-dropdown align="right" width="48" wire:key="filter-status">
                         <x-slot name="trigger">
-                            <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
+                            <x-secondary-button type="button" class="gap-0 sm:gap-1.5 h-10 !px-2.5 sm:!px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
                                 <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" />
                                 </svg>
-                                <span class="text-[12px] whitespace-nowrap">{{ $is_active === '1' ? 'Active Only' : ($is_active === '0' ? 'Inactive Only' : 'All Status') }}</span>
-                                <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <span class="hidden sm:inline text-[12px] whitespace-nowrap">{{ $is_active === '1' ? 'Active Only' : ($is_active === '0' ? 'Inactive Only' : 'All Status') }}</span>
+                                <svg class="hidden sm:block w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                                 </svg>
                             </x-secondary-button>
@@ -795,7 +848,7 @@
 
                     {{-- View Toggle (Seamless Single Icon) --}}
                     <button type="button" @click="tableView = (tableView === 'table' ? 'board' : 'table')"
-                        class="w-9 h-9 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors focus:outline-none shrink-0"
+                        class="w-10 h-10 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors focus:outline-none shrink-0"
                         :title="tableView === 'table' ? 'Switch to Board View' : 'Switch to Table View'">
                         
                         {{-- Show Board Icon (since clicking it will switch to Board) --}}
@@ -872,7 +925,7 @@
                                 {{ $user->date_hired ? date('d M Y', strtotime($user->date_hired)) : date('d M Y', strtotime($user->created_at)) }}
                             </td>
                             <td class="py-3 px-4 whitespace-nowrap text-right">
-                                <x-secondary-button @click="panel = 'form'; mode = 'view'; $wire.showEdit({{ $user->id }}, 'view')" class="h-8 px-3 inline-flex items-center gap-1.5 text-xs shadow-none border-slate-200">
+                                <x-secondary-button @click="openViewProfile({{ $user->id }})" class="h-8 px-3 inline-flex items-center gap-1.5 text-xs shadow-none border-slate-200">
                                     <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -937,7 +990,7 @@
                                         class="text-[10px] text-gray-400 font-medium">{{ optional($user->branch)->branch_name ?? 'Unassigned' }}</span>
                                 </div>
                                 <div class="flex items-center gap-1.5">
-                                    <button @click="panel = 'form'; mode = 'view'; $wire.showEdit({{ $user->id }}, 'view')"
+                                    <button @click="openViewProfile({{ $user->id }})"
                                         title="View Details"
                                         class="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all focus:outline-none">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -965,6 +1018,9 @@
                             />
                         </div>
                     @endforelse
+                </div>
+                <div class="mt-4">
+                    <x-pagination :paginator="$users" />
                 </div>
             </div>
 
@@ -1257,6 +1313,15 @@
                 deleteTargetId: null,
                 deleteTargetName: '',
 
+                // ── View Profile preload state ───────────────────────────
+                // The skeleton shows once per account, the first time that
+                // account's profile is opened in this session. Every open
+                // after that (for that same account) swaps instantly with
+                // no skeleton. viewProfileWarmedIds tracks which user IDs
+                // have already been loaded once.
+                viewProfileLoading: false,
+                viewProfileWarmedIds: new Set(),
+
                 // ── Entangled Form State ─────────────────────────────────
                 addr_region: @entangle('addr_region'),
                 addr_province: @entangle('addr_province'),
@@ -1289,6 +1354,29 @@
                         className: 'custom-leaflet-icon',
                         iconSize: [40, 40],
                         iconAnchor: [20, 40]
+                    });
+                },
+
+                openViewProfile(userId) {
+                    this.panel = 'form';
+                    this.mode = 'view';
+
+                    // Already showing this exact profile — nothing to refetch or re-render.
+                    if (this.$wire.editUserId === userId && this.$wire.mode === 'view') {
+                        return;
+                    }
+
+                    // This account was already loaded once this session —
+                    // skip the skeleton, swap instantly.
+                    if (this.viewProfileWarmedIds.has(userId)) {
+                        this.$wire.showEdit(userId, 'view');
+                        return;
+                    }
+
+                    this.viewProfileLoading = true;
+                    this.$wire.showEdit(userId, 'view').finally(() => {
+                        this.viewProfileLoading = false;
+                        this.viewProfileWarmedIds.add(userId);
                     });
                 },
 
@@ -1436,8 +1524,8 @@
                             const lat = parseFloat(data[0].lat);
                             const lng = parseFloat(data[0].lon);
                             
-                            this.$wire.set('addr_lat', lat);
-                            this.$wire.set('addr_lng', lng);
+                            this.addr_lat = lat;
+                            this.addr_lng = lng;
                             
                             if (this.map) {
                                 let zoom = 11;
@@ -1533,12 +1621,51 @@
                 map: null,
                 marker: null,
                 mapTimeout: null,
+
+                patchLeaflet() {
+                    if (typeof L === 'undefined' || L._patched) return;
+                    L._patched = true;
+
+                    const originalResetGrid = L.GridLayer.prototype._resetGrid;
+                    if (originalResetGrid) {
+                        L.GridLayer.prototype._resetGrid = function() {
+                            if (!this._map) return;
+                            return originalResetGrid.apply(this, arguments);
+                        };
+                    }
+
+                    const originalSetView = L.GridLayer.prototype._setView;
+                    if (originalSetView) {
+                        L.GridLayer.prototype._setView = function() {
+                            if (!this._map) return;
+                            return originalSetView.apply(this, arguments);
+                        };
+                    }
+
+                    const originalUpdate = L.GridLayer.prototype._update;
+                    if (originalUpdate) {
+                        L.GridLayer.prototype._update = function() {
+                            if (!this._map) return;
+                            return originalUpdate.apply(this, arguments);
+                        };
+                    }
+
+                    const originalResetView = L.GridLayer.prototype._resetView;
+                    if (originalResetView) {
+                        L.GridLayer.prototype._resetView = function() {
+                            if (!this._map) return;
+                            return originalResetView.apply(this, arguments);
+                        };
+                    }
+                },
+
                 initMap() {
                     if (typeof L === 'undefined') {
                         if (this.mapTimeout) clearTimeout(this.mapTimeout);
                         this.mapTimeout = setTimeout(() => this.initMap(), 100);
                         return;
                     }
+                    this.patchLeaflet();
                     if (this.map) {
                         if (this.mapTimeout) clearTimeout(this.mapTimeout);
                         this.mapTimeout = setTimeout(() => {
@@ -1551,6 +1678,8 @@
                                 this.map.setView([lat, lng], 16);
                                 if (this.marker) this.marker.setLatLng([lat, lng]);
                             }
+                            setTimeout(() => { if (this.map) this.map.invalidateSize(); }, 250);
+                            setTimeout(() => { if (this.map) this.map.invalidateSize(); }, 500);
                         }, 50);
                         return;
                     }
@@ -1601,8 +1730,8 @@
                             if (this.marker) this.marker.setLatLng(e.latlng);
                             else this.marker = L.marker(e.latlng, { icon: this.getCustomPinIcon() }).addTo(this.map);
                             
-                            this.$wire.set('addr_lat', lat);
-                            this.$wire.set('addr_lng', lng);
+                            this.addr_lat = lat;
+                            this.addr_lng = lng;
                             
                             try {
                                 const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&countrycodes=ph`);
@@ -1617,21 +1746,88 @@
                                 }
                             } catch (error) { console.error(error); }
                         });
+
+                        // The modal's show transition may still be in flight when the
+                        // map is constructed above, which locks Leaflet into a 0x0 size.
+                        // Force a couple of recalculations after the transition settles.
+                        setTimeout(() => { if (this.map) this.map.invalidateSize(); }, 250);
+                        setTimeout(() => { if (this.map) this.map.invalidateSize(); }, 500);
                     }, 50);
                 },
 
+                async initializeExistingAddress() {
+                    if (this.loc.region.items.length === 0) await this.loadRegions();
+                    if (!this.addr_region) return;
+
+                    const region = this.loc.region.items.find(r => r.name === this.addr_region);
+                    if (!region) return;
+
+                    try {
+                        const data = await this.fetchWithRetry(`https://psgc.cloud/api/regions/${region.code}/provinces`);
+                        this.loc.province.items = data.sort((a, b) => a.name.localeCompare(b.name));
+                        if (this.loc.province.items.length === 0) {
+                            this.loc.noProvince = true;
+                            const data2 = await this.fetchWithRetry(`https://psgc.cloud/api/regions/${region.code}/cities-municipalities`);
+                            this.loc.city.items = data2.sort((a, b) => a.name.localeCompare(b.name));
+                        }
+                    } catch (e) { console.error('Preload provinces failed', e); }
+
+                    if (this.addr_province && this.loc.province.items.length > 0) {
+                        const province = this.loc.province.items.find(p => p.name === this.addr_province);
+                        if (province) {
+                            try {
+                                const data = await this.fetchWithRetry(`https://psgc.cloud/api/provinces/${province.code}/cities-municipalities`);
+                                this.loc.city.items = data.sort((a, b) => a.name.localeCompare(b.name));
+                            } catch (e) { console.error('Preload cities failed', e); }
+                        }
+                    }
+
+                    if (this.addr_city && this.loc.city.items.length > 0) {
+                        const city = this.loc.city.items.find(c => c.name === this.addr_city);
+                        if (city) {
+                            try {
+                                const data = await this.fetchWithRetry(`https://psgc.cloud/api/cities-municipalities/${city.code}/barangays`);
+                                this.loc.barangay.items = data.sort((a, b) => a.name.localeCompare(b.name));
+                            } catch (e) { console.error('Preload barangays failed', e); }
+                        }
+                    }
+                },
+
                 init() {
-                    this.loadRegions();
+                    this.initializeExistingAddress();
+                    this.$watch('mode', (val) => {
+        if (val === 'create') {
+            this.loc.province.items = [];
+            this.loc.city.items     = [];
+            this.loc.barangay.items = [];
+            this.loc.noProvince     = false;
+        } else if (val === 'edit' || val === 'view') {
+            // Every edit/view can target a different user, so the cascade
+            // lists must be reloaded for that user's saved address — they
+            // don't refresh automatically just because addr_region/
+            // addr_province/etc changed via the wire entangle.
+            this.loc.province.items = [];
+            this.loc.city.items     = [];
+            this.loc.barangay.items = [];
+            this.loc.noProvince     = false;
+            this.initializeExistingAddress();
+        }
+    });
                     this.$watch('panel', (val) => {
+                        // The map picker only lives inside its modal and is
+                        // initialized when that modal is explicitly opened
+                        // (see the "Open Map Picker" button's @click). Calling
+                        // initMap() here too — while the modal is still closed
+                        // and its container has zero size — locks Leaflet
+                        // into a 0x0 box that never recovers on next open.
                         if (val === 'form') {
-                            this.initMap();
                             this.$nextTick(() => {
                                 if (typeof this.recalculateHistoryTab === 'function') {
                                     this.recalculateHistoryTab();
                                 }
                             });
                         } else {
-                            if (this.marker && this.mode === 'create') {
+                            if (this.marker && this.map && this.mode === 'create') {
                                 this.map.removeLayer(this.marker);
                                 this.marker = null;
                             }

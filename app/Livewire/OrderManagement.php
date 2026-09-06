@@ -53,7 +53,7 @@ class OrderManagement extends Component
         
         // Rehydrate selected order from URL if present
         if ($this->selectedOrderId) {
-            $this->selectedOrder = Order::with(['branch', 'user', 'items.product', 'customer', 'refundedBy', 'rider'])->find($this->selectedOrderId);
+            $this->selectedOrder = Order::with(['branch', 'user', 'items.product', 'customer', 'refundedBy', 'rider', 'proofOfDelivery'])->find($this->selectedOrderId);
             if (!$this->selectedOrder) {
                 $this->backToList();
             } else {
@@ -79,13 +79,27 @@ class OrderManagement extends Component
     public function __call($method, $parameters)
     {
         if (str_starts_with($method, 'updating') && !str_ends_with($method, 'Page')) {
-            $this->resetPage();
+            $this->resetAllPages();
         }
     }
 
     public function updatedPerPage()
     {
-        $this->resetPage();
+        $this->resetAllPages();
+    }
+
+    /**
+     * resetPage() with no argument only resets Livewire's default 'page'
+     * query param, but this component uses three named paginators
+     * (app_page/pos_page/history_page). Reset all three so filtering,
+     * searching, or acting on an order never leaves someone stranded on
+     * a now-empty page of a different tab.
+     */
+    private function resetAllPages()
+    {
+        $this->resetPage('app_page');
+        $this->resetPage('pos_page');
+        $this->resetPage('history_page');
     }
 
     public function updatedRefundReason()
@@ -100,19 +114,28 @@ class OrderManagement extends Component
 
     public function updatedSourceFilter($value)
     {
-        $this->resetPage();
+        $this->resetAllPages();
         
         $validStatuses = [];
         if ($value === 'POS') {
-            $validStatuses = [Order::STATUS_PENDING, Order::STATUS_DRAFTED];
+            $validStatuses = [Order::STATUS_PENDING, Order::STATUS_DRAFTED, Order::STATUS_COMPLETED];
         } elseif ($value === 'App') {
-            $validStatuses = [Order::STATUS_PENDING, Order::STATUS_PREPARING, Order::STATUS_READY, Order::STATUS_HANDED_TO_RIDER, Order::STATUS_OUT_FOR_DELIVERY];
+            $validStatuses = [Order::STATUS_PENDING, Order::STATUS_PREPARING, Order::STATUS_READY, Order::STATUS_HANDED_TO_RIDER, Order::STATUS_OUT_FOR_DELIVERY, Order::STATUS_COMPLETED, Order::STATUS_CANCELLED, Order::STATUS_VOID, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED];
         } elseif ($value === 'History') {
             $validStatuses = [Order::STATUS_COMPLETED, Order::STATUS_CANCELLED, Order::STATUS_VOID, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED];
         }
 
         if ($value !== '' && !in_array($this->statusFilter, $validStatuses)) {
             $this->statusFilter = ''; 
+        }
+
+        // Date filtering only applies to the History tab (completed/cancelled/refunded
+        // records over time). Active orders (App/POS) shouldn't be date-scoped, so
+        // clear any lingering range whenever the person leaves History.
+        if ($value !== 'History') {
+            $this->startDate = '';
+            $this->endDate = '';
+            $this->activeFilter = 'All Time';
         }
     }
 
@@ -152,32 +175,70 @@ class OrderManagement extends Component
                 $this->activeFilter = 'All Time';
                 break;
         }
-        $this->resetPage();
+        $this->resetAllPages();
     }
 
     private function buildOrdersQuery($sourceTab)
     {
         $query = Order::with(['branch', 'user', 'items.product', 'customer', 'refundedBy', 'rider']);
 
+        // Must match the 1-hour void/refund window used by Order::canBeVoided()/canBeRefunded()
+        $voidRefundCutoff = now()->subHour();
+
         // Filter by source
         if ($sourceTab === 'History') {
-            $query->whereIn('status', [
-                Order::STATUS_COMPLETED,
-                Order::STATUS_CANCELLED,
-                Order::STATUS_VOID,
-                Order::STATUS_REFUNDED,
-                Order::STATUS_PARTIALLY_REFUNDED
-            ]);
-        } else {
+            $query->where(function ($q) use ($voidRefundCutoff) {
+                $q->whereIn('status', [
+                    Order::STATUS_CANCELLED,
+                    Order::STATUS_VOID,
+                    Order::STATUS_REFUNDED,
+                    Order::STATUS_PARTIALLY_REFUNDED
+                ])
+                // Completed POS/App orders only move to History once their
+                // 1-hour void/refund window has passed.
+                ->orWhere(function ($q2) use ($voidRefundCutoff) {
+                    $q2->where('status', Order::STATUS_COMPLETED)
+                       ->where('created_at', '<', $voidRefundCutoff);
+                });
+            });
+        } elseif ($sourceTab === 'POS') {
             $query->where('source', $sourceTab);
-            // Exclude history statuses from active tabs
-            $query->whereNotIn('status', [
-                Order::STATUS_COMPLETED,
-                Order::STATUS_CANCELLED,
-                Order::STATUS_VOID,
-                Order::STATUS_REFUNDED,
-                Order::STATUS_PARTIALLY_REFUNDED
-            ]);
+            $query->where(function ($q) use ($voidRefundCutoff) {
+                $q->whereIn('status', [Order::STATUS_PENDING, Order::STATUS_DRAFTED])
+                  // Recently completed POS orders stay visible here while
+                  // still within the void/refund window.
+                  ->orWhere(function ($q2) use ($voidRefundCutoff) {
+                      $q2->where('status', Order::STATUS_COMPLETED)
+                         ->where('created_at', '>=', $voidRefundCutoff);
+                  });
+            });
+        } else {
+            // App / Delivery Orders — this is the active/live view. Recently
+            // resolved orders (completed, cancelled, voided, refunded) stay
+            // visible here for the same 1-hour window POS gets, so staff
+            // investigating a dispute don't need to already know to check
+            // Order History separately. After the window, they roll off to
+            // History same as before.
+            $query->where('source', $sourceTab);
+            $query->where(function ($q) use ($voidRefundCutoff) {
+                $q->whereNotIn('status', [
+                        Order::STATUS_COMPLETED,
+                        Order::STATUS_CANCELLED,
+                        Order::STATUS_VOID,
+                        Order::STATUS_REFUNDED,
+                        Order::STATUS_PARTIALLY_REFUNDED,
+                    ])
+                    ->orWhere(function ($q2) use ($voidRefundCutoff) {
+                        $q2->whereIn('status', [
+                                Order::STATUS_COMPLETED,
+                                Order::STATUS_CANCELLED,
+                                Order::STATUS_VOID,
+                                Order::STATUS_REFUNDED,
+                                Order::STATUS_PARTIALLY_REFUNDED,
+                            ])
+                            ->where('created_at', '>=', $voidRefundCutoff);
+                    });
+            });
         }
 
         // Search by reference number or customer details
@@ -189,9 +250,9 @@ class OrderManagement extends Component
         if (!empty($this->statusFilter)) {
             $validStatuses = [];
             if ($sourceTab === 'POS') {
-                $validStatuses = [Order::STATUS_PENDING, Order::STATUS_DRAFTED];
+                $validStatuses = [Order::STATUS_PENDING, Order::STATUS_DRAFTED, Order::STATUS_COMPLETED];
             } elseif ($sourceTab === 'App') {
-                $validStatuses = [Order::STATUS_PENDING, Order::STATUS_PREPARING, Order::STATUS_READY, Order::STATUS_HANDED_TO_RIDER, Order::STATUS_OUT_FOR_DELIVERY];
+                $validStatuses = [Order::STATUS_PENDING, Order::STATUS_PREPARING, Order::STATUS_READY, Order::STATUS_HANDED_TO_RIDER, Order::STATUS_OUT_FOR_DELIVERY, Order::STATUS_COMPLETED, Order::STATUS_CANCELLED, Order::STATUS_VOID, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED];
             } elseif ($sourceTab === 'History') {
                 $validStatuses = [Order::STATUS_COMPLETED, Order::STATUS_CANCELLED, Order::STATUS_VOID, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED];
             }
@@ -273,6 +334,7 @@ class OrderManagement extends Component
 
     public function openRejectModal(Order $order)
     {
+        if (!auth()->user()->can('manage', $order)) return;
         if ($order->status !== Order::STATUS_PENDING) return;
         $this->selectedOrder = $order;
         $this->rejectReason = '';
@@ -281,6 +343,11 @@ class OrderManagement extends Component
 
     public function openRefundModal(Order $order)
     {
+        if (!auth()->user()->can('manage', $order)) {
+            $this->dispatch('notify', type: 'error', message: 'Unauthorized.');
+            return;
+        }
+
         if (!$order->canBeRefunded()) {
             $this->dispatch('notify', 
                 type: 'error',
@@ -296,6 +363,11 @@ class OrderManagement extends Component
 
     public function openVoidModal(Order $order)
     {
+        if (!auth()->user()->can('manage', $order)) {
+            $this->dispatch('notify', type: 'error', message: 'Unauthorized.');
+            return;
+        }
+
         if (!$order->canBeVoided()) {
             $this->dispatch('notify', 
                 type: 'error',
@@ -310,6 +382,7 @@ class OrderManagement extends Component
 
     public function openReceiptModal(Order $order)
     {
+        if (!auth()->user()->can('manage', $order)) return;
         $this->selectedOrder = $order;
         $this->dispatch('open-modal', 'receipt-modal');
     }
@@ -318,8 +391,12 @@ class OrderManagement extends Component
     {
         $order = $this->selectedOrder;
 
-        // Authorization check
-        if (!auth()->user()->can('void', $order)) {
+        // Authorization check — kept consistent with openVoidModal(), which
+        // only checks 'manage'. The previous extra 'void' ability check
+        // caused every void to fail here even for authorized staff, since
+        // the modal already opened successfully under the 'manage' gate
+        // alone but this stricter second check silently blocked the confirm.
+        if (!$order || !auth()->user()->can('manage', $order)) {
             $this->dispatch('notify', 
                 type: 'error',
                 message: 'You do not have permission to void this order.'
@@ -336,7 +413,7 @@ class OrderManagement extends Component
 
         $this->dispatch('close-modal', 'confirm-void-order');
         $this->backToList();
-        $this->resetPage();
+        $this->resetAllPages();
     }
 
     public function cancelVoid()
@@ -348,7 +425,7 @@ class OrderManagement extends Component
     {
         $order = $this->selectedOrder;
 
-        if (!$order || !$order->canBeRefunded()) {
+        if (!$order || !auth()->user()->can('manage', $order) || !$order->canBeRefunded()) {
             $this->dispatch('notify', 
                 type: 'error',
                 message: 'Refund not possible.'
@@ -385,8 +462,13 @@ class OrderManagement extends Component
         }
     }
 
-    public function acceptOrder(Order $order)
+        public function acceptOrder(Order $order)
     {
+        if (!auth()->user()->can('manage', $order)) {
+            $this->dispatch('notify', type: 'error', message: 'Unauthorized.');
+            return;
+        }
+
         try {
             $order->updateStatus(Order::STATUS_PREPARING);
             // Refresh selected order if it's currently being viewed
@@ -396,6 +478,12 @@ class OrderManagement extends Component
             }
             $this->dispatch('notify', type: 'success', message: "Order #{$order->reference_no} accepted and preparing.");
             $this->backToList();
+
+            // 🖨️ Auto-print, same mechanism as POS's confirmPayment(). The
+            // browser-side listener decides Bluetooth vs. browser-popup based
+            // on window.thermalBluetoothPrinter's live connection state —
+            // whichever printer POS is currently paired with is what fires here too.
+            $this->dispatch('send-thermal-print', order_id: $order->id, receipt_type: 'all');
         } catch (\Exception $e) {
             $this->dispatch('notify', type: 'error', message: $e->getMessage());
         }
@@ -403,6 +491,11 @@ class OrderManagement extends Component
 
     public function markAsOutForDelivery(Order $order)
     {
+        if (!auth()->user()->can('manage', $order)) {
+            $this->dispatch('notify', type: 'error', message: 'Unauthorized.');
+            return;
+        }
+
         try {
             $order->updateStatus(Order::STATUS_OUT_FOR_DELIVERY);
             // Refresh selected order if it's currently being viewed
@@ -419,6 +512,7 @@ class OrderManagement extends Component
 
     public function openHandToRiderModal(Order $order)
     {
+        if (!auth()->user()->can('manage', $order)) return;
         $this->selectedOrder = $order;
         $this->selectedOrderId = $order->id;
         $this->selectedRiderId = $order->rider_id;
@@ -435,6 +529,10 @@ class OrderManagement extends Component
 
         try {
             $order = Order::findOrFail($this->selectedOrderId);
+            if (!auth()->user()->can('manage', $order)) {
+                $this->dispatch('notify', type: 'error', message: 'Unauthorized.');
+                return;
+            }
             $order->updateStatus(Order::STATUS_HANDED_TO_RIDER, [
                 'rider_id' => $this->selectedRiderId
             ]);
@@ -458,6 +556,11 @@ class OrderManagement extends Component
 
     public function markAsDelivered(Order $order)
     {
+        if (!auth()->user()->can('manage', $order)) {
+            $this->dispatch('notify', type: 'error', message: 'Unauthorized.');
+            return;
+        }
+
         try {
             $order->updateStatus(Order::STATUS_COMPLETED);
             // Refresh selected order if it's currently being viewed
@@ -474,6 +577,7 @@ class OrderManagement extends Component
 
     public function cancelOrder(Order $order)
     {
+        if (!auth()->user()->can('manage', $order)) return;
         if (!in_array($order->status, [Order::STATUS_PENDING, Order::STATUS_PREPARING])) return;
         $order->update(['status' => Order::STATUS_CANCELLED]);
 
@@ -490,7 +594,8 @@ class OrderManagement extends Component
 
     public function rejectOrder()
     {
-        if (!$this->selectedOrder || $this->selectedOrder->status !== Order::STATUS_PENDING) return;
+        if (!$this->selectedOrder || !auth()->user()->can('manage', $this->selectedOrder)) return;
+        if ($this->selectedOrder->status !== Order::STATUS_PENDING) return;
         
         $order = $this->selectedOrder;
         $reason = trim($this->rejectReason) ?: "Rejected by branch staff.";
@@ -502,13 +607,18 @@ class OrderManagement extends Component
             $this->selectedOrder = $order->fresh(['branch', 'user', 'items.product', 'customer', 'refundedBy', 'rider']);
         }
 
-        $this->dispatch('notify', type: 'error', message: "Order #{$order->reference_no} rejected.");
+        $this->dispatch('notify', type: 'success', message: "Order #{$order->reference_no} rejected.");
         $this->dispatch('close-modal', 'reject-modal');
         $this->backToList();
     }
 
     public function restoreDraft(Order $order)
     {
+        if (!auth()->user()->can('manageDraft', $order)) {
+            $this->dispatch('notify', type: 'error', message: 'Unauthorized.');
+            return;
+        }
+
         if (!$order->isDrafted()) {
             return;
         }
@@ -534,6 +644,11 @@ class OrderManagement extends Component
 
     public function deleteDraft(Order $order)
     {
+        if (!auth()->user()->can('manageDraft', $order)) {
+            $this->dispatch('notify', type: 'error', message: 'Unauthorized.');
+            return;
+        }
+
         if (!$order->isDrafted()) {
             return;
         }
@@ -547,7 +662,7 @@ class OrderManagement extends Component
         );
 
         $this->backToList();
-        $this->resetPage();
+        $this->resetAllPages();
     }
 
     private function updateHeader($state = 'list')
@@ -588,9 +703,9 @@ class OrderManagement extends Component
 
         $validStatuses = [];
         if ($this->sourceFilter === 'POS') {
-            $validStatuses = [Order::STATUS_PENDING, Order::STATUS_DRAFTED];
+            $validStatuses = [Order::STATUS_PENDING, Order::STATUS_DRAFTED, Order::STATUS_COMPLETED];
         } elseif ($this->sourceFilter === 'App') {
-            $validStatuses = [Order::STATUS_PENDING, Order::STATUS_PREPARING, Order::STATUS_READY, Order::STATUS_HANDED_TO_RIDER, Order::STATUS_OUT_FOR_DELIVERY];
+            $validStatuses = [Order::STATUS_PENDING, Order::STATUS_PREPARING, Order::STATUS_READY, Order::STATUS_HANDED_TO_RIDER, Order::STATUS_OUT_FOR_DELIVERY, Order::STATUS_COMPLETED, Order::STATUS_CANCELLED, Order::STATUS_VOID, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED];
         } elseif ($this->sourceFilter === 'History') {
             $validStatuses = [Order::STATUS_COMPLETED, Order::STATUS_CANCELLED, Order::STATUS_VOID, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED];
         }

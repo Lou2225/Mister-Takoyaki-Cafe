@@ -1,0 +1,21 @@
+directories:
+  output: dist
+  buildResources: public
+appId: com.mistertakoyaki.app
+productName: Mister Takoyaki Cafe
+files:
+  - filter:
+      - public/main.js
+      - public/preload.js
+      - public/favicon.ico
+      - public/build/**/*
+win:
+  target:
+    - nsis
+    - portable
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+electronVersion: 43.4.0

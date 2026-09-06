@@ -28,13 +28,11 @@
                 window.addEventListener('resize', onRefresh);
                 window.addEventListener('app:refresh-ui', onRefresh);
                 document.addEventListener('livewire:navigated', onRefresh);
-                document.addEventListener('livewire:update', onRefresh);
 
                 this.$el.addEventListener('alpine:destroy', () => {
                     window.removeEventListener('resize', onRefresh);
                     window.removeEventListener('app:refresh-ui', onRefresh);
                     document.removeEventListener('livewire:navigated', onRefresh);
-                    document.removeEventListener('livewire:update', onRefresh);
                 });
             },
 
@@ -150,5 +148,6 @@
     };
 
     document.addEventListener('alpine:init', registerAlpineFactories);
+    document.addEventListener('livewire:navigated', registerAlpineFactories);
     registerAlpineFactories();
 })();

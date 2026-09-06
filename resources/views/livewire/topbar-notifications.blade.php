@@ -1,4 +1,4 @@
-<div class="relative" x-data="{ notificationsOpen: false }" @close-notifications.window="notificationsOpen = false" wire:poll.10s>
+<div class="relative" x-data="{ notificationsOpen: false }" wire:ignore.self @close-notifications.window="notificationsOpen = false" wire:poll.10s.keep-alive>
     <button @click="notificationsOpen = !notificationsOpen" @click.outside="notificationsOpen = false" 
         class="p-3 text-gray-400 hover:text-gray-500 rounded-full hover:bg-gray-100 transition-colors focus:outline-none relative group">
         <span class="sr-only">View notifications</span>
@@ -12,7 +12,7 @@
         @endif
     </button>
 
-    <div x-show="notificationsOpen" x-transition x-cloak
+    <div x-show="typeof notificationsOpen !== 'undefined' && notificationsOpen" x-transition x-cloak
         class="absolute right-0 mt-2 w-80 bg-white border border-gray-100 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] z-[100] overflow-hidden">
         <div class="px-4 py-3 border-b border-gray-50 flex items-center justify-between bg-gray-50/30">
             <h3 class="text-[12px] font-black text-gray-900 uppercase tracking-widest">System Alerts</h3>

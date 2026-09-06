@@ -338,11 +338,68 @@ class BranchStockOrderAdmin extends Component
                     $mainStock->save();
 
                     $branchStock = BranchIngredientStock::firstOrCreate(
-                        ['branch_id' => $order->requesting_branch_id, 'ingredient_id' => $item->ingredient_id],
-                        ['stock_quantity' => 0]
-                    );
-                    $branchStock->stock_quantity += $qtyInBase;
-                    $branchStock->save();
+    ['branch_id' => $order->requesting_branch_id, 'ingredient_id' => $item->ingredient_id],
+    ['stock_quantity' => 0]
+);
+$branchStock->stock_quantity += $qtyInBase;
+$branchStock->save();
+
+// FIFO deduction: pull from HQ batches oldest-first until qty is fulfilled
+$remainingQty = $qtyInBase;
+
+$sourceBatches = \App\Models\StockBatch::where('branch_id', $mainBranch->id)
+    ->where('ingredient_id', $item->ingredient_id)
+    ->where('current_quantity', '>', 0)
+    ->where(function($q) {
+        $q->whereNull('expiry_date')
+          ->orWhere('expiry_date', '>=', now());
+    })
+    ->orderBy('expiry_date', 'asc') // FIFO: oldest expiry first
+    ->lockForUpdate()
+    ->get();
+
+foreach ($sourceBatches as $sourceBatch) {
+    if ($remainingQty <= 0) break;
+
+    $deductFromThisBatch = min($remainingQty, $sourceBatch->current_quantity);
+
+    // Deduct from this HQ batch
+    $sourceBatch->current_quantity -= $deductFromThisBatch;
+    $sourceBatch->save();
+
+        // unit_price is priced per order_unit (e.g. per box/sack), but this
+    // batch's quantity is stored in base units (g/ml/pc) — convert so
+    // unit_cost matches the unit current_quantity is actually measured in.
+    $baseUnitsPerOrderUnit = $item->ingredient
+        ? StockHelper::convertToBase(1, $item->order_unit, $item->ingredient)
+        : 1;
+    $unitCostPerBase = $baseUnitsPerOrderUnit > 0
+        ? (float) $item->unit_price / $baseUnitsPerOrderUnit
+        : (float) $item->unit_price;
+
+    foreach ($sourceBatches as $sourceBatch) {
+        if ($remainingQty <= 0) break;
+
+        $deductFromThisBatch = min($remainingQty, $sourceBatch->current_quantity);
+
+        $sourceBatch->current_quantity -= $deductFromThisBatch;
+        $sourceBatch->save();
+
+        \App\Models\StockBatch::create([
+            'branch_id'        => $order->requesting_branch_id,
+            'ingredient_id'    => $item->ingredient_id,
+            'batch_number'     => $transferRef . '-' . $sourceBatch->id,
+            'initial_quantity' => $deductFromThisBatch,
+            'current_quantity' => $deductFromThisBatch,
+            'expiry_date'      => $sourceBatch->expiry_date,
+            'unit_cost'        => round($unitCostPerBase, 4),
+        ]);
+
+        $remainingQty -= $deductFromThisBatch;
+    }
+
+    $remainingQty -= $deductFromThisBatch;
+}
 
                     $this->logMovement($mainBranch->id, $item->ingredient_id, 'transfer_out', $qtyInBase, $order->requesting_branch_id, $transferRef, "Transfer to branch");
                     $this->logMovement($order->requesting_branch_id, $item->ingredient_id, 'transfer_in', $qtyInBase, $mainBranch->id, $transferRef, "Transfer from HQ");

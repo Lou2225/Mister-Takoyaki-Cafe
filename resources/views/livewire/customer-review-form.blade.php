@@ -41,6 +41,7 @@
                                     <button type="button" 
                                             wire:click="setRating({{ $index }}, {{ $i }})"
                                             @mouseover="hoverRating = {{ $i }}"
+                                            aria-label="Rate {{ $i }} out of 5"
                                             class="transform transition-transform active:scale-90 focus:outline-none p-1"
                                     >
                                         <svg class="w-10 h-10 sm:w-12 sm:h-12 transition-colors duration-200" 
@@ -54,7 +55,7 @@
                         @else
                             <textarea wire:model.live="answers.{{ $index }}" rows="3" 
                                 class="w-full bg-gray-50 border {{ $errors->has('answers.'.$index) ? 'border-red-500 bg-red-50' : 'border-gray-200' }} text-gray-900 text-[14px] rounded-xl focus:ring-rose-500 focus:border-rose-500 block p-3.5 transition-all shadow-sm placeholder-gray-400" 
-                                placeholder="Type your answer here..." x-on:input="restrictInput($event, 'name_basic')"></textarea>
+                                placeholder="Type your answer here..."></textarea>
                         @endif
 
                         @error("answers.$index") <span class="text-xs text-rose-500 font-bold mt-2 block">{{ $message }}</span> @enderror

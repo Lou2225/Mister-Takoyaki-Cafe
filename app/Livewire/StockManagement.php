@@ -27,7 +27,10 @@ class StockManagement extends Component
     use WithPagination, HandlesValidations, HandlesExports;
 
     // ── Filters & Display ─────────────────────────────────────────
-    public $selectedBranchId = '';
+    // ── Filters & Display ─────────────────────────────────────────
+public $selectedBranchId = '';
+public $filterStatus = ''; // 'low', 'critical', 'healthy'
+public $filterCategoryId = '';
 
     // ── Panel Context ─────────────────────────────────────────────
     public $panel = 'list'; // Alpine listens to this via event
@@ -258,6 +261,24 @@ class StockManagement extends Component
         }
     }
 
+    public function updatedIngredientCategoryId($value)
+    {
+        $this->ingredientCategorySearch = '';
+        $this->selectedCategoryName = $value === '' || $value === null
+            ? 'Uncategorized'
+            : IngredientCategory::find($value)?->name ?? 'Select Category';
+    }
+
+    public function selectIngredientCategory($categoryId)
+    {
+        $this->ingredientCategoryId = $categoryId;
+    }
+
+    public function selectIngredientUnit($unit)
+    {
+        $this->ingredientUnit = $unit;
+    }
+
     private function updateAvailableBulkUnits()
     {
         $allBulk = StockHelper::BULK_UNITS;
@@ -284,12 +305,25 @@ class StockManagement extends Component
     }
 
     // ── Role Helpers ──────────────────────────────────────────────
-    public function isSuperAdmin() { return auth()->user()?->isSuperAdmin(); }
-    public function isAdmin()      { return auth()->user()?->isAdmin();      }
-    public function isStaff()      { return auth()->user()?->isStaff();      }
 
 
 
+
+
+    public function isSuperAdmin(): bool
+    {
+        return auth()->user()?->isSuperAdmin() ?? false;
+    }
+
+    public function isAdmin(): bool
+    {
+        return auth()->user()?->isAdmin() ?? false;
+    }
+
+    public function isStaff(): bool
+    {
+        return auth()->user()?->isStaff() ?? false;
+    }
 
     public function confirmWasteBatch($id)
     {
@@ -374,15 +408,38 @@ class StockManagement extends Component
         $this->ingredientCost = $ing->cost;
         $this->ingredientScope = 'global';
 
-        // Load existing conversion rows
-        $this->conversionRows = $ing->unitConversions->map(fn($c, $i) => [
-            'unit_name'        => $c->unit_name,
-            'qty_in_base'      => $c->qty_in_base,
-            'price_per_unit'   => $c->price_per_unit,
-            'sort_order'       => $c->sort_order,
-            'chain_multiplier' => '',
-            'chain_from_index' => null,
-        ])->values()->toArray();
+        // Load existing conversion rows and reverse-compute chain fields
+        $conversions = $ing->unitConversions->sortBy('sort_order')->values();
+        $this->conversionRows = [];
+        
+        foreach ($conversions as $i => $c) {
+            // Reverse-compute chain_multiplier and chain_from_index from qty_in_base
+            $chainFromIndex = 'base';
+            $chainMultiplier = $c->qty_in_base;
+            
+            // Check if this row chains from a previous row
+            foreach ($this->conversionRows as $j => $prevRow) {
+                $prevQty = (float) $prevRow['qty_in_base'];
+                if ($prevQty > 0) {
+                    $ratio = $c->qty_in_base / $prevQty;
+                    $rounded = round($ratio, 4);
+                    if ($ratio > 0.9999 && abs($ratio - $rounded) < 0.0001 && $rounded == round($rounded, 0)) {
+                        $chainFromIndex = $j;
+                        $chainMultiplier = $rounded;
+                        break;
+                    }
+                }
+            }
+            
+            $this->conversionRows[] = [
+                'unit_name'        => $c->unit_name,
+                'qty_in_base'      => $c->qty_in_base,
+                'price_per_unit'   => $c->price_per_unit,
+                'sort_order'       => $c->sort_order,
+                'chain_multiplier' => $chainMultiplier,
+                'chain_from_index' => $chainFromIndex,
+            ];
+        }
         
         $this->resetValidation();
         $this->updateGlobalHeader('edit');
@@ -414,72 +471,88 @@ class StockManagement extends Component
         }
     }
 
-    public function setRowUnitName(int $index, string $unitName): void
-    {
-        if (isset($this->conversionRows[$index])) {
-            $this->conversionRows[$index]['unit_name'] = $unitName;
-        }
-    }
+
 
     /**
      * Auto-compute qty_in_base when the chain calculator fields change.
      * Called by Livewire when any conversionRows.*.chain_* field updates.
      */
-    public function updatedConversionRows($value, $key): void
+    public function setConversionLink(int $rowIndex, $fromIndex): void
     {
-        // key format: "2.chain_multiplier" or "2.chain_from_index" or "2.qty_in_base"
-        $parts = explode('.', $key);
-        if (count($parts) < 2) return;
-
-        $rowIndex = (int) $parts[0];
-        $field    = $parts[1];
-
-        if (!isset($this->conversionRows[$rowIndex])) return;
-
-        // Auto-fill standard metric conversions (Smart Formatting)
-        if ($field === 'unit_name') {
-            $unitName = $this->conversionRows[$rowIndex]['unit_name'] ?? '';
-            $base = $this->ingredientUnit;
-            
-            if (($unitName === 'l' && $base === 'ml') || ($unitName === 'kg' && $base === 'g')) {
-                $this->conversionRows[$rowIndex]['chain_multiplier'] = 1000;
-                $this->conversionRows[$rowIndex]['chain_from_index'] = 'base';
-                $this->dispatch('notify', type: 'info', message: 'Standard metric conversion auto-filled (1000 ' . strtoupper($base) . ').');
-            }
+        if (!isset($this->conversionRows[$rowIndex])) {
+            return;
+        }
+        // Log for debugging when selection is made from the UI
+        try {
+            \Log::info('setConversionLink called', ['rowIndex' => $rowIndex, 'fromIndex' => $fromIndex]);
+        } catch (\Throwable $e) {
+            // ignore logging errors
         }
 
-        // When chain fields change, auto-compute qty_in_base
-        if (in_array($field, ['unit_name', 'chain_multiplier', 'chain_from_index'])) {
-            $this->recomputeQtyInBase($rowIndex);
-        }
-
-        // When any row changes, cascade-recompute all rows after it
-        if (in_array($field, ['unit_name', 'qty_in_base', 'chain_multiplier', 'chain_from_index'])) {
-            $this->cascadeRecompute($rowIndex + 1);
-        }
+        $this->conversionRows[$rowIndex]['chain_from_index'] = $fromIndex === 'base' ? 'base' : (int) $fromIndex;
+        $this->computeQtyInBase($rowIndex);
+        $this->cascadeRecompute($rowIndex + 1);
     }
+
+    public function updateConversionMultiplier(int $rowIndex): void
+    {
+        if (!isset($this->conversionRows[$rowIndex])) {
+            return;
+        }
+
+        $multiplier = (float) ($this->conversionRows[$rowIndex]['chain_multiplier'] ?? 0);
+        if ($multiplier <= 0) {
+            $this->conversionRows[$rowIndex]['qty_in_base'] = '';
+            return;
+        }
+
+        if ($this->conversionRows[$rowIndex]['chain_from_index'] === null || $this->conversionRows[$rowIndex]['chain_from_index'] === '') {
+            $this->conversionRows[$rowIndex]['chain_from_index'] = 'base';
+        }
+
+        $this->computeQtyInBase($rowIndex);
+        $this->cascadeRecompute($rowIndex + 1);
+    }
+
+    // Note: conversion link updates are handled explicitly via `setConversionLink`
+    // which is invoked from the UI (now using Alpine `$wire.call(...)`).
 
     /**
      * Compute qty_in_base for a row from its chain calculator fields.
      * Chain: multiplier × previous_row_qty_in_base = qty_in_base
      */
-    private function recomputeQtyInBase(int $index): void
+    private function computeQtyInBase(int $index): void
     {
         $row = $this->conversionRows[$index];
         $multiplier = (float) ($row['chain_multiplier'] ?? 0);
-        $fromIndex  = $row['chain_from_index'];
+        $fromIndex  = $row['chain_from_index'] ?? null;
 
-        if ($multiplier <= 0) return;
+        if ($multiplier <= 0) {
+            // Clear qty_in_base if multiplier is invalid
+            $this->conversionRows[$index]['qty_in_base'] = '';
+            return;
+        }
 
-        if ($fromIndex === null || $fromIndex === '' || $fromIndex === 'base') {
+        // Default chain_from_index to 'base' if null or empty string
+        if ($fromIndex === null || $fromIndex === '') {
+            $fromIndex = 'base';
+            $this->conversionRows[$index]['chain_from_index'] = 'base';
+        }
+
+        if ($fromIndex === 'base') {
             // Multiply against the ingredient's base unit directly
             // qty_in_base = multiplier × 1 base unit
             $this->conversionRows[$index]['qty_in_base'] = $multiplier;
         } else {
             $fromIndex = (int) $fromIndex;
-            $prevQty = (float) ($this->conversionRows[$fromIndex]['qty_in_base'] ?? 0);
-            if ($prevQty > 0) {
-                $this->conversionRows[$index]['qty_in_base'] = $multiplier * $prevQty;
+            if (isset($this->conversionRows[$fromIndex])) {
+                $prevQty = (float) ($this->conversionRows[$fromIndex]['qty_in_base'] ?? 0);
+                if ($prevQty > 0) {
+                    $this->conversionRows[$index]['qty_in_base'] = $multiplier * $prevQty;
+                } else {
+                    // Previous row doesn't have valid qty_in_base yet
+                    $this->conversionRows[$index]['qty_in_base'] = '';
+                }
             }
         }
     }
@@ -492,8 +565,8 @@ class StockManagement extends Component
     {
         for ($i = $startIndex; $i < count($this->conversionRows); $i++) {
             $fromIndex = $this->conversionRows[$i]['chain_from_index'] ?? null;
-            if ($fromIndex !== null && $fromIndex !== '' && $fromIndex !== 'base') {
-                $this->recomputeQtyInBase($i);
+            if ($fromIndex !== null && $fromIndex !== '') {
+                $this->computeQtyInBase($i);
             }
         }
     }
@@ -522,9 +595,18 @@ class StockManagement extends Component
             'ingredientCategoryId' => ['nullable', 'exists:ingredient_categories,id'],
             'ingredientUnit'       => ['required', 'in:' . implode(',', array_keys($this->availableUnits))],
             'ingredientMinStock'   => ['required', 'numeric', 'min:0'],
+            
+            // Dynamic Conversion Rows Validation
+            'conversionRows'                  => ['nullable', 'array'],
+            'conversionRows.*.unit_name'      => ['required_with:conversionRows.*.chain_multiplier', 'nullable', 'string', 'in:' . implode(',', array_keys($this->availableBulkUnits))],
+            'conversionRows.*.chain_multiplier' => ['required_with:conversionRows.*.unit_name', 'nullable', 'numeric', 'min:0.0001'],
+            'conversionRows.*.price_per_unit'   => ['nullable', 'numeric', 'min:0'],
         ];
 
-
+        if ($this->ingredientScope === 'branch') {
+            $rules['assignedBranchIds'] = ['required', 'array', 'min:1'];
+            $rules['assignedBranchIds.*'] = ['exists:branches,id'];
+        }
 
         $this->validateBeforeModal($rules, ValidationHelper::commonMessages(), 'confirm-save-ingredient');
     }
@@ -537,7 +619,7 @@ class StockManagement extends Component
         }
 
         $rules = [
-            'ingredientName'       => ['required', 'string', 'max:255', 'regex:' . ValidationHelper::REGEX_NOTES, Rule::unique('ingredients', 'name')->ignore($this->editIngredientId)],
+            'ingredientName'       => ['required', 'string', 'max:255', 'regex:' . ValidationHelper::REGEX_NAME, Rule::unique('ingredients', 'name')->ignore($this->editIngredientId)],
             'ingredientCategoryId' => ['nullable', 'exists:ingredient_categories,id'],
             'ingredientUnit'       => ['required', 'in:' . implode(',', array_keys($this->availableUnits))],
             'ingredientMinStock'   => ['required', 'numeric', 'min:0'],
@@ -554,7 +636,8 @@ class StockManagement extends Component
             $rules['assignedBranchIds.*'] = ['exists:branches,id'];
         }
 
-        $this->validate($rules, ValidationHelper::commonMessages());
+        // Validate and close modal on error, show scroll-to-error
+        $this->validateSecure($rules, ValidationHelper::commonMessages(), [], 'confirm-save-ingredient');
 
 
 
@@ -763,11 +846,12 @@ class StockManagement extends Component
         $this->updateCategorySelection($ingredientCategories);
 
         return view('livewire.stock-management', array_merge([
-            'branches' => $branches,
-            'ingredientCategories' => $this->getFilteredCategories($ingredientCategories),
-            'inventoryConfig' => $inventoryConfig,
-            'alertDays' => $alertDays,
-        ], $kpis, $expiryTracking))->layout('layouts.app');
+    'branches' => $branches,
+    'ingredientCategories' => $this->getFilteredCategories($ingredientCategories),
+    'allIngredientCategories' => IngredientCategory::orderBy('name')->get(),
+    'inventoryConfig' => $inventoryConfig,
+    'alertDays' => $alertDays,
+], $kpis, $expiryTracking))->layout('layouts.app');
     }
 
     private function getAvailableBranches()
@@ -808,13 +892,46 @@ class StockManagement extends Component
                 ->sum(DB::raw('unit_cost * quantity'));
         }
 
+        $allIngredients = Ingredient::with(['branchStocks', 'category'])->get()->sort(function ($a, $b) use ($branchId, $inventoryConfig) {
+            $statusOrder = ['healthy' => 0, 'low' => 1, 'critical' => 2];
+            $statusA = $this->getIngredientStockStatus($a, $branchId, $inventoryConfig);
+            $statusB = $this->getIngredientStockStatus($b, $branchId, $inventoryConfig);
+
+            if ($statusA !== $statusB) {
+                return $statusOrder[$statusA] <=> $statusOrder[$statusB];
+            }
+
+            return strcasecmp($a->name, $b->name);
+        })->values();
+
         return [
             'totalIngredients' => $totalIngredients,
             'lowStockWarnings' => $lowStockWarnings,
             'expiringCount' => $expiringCount,
             'monthlyProcurement' => $monthlyProcurement,
-            'allIngredients' => Ingredient::with(['branchStocks', 'category'])->orderBy('name', 'asc')->get(),
+            'allIngredients' => $allIngredients,
         ];
+    }
+
+    private function getIngredientStockStatus($ingredient, $branchId, $inventoryConfig)
+    {
+        $globalLow = (int)($inventoryConfig['low_stock_threshold'] ?? 10);
+        $globalCritical = (int)($inventoryConfig['critical_stock_threshold'] ?? 5);
+        $effectiveMin = $ingredient->minimum_stock > 0 ? $ingredient->minimum_stock : $globalLow;
+
+        $stockQuantity = $branchId
+            ? (collect($ingredient->branchStocks)->where('branch_id', $branchId)->first()?->stock_quantity ?? 0)
+            : collect($ingredient->branchStocks)->sum('stock_quantity');
+
+        if ($stockQuantity <= $globalCritical) {
+            return 'critical';
+        }
+
+        if ($stockQuantity <= $effectiveMin) {
+            return 'low';
+        }
+
+        return 'healthy';
     }
 
     private function getExpiryTracking($branchId, $today, $alertDays)

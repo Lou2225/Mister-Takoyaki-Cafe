@@ -3,7 +3,7 @@
     <div class="px-1 pt-2">
         <div class="mb-6 flex items-center justify-between">
             <div>
-                <h2 class="text-[17px] font-bold text-gray-900 tracking-tight leading-none mb-1.5">Order Inbox</h2>
+                <h2 class="text-[17px] font-bold text-gray-900 tracking-tight leading-none mb-1.5">Branch Requests</h2>
                 <p class="text-[12px] text-gray-500 font-medium">Network Overview: <span class="text-amber-600 font-bold">{{ $kpis['pending'] }} pending requests</span></p>
             </div>
             <x-report-dropdown module="Stock Order Report" />
@@ -136,18 +136,20 @@
     </div>
 
     <!-- Toolbar -->
-    <div class="relative z-20 flex flex-col lg:flex-row lg:items-center justify-between mb-8 gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm" x-show="panel !== 'logistics'">
-        <x-search-bar wireModel="search" placeholder="Find records..." width="w-full lg:w-72" />
-        <div class="flex flex-wrap items-center lg:justify-end gap-2">
+    <div class="relative z-20 flex flex-row items-center justify-between mb-8 gap-2 sm:gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm" x-show="panel !== 'logistics'">
+        <div class="flex-1 min-w-0 lg:flex-initial">
+            <x-search-bar wireModel="search" placeholder="Find records..." width="w-full lg:w-72" />
+        </div>
+        <div class="flex flex-nowrap items-center justify-end gap-1.5 sm:gap-2 shrink-0">
             {{-- 3-in-1 Date Filter Component --}}
             <x-date-filter startModel="startDate" endModel="endDate" activeModel="activeFilter" />
 
             <x-dropdown align="right" width="48" x-show="panel !== 'analytics'">
                 <x-slot name="trigger">
-                    <x-secondary-button class="gap-2 bg-white text-gray-700 hover:bg-gray-50 border-gray-200">
+                    <x-secondary-button class="gap-0 sm:gap-2 !px-2.5 sm:!px-4 bg-white text-gray-700 hover:bg-gray-50 border-gray-200">
                         <svg class="w-4 h-4 text-indigo-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
-                        <span class="text-[13px] font-black">Filter Options</span>
-                        <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                        <span class="hidden sm:inline text-[13px] font-black">Filter Options</span>
+                        <svg class="hidden sm:block w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </x-secondary-button>
                 </x-slot>
                 <x-slot name="content">
@@ -303,9 +305,9 @@
                                 </h3>
                                 <p class="text-[12px] text-slate-500 font-medium mt-1 ml-13">Configure operational distances for automated logistics billing</p>
                             </div>
-                            <button wire:click="syncAllDistances" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-black text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-100 transition-all shadow-sm group">
+                            <button wire:click="syncAllDistances" class="inline-flex items-center gap-0 sm:gap-2 px-2.5 sm:px-4 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-black text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-100 transition-all shadow-sm group shrink-0">
                                 <svg wire:loading.class="animate-spin" class="w-4 h-4 text-slate-400 group-hover:text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                                Sync Map Data
+                                <span class="hidden sm:inline">Sync Map Data</span>
                             </button>
                         </div>
                         <div class="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -703,8 +705,8 @@
         });
 
         // Inbox Analytics Dashboard logic
-        document.addEventListener('alpine:init', () => {
-            Alpine.data('orderInboxAnalytics', (initialData) => ({
+        if (typeof Alpine !== 'undefined') {
+    Alpine.data('orderInboxAnalytics', (initialData) => ({
                 analyticsData: initialData,
                 trendChart: null,
 
@@ -876,7 +878,7 @@
                         this.trendChart.render();
                     }
                 }
-            }));
-        });
+    }));
+}
     </script>
 </div>

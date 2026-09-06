@@ -15,7 +15,8 @@ class OrderItem extends Model
         'quantity',
         'unit_price',
         'subtotal',
-        'stock_batch_id'
+        'stock_batch_id',
+        'special_instructions',
     ];
 
     public function order()
@@ -36,6 +37,11 @@ class OrderItem extends Model
     public function product()
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function getPriceAttribute(): float
+    {
+        return (float) ($this->attributes['price'] ?? $this->attributes['unit_price'] ?? 0);
     }
 
     public function batch()

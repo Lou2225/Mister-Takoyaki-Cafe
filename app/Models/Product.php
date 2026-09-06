@@ -117,9 +117,9 @@ class Product extends Model
                 ->get();
         }
         
-        // If no base recipes, fall back to default option
+                // If no base recipes, fall back to default option
         if ($recipes->isEmpty()) {
-            if ($this->relationLoaded('recipes') && $this->relationLoaded('optionGroups.options')) {
+            if ($this->relationLoaded('recipes') && $this->relationLoaded('optionGroups')) {
                 // Complex collection logic to find default option recipes
                 $defaultOptionIds = $this->optionGroups->flatMap(fn($g) => $g->options->where('is_default', true)->pluck('id'));
                 $recipes = $this->recipes
@@ -134,8 +134,21 @@ class Product extends Model
                     ->get();
             }
         }
-        
+
+        // Still nothing to check against stock for — if that's because the
+        // product's only groups are flagged "No Recipe Required" (e.g. a
+        // pure "Temperature: Hot/Iced" product with no ingredient-backed
+        // base recipe at all), treat it as always available rather than
+        // reporting zero stock.
         if ($recipes->isEmpty()) {
+            $hasOnlyNoRecipeGroups = $this->relationLoaded('optionGroups')
+                ? $this->optionGroups->isNotEmpty() && $this->optionGroups->every(fn($g) => $g->no_recipe_required)
+                : $this->optionGroups()->exists() && !$this->optionGroups()->where('no_recipe_required', false)->exists();
+
+            if ($hasOnlyNoRecipeGroups) {
+                return PHP_INT_MAX;
+            }
+
             return 0;
         }
 
@@ -161,7 +174,7 @@ class Product extends Model
      * Get availability per option in a group (for display in POS)
      * Returns array: ['optionId' => 'quantity_available']
      */
-    public function getOptionAvailability(int $branchId, $prefetchedStocks = null): array
+        public function getOptionAvailability(int $branchId, $prefetchedStocks = null): array
     {
         $availability = [];
         
@@ -177,10 +190,20 @@ class Product extends Model
 
         foreach ($this->optionGroups as $group) {
             foreach ($group->options as $option) {
+                // Group is flagged "No Recipe Required" — this option never
+                // tracks ingredients and is always sellable, regardless of
+                // whether any Recipe rows exist for it.
+                if ($group->no_recipe_required) {
+                    $availability[$option->id] = PHP_INT_MAX;
+                    continue;
+                }
+
                 $recipes = $allRecipes->where('product_option_id', $option->id)->whereNull('modifier_id');
 
+                // No ingredients mapped to this option at all — not sellable,
+                // regardless of the base product's own stock state.
                 if ($recipes->isEmpty()) {
-                    $availability[$option->id] = $this->getMaxAvailableQuantity($branchId, $prefetchedStocks);
+                    $availability[$option->id] = 0;
                     continue;
                 }
 
@@ -216,8 +239,9 @@ class Product extends Model
         foreach ($this->modifiers as $modifier) {
             $recipes = $allRecipes->where('modifier_id', $modifier->id);
 
+            // No ingredients mapped to this modifier at all — not sellable.
             if ($recipes->isEmpty()) {
-                $availability[$modifier->id] = 999;
+                $availability[$modifier->id] = 0;
                 continue;
             }
 
@@ -263,7 +287,7 @@ class Product extends Model
             ];
         }
 
-        // Efficient batch loading for the full data set
+                // Efficient batch loading for the full data set
         $this->loadMissing(['recipes', 'optionGroups.options', 'modifiers']);
         $ingredientIds = $this->recipes->pluck('ingredient_id')->unique();
         
@@ -275,11 +299,21 @@ class Product extends Model
  
         return [
             'is_available' => $qty > 0,
-            'available_quantity' => $qty,
+            'available_quantity' => self::displayQty($qty),
             'availability_label' => $qty > 0 ? 'Available' : 'Unavailable / Out of Stock',
-            'option_availability' => $optionAvail,
+            'option_availability' => array_map(fn($q) => self::displayQty($q), $optionAvail),
             'modifier_availability' => $modifierAvail,
         ];
+    }
+
+    /**
+     * Cap a computed "unlimited" quantity (PHP_INT_MAX sentinel from a
+     * no_recipe_required option/product) down to a client-friendly number
+     * before it leaks into an API/JSON response.
+     */
+    private static function displayQty(int $qty): int
+    {
+        return $qty === PHP_INT_MAX ? 999 : $qty;
     }
 
     /**

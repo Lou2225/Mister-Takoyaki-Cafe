@@ -51,7 +51,10 @@ class Branch extends Model
      */
     public function products()
     {
-        return $this->belongsToMany(Product::class, 'branch_product')->withTimestamps();
+        return $this->belongsToMany(Product::class, 'branch_product')
+                    ->withPivot('is_active')
+                    ->withTimestamps()
+                    ->wherePivot('is_active', 1);
     }
 
     /**

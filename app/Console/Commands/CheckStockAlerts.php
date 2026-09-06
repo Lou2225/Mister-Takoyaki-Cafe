@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\Mail;
 use App\Mail\StockAlertMail;
 use Carbon\Carbon;
 use App\Helpers\StockHelper;
-
+use App\Services\ConfigurationService;
+use Illuminate\Support\Facades\Cache;
 class CheckStockAlerts extends Command
 {
     /**
@@ -32,8 +33,29 @@ class CheckStockAlerts extends Command
      *
      * @return int
      */
-    public function handle()
+        public function handle()
     {
+        $config = ConfigurationService::getInventoryConfig();
+
+        // Respect the same "Auto-Notifications" toggle the web UI uses.
+        // Without this check, the daily cron ignored the setting entirely
+        // and emailed admins regardless of what was configured.
+        if (!($config['auto_reorder_enabled'] ?? false)) {
+            $this->info("Auto-notifications are disabled in Settings. Skipping stock check.");
+            return 0;
+        }
+
+        // Atomic lock: only proceeds if no alert has been sent yet today
+        // (whether by this command or by an admin loading the Stock
+        // Management page, which uses the same cache key). This prevents
+        // the duplicate-email scenario where the web path claims the lock
+        // moments before this scheduled run fires.
+        $cacheKey = 'stock_alert_sent_' . today()->toDateString();
+        if (!Cache::add($cacheKey, true, now()->endOfDay())) {
+            $this->info("Stock alert already sent today via another trigger. Skipping.");
+            return 0;
+        }
+
         $this->info("Running enterprise stock checks...");
 
         $branchData = []; // [branch_id => ['name' => ..., 'low' => [], 'expiring' => [], 'expired' => []]]
@@ -62,8 +84,9 @@ class CheckStockAlerts extends Command
             ->where('current_quantity', '>', 0)
             ->get();
 
-        $today = Carbon::today();
-        $nextWeek = Carbon::today()->addDays(7);
+                $today = Carbon::today();
+        $alertDays = (int) ($config['expiry_alert_days'] ?? 7);
+        $nextWeek = Carbon::today()->addDays($alertDays);
 
         foreach ($batches as $batch) {
             $expiry = Carbon::parse($batch->expiry_date)->startOfDay();
@@ -129,11 +152,7 @@ class CheckStockAlerts extends Command
             }
         }
 
-        // Set cache flag to prevent web interface from triggering redundant daily alerts
-        $cacheKey = 'stock_alert_sent_' . today()->toDateString();
-        \Illuminate\Support\Facades\Cache::put($cacheKey, true, now()->endOfDay());
-
-        $this->info("Stock check complete. Emails dispatched.");
+                $this->info("Stock check complete. Emails dispatched.");
         return 0;
     }
 }

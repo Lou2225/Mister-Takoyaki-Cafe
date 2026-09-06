@@ -88,13 +88,33 @@
 
             {{-- Right: Filters --}}
             <div class="flex flex-wrap items-center lg:justify-end gap-2">
-                <select wire:model.live="type" class="bg-white border border-slate-200 text-slate-600 rounded-lg px-3 py-1.5 text-[12px] font-medium focus:ring-2 focus:ring-indigo-500/20 shadow-sm transition-all min-w-[140px] h-9">
-                    <option value="">All Types</option>
-                    <option value="stock">Inventory Alerts</option>
-                    <option value="expiry">Expiry Warnings</option>
-                    <option value="order">New Orders</option>
-                    <option value="review">Customer Reviews</option>
-                </select>
+                @php
+                    $typeLabels = [
+                        ''        => 'All Types',
+                        'stock'   => 'Inventory Alerts',
+                        'expiry'  => 'Expiry Warnings',
+                        'order'   => 'New Orders',
+                        'review'  => 'Customer Reviews',
+                    ];
+                @endphp
+                <x-dropdown align="right" width="48" wire:key="filter-type">
+                    <x-slot name="trigger">
+                        <x-secondary-button type="button" class="gap-0 sm:gap-1.5 h-10 !px-2.5 sm:!px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
+                            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                            </svg>
+                            <span class="hidden sm:inline text-[12px] whitespace-nowrap">{{ $typeLabels[$type] ?? 'All Types' }}</span>
+                            <svg class="hidden sm:block w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </x-secondary-button>
+                    </x-slot>
+                    <x-slot name="content">
+                        @foreach($typeLabels as $value => $label)
+                            <x-dropdown-link href="#" wire:click.prevent="$set('type', '{{ $value }}')">{{ $label }}</x-dropdown-link>
+                        @endforeach
+                    </x-slot>
+                </x-dropdown>
             </div>
         </div>
 
@@ -112,7 +132,7 @@
                 @forelse($notifications as $n)
                     <tr wire:click="trace({{ $n->id }})" class="cursor-pointer hover:bg-slate-50/50 transition-colors {{ !$n->is_read ? 'bg-indigo-50/30' : '' }}">
                         <td class="py-3 px-4 whitespace-nowrap">
-                            <div class="w-9 h-9 rounded-xl flex items-center justify-center {{ $n->is_read ? 'bg-gray-100 text-gray-400' : 'bg-white shadow-sm ring-1 ring-indigo-500/20 text-indigo-500' }}">
+                            <div class="w-9 h-10 rounded-xl flex items-center justify-center {{ $n->is_read ? 'bg-gray-100 text-gray-400' : 'bg-white shadow-sm ring-1 ring-indigo-500/20 text-indigo-500' }}">
                                 @if($n->type === 'stock')
                                     <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                                 @elseif($n->type === 'expiry')

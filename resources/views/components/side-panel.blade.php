@@ -10,7 +10,7 @@
     x-on:open-modal.window="open($event.detail)"
     x-on:close-modal.window="close($event.detail)"
     x-on:keydown.escape.window="closePanel()"
-    x-show="isPanelOpen"
+    x-show="typeof isPanelOpen !== 'undefined' && isPanelOpen"
     x-cloak
     class="fixed inset-0 z-[9999] overflow-hidden"
 >
@@ -19,7 +19,7 @@
 
         {{-- Backdrop overlay --}}
         <div
-            x-show="isPanelOpen"
+            x-show="typeof isPanelOpen !== 'undefined' && isPanelOpen"
             x-transition:enter="ease-in-out duration-500"
             x-transition:enter-start="opacity-0"
             x-transition:enter-end="opacity-100"
@@ -34,7 +34,7 @@
         <div class="pointer-events-none fixed inset-y-0 right-0 flex max-w-full">
             <div
                 wire:ignore.self
-                x-show="isPanelOpen"
+                x-show="typeof isPanelOpen !== 'undefined' && isPanelOpen"
                 x-transition:enter="transform transition ease-in-out duration-500 sm:duration-700"
                 x-transition:enter-start="translate-x-full"
                 x-transition:enter-end="translate-x-0"
@@ -52,4 +52,4 @@
 
     </div>
 </div>
-
+

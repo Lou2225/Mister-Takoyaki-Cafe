@@ -35,8 +35,17 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="theme-color" content="#f59e0b">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="{{ \App\Services\ConfigurationService::getBusinessName() }}">
 
     <title>{{ \App\Services\ConfigurationService::getBusinessName() }}</title>
+
+    {{-- Favicon --}}
+    <link rel="icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
+    <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
 
     {{-- Fonts --}}
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -46,19 +55,16 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" data-navigate-once></script>
 
-    {{-- [FIX] x-cloak must be defined here or Alpine elements will flash on load --}}
+            {{-- [FIX] x-cloak must be defined here or Alpine elements will flash on load --}}
     <style>[x-cloak] { display: none !important; }</style>
 
-    {{-- Styles --}}
-    @livewireStyles
     @vite(['resources/js/app.js'])
 
     {{-- Form validation --}}
-    <script src="{{ asset('js/form-validation.js') }}" data-navigate-once></script>
+    <script src="{{ asset('js/form-validation.js') }}" defer data-navigate-once></script>
 
     {{-- Alpine Components --}}
-    <script src="{{ asset('js/alpine-components.js') }}" data-navigate-once></script>
-
+    <script src="{{ asset('js/alpine-components.js') }}" defer data-navigate-once></script>
     {{-- Leaflet Overrides --}}
     <style>
         .leaflet-pane,

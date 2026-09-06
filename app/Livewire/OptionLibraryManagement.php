@@ -24,7 +24,8 @@ class OptionLibraryManagement extends Component
     public $editTemplateId = null;
     public $name = '';
     public $priceMode = 'additive';
-    public $isRequired = false;
+        public $isRequired = false;
+    public $noRecipeRequired = false;
     public $templateItems = [];
 
     // Deletion State
@@ -51,9 +52,57 @@ class OptionLibraryManagement extends Component
         $this->resetPage();
     }
 
-    public function updatedPerPage()
+        public function updatedPerPage()
     {
         $this->resetPage();
+    }
+
+    public function updatedNoRecipeRequired($value)
+    {
+        if ($value) {
+            foreach ($this->templateItems as $i => $item) {
+                $this->templateItems[$i]['ingredients'] = [];
+            }
+        }
+    }
+
+    public function addItemIngredient(int $itemIndex)
+    {
+        $ingredientPath = "templateItems.{$itemIndex}.new_ingredient_id";
+        $quantityPath = "templateItems.{$itemIndex}.new_ingredient_qty";
+
+        $this->validate([
+            $ingredientPath => 'required|exists:ingredients,id',
+            $quantityPath => 'required|numeric|min:0.01',
+        ], ["{$quantityPath}.min" => 'Quantity must be at least 0.01.']);
+
+        $item = $this->templateItems[$itemIndex] ?? null;
+        $ing = \App\Models\Ingredient::find($item['new_ingredient_id'] ?? null);
+        if (!$ing || !isset($this->templateItems[$itemIndex])) return;
+
+        foreach (($this->templateItems[$itemIndex]['ingredients'] ?? []) as $ri) {
+            if ($ri['id'] == $ing->id) {
+                $this->dispatch('notify', type: 'error', message: 'Ingredient already added to this option.');
+                return;
+            }
+        }
+
+        $this->templateItems[$itemIndex]['ingredients'][] = [
+            'id'       => $ing->id,
+            'name'     => $ing->name,
+            'unit'     => $ing->unit,
+            'quantity' => (float) ($item['new_ingredient_qty'] ?? 0),
+            'cost'     => $ing->cost,
+        ];
+
+        $this->templateItems[$itemIndex]['new_ingredient_id'] = '';
+        $this->templateItems[$itemIndex]['new_ingredient_qty'] = '';
+    }
+
+    public function removeItemIngredient(int $itemIndex, int $ingredientIndex)
+    {
+        unset($this->templateItems[$itemIndex]['ingredients'][$ingredientIndex]);
+        $this->templateItems[$itemIndex]['ingredients'] = array_values($this->templateItems[$itemIndex]['ingredients'] ?? []);
     }
 
     // ── Panel Actions ─────────────────────────────────────────────
@@ -66,17 +115,26 @@ class OptionLibraryManagement extends Component
 
     public function showEdit($id)
     {
-        $template = OptionTemplate::with('items')->findOrFail($id);
+        $template = OptionTemplate::with('items.ingredients.ingredient')->findOrFail($id);
         $this->editTemplateId = $template->id;
         $this->name = $template->name;
         $this->priceMode = $template->price_mode;
-        $this->isRequired = (bool)$template->is_required;
+                $this->isRequired = (bool)$template->is_required;
+        $this->noRecipeRequired = (bool)$template->no_recipe_required;
         
         $this->templateItems = collect($template->items)->map(fn($item) => [
             'id'         => $item instanceof OptionTemplateItem ? $item->id : ($item['id'] ?? null),
             'name'       => $item instanceof OptionTemplateItem ? $item->name : ($item['name'] ?? ''),
             'price'      => $item instanceof OptionTemplateItem ? ($item->price == 0 ? '' : $item->price) : ($item['price'] == 0 ? '' : $item['price']),
             'is_default' => (bool)($item instanceof OptionTemplateItem ? $item->is_default : ($item['is_default'] ?? false)),
+            'new_ingredient_id' => '',
+            'new_ingredient_qty' => '',
+            'ingredients' => $item instanceof OptionTemplateItem
+                ? $item->ingredients->map(fn($ri) => [
+                    'id' => $ri->ingredient_id, 'name' => $ri->ingredient->name,
+                    'unit' => $ri->ingredient->unit, 'quantity' => (float)$ri->quantity, 'cost' => $ri->ingredient->cost,
+                  ])->toArray()
+                : [],
         ])->values()->toArray();
 
         $this->panel = 'form';
@@ -98,6 +156,9 @@ class OptionLibraryManagement extends Component
             'name' => '',
             'price' => '',
             'is_default' => false,
+            'new_ingredient_id' => '',
+            'new_ingredient_qty' => '',
+            'ingredients' => [],
         ];
     }
 
@@ -145,9 +206,10 @@ class OptionLibraryManagement extends Component
                     ? OptionTemplate::findOrFail($this->editTemplateId)
                     : new OptionTemplate();
 
-                $template->name = $this->name;
+                                $template->name = $this->name;
                 $template->price_mode = $this->priceMode;
                 $template->is_required = $this->isRequired;
+                $template->no_recipe_required = $this->noRecipeRequired;
                 $template->save();
 
                 $keepIds = [];
@@ -161,6 +223,18 @@ class OptionLibraryManagement extends Component
 
                     $item = $item ? tap($item, fn($i) => $i->update($payload)) : $template->items()->create($payload);
                     $keepIds[] = $item->id;
+
+                                        // Rebuild this item's ingredient recipe from scratch —
+                    // same pattern as Recipe rebuild in MenuManagement.
+                    $item->ingredients()->delete();
+                    if (!$this->noRecipeRequired) {
+                        foreach (($itemData['ingredients'] ?? []) as $ri) {
+                            $item->ingredients()->create([
+                                'ingredient_id' => $ri['id'],
+                                'quantity'      => $ri['quantity'],
+                            ]);
+                        }
+                    }
                 }
                 $template->items()->whereNotIn('id', $keepIds)->delete();
             });
@@ -201,7 +275,8 @@ class OptionLibraryManagement extends Component
         $this->editTemplateId = null;
         $this->name = '';
         $this->priceMode = 'additive';
-        $this->isRequired = false;
+                $this->isRequired = false;
+        $this->noRecipeRequired = false;
         $this->templateItems = [];
         $this->resetValidation();
     }

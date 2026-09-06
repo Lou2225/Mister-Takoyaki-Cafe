@@ -3,18 +3,14 @@
 namespace App\Livewire;
 
 use App\Models\Branch;
-use App\Models\BranchIngredientStock;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderItemOption;
 use App\Models\OrderItemModifier;
 use App\Models\Product;
 use App\Models\ProductCategory;
-use App\Models\ProductOption;
-use App\Models\Modifier;
 use App\Models\Recipe;
 use App\Models\SystemSetting;
-use App\Models\FinancialLedger;
 use App\Models\BranchCategorySort;
 use App\Services\StockDeductionService;
 use App\Services\PayMongoService;
@@ -29,9 +25,7 @@ use App\Helpers\ValidationHelper;
 class PosTerminal extends Component
 {
     use HandlesValidations;
-    // ─── Filters ───────────────────────────────────────────────────────────
-    public ?int $selectedCategoryId = null;
-    public $search = '';
+    
 
     // ─── Cart ──────────────────────────────────────────────────────────────
     // Structure: [ product_id => ['name', 'price', 'qty', 'image', 'available'] ]
@@ -41,8 +35,8 @@ class PosTerminal extends Component
     public string $orderType = '';
     public string $tableNumber = '';
     public string $paymentMethod = '';
-    public string $paymentReference = '';
-    public float $amountTendered = 0;
+public string $paymentReference = '';
+public $amountTendered = 0;
 
     // ─── Branch / Settings ─────────────────────────────────────────────────
     public ?int $branchId = null;
@@ -64,7 +58,6 @@ class PosTerminal extends Component
     public bool $applyRegularDiscount = false;
     public bool $applySeniorDiscount = false;
     public array $branches = [];
-    public bool $showDraftsModal = false;
     public string $gcashAccountName = '';
     public string $gcashAccountNumber = '';
     public string $gcashQrImage = '';
@@ -72,13 +65,6 @@ class PosTerminal extends Component
     public string $primaryColor = 'indigo';
 
     // ─── Options Modal ─────────────────────────────────────
-    public ?int $showingOptionsId = null;
-    public array $selectedOptions = []; // [groupId => [optionId, optionId, ...]] for additive; [groupId => [optionId]] for fixed
-    public array $selectedModifierIds = [];
-    protected ?Product $currentProduct = null;
-    public array $optionAvailability = [];
-    public array $modifierAvailability = []; // [modifierId => quantity_available]
-    public bool $isVerifyingGCash = false;
     public bool $gcashVerified = false;
     public array $gcashTransactionDetails = [];
     // PayMongo GCash payment state
@@ -87,15 +73,140 @@ class PosTerminal extends Component
     public bool $gcashPolling = false;
     public bool $isManualGcash = false; // To distinguish verification types
 
-    public function updatedPaymentMethod()
-    {
-        $this->gcashVerified = false;
-        $this->isManualGcash = false;
-        $this->paymentReference = '';
-        $this->gcashTransactionDetails = [];
+public function updatedPaymentMethod()
+{
+    $this->resetGCashState();
+}
+
+/**
+ * The Amount Tendered input can be cleared to an empty string by the
+ * cashier. $amountTendered is a typed float property, so an empty
+ * string sent from the browser on blur would throw a TypeError when
+ * Livewire tries to hydrate it. Coerce anything non-numeric to 0
+ * instead of letting it reach the typed property directly.
+ */
+public function updatingAmountTendered($value)
+{
+    $this->amountTendered = is_numeric($value) ? (float) $value : 0;
+}
+
+protected $listeners = [
+    'posSettingsUpdated' => 'handlePosSettingsUpdated',
+];
+
+/**
+ * Fired when System Settings > POS Platform is saved elsewhere. Refreshes
+ * the live order type / payment method lists (and GCash config) without
+ * requiring the cashier to reload the page. If the currently-selected
+ * order type or payment method no longer exists in the updated list,
+ * fall back to the first available option and clear anything tied to
+ * the old selection (e.g. an in-progress GCash verification).
+ */
+public function handlePosSettingsUpdated($pos = null): void
+{
+    $this->orderTypes      = (array) SystemSetting::get('pos_order_types', ['Dine-in', 'Take-out']);
+    $this->paymentMethods   = (array) SystemSetting::get('pos_payment_methods', ['Cash', 'GCash']);
+    $this->serviceChargeRate = (float) SystemSetting::get('service_charge', 0);
+    $this->discountPercent   = (float) SystemSetting::get('discount_rate', 0);
+    $this->seniorDiscountRate = (float) SystemSetting::get('senior_discount_rate', 0.20);
+    $this->gcashAccountName   = (string) SystemSetting::get('gcash_account_name', 'Mister Takoyaki Cafe');
+    $this->gcashAccountNumber = (string) SystemSetting::get('gcash_account_number', '');
+    $this->gcashQrImage       = (string) SystemSetting::get('gcash_qr_image', '');
+
+    if (!in_array($this->orderType, $this->orderTypes, true)) {
+        $this->orderType = $this->orderTypes[0] ?? 'Dine-in';
     }
 
-    // ─── Mount ─────────────────────────────────────────────────────────────
+    if (!in_array($this->paymentMethod, $this->paymentMethods, true)) {
+        $this->paymentMethod = $this->paymentMethods[0] ?? 'Cash';
+        $this->resetGCashState();
+    }
+
+    $this->dispatch('notify', type: 'info', message: 'POS configuration was updated.');
+}
+
+public function resetGCashState(): void
+{
+    $this->gcashVerified = false;
+    $this->gcashPolling = false;
+    $this->gcashPaymentUrl = null;
+    $this->gcashPaymentIntentId = null;
+    $this->isManualGcash = false;
+    $this->paymentReference = '';
+    $this->gcashTransactionDetails = [];
+
+    // Alpine's local `gcashPaid` (in the payment modal's x-data) is only
+    // ever set once, on first init — x-show never re-runs it. Without
+    // this event, clearing the server-side flag here left the UI
+    // permanently showing "Confirmed Payment" for every order afterward,
+    // even a brand new one that was never verified.
+    $this->dispatch('gcash-reset');
+}
+
+/**
+ * Called by the Cancel button on the payment modal. Once a GCash
+ * payment has been verified (dynamic PayMongo or manual static QR),
+ * the money has already been received — cancelling here without
+ * placing the order would leave a paid transaction with no order
+ * record at all. In that state the only way out is to place the
+ * order, then void it afterward in Order Management if needed.
+ */
+    public function cancelPaymentModal(): void
+    {
+        if ($this->paymentMethod === 'GCash' && $this->gcashVerified) {
+            $this->addError('gcashCancel', 'This payment has already been verified and the money has already been received. You must place the order to complete it — to cancel it afterward, void the completed order in Order Management.');
+            return;
+        }
+
+        $this->resetErrorBag('gcashCancel');
+        $this->resetGCashState();
+        $this->dispatch('close-modal', 'pos-payment');
+    }
+
+    /**
+     * Public wrapper so the "Proceed to Payment" button can clear a stale
+     * gcashCancel warning from a previous order before opening a fresh
+     * payment modal. $wire.methodName() from Blade/Alpine can only invoke
+     * public component methods — resetErrorBag() itself isn't callable
+     * directly that way since it's a trait/framework method, not a
+     * public action on this component.
+     */
+    /**
+ * The modal itself is opened INSTANTLY on the client (Alpine dispatches
+ * 'open-modal' directly in the "Proceed to Payment" button, before this
+ * method's network round-trip even begins — see pos-terminal.blade.php).
+ *
+ * This method no longer owns opening the modal. It runs in the
+ * background purely to re-verify the cart/prices/stock against the
+ * database. If that verification fails, it closes the modal it never
+ * actually needed to open in the first place.
+ */
+public function openPaymentModal(): void
+{
+    $this->resetErrorBag('gcashCancel');
+
+    if (empty($this->cart)) {
+        $this->dispatch('close-modal', 'pos-payment');
+        $this->dispatch('notify', type: 'error', message: 'Cart is empty.');
+        return;
+    }
+
+    $this->cart = $this->buildVerifiedCart();
+    $stockValidation = $this->validateStockAvailability();
+
+    if (!$stockValidation['available']) {
+        $this->dispatch('close-modal', 'pos-payment');
+        $this->dispatch('notify',
+            type: 'error',
+            message: 'Insufficient stock: ' . $stockValidation['message']
+        );
+        return;
+    }
+
+    $this->amountTendered = $this->total;
+}
+
+// ─── Mount ─────────────────────────────────────────────────────────────
     public function mount(): void
     {
         $user = auth()->user();
@@ -121,9 +232,11 @@ class PosTerminal extends Component
         // Set defaults
         $this->orderType     = $this->orderTypes[0] ?? 'Dine-in';
         $this->paymentMethod = $this->paymentMethods[0] ?? 'Cash';
-        
-        // Generate a draft reference number
-        $this->referenceNo = $this->generateReferenceNo();
+
+        // Reference number is generated lazily — see saveDraft()/confirmPayment()
+        // — not here, so an abandoned session never shows a "committed" order ID
+        // for an order that doesn't exist yet.
+        $this->referenceNo = '';
 
         // Load branches (for super admin)
         if ($user->role_id === 1) {
@@ -205,21 +318,30 @@ class PosTerminal extends Component
         $this->dispatch('notify', type: 'success', message: 'Branch category layout updated.');
     }
 
+    public function refreshPosData(): void
+    {
+        $this->productsCache = null;
+        $this->categoriesCache = null;
+    }
+    
     // ─── Computed: Products ────────────────────────────────────────────────
     protected ?Collection $productsCache = null;
     public function getProductsProperty()
     {
         if ($this->productsCache !== null) return $this->productsCache;
 
-        $query = Product::with(['category', 'recipes', 'optionGroups.options', 'modifiers'])
-            ->where('is_active', true);
+        $query = Product::with(['category', 'recipes', 'optionGroups.options', 'modifiers']);
 
-        // Scope to branch
+       // Scope to branch
         if ($this->branchId) {
             $query->where(function ($q) {
                 $q->where('scope', 'global')
                     ->orWhereHas('branches', fn($bq) => $bq->where('branches.id', $this->branchId));
             });
+        } else {
+            // No branch context — fall back to the product's global
+            // is_active flag since there's no branch_product row to check.
+            $query->where('products.is_active', true);
         }
 
         // Joint-based sorting requires manual selects to avoid ID collisions
@@ -230,6 +352,15 @@ class PosTerminal extends Component
                 $join->on('products.id', '=', 'branch_product.product_id')
                      ->where('branch_product.branch_id', '=', (int)$this->branchId);
             })->addSelect('branch_product.sort_order as branch_sort_order');
+
+            // Effective visibility = branch override if one exists,
+            // otherwise fall back to the product's global is_active flag.
+            $query->where(function ($q) {
+                $q->where(function ($sub) {
+                    $sub->whereNull('branch_product.is_active')
+                        ->where('products.is_active', true);
+                })->orWhere('branch_product.is_active', 1);
+            });
         }
 
         $query->leftJoin('product_categories', 'products.category_id', '=', 'product_categories.id')
@@ -267,7 +398,7 @@ class PosTerminal extends Component
                 $product->prefetched_stocks = $stocks;
             }
 
-            // SORT: Available items first, then Out of Stock
+// SORT: Available items first, then Out of Stock
             $products = $products->sortBy(function($product) {
                 $isAvailable = $product->getMaxAvailableQuantity((int)$this->branchId, $product->prefetched_stocks) > 0;
                 return [
@@ -277,6 +408,13 @@ class PosTerminal extends Component
                     $product->name
                 ];
             });
+        }
+
+        // Tag max_available onto each product for Alpine stock limiting
+        foreach ($products as $product) {
+            $product->max_available = $this->branchId
+                ? $product->getMaxAvailableQuantity((int)$this->branchId, $product->prefetched_stocks ?? null)
+                : 999;
         }
 
         return $this->productsCache = $products;
@@ -393,12 +531,11 @@ class PosTerminal extends Component
         return round($total + $this->serviceChargeAmount, 2);
     }
 
-    #[Computed]
-    public function change(): float
-    {
-        return max(0, $this->amountTendered - $this->total);
-    }
-
+#[Computed]
+public function change(): float
+{
+    return max(0, (float) $this->amountTendered - $this->total);
+}
     private function generateDiscountNotes(): ?string
     {
         $types = [];
@@ -431,33 +568,21 @@ class PosTerminal extends Component
 
     // ─── Cart Actions ──────────────────────────────────────────────────────
 
-    public function decrementCart(string $key): void
-    {
-        if (!isset($this->cart[$key])) return;
-
-        if ($this->cart[$key]['qty'] > 1) {
-            $this->cart[$key]['qty']--;
-        } else {
-            unset($this->cart[$key]);
-        }
-    }
-
-    public function incrementCart(string $key): void
-    {
-        if (!isset($this->cart[$key])) return;
-        $this->cart[$key]['qty']++;
-    }
-
-    public function removeFromCart(string $key): void
-    {
-        unset($this->cart[$key]);
-    }
-
 
     public function saveEditItem(): void
     {
         $key = $this->editCartItemId;
         if (!isset($this->cart[$key])) return;
+
+        // Guard against exceeding available stock without showing a duplicate toast
+        $productId = $this->cart[$key]['id'];
+        $product = Product::find($productId);
+        if ($product && $this->branchId) {
+            $maxQty = $product->getMaxAvailableQuantity((int)$this->branchId);
+            if ($this->editCartItemQty > $maxQty) {
+                $this->editCartItemQty = max(1, $maxQty);
+            }
+        }
 
         $this->cart[$key]['qty'] = $this->editCartItemQty;
         $this->cart[$key]['instructions'] = $this->editCartItemNotes;
@@ -482,20 +607,23 @@ class PosTerminal extends Component
         $this->dispatch('close-modal', name: 'edit-cart-item');
     }
 
-    public function decrementEditQuantity(): void
-    {
-        $this->editCartItemQty = max(0, $this->editCartItemQty - 1);
-    }
+    
 
-    public function incrementEditQuantity(): void
+    /**
+     * @param bool $force Bypasses the verified-payment guard. Used internally
+     *                     after an order has actually been placed/drafted,
+     *                     where the cart legitimately needs to be emptied.
+     */
+    public function clearCart(bool $force = false): void
     {
-        $this->editCartItemQty = $this->editCartItemQty + 1;
-    }
+        if (!$force && $this->paymentMethod === 'GCash' && $this->gcashVerified) {
+            $this->dispatch('notify', type: 'error', message: 'This order has a verified GCash payment and cannot be cleared. Place the order, then void it in Order Management if you need to cancel it.');
+            return;
+        }
 
-    public function clearCart(): void
-    {
         $this->cart = [];
-        $this->referenceNo = $this->generateReferenceNo();
+        $this->referenceNo = '';
+        $this->resetGCashState();
     }
 
     // ─── Draft Order Management ────────────────────────────────────────────
@@ -511,8 +639,14 @@ class PosTerminal extends Component
             return;
         }
 
+        if (empty($this->referenceNo)) {
+            $this->referenceNo = $this->generateReferenceNo();
+        }
+
         try {
             DB::transaction(function() {
+                $this->cart = $this->buildVerifiedCart();
+
                 // Create a Draft Order
                 $draftOrder = Order::create([
                     'reference_no'    => $this->referenceNo,
@@ -534,11 +668,12 @@ class PosTerminal extends Component
                     $productId = $item['id'];
 
                     $orderItem = OrderItem::create([
-                        'order_id'   => $draftOrder->id,
-                        'product_id' => $productId,
-                        'quantity'   => $item['qty'],
-                        'unit_price' => $item['price'],
-                        'subtotal'   => $item['price'] * $item['qty'],
+                        'order_id'              => $draftOrder->id,
+                        'product_id'            => $productId,
+                        'quantity'              => $item['qty'],
+                        'unit_price'            => $item['price'],
+                        'subtotal'              => $item['price'] * $item['qty'],
+                        'special_instructions'  => !empty($item['instructions']) ? $item['instructions'] : null,
                     ]);
 
                     // Save Selected Options to DB
@@ -564,7 +699,7 @@ class PosTerminal extends Component
                     }
                 }
 
-                $this->clearCart();
+                $this->clearCart(force: true);
                 $this->dispatch('notify', 
                     type: 'success',
                     message: "Draft order #{$draftOrder->reference_no} saved successfully!"
@@ -596,11 +731,14 @@ class PosTerminal extends Component
             }
 
             // Load draft data into POS
+            // Load draft data into POS
+            // Note: branchId is intentionally NOT overwritten here — drafts are
+            // already scoped to the cashier's current branch in getDraftsProperty(),
+            // and reassigning it forces an oversized re-render mid-modal.
             $this->orderType = $draft->order_type;
             $this->tableNumber = $draft->table_number;
             $this->paymentMethod = $draft->payment_method;
             $this->referenceNo = $draft->reference_no;
-            $this->branchId = $draft->branch_id;
 
             // Populate cart from order items
             $this->cart = [];
@@ -754,6 +892,7 @@ class PosTerminal extends Component
                 $this->gcashPolling = false;
                 $this->paymentReference = $this->gcashPaymentIntentId;
                 $this->dispatch('notify', type: 'success', message: 'GCash payment received! You may now confirm the order.');
+                $this->dispatch('gcash-verified');
             }
         } catch (\Exception $e) {
             // Silent fail — just try again next poll
@@ -769,6 +908,7 @@ class PosTerminal extends Component
         $this->gcashVerified = true;
         $this->isManualGcash = true;
         $this->dispatch('notify', type: 'success', message: 'GCash payment manually verified!');
+        $this->dispatch('gcash-verified');
     }
 
     protected function validateStockAvailability(): array
@@ -791,10 +931,12 @@ class PosTerminal extends Component
             }
         }
 
-        // Single query for all possible recipes involved in this cart
+                // Single query for all possible recipes involved in this cart
         $allRecipes = Recipe::with('ingredient')
             ->whereIn('product_id', array_unique($productIds))
             ->get();
+
+        $allRecipes = $this->filterOutNoRecipeOptions($allRecipes);
 
         $ingredientRequirements = [];
 
@@ -853,9 +995,113 @@ class PosTerminal extends Component
         return ['available' => true];
     }
 
+    /**
+     * Strips out any Recipe rows tied to a product option whose group is
+     * flagged "No Recipe Required" — covers products saved before this flag
+     * existed, or edited outside the normal save path. Shared by both stock
+     * validation and actual FEFO deduction so they can't disagree.
+     */
+    private function filterOutNoRecipeOptions(\Illuminate\Support\Collection $recipes): \Illuminate\Support\Collection
+    {
+        $touchedOptionIds = $recipes->pluck('product_option_id')->filter()->unique();
+        if ($touchedOptionIds->isEmpty()) {
+            return $recipes;
+        }
+        $groupIdByOption = \App\Models\ProductOption::whereIn('id', $touchedOptionIds)->pluck('group_id', 'id');
+        $noRecipeGroupIds = \App\Models\ProductOptionGroup::whereIn('id', $groupIdByOption->unique()->values())
+            ->where('no_recipe_required', true)
+            ->pluck('id')->all();
+        $noRecipeOptionIds = $groupIdByOption->filter(fn($gid) => in_array($gid, $noRecipeGroupIds))->keys()->all();
+        return $recipes->reject(fn($r) => $r->product_option_id && in_array($r->product_option_id, $noRecipeOptionIds));
+    }
+
+
+    /**
+     * Rebuilds the cart from trusted server-side data.
+     * Never trust price/discount flags sent from the browser — only the
+     * product/option/modifier IDs and quantities are taken from the client;
+     * every price is re-derived from the database.
+     */
+    protected function buildVerifiedCart(): array
+    {
+        $productIds = collect($this->cart)->pluck('id')->filter()->unique()->values()->all();
+
+        if (empty($productIds)) {
+            return [];
+        }
+
+        $products = Product::with(['optionGroups.options', 'modifiers'])
+            ->whereIn('id', $productIds)
+            ->get()
+            ->keyBy('id');
+
+        $verifiedCart = [];
+
+        foreach ($this->cart as $key => $item) {
+            $product = $products->get($item['id'] ?? null);
+            if (!$product) {
+                continue; // drop any line item referencing a product that doesn't exist
+            }
+
+            $requestedOptionIds   = collect($item['options'] ?? [])->pluck('id')->all();
+            $requestedModifierIds = collect($item['modifiers'] ?? [])->pluck('id')->all();
+
+            $allOptions = $product->optionGroups->flatMap(fn ($g) => $g->options);
+
+            // Only keep options/modifiers that genuinely belong to this product
+            $selectedOptions   = $allOptions->filter(fn ($o) => in_array($o->id, $requestedOptionIds));
+            $selectedModifiers = $product->modifiers->filter(fn ($m) => in_array($m->id, $requestedModifierIds));
+
+            $hasFixed = $selectedOptions->contains(function ($o) use ($product) {
+                $group = $product->optionGroups->firstWhere('id', $o->group_id);
+                return $group && $group->price_mode === 'fixed';
+            });
+
+            if ($hasFixed) {
+                $basePrice = $selectedOptions->filter(function ($o) use ($product) {
+                    $group = $product->optionGroups->firstWhere('id', $o->group_id);
+                    return $group && $group->price_mode === 'fixed';
+                })->sum(fn ($o) => (float) $o->price);
+            } else {
+                $basePrice = (float) $product->getPriceAt((int) $this->branchId);
+            }
+
+            $additivePrice = $selectedOptions->filter(function ($o) use ($product) {
+                $group = $product->optionGroups->firstWhere('id', $o->group_id);
+                return $group && $group->price_mode === 'additive';
+            })->sum(fn ($o) => (float) $o->price);
+
+            $modifiersPrice = $selectedModifiers->sum(fn ($m) => (float) $m->price);
+
+            $verifiedCart[$key] = [
+                'id'                     => $product->id,
+                'name'                   => $product->name,
+                'price'                  => $basePrice + $additivePrice + $modifiersPrice,
+                'qty'                    => max(1, (int) ($item['qty'] ?? 1)),
+                'image'                  => $product->image,
+                'options'                => $selectedOptions->map(fn ($o) => [
+                    'id'    => $o->id,
+                    'name'  => $o->name,
+                    'price' => (float) $o->price,
+                ])->values()->all(),
+                'modifiers'              => $selectedModifiers->map(fn ($m) => [
+                    'id'    => $m->id,
+                    'name'  => $m->name,
+                    'price' => (float) $m->price,
+                ])->values()->all(),
+                'instructions'           => $item['instructions'] ?? '',
+                'apply_regular_discount' => (bool) ($item['apply_regular_discount'] ?? false),
+                'apply_senior_discount'  => (bool) ($item['apply_senior_discount'] ?? false),
+            ];
+        }
+
+        return $verifiedCart;
+    }
 
     public function confirmPayment(): void
     {
+        $this->resetErrorBag('gcashCancel');
+
         if (empty($this->cart)) {
             $this->dispatch('notify', type: 'error', message: 'Cart is empty.');
             return;
@@ -866,7 +1112,25 @@ class PosTerminal extends Component
             return;
         }
 
-        if ($this->paymentMethod === 'Cash' && $this->amountTendered < $this->total) {
+        if (empty($this->referenceNo)) {
+            $this->referenceNo = $this->generateReferenceNo();
+        }
+
+        // Overwrite the client-supplied cart with server-verified prices before
+        // computing totals, validating stock, or saving anything.
+        $this->cart = $this->buildVerifiedCart();
+
+        if (empty($this->cart)) {
+            $this->dispatch('notify', type: 'error', message: 'Cart is empty or contains invalid items.');
+            return;
+        }
+
+        if (!in_array($this->paymentMethod, $this->paymentMethods, true)) {
+            $this->dispatch('notify', type: 'error', message: 'Invalid payment method.');
+            return;
+        }
+
+        if ($this->paymentMethod === 'Cash' && (float) $this->amountTendered < $this->total) {
             $this->dispatch('notify', type: 'error', message: 'Amount tendered is less than total amount.');
             return;
         }
@@ -874,9 +1138,22 @@ class PosTerminal extends Component
         if ($this->paymentMethod === 'GCash') {
             // Allows either PayMongo automated confirmation OR manual reference entry (for Static QR mode)
             if (!$this->gcashVerified && empty($this->paymentReference)) {
-                $this->addError('gcashVerified', 'Please wait for GCash confirmation or enter a reference number.');
+                $this->addError('gcashVerified', 'Please verify the payment first before placing an order.');
                 return;
             }
+        } elseif ($this->paymentMethod !== 'Cash') {
+            // Any custom payment method (added via Settings) has no built-in
+            // verification flow — require a manually entered reference so it
+            // can't be marked Paid with zero proof of payment.
+            if (empty(trim($this->paymentReference))) {
+                $this->addError('paymentReference', 'Enter a payment reference or confirmation number for this payment method.');
+                return;
+            }
+        }
+
+        if (!in_array($this->orderType, $this->orderTypes, true)) {
+            $this->dispatch('notify', type: 'error', message: 'Invalid order type.');
+            return;
         }
 
         $this->validate([
@@ -906,7 +1183,9 @@ class PosTerminal extends Component
                 'service_charge'  => $this->serviceChargeAmount,
                 'discount_amount' => $this->discountAmount,
                 'payment_method'  => $this->paymentMethod,
-                'payment_reference'=> $this->paymentMethod === 'GCash' ? $this->paymentReference : null,
+                'payment_reference'=> $this->paymentMethod === 'Cash' ? null : $this->paymentReference,
+                'amount_tendered' => $this->paymentMethod === 'Cash' ? (float) $this->amountTendered : null,
+                'change_amount'   => $this->paymentMethod === 'Cash' ? $this->change : null,
                 'order_type'      => $this->orderType,
                 'table_number'    => $this->tableNumber,
                 'status'          => Order::STATUS_COMPLETED, // POS orders complete immediately when paid
@@ -923,11 +1202,12 @@ class PosTerminal extends Component
                 $modifierIds = collect($item['modifiers'] ?? [])->pluck('id')->toArray();
 
                 $orderItem = OrderItem::create([
-                    'order_id'   => $order->id,
-                    'product_id' => $productId,
-                    'quantity'   => $item['qty'],
-                    'unit_price' => $item['price'],
-                    'subtotal'   => $item['price'] * $item['qty'],
+                    'order_id'              => $order->id,
+                    'product_id'            => $productId,
+                    'quantity'              => $item['qty'],
+                    'unit_price'            => $item['price'],
+                    'subtotal'              => $item['price'] * $item['qty'],
+                    'special_instructions'  => !empty($item['instructions']) ? $item['instructions'] : null,
                 ]);
 
                 // Save Selected Options to DB
@@ -969,6 +1249,7 @@ class PosTerminal extends Component
                 });
                 
                 $recipes = $recipeQuery->get();
+                $recipes = $this->filterOutNoRecipeOptions($recipes);
 
                 foreach ($recipes as $recipe) {
                     $baseQty = $recipe->quantity * $item['qty'];
@@ -991,17 +1272,15 @@ class PosTerminal extends Component
                 }
             }
 
-            $this->clearCart();
+            $this->clearCart(force: true);
             $this->dispatch('close-modal', 'pos-payment');
             $this->dispatch('cart-collapsed');
             $this->dispatch('cart-reset');
             $this->dispatch('notify', type: 'success', message: "Order #{$order->reference_no} placed successfully!");
             
-            // 🖨️ AUTOMATIC RECEIPT PRINTING
-            // This dispatches to browser event listener in layouts/app.blade.php
-            // The receipt window will open and automatically trigger print() for the wired printer
-            $receiptUrl = route('receipts.thermal', ['order' => $order->id]);
-            $this->dispatch('open-receipt', url: $receiptUrl);
+                        // 🖨️ AUTOMATIC RECEIPT PRINTING
+            // Send print job to thermal printer (async, no user interaction needed)
+            $this->dispatch('send-thermal-print', order_id: $order->id, receipt_type: 'all');
         });
     }
 

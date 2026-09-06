@@ -36,8 +36,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/users', \App\Livewire\UserManagement::class)->name('users.index');
         Route::get('/users/create', \App\Livewire\UserManagement::class)->name('users.create');
 
-        // POS Terminal
+               // POS Terminal
         Route::get('/pos', \App\Livewire\PosTerminal::class)->name('pos.index');
+        Route::get('/pos/orders/{order}/receipt-data', [\App\Http\Controllers\Api\PosReceiptController::class, 'data'])->name('pos.receipt.data');
         // GCash return URL — where GCash redirects the user after payment
         Route::get('/paymongo/return', [\App\Http\Controllers\PayMongoWebhookController::class, 'returnCallback'])->name('paymongo.return');
         

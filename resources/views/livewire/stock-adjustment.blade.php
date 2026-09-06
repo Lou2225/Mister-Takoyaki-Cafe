@@ -9,29 +9,26 @@
         {{-- ════════════════ PANEL 1 — ADJUSTMENT LIST ════════════════ --}}
         <div x-show="panel === 'list'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="px-1">
 
-            <div class="mb-5 flex items-center justify-between">
-                <div>
-                    <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Inventory Adjustment</h2>
-                    <p class="text-[12px] text-gray-500 font-medium">History of stock movements and manual corrections</p>
-                </div>
+            <div class="mb-5 flex items-center justify-between gap-3">
+                <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Stock Adjustment</h2>
                 
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
                     @if(!$this->isStaff())
-                        <x-secondary-button wire:click="exportToCsv" class="h-10 px-4">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                            Export CSV
+                        <x-secondary-button wire:click="exportToCsv" class="h-10 !px-2.5 sm:!px-4">
+                            <svg class="w-4 h-4 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                            <span class="hidden sm:inline">Export CSV</span>
                         </x-secondary-button>
-                        <x-secondary-button wire:click="startBulkAdjustment" class="h-10 px-4">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                            Stock Reconcile
+                        <x-secondary-button wire:click="startBulkAdjustment" class="h-10 !px-2.5 sm:!px-4">
+                            <svg class="w-4 h-4 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                            <span class="hidden sm:inline">Stock Reconcile</span>
                         </x-secondary-button>
-                        <x-primary-button wire:click="handleQuickAdjustment(null)" class="h-10 px-4">
-                            <span class="mr-2 text-lg leading-none">+</span> New Adjustment
+                        <x-primary-button wire:click="handleQuickAdjustment(null)" class="h-10 !px-2.5 sm:!px-4">
+                            <span class="text-lg leading-none sm:mr-2">+</span> <span class="hidden sm:inline">New Adjustment</span>
                         </x-primary-button>
                     @else
-                        <div class="inline-flex items-center px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-gray-400 font-bold text-[12px] shadow-sm select-none h-10">
-                            <svg class="w-3.5 h-3.5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                            View Only Mode
+                        <div class="inline-flex items-center px-2.5 sm:px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-gray-400 font-bold text-[12px] shadow-sm select-none h-10">
+                            <svg class="w-3.5 h-3.5 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                            <span class="hidden sm:inline">View Only Mode</span>
                         </div>
                     @endif
                 </div>
@@ -89,15 +86,15 @@
             </div>
 
             {{-- macOS Style Unified Toolbar --}}
-            <div class="relative z-20 flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
+            <div class="relative z-20 flex flex-row items-center justify-between mb-6 gap-2 sm:gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
                 
                 {{-- Left: Search Bar --}}
-                <div class="flex flex-1 w-full lg:w-auto">
+                <div class="flex flex-1 min-w-0 lg:flex-initial">
                     <x-search-bar wireModel="search" placeholder="Find logs (Reference, Item, etc.)" width="w-full lg:w-80" />
                 </div>
 
                 {{-- Right: Filters --}}
-                <div class="flex flex-wrap items-center lg:justify-end gap-2">
+                <div class="flex flex-nowrap items-center justify-end gap-1.5 sm:gap-2 shrink-0">
                     {{-- 3-in-1 Date Filter Component --}}
                     <x-date-filter startModel="startDate" endModel="endDate" activeModel="activeFilter" />
 
@@ -105,12 +102,12 @@
                     @if($this->isSuperAdmin())
                         <x-dropdown align="right" width="48" wire:key="filter-branch">
                             <x-slot name="trigger">
-                                <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
+                                <x-secondary-button type="button" class="gap-0 sm:gap-1.5 h-10 !px-2.5 sm:!px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
                                     <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                     </svg>
-                                    <span class="text-[12px] whitespace-nowrap font-bold">{{ $selectedBranchId ? $branches->firstWhere('id', $selectedBranchId)?->branch_name : 'All Branches' }}</span>
-                                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <span class="hidden sm:inline text-[12px] whitespace-nowrap font-bold">{{ $selectedBranchId ? $branches->firstWhere('id', $selectedBranchId)?->branch_name : 'All Branches' }}</span>
+                                    <svg class="hidden sm:block w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                                     </svg>
                                 </x-secondary-button>
@@ -126,9 +123,9 @@
                             </x-slot>
                         </x-dropdown>
                     @else
-                        <div class="inline-flex items-center gap-2 px-3 h-9 text-[12px] font-black text-slate-600 bg-slate-50 border border-slate-200 rounded-lg shadow-inner">
+                        <div class="inline-flex items-center gap-0 sm:gap-2 px-2.5 sm:px-3 h-10 text-[12px] font-black text-slate-600 bg-slate-50 border border-slate-200 rounded-lg shadow-inner shrink-0">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                            <span>{{ auth()->user()->branch->branch_name ?? 'Unknown Branch' }}</span>
+                            <span class="hidden sm:inline">{{ auth()->user()->branch->branch_name ?? 'Unknown Branch' }}</span>
                         </div>
                     @endif
                 </div>
@@ -260,9 +257,15 @@
                         <h2 class="text-[13px] font-semibold text-gray-700 uppercase tracking-wider mb-4">Adjustment Details</h2>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <x-input-label value="Reference *" />
-                                <x-text-input wire:model.live.debounce.400ms="globalReference" placeholder="e.g. ADJ-{{ now()->format('Ymd') }}-01" class="mt-1.5 h-11 w-full font-medium" :hasError="$errors->has('globalReference')" />
-                                <x-input-error :messages="$errors->get('globalReference')" class="mt-1" />
+                                <x-input-label value="Reference" />
+                                @if(!empty($rows))
+                                    <x-text-input wire:model.live.debounce.400ms="globalReference" placeholder="e.g. ADJ-{{ now()->format('Ymd') }}-01" class="mt-1.5 h-11 w-full font-medium" :hasError="$errors->has('globalReference')" />
+                                    <x-input-error :messages="$errors->get('globalReference')" class="mt-1" />
+                                @else
+                                    <div class="mt-1.5 h-11 w-full flex items-center px-4 bg-slate-50 border border-dashed border-slate-200 rounded-xl text-[12px] text-slate-400 font-medium italic">
+                                        Generated once you add the first item
+                                    </div>
+                                @endif
                             </div>
                             <div>
                                 <x-input-label value="Notes" />
@@ -405,7 +408,6 @@
                                                 <x-dropdown-link href="#" wire:click.prevent="$set('newItemType', 'in')">Procurement (Stock In)</x-dropdown-link>
                                             @endif
                                             <x-dropdown-link href="#" wire:click.prevent="$set('newItemType', 'waste')">Waste</x-dropdown-link>
-                                            <x-dropdown-link href="#" wire:click.prevent="$set('newItemType', 'adjust')">Manual Correction</x-dropdown-link>
                                             <x-dropdown-link href="#" wire:click.prevent="$set('newItemType', 'out')">Stock Out</x-dropdown-link>
                                         </x-slot>
                                     </x-dropdown>
@@ -455,7 +457,7 @@
                             @endif
                         @endif
 
-                        @if(($newItemType === 'in' && (string)$selectedBranchId === (string)$mainBranchId) || $newItemType === 'adjust')
+                        @if($newItemType === 'in' && (string)$selectedBranchId === (string)$mainBranchId)
                             <div class="animate-fadeIn">
                                 <x-input-label value="Procurement Cost" />
                                 <div class="mt-1.5">
@@ -529,13 +531,6 @@
                                 <div>
                                     <p class="text-[12px] font-bold text-slate-700 leading-tight">Stock Out</p>
                                     <p class="text-[10px] text-slate-400 font-medium leading-relaxed mt-0.5">Reduces inventory for manual consumption or internal use.</p>
-                                </div>
-                            </div>
-                            <div class="flex gap-3">
-                                <div class="shrink-0 w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center text-[10px] font-black text-indigo-600">AD</div>
-                                <div>
-                                    <p class="text-[12px] font-bold text-slate-700 leading-tight">Manual Correction</p>
-                                    <p class="text-[10px] text-slate-400 font-medium leading-relaxed mt-0.5">Quickly fix a single item's stock level without a full reconciliation.</p>
                                 </div>
                             </div>
                         </div>

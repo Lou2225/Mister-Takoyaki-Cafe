@@ -5,6 +5,12 @@
 
     RewriteEngine On
 
+    <IfModule mod_headers.c>
+        <Files "sw.js">
+            Header always set Cache-Control "no-cache, no-store, must-revalidate"
+        </Files>
+    </IfModule>
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]

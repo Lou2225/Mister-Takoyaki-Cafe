@@ -1,22 +1,60 @@
 {
+    "name": "mister-takoyaki-cafe",
+    "version": "1.0.0",
+    "description": "Mister Takoyaki Cafe management system desktop application",
+    "author": "Mister Takoyaki Cafe",
     "private": true,
+    "main": "public/main.js",
+    "homepage": "./",
     "scripts": {
         "dev": "vite",
-        "build": "vite build"
+        "build": "vite build",
+        "electron": "electron .",
+        "electron-dev": "concurrently \"npm run dev -- --host 0.0.0.0 --port 5173\" \"wait-on http://localhost:5173 && electron .\"",
+        "electron-build": "npm run build && electron-builder"
     },
     "devDependencies": {
         "@tailwindcss/forms": "^0.5.2",
         "autoprefixer": "^10.4.2",
         "axios": "^1.1.2",
+        "concurrently": "^10.0.5",
+        "electron": "^43.4.0",
+        "electron-builder": "^26.15.3",
         "laravel-vite-plugin": "^1.0.0",
         "lodash": "^4.17.19",
         "postcss": "^8.4.6",
         "sass": "^1.56.1",
         "tailwindcss": "^3.1.0",
-        "vite": "^6.0.0"
+        "vite": "^6.0.0",
+        "wait-on": "^9.1.0"
     },
     "dependencies": {
         "apexcharts": "^5.12.0",
         "leaflet": "^1.9.4"
+    },
+    "build": {
+        "appId": "com.mistertakoyaki.app",
+        "productName": "Mister Takoyaki Cafe",
+        "files": [
+            "public/main.js",
+            "public/preload.js",
+            "public/favicon.ico",
+            "public/build/**/*"
+        ],
+        "directories": {
+            "buildResources": "public"
+        },
+        "win": {
+            "target": [
+                "nsis",
+                "portable"
+            ]
+        },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true,
+            "createDesktopShortcut": true,
+            "createStartMenuShortcut": true
+        }
     }
 }

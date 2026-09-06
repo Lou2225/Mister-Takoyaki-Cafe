@@ -15,17 +15,19 @@ use App\Models\SystemSetting;
 use App\Models\Branch;
 use App\Services\ConfigurationService;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\File;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class SystemSettings extends Component
 {
     use WithPagination, WithFileUploads, HandlesValidations;
 
+    // Fixed, non-extensible option sets — POS order modes and payment
+    // methods are now toggled on/off rather than freely typed, so staff
+    // can't introduce typos, duplicates, or unsupported gateways.
+    public const ORDER_TYPE_OPTIONS = ['Dine-in', 'Take-out', 'Delivery', 'Pick-up'];
+    public const PAYMENT_METHOD_OPTIONS = ['Cash', 'GCash'];
+
     public $tab = 'general';
     public $perPage = 5;
-    public $page = 1;
 
     // Business Settings
     public $businessName;
@@ -46,11 +48,9 @@ class SystemSettings extends Component
     public $addr_lng      = null;
 
     // Financial Settings
-    public $vatRate;
     public $serviceCharge;
     public $currency;
     public $currencySymbol;
-    public $taxDestination; // Where tax revenue is credited: 'TAX_LIABILITY' or 'BUSINESS'
 
     // Receipt Settings
     public $receiptLogoEnabled;
@@ -59,6 +59,13 @@ class SystemSettings extends Component
     public $receiptReturnPolicy;
     public $receiptCopies;
     public $receiptQrUrl;
+    public $kitchenSlipTitle;
+    public $kitchenSlipSubtitle;
+    public $baristaSlipTitle;
+    public $baristaSlipSubtitle;
+    public $customerReceiptTitle;
+    public $showReceiptQrCode;
+    public $showReceiptFooter;
 
     // Inventory Settings
     public $lowStockThreshold;
@@ -72,8 +79,6 @@ class SystemSettings extends Component
     public $posBusinessName;
     public $posOrderTypes = [];
     public $posPaymentMethods = [];
-    public $newOrderType = '';
-    public $newPaymentMethod = '';
     public $gcashAccountName;
     public $gcashAccountNumber;
     public $gcashQrImage;
@@ -90,6 +95,13 @@ class SystemSettings extends Component
     public $reviewQuestions = [];
     public $sampleQrCode = ''; // Data URI for sample QR code in receipt preview
 
+    // Thermal Printer Settings
+    public $printerEnabled = false;
+    public $printerType = 'bluetooth';
+    public $printerName = '';
+    public $printerAutoCut = true;
+    public array $availablePrinters = [];
+    public bool $windowsPrintingAvailable = false;
 
     protected $queryString = [
         'perPage' => ['except' => 5, 'as' => 'ss_pp'],
@@ -128,14 +140,30 @@ class SystemSettings extends Component
     }
 
 
+        /**
+     * Strips any punctuation and a leading '63' country code (with or
+     * without a '+'), returning a clean 10-digit local number. Handles
+     * both correctly-prefixed values ('+639989282479') and legacy/bad
+     * data that was saved without the '+' ('639989282479') — a plain
+     * str_starts_with(...,'+63') check only catches the first case and
+     * silently leaves stale country-code digits in the field otherwise.
+     */
+    private function normalizeMobileDisplay(?string $raw): string
+    {
+        $digits = preg_replace('/[^0-9]/', '', (string) $raw);
+        if (strlen($digits) > 10) {
+            $digits = str_starts_with($digits, '63')
+                ? substr($digits, 2)
+                : substr($digits, -10);
+        }
+        return $digits;
+    }
+
     private function loadSettings()
     {
         $this->businessName    = SystemSetting::get('business_name', 'Mister Takoyaki Cafe');
         $this->businessEmail   = SystemSetting::get('business_email', 'contact@mistertakoyaki.com');
-        $this->businessPhone   = SystemSetting::get('business_phone', '');
-        if (str_starts_with($this->businessPhone, '+63')) {
-            $this->businessPhone = substr($this->businessPhone, 3);
-        }
+                $this->businessPhone = $this->normalizeMobileDisplay(SystemSetting::get('business_phone', ''));
 
         $this->businessTin     = SystemSetting::get('business_tin', '');
         $this->businessAddress = SystemSetting::get('business_address', '');
@@ -158,11 +186,9 @@ class SystemSettings extends Component
             $this->businessAddress = $addr['formatted'] ?? '';
         }
 
-        $this->vatRate        = 0;
         $this->serviceCharge  = SystemSetting::get('service_charge', 0.00);
         $this->currency       = SystemSetting::get('currency', 'PHP');
         $this->currencySymbol = SystemSetting::get('currency_symbol', '₱');
-        $this->taxDestination = 'BUSINESS';
 
         $this->receiptLogoEnabled   = SystemSetting::get('receipt_logo_enabled', true);
         $this->receiptShowVat       = SystemSetting::get('receipt_show_vat', true);
@@ -170,6 +196,15 @@ class SystemSettings extends Component
         $this->receiptReturnPolicy  = SystemSetting::get('receipt_return_policy', 'No return, no exchange.');
         $this->receiptCopies        = SystemSetting::get('receipt_copies', 1);
         $this->receiptQrUrl         = SystemSetting::get('receipt_qr_url', '');
+        
+        // Thermal printer receipt customization
+        $this->kitchenSlipTitle     = SystemSetting::get('kitchen_slip_title', '🍳 KITCHEN SLIP');
+        $this->kitchenSlipSubtitle  = SystemSetting::get('kitchen_slip_subtitle', 'Food Preparation Order');
+        $this->baristaSlipTitle     = SystemSetting::get('barista_slip_title', '☕ BARISTA SLIP');
+        $this->baristaSlipSubtitle  = SystemSetting::get('barista_slip_subtitle', 'Beverage Preparation Order');
+        $this->customerReceiptTitle = SystemSetting::get('customer_receipt_title', 'Customer Receipt & Invoice');
+        $this->showReceiptQrCode    = SystemSetting::get('show_receipt_qr_code', true);
+        $this->showReceiptFooter    = SystemSetting::get('show_receipt_footer', true);
 
         $this->lowStockThreshold      = SystemSetting::get('low_stock_threshold', 10);
         $this->criticalStockThreshold = SystemSetting::get('critical_stock_threshold', 5);
@@ -179,13 +214,16 @@ class SystemSettings extends Component
         $this->discountRate      = SystemSetting::get('discount_rate', 0.10);
         $this->seniorDiscountRate = SystemSetting::get('senior_discount_rate', 0.20);
         $this->posBusinessName   = SystemSetting::get('pos_business_name', 'Mister Takoyaki');
-        $this->posOrderTypes     = SystemSetting::get('pos_order_types', ['Dine-in', 'Take-out']);
-        $this->posPaymentMethods = SystemSetting::get('pos_payment_methods', ['Cash', 'GCash']);
+        $this->posOrderTypes = array_values(array_intersect(
+            SystemSetting::get('pos_order_types', ['Dine-in', 'Take-out']),
+            self::ORDER_TYPE_OPTIONS
+        ));
+        $this->posPaymentMethods = array_values(array_intersect(
+            SystemSetting::get('pos_payment_methods', ['Cash', 'GCash']),
+            self::PAYMENT_METHOD_OPTIONS
+        ));
         $this->gcashAccountName   = SystemSetting::get('gcash_account_name', 'Mister Takoyaki Cafe');
-        $this->gcashAccountNumber  = SystemSetting::get('gcash_account_number', '');
-        if (str_starts_with($this->gcashAccountNumber, '+63')) {
-            $this->gcashAccountNumber = substr($this->gcashAccountNumber, 3);
-        }
+                $this->gcashAccountNumber = $this->normalizeMobileDisplay(SystemSetting::get('gcash_account_number', ''));
         $this->existingGcashQrImage = SystemSetting::get('gcash_qr_image', '');
 
         // Per-user preference for module visibility (isolates settings between super admins)
@@ -202,6 +240,30 @@ class SystemSettings extends Component
         $this->reviewQuestions = is_string($reviewQuestionsJson) 
             ? json_decode($reviewQuestionsJson, true) 
             : $reviewQuestionsJson;
+            // Thermal Printer Settings
+        $printerConfig = SystemSetting::get('thermal_printer_config', []);
+        if (is_string($printerConfig)) {
+            $printerConfig = json_decode($printerConfig, true) ?? [];
+        }
+                $this->printerEnabled = $printerConfig['enabled'] ?? false;
+        $storedPrinterType = $printerConfig['type'] ?? 'bluetooth';
+        $this->printerType = in_array($storedPrinterType, ['windows', 'usb'], true)
+            ? 'wired'
+            : ($storedPrinterType === 'file' || $storedPrinterType === 'network' ? 'bluetooth' : $storedPrinterType);
+        $this->printerName = $printerConfig['name'] ?? '';
+        $this->printerAutoCut = $printerConfig['auto_cut'] ?? true;
+        // A hosted Linux server cannot access a printer attached to the
+        // cashier's Windows PC. Avoid loading the legacy Windows-only printer
+        // service here so a problem in that optional service cannot prevent
+        // the Settings page from opening on Hostinger.
+        $this->windowsPrintingAvailable = PHP_OS_FAMILY === 'Windows' && function_exists('proc_open');
+        $this->availablePrinters = $this->windowsPrintingAvailable
+            ? \App\Services\ThermalPrinterService::getWindowsPrinters()
+            : [];
+
+        if (empty($this->printerName) && !empty($this->availablePrinters)) {
+            $this->printerName = $this->availablePrinters[0];
+        }
     }
 
     public function updatedBusinessName()
@@ -240,6 +302,36 @@ class SystemSettings extends Component
         $this->validateFieldLive('lowStockThreshold', ['required', 'integer', 'min:1', 'max:10000'], ValidationHelper::commonMessages());
     }
 
+    public function updatedCriticalStockThreshold()
+    {
+        $this->validateFieldLive('criticalStockThreshold', ['required', 'integer', 'min:1', 'lt:lowStockThreshold'], ValidationHelper::commonMessages());
+    }
+
+    public function updatedExpiryAlertDays()
+    {
+        $this->validateFieldLive('expiryAlertDays', ['required', 'integer', 'min:1', 'max:365'], ValidationHelper::commonMessages());
+    }
+
+    public function updatedDiscountRate()
+    {
+        $this->validateFieldLive('discountRate', ['required', 'numeric', 'min:0', 'max:1'], ValidationHelper::commonMessages());
+    }
+
+    public function updatedSeniorDiscountRate()
+    {
+        $this->validateFieldLive('seniorDiscountRate', ['required', 'numeric', 'min:0', 'max:1'], ValidationHelper::commonMessages());
+    }
+
+    public function updatedServiceCharge()
+    {
+        $this->validateFieldLive('serviceCharge', ['required', 'numeric', 'min:0', 'max:1'], ValidationHelper::commonMessages());
+    }
+
+    public function updatedReviewFormTitle()
+    {
+        $this->validateFieldLive('reviewFormTitle', ['required', 'string', 'max:255'], ValidationHelper::commonMessages());
+    }
+
 
     /**
      * Magic method to handle all updating* methods that reset pagination.
@@ -250,50 +342,48 @@ class SystemSettings extends Component
             $this->resetPage();
             return;
         }
-
-        // Handle other potential missing methods if needed
-        return parent::__call($method, $parameters);
     }
 
     public function selectTab($tab)
     {
-        // Guard against non-super admins trying to access restricted tabs
+        $superAdminTabs = ['general', 'receipts', 'inventory', 'pos', 'reviews', 'system', 'logs'];
         $operationalTabs = ['inventory', 'pos', 'reviews'];
+
+        // Validate tab is a known value
+        if (!in_array($tab, $superAdminTabs)) {
+            return;
+        }
+
+        // Non-super admins can only access operational tabs
         if (!auth()->user()->isSuperAdmin() && !in_array($tab, $operationalTabs)) {
             return;
         }
 
         $this->tab = $tab;
-        $this->resetPage(); // Reset pagination when switching tabs
+        $this->resetPage();
         $this->updateHeader();
     }
 
-    public function addOrderType()
+    public function toggleOrderType(string $type)
     {
-        $type = trim($this->normalizeString($this->newOrderType));
-        if ($type && !in_array($type, $this->posOrderTypes)) {
+        if (!in_array($type, self::ORDER_TYPE_OPTIONS, true)) return;
+
+        if (in_array($type, $this->posOrderTypes, true)) {
+            $this->posOrderTypes = array_values(array_diff($this->posOrderTypes, [$type]));
+        } else {
             $this->posOrderTypes[] = $type;
         }
-        $this->newOrderType = '';
     }
 
-    public function removeOrderType($type)
+    public function togglePaymentMethod(string $method)
     {
-        $this->posOrderTypes = array_filter($this->posOrderTypes, fn($t) => $t !== $type);
-    }
+        if (!in_array($method, self::PAYMENT_METHOD_OPTIONS, true)) return;
 
-    public function addPaymentMethod()
-    {
-        $method = trim($this->normalizeString($this->newPaymentMethod));
-        if ($method && !in_array($method, $this->posPaymentMethods)) {
+        if (in_array($method, $this->posPaymentMethods, true)) {
+            $this->posPaymentMethods = array_values(array_diff($this->posPaymentMethods, [$method]));
+        } else {
             $this->posPaymentMethods[] = $method;
         }
-        $this->newPaymentMethod = '';
-    }
-
-    public function removePaymentMethod($method)
-    {
-        $this->posPaymentMethods = array_filter($this->posPaymentMethods, fn($m) => $m !== $method);
     }
 
     public function addReviewQuestion()
@@ -331,10 +421,7 @@ class SystemSettings extends Component
 
     public function validateBeforeSave()
     {
-        // Authorize based on tab and role
-        $isOperationsTab = in_array($this->tab, ['inventory', 'pos', 'reviews']);
-        
-        if (!$this->isSuperAdmin() && !$isOperationsTab) {
+        if (!$this->authorizeTabAccess()) {
             $this->dispatch('notify', 
                 type: 'error', 
                 message: 'Unauthorized operation. You only have permission to modify operational settings.'
@@ -351,16 +438,22 @@ class SystemSettings extends Component
         $this->validateBeforeModal($rules, ValidationHelper::commonMessages(), 'confirm-update-settings');
     }
 
-    private function normalizeCurrentTabData()
+    private function authorizeTabAccess(): bool
+    {
+        $isOperationsTab = in_array($this->tab, ['inventory', 'pos', 'reviews']);
+        return $this->isSuperAdmin() || $isOperationsTab;
+    }
+
+        private function normalizeCurrentTabData()
     {
         if ($this->tab === 'general') {
             $this->businessName    = $this->normalizeString($this->businessName);
             $this->businessEmail   = trim(strtolower($this->businessEmail));
-            $this->businessPhone   = trim(preg_replace('/\s+/', '', $this->businessPhone));
+            $this->businessPhone   = $this->normalizeMobileDisplay($this->businessPhone);
             $this->businessTin     = trim($this->businessTin);
             $this->businessAddress = $this->normalizeString($this->businessAddress);
         } elseif ($this->tab === 'pos') {
-            $this->gcashAccountNumber = trim(preg_replace('/\s+/', '', $this->gcashAccountNumber));
+            $this->gcashAccountNumber = $this->normalizeMobileDisplay($this->gcashAccountNumber);
         }
     }
 
@@ -383,8 +476,13 @@ class SystemSettings extends Component
             'receipts' => [
                 'receiptFooterMessage' => ['nullable', 'string', 'max:255'],
                 'receiptReturnPolicy'  => ['nullable', 'string', 'max:500'],
-                'receiptCopies'        => ['required', 'integer', 'min:1', 'max:5'],
+                'receiptCopies'        => ['required', 'integer', 'min:1', 'max:3'],
                 'receiptQrUrl'         => ['nullable', 'url', 'max:500'],
+                'kitchenSlipTitle'     => ['required', 'string', 'max:255'],
+                'kitchenSlipSubtitle'  => ['nullable', 'string', 'max:255'],
+                'baristaSlipTitle'     => ['required', 'string', 'max:255'],
+                'baristaSlipSubtitle'  => ['nullable', 'string', 'max:255'],
+                'customerReceiptTitle' => ['required', 'string', 'max:255'],
             ],
             'inventory' => [
                 'lowStockThreshold'      => ['required', 'integer', 'min:1', 'max:10000'],
@@ -402,10 +500,17 @@ class SystemSettings extends Component
                 'gcashAccountNumber' => ['nullable', 'string', 'regex:~^[0-9]{10}$~'],
                 'gcashQrImage'       => ['nullable', 'image', 'max:1024'],
             ],
-            'system' => [
+                        'system' => [
                 'opBranchId' => [
                     auth()->user()->role_id === 1 && !$this->hideOperationalModules ? 'required' : 'nullable',
                 ],
+            ],
+                        'printer' => [
+                'printerType' => ['required', 'in:wired,bluetooth'],
+                'printerName' => $this->printerEnabled && $this->printerType === 'wired'
+                    ? ['required', 'string', 'max:255']
+                    : ['nullable', 'string', 'max:255'],
+                'printerAutoCut' => ['boolean'],
             ],
             'reviews' => [
                 'reviewFormTitle' => ['required', 'string', 'max:255'],
@@ -421,23 +526,22 @@ class SystemSettings extends Component
         $this->normalizeCurrentTabData();
         $rules = $this->getRulesForTab($this->tab);
         
-        $this->validateSecure($rules, [
+                $this->validateSecure($rules, [
             'businessName.regex' => 'Business name has invalid characters.',
             'businessPhone.regex' => 'Enter 10-digit mobile number (e.g. 9123456789).',
             'posBusinessName.regex' => 'Terminal name has invalid characters.',
             'opBranchId.required' => 'An Operating Branch is required when operational modules are visible.',
             'gcashAccountNumber.regex' => 'Enter 10-digit mobile number (e.g. 9123456789).',
+            'printerName.required' => 'Printer name/address is required while the printer is enabled.',
+            'printerName.regex' => 'Enter a network address in the format IP:PORT (e.g. 192.168.1.100:9100) — not a printer name.',
         ]);
     }
 
     public function updateSettings()
     {
-        // Authorize based on tab and role
-        $isOperationsTab = in_array($this->tab, ['inventory', 'pos', 'reviews']);
-        
-        if (!$this->isSuperAdmin() && !$isOperationsTab) {
-            $this->dispatch('notify', 
-                type: 'error', 
+        if (!$this->authorizeTabAccess()) {
+            $this->dispatch('notify',
+                type: 'error',
                 message: 'Unauthorized: You only have permission to modify operational settings.'
             );
             return;
@@ -445,7 +549,64 @@ class SystemSettings extends Component
 
         $this->validateSettingsData();
 
-        // Handle Logo Upload
+        switch ($this->tab) {
+            case 'general':
+                $this->saveGeneralTab();
+                break;
+            case 'receipts':
+                $this->saveReceiptsTab();
+                break;
+            case 'inventory':
+                $this->saveInventoryTab();
+                break;
+            case 'pos':
+                $this->savePosTab();
+                break;
+            case 'system':
+                $this->saveSystemTab();
+                break;
+            case 'reviews':
+                $this->saveReviewsTab();
+                break;
+                case 'printer':
+                $this->savePrinterTab();
+                break;
+        }
+
+        // Invalidate all cached configurations so other modules get fresh data
+        ConfigurationService::invalidateCache();
+
+        // Broadcast update events so other Livewire components can react
+        $this->dispatch('settingsUpdated',
+            type: 'all',
+            business: ConfigurationService::getBusinessConfig(),
+            financial: ConfigurationService::getFinancialConfig(),
+            inventory: ConfigurationService::getInventoryConfig(),
+            pos: ConfigurationService::getPosConfig(),
+        );
+        $this->dispatch('businessSettingsUpdated', ConfigurationService::getBusinessConfig());
+        $this->dispatch('financialSettingsUpdated', ConfigurationService::getFinancialConfig());
+        $this->dispatch('inventorySettingsUpdated', ConfigurationService::getInventoryConfig());
+        $this->dispatch('posSettingsUpdated', ConfigurationService::getPosConfig());
+
+        $this->dispatch('notify',
+            type: 'success',
+            message: ucwords(str_replace('_', ' ', $this->tab)) . ' settings saved successfully.'
+        );
+
+        $this->dispatch('close-modal', name: 'confirm-update-settings');
+
+        $this->dispatch('businessconfigupdated',
+            logo_url: ConfigurationService::getBusinessLogoUrl(),
+            business_name: ConfigurationService::getBusinessName(),
+        );
+
+        $this->dispatch('refreshTopbar');
+        $this->updateHeader();
+    }
+
+    private function saveGeneralTab(): void
+    {
         if ($this->businessLogo) {
             if ($this->existingLogo) {
                 Storage::disk('public')->delete($this->existingLogo);
@@ -454,17 +615,6 @@ class SystemSettings extends Component
             $this->businessLogo = null;
         }
 
-        // Handle GCash QR Upload
-        if ($this->gcashQrImage) {
-            if ($this->existingGcashQrImage) {
-                Storage::disk('public')->delete($this->existingGcashQrImage);
-            }
-            $this->existingGcashQrImage = $this->gcashQrImage->store('branding', 'public');
-            $this->gcashQrImage = null;
-        }
-
-        // Save All to DB
-        // Compose address JSON from PSGC sub-fields
         $parts = array_filter([
             $this->addr_street,
             $this->addr_barangay,
@@ -491,189 +641,100 @@ class SystemSettings extends Component
         SystemSetting::set('business_tin', $this->businessTin);
         SystemSetting::set('business_address', $addressJson);
         SystemSetting::set('business_logo', $this->existingLogo);
+    }
 
-        SystemSetting::set('vat_rate', 0);
-        SystemSetting::set('service_charge', (float)$this->serviceCharge);
-        SystemSetting::set('currency', $this->currency);
-        SystemSetting::set('currency_symbol', $this->currencySymbol);
-        SystemSetting::set('tax_destination', 'BUSINESS');
-
-        SystemSetting::set('receipt_logo_enabled', (bool)$this->receiptLogoEnabled);
-        SystemSetting::set('receipt_show_vat', (bool)$this->receiptShowVat);
+    private function saveReceiptsTab(): void
+    {
+        SystemSetting::set('receipt_logo_enabled', (bool) $this->receiptLogoEnabled);
+        SystemSetting::set('receipt_show_vat', (bool) $this->receiptShowVat);
         SystemSetting::set('receipt_footer_message', $this->receiptFooterMessage);
         SystemSetting::set('receipt_return_policy', $this->receiptReturnPolicy);
-        SystemSetting::set('receipt_copies', (int)$this->receiptCopies);
+        SystemSetting::set('receipt_copies', (int) $this->receiptCopies);
         SystemSetting::set('receipt_qr_url', $this->receiptQrUrl);
+        
+        // Thermal printer receipt customization
+        SystemSetting::set('kitchen_slip_title', $this->kitchenSlipTitle);
+        SystemSetting::set('kitchen_slip_subtitle', $this->kitchenSlipSubtitle);
+        SystemSetting::set('barista_slip_title', $this->baristaSlipTitle);
+        SystemSetting::set('barista_slip_subtitle', $this->baristaSlipSubtitle);
+        SystemSetting::set('customer_receipt_title', $this->customerReceiptTitle);
+        SystemSetting::set('show_receipt_qr_code', (bool) $this->showReceiptQrCode);
+        SystemSetting::set('show_receipt_footer', (bool) $this->showReceiptFooter);
+        $this->regenerateQrCode();
+    }
 
-        SystemSetting::set('low_stock_threshold', (int)$this->lowStockThreshold);
-        SystemSetting::set('critical_stock_threshold', (int)$this->criticalStockThreshold);
-        SystemSetting::set('expiry_alert_days', (int)$this->expiryAlertDays);
-        SystemSetting::set('auto_reorder_enabled', (bool)$this->autoReorderEnabled);
+    private function saveInventoryTab(): void
+    {
+        SystemSetting::set('low_stock_threshold', (int) $this->lowStockThreshold);
+        SystemSetting::set('critical_stock_threshold', (int) $this->criticalStockThreshold);
+        SystemSetting::set('expiry_alert_days', (int) $this->expiryAlertDays);
+        SystemSetting::set('auto_reorder_enabled', (bool) $this->autoReorderEnabled);
+    }
 
-        SystemSetting::set('discount_rate', (float)$this->discountRate);
-        SystemSetting::set('senior_discount_rate', (float)$this->seniorDiscountRate);
+    private function savePosTab(): void
+    {
+        if ($this->gcashQrImage) {
+            if ($this->existingGcashQrImage) {
+                Storage::disk('public')->delete($this->existingGcashQrImage);
+            }
+            $this->existingGcashQrImage = $this->gcashQrImage->store('branding', 'public');
+            $this->gcashQrImage = null;
+        }
+
+        SystemSetting::set('service_charge', (float) $this->serviceCharge);
+        SystemSetting::set('discount_rate', (float) $this->discountRate);
+        SystemSetting::set('senior_discount_rate', (float) $this->seniorDiscountRate);
         SystemSetting::set('pos_business_name', $this->posBusinessName);
         SystemSetting::set('pos_order_types', $this->posOrderTypes);
         SystemSetting::set('pos_payment_methods', $this->posPaymentMethods);
         SystemSetting::set('gcash_account_name', $this->gcashAccountName);
         SystemSetting::set('gcash_account_number', $this->gcashAccountNumber ? '+63' . trim($this->gcashAccountNumber) : '');
         SystemSetting::set('gcash_qr_image', $this->existingGcashQrImage);
+    }
 
-        // Save per-user preferences (isolates settings from other super admins)
+    private function saveSystemTab(): void
+    {
         $user = auth()->user();
         $user->update([
-            'hide_modules' => (bool)$this->hideOperationalModules,
-            'branch_id'    => $this->opBranchId ? (int)$this->opBranchId : null
+            'hide_modules' => (bool) $this->hideOperationalModules,
+            'branch_id'    => $this->opBranchId ? (int) $this->opBranchId : null,
         ]);
 
         if ($user->role_id === 1) {
             \App\Services\BranchContext::setActiveBranch($this->opBranchId);
         }
 
+        $this->dispatch('accessibility-config-updated', hide_modules: (bool) $this->hideOperationalModules);
 
-        if ($this->tab === 'reviews') {
-            SystemSetting::set('review_form_title', $this->reviewFormTitle);
-            SystemSetting::set('review_form_subtitle', $this->reviewFormSubtitle);
-            SystemSetting::set('review_questions', json_encode($this->reviewQuestions));
-        }
-
-        // Invalidate all cached configurations so other modules get fresh data
-        ConfigurationService::invalidateCache();
-
-        // Broadcast update events so other Livewire components can react
-        $this->dispatch('settingsUpdated', 
-            type: 'all',
-            business: ConfigurationService::getBusinessConfig(),
-            financial: ConfigurationService::getFinancialConfig(),
-            inventory: ConfigurationService::getInventoryConfig(),
-            pos: ConfigurationService::getPosConfig(),
-        );
-
-        // Broadcast to specific modules
-        $this->dispatch('businessSettingsUpdated', ConfigurationService::getBusinessConfig());
-        $this->dispatch('financialSettingsUpdated', ConfigurationService::getFinancialConfig());
-        $this->dispatch('inventorySettingsUpdated', ConfigurationService::getInventoryConfig());
-        $this->dispatch('posSettingsUpdated', ConfigurationService::getPosConfig());
-
-        $this->dispatch('notify', 
-            type: 'success',
-            message: 'System configuration persisted successfully. All modules reloading...'
-        );
-
-        $this->dispatch('close-modal', name: 'confirm-update-settings');
-        
-        // Dispatch to browser to refresh sidebar logo and business name
-        $this->dispatch('businessconfigupdated', 
-            logo_url: ConfigurationService::getBusinessLogoUrl(),
-            business_name: ConfigurationService::getBusinessName(),
-        );
-
-        $this->dispatch('accessibility-config-updated', 
-            hide_modules: (bool)$this->hideOperationalModules
-        );
-
-        $this->dispatch('refreshTopbar');
-        $branchName = $this->opBranchId 
-            ? \App\Models\Branch::find($this->opBranchId)?->branch_name 
+        $branchName = $this->opBranchId
+            ? \App\Models\Branch::find($this->opBranchId)?->branch_name
             : 'General Headquarters';
         $this->dispatch('branchContextUpdated', branchName: $branchName);
         $this->dispatch('branch-switched', branchName: $branchName);
-        $this->updateHeader();
-        $this->regenerateQrCode();
     }
 
-    public function regenerateQrCode()
+    private function saveReviewsTab(): void
+    {
+        SystemSetting::set('review_form_title', $this->reviewFormTitle);
+        SystemSetting::set('review_form_subtitle', $this->reviewFormSubtitle);
+        SystemSetting::set('review_questions', json_encode($this->reviewQuestions));
+    }
+
+        public function regenerateQrCode()
     {
         $this->sampleQrCode = QrCodeHelper::generateReviewQrCode('SAMPLE-' . uniqid());
     }
 
-    public function downloadDatabaseBackup()
+    public function incrementReceiptCopies(): void
     {
-        // Authorize: Only super admins can download backups
-        if (!auth()->user()->isSuperAdmin()) {
-            $this->dispatch('notify', type: 'error', message: 'Unauthorized: Only administrators can download database backups.');
-            return;
-        }
-
-        $filename = "backup-" . now()->format('Y-m-d-H-i') . ".sql";
-        $path = storage_path("app/backups/" . $filename);
-        
-        if (!File::exists(storage_path('app/backups'))) {
-            File::makeDirectory(storage_path('app/backups'), 0755, true);
-        }
-
-        $mysqldumpPath = 'C:\\xampp\\mysql\\bin\\mysqldump.exe';
-        $dbName = config('database.connections.mysql.database');
-        $dbUser = config('database.connections.mysql.username');
-        $dbPass = config('database.connections.mysql.password');
-
-        $command = "\"$mysqldumpPath\" --user=$dbUser " . ($dbPass ? "--password=$dbPass " : "") . "$dbName > \"$path\"";
-        
-        exec($command, $output, $returnVar);
-
-        if ($returnVar === 0) {
-            return response()->download($path)->deleteFileAfterSend(true);
-        }
-
-        $this->dispatch('notify', type: 'error', message: 'Database backup failed. Check server permissions.');
+        $this->receiptCopies = min(3, ((int) $this->receiptCopies) + 1);
     }
 
-    public $backupFile;
-    public function restoreDatabaseBackup()
+    public function decrementReceiptCopies(): void
     {
-        // Authorize: Only super admins can restore backups
-        if (!auth()->user()->isSuperAdmin()) {
-            $this->dispatch('notify', type: 'error', message: 'Unauthorized: Only administrators can restore database backups.');
-            return;
-        }
-
-        $this->validate([
-            'backupFile' => 'required|file|max:50120', // 50MB max
-        ]);
-
-        $path = $this->backupFile->store('temp_restores');
-        $fullPath = storage_path('app/' . $path);
-
-        $mysqlPath = 'C:\\xampp\\mysql\\bin\\mysql.exe';
-        $dbName = config('database.connections.mysql.database');
-        $dbUser = config('database.connections.mysql.username');
-        $dbPass = config('database.connections.mysql.password');
-
-        $command = "\"$mysqlPath\" --user=$dbUser " . ($dbPass ? "--password=$dbPass " : "") . "$dbName < \"$fullPath\"";
-        
-        exec($command, $output, $returnVar);
-
-        Storage::delete($path);
-
-        if ($returnVar === 0) {
-            $this->dispatch('notify', type: 'success', message: 'System state restored successfully. Initializing...');
-            return redirect()->route('settings.index');
-        }
-
-        $this->dispatch('notify', type: 'error', message: 'Recovery failed. SQL syntax error or connection drop.');
+        $this->receiptCopies = max(1, ((int) $this->receiptCopies) - 1);
     }
 
-    public function downloadMediaBackup()
-    {
-        $filename = "media-backup-" . now()->format('Y-m-d-H-i') . ".zip";
-        $path = storage_path("app/backups/" . $filename);
-
-        if (!File::exists(storage_path('app/backups'))) {
-            File::makeDirectory(storage_path('app/backups'), 0755, true);
-        }
-
-        $zip = new \ZipArchive();
-        if ($zip->open($path, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) === TRUE) {
-            $files = File::allFiles(storage_path('app/public'));
-            foreach ($files as $file) {
-                $zip->addFile($file->getRealPath(), 'public/' . $file->getRelativePathname());
-            }
-            $zip->close();
-            return response()->download($path)->deleteFileAfterSend(true);
-        }
-
-        $this->dispatch('notify', type: 'error', message: 'Media backup failed. Zip extension might be missing.');
-    }
 
     private function updateHeader()
     {
@@ -704,7 +765,7 @@ class SystemSettings extends Component
             ->get()
             ->map(fn($o) => [
                 'id' => 'ord-' . $o->id,
-                'user' => $o->user->name ?? 'System',
+                'user' => $o->user ? $o->user->first_name . ' ' . $o->user->last_name : 'System',
                 'action' => 'Order ' . $o->status,
                 'target' => '#' . $o->reference_no,
                 'time' => $o->created_at->diffForHumans(),
@@ -723,7 +784,7 @@ class SystemSettings extends Component
             ->get()
             ->map(fn($m) => [
                 'id' => 'stk-' . $m->id,
-                'user' => $m->user->name ?? 'System',
+                'user' => $m->user ? $m->user->first_name . ' ' . $m->user->last_name : 'System',
                 'action' => 'Stock ' . ucfirst($m->type),
                 'target' => ($m->ingredient->name ?? 'Item') . ' (' . ($m->quantity > 0 ? '+' : '') . $m->quantity . ')',
                 'time' => $m->created_at->diffForHumans(),
@@ -739,7 +800,7 @@ class SystemSettings extends Component
                 'id' => 'usr-' . $u->id,
                 'user' => 'System',
                 'action' => 'Account Created',
-                'target' => $u->name,
+                'target' => $u->first_name . ' ' . $u->last_name,
                 'time' => $u->created_at->diffForHumans(),
                 'timestamp' => $u->created_at,
                 'status' => 'warning'
@@ -750,16 +811,17 @@ class SystemSettings extends Component
             ->sortByDesc('timestamp')
             ->values();
 
-        $page = $this->page ?: 1;
+        $page = $this->getPage();
         
         return new LengthAwarePaginator(
             $allLogs->forPage($page, $this->perPage),
             $allLogs->count(),
             $this->perPage,
-            $page
+            $page,
+            ['path' => request()->url(), 'query' => request()->query()]
         );
     }
-
+    
     public function isSuperAdmin()
     {
         return auth()->check() && auth()->user()->role_id === 1;
@@ -773,5 +835,48 @@ class SystemSettings extends Component
     public function isStaff()
     {
         return auth()->check() && in_array(auth()->user()->role_id, [1, 2, 3]);
+    }
+    
+    private function savePrinterTab(): void
+    {
+        $printerConfig = [
+            'enabled' => (bool) $this->printerEnabled,
+            'type' => $this->printerType === 'wired' ? 'usb' : 'bluetooth',
+            'name' => $this->printerName,
+            'auto_cut' => (bool) $this->printerAutoCut,
+        ];
+        SystemSetting::set('thermal_printer_config', json_encode($printerConfig));
+    }
+
+    public function refreshAvailablePrinters(): void
+    {
+        $this->availablePrinters = \App\Services\ThermalPrinterService::getWindowsPrinters();
+
+        if (empty($this->printerName) && !empty($this->availablePrinters)) {
+            $this->printerName = $this->availablePrinters[0];
+        }
+
+        $this->dispatch('notify', type: 'info', message: empty($this->availablePrinters)
+            ? 'No local printers were detected on this Windows machine.'
+            : 'Available printers refreshed.'
+        );
+    }
+
+        public function testPrinterConnection(): void
+    {
+        $printerConfig = [
+            'enabled' => (bool) $this->printerEnabled,
+            'type' => $this->printerType === 'wired' ? 'usb' : 'bluetooth',
+            'name' => $this->printerName,
+            'auto_cut' => (bool) $this->printerAutoCut,
+        ];
+
+        $result = \App\Services\ThermalPrinterService::testPrinter($printerConfig);
+
+        if ($result['success']) {
+            $this->dispatch('notify', type: 'success', message: 'Printer test successful! Check your printer.');
+        } else {
+            $this->dispatch('notify', type: 'error', message: 'Printer test failed: ' . $result['message']);
+        }
     }
 }

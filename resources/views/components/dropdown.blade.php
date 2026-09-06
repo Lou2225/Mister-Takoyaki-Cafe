@@ -26,14 +26,13 @@ switch ($width) {
         break;
 }
 @endphp
-<div wire:ignore.self 
+<div
      {{ $wireKey ? 'wire:key='.$wireKey : '' }}
-     {{ $attributes->merge(['class' => 'relative ' . $containerClasses . ' text-left']) }} 
-     :class="dropdownOpen ? 'z-40' : ''" 
      x-data="{ dropdownOpen: false }" 
+     :class="dropdownOpen ? 'z-40' : ''"
      @click.away="dropdownOpen = false" 
      @close.stop="dropdownOpen = false" 
-     data-has-alpine-state="true">
+     {{ $attributes->merge(['class' => 'relative ' . $containerClasses . ' text-left']) }} >
     <div @click="dropdownOpen = !dropdownOpen" x-ref="trigger" class="relative z-0 w-full">
         {{ $trigger }}
     </div>
@@ -46,7 +45,7 @@ switch ($width) {
          x-transition:leave-start="transform opacity-100 translate-y-0" 
          x-transition:leave-end="transform opacity-0 -translate-y-1" 
          class="absolute z-50 mt-2 {{ $alignmentClasses }} {{ $widthClass }} rounded-lg border border-slate-200 shadow-lg {{ $contentClasses }}" style="display: none;">
-        <div class="rounded-lg bg-white w-full" @click.stop>
+        <div class="rounded-lg bg-white w-full">
             {{ $content }}
         </div>
     </div>

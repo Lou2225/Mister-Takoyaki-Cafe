@@ -10,33 +10,52 @@
     x-data="window.stockManagement($wire)"
     x-on:switch-panel.window="panel = $event.detail.panel; if($event.detail.mode) mode = $event.detail.mode"
     @trigger-edit-ingredient.window="$wire.showEdit($event.detail.id)"
-    wire:ignore.self
     wire:key="stock-management-main-container"
     class="relative">
 
-    {{-- Hidden reactive updater to sync allIngredients list under wire:ignore --}}
-    <div x-effect="updateIngredientsList(@js($allIngredients->map(fn($i) => ['id' => $i->id, 'name' => $i->name])))" class="hidden" wire:key="ingredients-sync-helper"></div>
+    {{-- Hidden reactive updaters: OUTSIDE wire:ignore so Livewire can update them --}}
+    @php
+    $ingredientSyncData = $allIngredients->map(function($i) use ($selectedBranchId, $inventoryConfig) {
+        $globalLow = $inventoryConfig['low_stock_threshold'] ?? 10;
+        $globalCritical = $inventoryConfig['critical_stock_threshold'] ?? 5;
+        $effectiveMin = $i->minimum_stock > 0 ? $i->minimum_stock : $globalLow;
+        $stock = $selectedBranchId
+            ? (collect($i->branchStocks)->where('branch_id', $selectedBranchId)->first()?->stock_quantity ?? 0)
+            : collect($i->branchStocks)->sum('stock_quantity');
+        $status = 'healthy';
+        if ($stock <= $globalCritical) $status = 'critical';
+        elseif ($stock <= $effectiveMin) $status = 'low';
+        return [
+            'id'          => $i->id,
+            'name'        => $i->name,
+            'category_id' => $i->category_id,
+            'status'      => $status,
+        ];
+    });
+    @endphp
+    <div x-effect="updateIngredientsList(@js($ingredientSyncData))" class="hidden" wire:key="ingredients-sync-helper"></div>
     <div x-effect="updateBatchesList(@js($allBatches->map(fn($b) => [
         'id' => $b->id,
         'ingredient_name' => $b->ingredient->name ?? '',
         'status' => $b->computed_status
     ])))" class="hidden" wire:key="batches-sync-helper"></div>
 
+        {{-- wire:ignore wraps only the list/expiry panels, NOT the form --}}
     <div class="relative min-h-[600px]" wire:init="triggerExpiryAlerts">
 
         {{-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• DYNAMIC HEADER â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• --}}
         <div x-show="(panel === 'list' || panel === 'expiry')" x-cloak class="px-1">
             <div class="mb-5 flex items-center justify-between">
                 <div>
-                    <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Stock & Inventory</h2>
+                    <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Inventory Overview</h2>
                     <p class="text-[12px] text-gray-500 font-medium">Managing <span class="text-indigo-600 font-bold">{{ $totalIngredients }} catalog assets</span></p>
                 </div>
                 <div class="flex items-center gap-3">
                     <x-report-dropdown module="Stock Report" />
                     @if(!$this->isStaff() && $this->isSuperAdmin())
-                        <x-primary-button wire:click="showCreate" class="h-10">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-                            Add Ingredient
+                        <x-primary-button wire:click="showCreate" class="h-10 !px-3 sm:!px-4">
+                            <svg class="w-4 h-4 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                            <span class="hidden sm:inline">Add Ingredient</span>
                         </x-primary-button>
                     @endif
                 </div>
@@ -68,7 +87,7 @@
             </x-sliding-tabs>
         </div>
 
-        {{-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• PANEL 1 â€” LIST â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• --}}
+        {{-- ═══════════════ PANEL 1 – LIST ═══════════════ --}}
         <div x-show="panel === 'list'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="px-1">
 
             {{-- KPI Dashboard (User Management Aesthetic) --}}
@@ -150,44 +169,91 @@
 
 
             {{-- macOS Style Unified Toolbar --}}
-            <div class="relative z-20 flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
-                
-                {{-- Left: Search Bar --}}
-                <div class="w-full lg:w-auto flex-1">
-                    <x-search-bar x-model.debounce.50ms="stockSearch" placeholder="Find ingredient..." width="w-full lg:w-80" />
-                </div>
+<div class="relative z-20 flex flex-row items-center justify-between mb-6 gap-2 sm:gap-3 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
+    
+    {{-- Left: Search Bar --}}
+    <div class="flex-1 min-w-0 lg:flex-initial">
+        <x-search-bar x-model.debounce.50ms="stockSearch" placeholder="Find ingredient..." width="w-full lg:w-80" />
+    </div>
 
-                {{-- Right: Branch Switcher --}}
-                <div class="w-full lg:w-auto">
-                    @if($this->isSuperAdmin())
-                        <x-dropdown align="right" width="full">
-                            <x-slot name="trigger">
-                                <x-secondary-button type="button" class="w-full justify-between gap-1.5 h-10 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
-                                    <div class="flex items-center gap-1.5 truncate">
-                                        <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                                        <span class="text-[12px] truncate">{{ $selectedBranchId ? ($branches->firstWhere('id', $selectedBranchId)->branch_name ?? 'Select Branch') : 'Select Branch' }}</span>
-                                    </div>
-                                    <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-                                </x-secondary-button>
-                            </x-slot>
-                            <x-slot name="content">
-                                @foreach($branches as $branch)
-                                    <x-dropdown-link href="#" wire:click.prevent="$set('selectedBranchId', '{{ $branch->id }}')">
-                                        {{ $branch->branch_name }}
-                                    </x-dropdown-link>
-                                @endforeach
-                            </x-slot>
-                        </x-dropdown>
-                    @else
-                        <div class="inline-flex items-center justify-between px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-lg font-bold text-[11px] text-emerald-700 h-10 w-full">
-                            <div class="flex items-center gap-2">
-                                <svg class="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                                <span>Branch Stock</span>
-                            </div>
-                        </div>
-                    @endif
+    {{-- Right: Filters --}}
+    <div class="flex flex-nowrap items-center justify-end gap-1.5 sm:gap-2 shrink-0">
+
+        {{-- Status Filter --}}
+        <x-dropdown align="left" width="48">
+            <x-slot name="trigger">
+                <x-secondary-button type="button" class="gap-0 sm:gap-1.5 h-10 !px-2.5 sm:!px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
+                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                    <span class="hidden sm:inline text-[12px]" x-text="{'': 'All Status', 'healthy': 'Healthy', 'low': 'Low Stock', 'critical': 'Critical'}[stockStatusFilter] || 'All Status'"></span>
+                    <svg class="hidden sm:block w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </x-secondary-button>
+            </x-slot>
+            <x-slot name="content">
+                <x-dropdown-link href="#" x-on:click.prevent="stockStatusFilter = ''; stockCurrentPage = 1; dropdownOpen = false;">
+                    <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-slate-300"></span> All Status</div>
+                </x-dropdown-link>
+                <x-dropdown-link href="#" x-on:click.prevent="stockStatusFilter = 'healthy'; stockCurrentPage = 1; dropdownOpen = false;">
+                    <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Healthy</div>
+                </x-dropdown-link>
+                <x-dropdown-link href="#" x-on:click.prevent="stockStatusFilter = 'low'; stockCurrentPage = 1; dropdownOpen = false;">
+                    <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-amber-500"></span> Low Stock</div>
+                </x-dropdown-link>
+                <x-dropdown-link href="#" x-on:click.prevent="stockStatusFilter = 'critical'; stockCurrentPage = 1; dropdownOpen = false;">
+                    <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-red-500"></span> Critical</div>
+                </x-dropdown-link>
+            </x-slot>
+        </x-dropdown>
+
+        {{-- Category Filter --}}
+        <x-dropdown align="left" width="48">
+            <x-slot name="trigger">
+                <x-secondary-button type="button" class="gap-0 sm:gap-1.5 h-10 !px-2.5 sm:!px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
+                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+                    <span class="hidden sm:inline text-[12px] truncate max-w-[100px]" x-text="stockCategoryFilter ? (stockCategoryLabels[stockCategoryFilter] || 'Category') : 'All Categories'">All Categories</span>
+                    <svg class="hidden sm:block w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </x-secondary-button>
+            </x-slot>
+            <x-slot name="content">
+                <div class="max-h-60 overflow-y-auto custom-scrollbar">
+                    <x-dropdown-link href="#" x-on:click.prevent="stockCategoryFilter = ''; stockCurrentPage = 1; dropdownOpen = false;">
+                        All Categories
+                    </x-dropdown-link>
+                    <hr class="border-slate-50">
+                    @foreach($allIngredientCategories as $cat)
+                        <x-dropdown-link href="#" x-on:click.prevent="stockCategoryFilter = '{{ $cat->id }}'; stockCurrentPage = 1; dropdownOpen = false;">
+                            {{ $cat->name }}
+                        </x-dropdown-link>
+                    @endforeach
                 </div>
+            </x-slot>
+        </x-dropdown>
+
+        {{-- Branch Switcher --}}
+        @if($this->isSuperAdmin())
+            <x-dropdown align="right" width="48">
+                <x-slot name="trigger">
+                    <x-secondary-button type="button" class="gap-0 sm:gap-1.5 h-10 !px-2.5 sm:!px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
+                        <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                        <span class="hidden sm:inline text-[12px] truncate max-w-[120px]">{{ $selectedBranchId ? ($branches->firstWhere('id', $selectedBranchId)->branch_name ?? 'Select Branch') : 'Select Branch' }}</span>
+                        <svg class="hidden sm:block w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                    </x-secondary-button>
+                </x-slot>
+                <x-slot name="content">
+                    @foreach($branches as $branch)
+                        <x-dropdown-link href="#" wire:click.prevent="$set('selectedBranchId', '{{ $branch->id }}')">
+                            {{ $branch->branch_name }}
+                        </x-dropdown-link>
+                    @endforeach
+                </x-slot>
+            </x-dropdown>
+        @else
+            <div class="inline-flex items-center justify-center sm:justify-between gap-2 px-2.5 sm:px-3 bg-emerald-50 border border-emerald-100 rounded-lg font-bold text-[11px] text-emerald-700 h-10 shrink-0">
+                <svg class="w-3 h-3 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                <span class="hidden sm:inline">Branch Stock</span>
             </div>
+        @endif
+    </div>
+</div>
 
             {{-- â”€â”€ Unified Catalog Table â”€â”€ --}}
             <div class="relative min-h-[400px]">
@@ -316,10 +382,10 @@
                                             </x-slot>
                                             <x-slot name="content">
                                                 <template x-for="option in [5, 10, 15, 30, 50, 100]">
-                                                    <x-dropdown-link href="#" @click.prevent="stockPerPage = option; stockCurrentPage = 1;">
-                                                        <span x-text="option"></span>
-                                                    </x-dropdown-link>
-                                                </template>
+    <x-dropdown-link href="#" x-on:click.prevent="stockPerPage = option; stockCurrentPage = 1; dropdownOpen = false;">
+        <span x-text="option"></span>
+    </x-dropdown-link>
+</template>
                                             </x-slot>
                                         </x-dropdown>
                                     </div>
@@ -386,7 +452,7 @@
 
         </div>{{-- end panel 1 --}}
 
-        {{-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• PANEL 4 â€” FORM (CREATE/EDIT) â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• --}}
+        {{-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• PANEL 4 — FORM (CREATE/EDIT) â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• --}}
         <div x-show="panel === 'form'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="px-1">
             <div class="mb-5 flex items-center justify-between">
                 <div>
@@ -436,11 +502,11 @@
                                                         </div>
                                                         <div class="max-h-60 overflow-y-auto custom-scrollbar">
                                                             @if(empty($ingredientCategorySearch))
-                                                                <x-dropdown-link href="#" wire:click.prevent="$set('ingredientCategoryId', '')">Uncategorized</x-dropdown-link>
+                                                                <x-dropdown-link href="#" wire:click.prevent="selectIngredientCategory('')">Uncategorized</x-dropdown-link>
                                                                 <hr class="border-slate-50">
                                                             @endif
                                                             @forelse($ingredientCategories as $cat)
-                                                                <x-dropdown-link href="#" wire:click.prevent="$set('ingredientCategoryId', {{ $cat->id }})">{{ $cat->name }}</x-dropdown-link>
+                                                                <x-dropdown-link href="#" wire:click.prevent="selectIngredientCategory({{ $cat->id }})">{{ $cat->name }}</x-dropdown-link>
                                                             @empty
                                                                 <div class="px-4 py-3 text-[11px] text-slate-400 text-center italic">No categories found</div>
                                                             @endforelse
@@ -474,7 +540,7 @@
                                                 <div class="p-2">
                                                     <div class="max-h-60 overflow-y-auto custom-scrollbar">
                                                         @foreach($availableUnits as $key => $label)
-                                                            <x-dropdown-link href="#" wire:click.prevent="$set('ingredientUnit', '{{ $key }}')">{{ $label }}</x-dropdown-link>
+                                                            <x-dropdown-link href="#" wire:click.prevent="selectIngredientUnit('{{ $key }}')">{{ $label }}</x-dropdown-link>
                                                         @endforeach
                                                     </div>
                                                 </div>
@@ -527,12 +593,16 @@
                             @endif
                         </div>
 
-                        @if(empty($conversionRows))
+                                                @if(empty($conversionRows))
                         <div class="py-12 border-2 border-dashed border-slate-100 rounded-2xl text-center">
                             <p class="text-[13px] text-slate-400 font-medium">No bulk units defined for this ingredient.</p>
                         </div>
                     @else
-                        <div class="space-y-3">
+                        {{-- Height-limited + scrollable. Because this makes the container
+                             an overflow-y-auto box, the Packaging Type and Linked To
+                             dropdowns inside each row are teleported to <body> instead of
+                             using <x-dropdown>, so they can't be clipped by this box. --}}
+                        <div class="space-y-3 max-h-[420px] overflow-y-auto pr-2 custom-scrollbar">
                             @foreach($conversionRows as $i => $row)
                                 @php
                                     $qtyInBase   = (float)($row['qty_in_base'] ?? 0);
@@ -542,29 +612,102 @@
                                 <div wire:key="conv-row-{{ $i }}" class="relative border border-slate-100 rounded-2xl shadow-sm group" style="z-index: {{ 100 - $i }};">
                                     <div class="flex items-center justify-between p-3 bg-slate-50/50 border-b border-slate-100 rounded-t-2xl">
                                         <div class="flex flex-col sm:flex-row items-start sm:items-end gap-3 flex-1">
-                                            <div class="w-full sm:w-40">
+                                                                                        <div class="w-full sm:w-40">
                                                 <x-input-label value="Packaging Type" class="mb-1 text-[10px]" />
-                                                <x-dropdown align="left" width="48" containerClasses="block w-full">
-                                                    <x-slot name="trigger">
-                                                        <button type="button" class="flex items-center justify-between w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-[12px] text-slate-700 shadow-sm hover:border-slate-300 focus:outline-none transition-all h-9">
-                                                            <span class="font-bold text-slate-700 truncate mr-2">
-                                                                {{ !empty($row['unit_name']) && isset($availableBulkUnits[$row['unit_name']]) ? $availableBulkUnits[$row['unit_name']] : 'Select Packaging...' }}
-                                                            </span>
-                                                            <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
-                                                        </button>
-                                                    </x-slot>
-                                                    <x-slot name="content">
-                                                        <div class="p-2">
+                                                <div class="relative"
+                                                    x-data="{
+                                                        open: false,
+                                                        openUpward: false,
+                                                        top: 0, left: 0,
+                                                        rafId: null,
+                                                        // Fixed, wider panel width — independent of the
+                                                        // trigger's own w-40, so long unit labels never
+                                                        // get squished.
+                                                        panelWidth: 260,
+                                                        position() {
+                                                            const trigger = this.$refs.packagingTrigger;
+                                                            const panel = this.$refs.packagingPanel;
+                                                            if (!trigger || !panel) return;
+
+                                                            const r = trigger.getBoundingClientRect();
+                                                            const gap = 6;
+                                                            const panelHeight = panel.offsetHeight;
+                                                            const spaceBelow = window.innerHeight - r.bottom;
+                                                            const spaceAbove = r.top;
+
+                                                            this.openUpward = spaceBelow < (panelHeight + gap) && spaceAbove > spaceBelow;
+
+                                                            this.top = this.openUpward
+                                                                ? (r.top + window.scrollY - panelHeight - gap)
+                                                                : (r.bottom + window.scrollY + gap);
+
+                                                            let left = r.left + window.scrollX;
+                                                            const maxLeft = window.scrollX + window.innerWidth - this.panelWidth - 8;
+                                                            this.left = Math.max(8, Math.min(left, maxLeft));
+                                                        },
+                                                        startTracking() {
+                                                            const loop = () => {
+                                                                if (!this.open) { this.rafId = null; return; }
+                                                                this.position();
+                                                                this.rafId = requestAnimationFrame(loop);
+                                                            };
+                                                            this.rafId = requestAnimationFrame(loop);
+                                                        },
+                                                        async openDropdown() {
+                                                            this.open = true;
+                                                            await this.$nextTick();
+                                                            this.position();
+                                                            this.startTracking();
+                                                        },
+                                                        closeDropdown() {
+                                                            this.open = false;
+                                                            if (this.rafId) { cancelAnimationFrame(this.rafId); this.rafId = null; }
+                                                        },
+                                                        destroy() {
+                                                            if (this.rafId) cancelAnimationFrame(this.rafId);
+                                                        }
+                                                    }"
+                                                    @click.outside="closeDropdown()"
+                                                    @keydown.escape.window="closeDropdown()">
+
+                                                    <button type="button" x-ref="packagingTrigger"
+                                                        @click="open ? closeDropdown() : openDropdown()"
+                                                        class="flex items-center justify-between w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-[12px] text-slate-700 shadow-sm hover:border-slate-300 focus:outline-none transition-all h-9">
+                                                        <span class="font-bold text-slate-700 truncate mr-2">
+                                                            {{ !empty($row['unit_name']) && isset($availableBulkUnits[$row['unit_name']]) ? $availableBulkUnits[$row['unit_name']] : 'Select Packaging...' }}
+                                                        </span>
+                                                        <svg class="w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
+                                                    </button>
+
+                                                    {{-- Teleported to <body>: escapes the row's overflow-y-auto
+                                                         ancestor, and uses a fixed wider panelWidth so labels
+                                                         like longer unit names are never squished to w-40. --}}
+                                                    <template x-teleport="body">
+                                                        <div x-show="open" x-cloak x-ref="packagingPanel"
+                                                            x-transition:enter="transition ease-out duration-100"
+                                                            x-transition:enter-start="opacity-0"
+                                                            x-transition:enter-end="opacity-100"
+                                                            x-transition:leave="transition ease-in duration-75"
+                                                            x-transition:leave-start="opacity-100"
+                                                            x-transition:leave-end="opacity-0"
+                                                            :style="`position:absolute; top:${top}px; left:${left}px; width:${panelWidth}px;`"
+                                                            class="z-[9999] bg-white rounded-xl shadow-lg ring-1 ring-black ring-opacity-5 p-2">
                                                             <div class="max-h-60 overflow-y-auto custom-scrollbar">
-                                                                <x-dropdown-link href="#" wire:click.prevent="$set('conversionRows.{{ $i }}.unit_name', '')">Select Packaging...</x-dropdown-link>
+                                                                <a href="#" wire:click.prevent="$set('conversionRows.{{ $i }}.unit_name', '')" @click="closeDropdown()"
+                                                                    class="block px-4 py-2 text-[12px] rounded-lg hover:bg-slate-50 transition-colors text-slate-700">
+                                                                    Select Packaging...
+                                                                </a>
                                                                 <hr class="border-slate-50 my-1">
                                                                 @foreach($availableBulkUnits as $key => $label)
-                                                                    <x-dropdown-link href="#" wire:click.prevent="$set('conversionRows.{{ $i }}.unit_name', '{{ $key }}')">{{ $label }}</x-dropdown-link>
+                                                                    <a href="#" wire:click.prevent="$set('conversionRows.{{ $i }}.unit_name', '{{ $key }}')" @click="closeDropdown()"
+                                                                        class="block px-4 py-2 text-[12px] rounded-lg hover:bg-slate-50 transition-colors text-slate-700">
+                                                                        {{ $label }}
+                                                                    </a>
                                                                 @endforeach
                                                             </div>
                                                         </div>
-                                                    </x-slot>
-                                                </x-dropdown>
+                                                    </template>
+                                                </div>
                                             </div>
                                             <div class="w-full sm:w-40">
                                                 <x-input-label value="Unit Cost (₱)" class="mb-1 text-[10px]" />
@@ -572,7 +715,7 @@
                                                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                                                         <span class="text-[10px] font-black uppercase tracking-tighter">Cost ₱</span>
                                                     </div>
-                                                    <x-text-input wire:model.live.debounce.500ms="conversionRows.{{ $i }}.price_per_unit" 
+                                                    <x-text-input value="{{ number_format((float)($row['price_per_unit'] ?? 0), 2) }}" 
                                                         class="w-full h-9 pl-14 text-[12px] font-black text-right bg-slate-50 text-slate-400 cursor-not-allowed" 
                                                         placeholder="0.00" 
                                                         readonly 
@@ -604,11 +747,13 @@
                                             <div class="w-20 shrink-0 relative group/hint">
                                                 <x-input-label value="Pack Size" class="mb-1 text-[10px]" />
                                                 <x-text-input 
-                                                    wire:model.live.debounce.500ms="conversionRows.{{ $i }}.chain_multiplier" 
+                                                    wire:model.live="conversionRows.{{ $i }}.chain_multiplier" 
+                                                    wire:change="updateConversionMultiplier({{ $i }})"
                                                     class="w-full h-8 text-[12px] font-black text-center border-indigo-100 bg-indigo-50/30" 
                                                     placeholder="Size" 
                                                     type="number"
                                                     min="0"
+                                                    step="0.0001"
                                                     oninput="this.value = !!this.value && Math.abs(this.value) >= 0 ? Math.abs(this.value) : null"
                                                     onkeypress="return (event.charCode >= 48 && event.charCode <= 57) || event.charCode == 46"
                                                 />
@@ -639,30 +784,93 @@
                                                             }
                                                         }
                                                     @endphp
-                                                    <x-dropdown align="left" width="full" containerClasses="block w-full">
-                                                        <x-slot name="trigger">
-                                                            <button type="button" class="flex items-center justify-between w-full px-2.5 py-1 bg-slate-50/50 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-600 shadow-sm hover:border-slate-300 focus:outline-none transition-all h-8">
-                                                                <span class="truncate mr-2">{{ $chainDisplay }}</span>
-                                                                <svg class="w-3 h-3 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
-                                                            </button>
-                                                        </x-slot>
-                                                        <x-slot name="content">
-                                                            <div class="p-1.5">
+                                                                                                        <div class="relative"
+                                                        x-data="{
+                                                            open: false,
+                                                            openUpward: false,
+                                                            top: 0, left: 0, width: 0,
+                                                            rafId: null,
+                                                            position() {
+                                                                const trigger = this.$refs.linkedToTrigger;
+                                                                const panel = this.$refs.linkedToPanel;
+                                                                if (!trigger || !panel) return;
+
+                                                                const r = trigger.getBoundingClientRect();
+                                                                const gap = 6;
+                                                                const panelHeight = panel.offsetHeight;
+                                                                const spaceBelow = window.innerHeight - r.bottom;
+                                                                const spaceAbove = r.top;
+
+                                                                this.openUpward = spaceBelow < (panelHeight + gap) && spaceAbove > spaceBelow;
+
+                                                                this.top = this.openUpward
+                                                                    ? (r.top + window.scrollY - panelHeight - gap)
+                                                                    : (r.bottom + window.scrollY + gap);
+
+                                                                let left = r.left + window.scrollX;
+                                                                const maxLeft = window.scrollX + window.innerWidth - r.width - 8;
+                                                                this.left = Math.max(8, Math.min(left, maxLeft));
+                                                                this.width = r.width;
+                                                            },
+                                                            startTracking() {
+                                                                const loop = () => {
+                                                                    if (!this.open) { this.rafId = null; return; }
+                                                                    this.position();
+                                                                    this.rafId = requestAnimationFrame(loop);
+                                                                };
+                                                                this.rafId = requestAnimationFrame(loop);
+                                                            },
+                                                            async openDropdown() {
+                                                                this.open = true;
+                                                                await this.$nextTick();
+                                                                this.position();
+                                                                this.startTracking();
+                                                            },
+                                                            closeDropdown() {
+                                                                this.open = false;
+                                                                if (this.rafId) { cancelAnimationFrame(this.rafId); this.rafId = null; }
+                                                            },
+                                                            destroy() {
+                                                                if (this.rafId) cancelAnimationFrame(this.rafId);
+                                                            }
+                                                        }"
+                                                        @click.outside="closeDropdown()"
+                                                        @keydown.escape.window="closeDropdown()">
+
+                                                        <button type="button" x-ref="linkedToTrigger"
+                                                            @click="open ? closeDropdown() : openDropdown()"
+                                                            class="flex items-center justify-between w-full px-2.5 py-1 bg-slate-50/50 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-600 shadow-sm hover:border-slate-300 focus:outline-none transition-all h-8">
+                                                            <span class="truncate mr-2">{{ $chainDisplay }}</span>
+                                                            <svg class="w-3 h-3 text-slate-400 shrink-0 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
+                                                        </button>
+
+                                                        <template x-teleport="body">
+                                                            <div x-show="open" x-cloak x-ref="linkedToPanel"
+                                                                x-transition:enter="transition ease-out duration-100"
+                                                                x-transition:enter-start="opacity-0"
+                                                                x-transition:enter-end="opacity-100"
+                                                                x-transition:leave="transition ease-in duration-75"
+                                                                x-transition:leave-start="opacity-100"
+                                                                x-transition:leave-end="opacity-0"
+                                                                :style="`position:absolute; top:${top}px; left:${left}px; width:${width}px;`"
+                                                                class="z-[9999] bg-white rounded-xl shadow-lg ring-1 ring-black ring-opacity-5 p-1.5">
                                                                 <div class="max-h-60 overflow-y-auto custom-scrollbar">
-                                                                    <x-dropdown-link href="#" wire:click.prevent="$set('conversionRows.{{ $i }}.chain_from_index', 'base')">
+                                                                    <a href="#" wire:click.prevent="setConversionLink({{ $i }}, 'base')" @click="closeDropdown()"
+                                                                        class="block px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">
                                                                         <span class="text-[11px] font-bold text-slate-600">1 {{ strtoupper($ingredientUnit) }}</span>
-                                                                    </x-dropdown-link>
+                                                                    </a>
                                                                     @foreach($conversionRows as $j => $prevRow)
                                                                         @if($j < $i && ($prevRow['unit_name'] ?? ''))
-                                                                            <x-dropdown-link href="#" wire:click.prevent="$set('conversionRows.{{ $i }}.chain_from_index', '{{ $j }}')">
+                                                                            <a href="#" wire:click.prevent="setConversionLink({{ $i }}, {{ $j }})" @click="closeDropdown()"
+                                                                                class="block px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">
                                                                                 <span class="text-[11px] font-bold text-slate-600">{{ strtoupper($prevRow['unit_name'] ?? '') }} ({{ number_format((float)($prevRow['qty_in_base'] ?? 0), 2) }} {{ strtoupper($ingredientUnit) }})</span>
-                                                                            </x-dropdown-link>
+                                                                            </a>
                                                                         @endif
                                                                     @endforeach
                                                                 </div>
                                                             </div>
-                                                        </x-slot>
-                                                    </x-dropdown>
+                                                        </template>
+                                                    </div>
                                                 @else
                                                     <div class="h-8 w-full border border-slate-100 bg-slate-50/30 rounded-lg flex items-center px-3 text-[11px] font-black text-slate-400 italic">
                                                         1 {{ strtoupper($ingredientUnit) }}
@@ -948,7 +1156,7 @@
         </div>
     </x-modal>
 
-    {{-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• PANEL â€” EXPIRY TRACKING â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• --}}
+    {{-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• PANEL — EXPIRY TRACKING â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• --}}
     <div x-show="panel === 'expiry'"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0 translate-y-4"
@@ -1044,19 +1252,19 @@
             </div>
         </div>
 
-        {{-- macOS Style Expiry Toolbar --}}
-        <div class="relative z-20 flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
-            <div class="flex flex-1 w-full lg:w-auto">
+{{-- macOS Style Expiry Toolbar --}}
+        <div class="relative z-20 flex flex-row items-center justify-between mb-6 gap-2 sm:gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
+            <div class="flex flex-1 min-w-0 lg:flex-initial">
                 <x-search-bar x-model.debounce.50ms="expirySearchText" placeholder="Filter batches..." width="w-full lg:w-72" />
             </div>
 
-            <div class="flex flex-wrap items-center lg:justify-end gap-2">
+            <div class="flex flex-nowrap items-center justify-end gap-1.5 sm:gap-2 shrink-0">
                 <x-dropdown align="right" width="48">
                     <x-slot name="trigger">
-                        <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
+                        <x-secondary-button type="button" class="gap-0 sm:gap-1.5 h-10 !px-2.5 sm:!px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
                             <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-                            <span class="text-[12px] whitespace-nowrap" x-text="{'all': 'All Batches', 'expired': 'Expired Only', 'expiring': 'Expiring Soon', 'fresh': 'Stable Stock', 'no_date': 'Non-Perishables'}[expiryStatus] || 'Filter Status'"></span>
-                            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                            <span class="hidden sm:inline text-[12px] whitespace-nowrap" x-text="{'all': 'All Batches', 'expired': 'Expired Only', 'expiring': 'Expiring Soon', 'fresh': 'Stable Stock', 'no_date': 'Non-Perishables'}[expiryStatus] || 'Filter Status'"></span>
+                            <svg class="hidden sm:block w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                         </x-secondary-button>
                     </x-slot>
                     <x-slot name="content">
@@ -1104,12 +1312,12 @@
                         <tr x-show="isBatchVisible({{ $batch->id }})" x-cloak class="hover:bg-slate-50/50 transition-colors {{ $isExpired ? 'bg-rose-50/30' : ($isExpiring ? 'bg-amber-50/30' : '') }}">
                             <td class="py-4 px-6 border-r border-slate-100/50 whitespace-nowrap">
                                 <div class="flex flex-col">
-                                    <span class="text-[14px] font-bold text-slate-900">{{ $batch->ingredient->name ?? 'â€”' }}</span>
+                                    <span class="text-[14px] font-bold text-slate-900">{{ $batch->ingredient->name ?? '—' }}</span>
                                     <span class="text-[10px] text-slate-400 font-black uppercase tracking-widest">{{ $batch->ingredient->unit ?? '' }}</span>
                                 </div>
                             </td>
                             <td class="py-4 px-6 border-r border-slate-100/50 text-center whitespace-nowrap">
-                                <span class="text-[12px] font-bold text-slate-600">{{ $batch->branch->branch_name ?? 'â€”' }}</span>
+                                <span class="text-[12px] font-bold text-slate-600">{{ $batch->branch->branch_name ?? '—' }}</span>
                             </td>
                             <td class="py-4 px-6 border-r border-slate-100/50 text-right whitespace-nowrap">
                                 <span class="text-[15px] font-black {{ $isExpired ? 'text-rose-600' : 'text-slate-900' }}">
@@ -1147,17 +1355,17 @@
                                             Dispose
                                         </x-danger-button>
                                     @else
-                                        <span class="text-slate-300">â€”</span>
+                                        <span class="text-slate-300">—</span>
                                     @endif
                                 </td>
                             @endif
                         </tr>
-                        <tr x-show="filteredBatchIds.length === 0 && expirySearchText.trim() !== ''" x-cloak>
-                            <td colspan="{{ $this->isStaff() ? 5 : 6 }}" class="py-12">
-                                <x-empty-state title="No batches match your search" description="Try a different name or clear your search." />
-                            </td>
-                        </tr>
-                    @endforeach
+                        @endforeach
+                    <tr x-show="filteredBatchIds.length === 0 && expirySearchText.trim() !== ''" x-cloak>
+                        <td colspan="{{ $this->isStaff() ? 5 : 6 }}" class="py-12">
+                            <x-empty-state title="No batches match your search" description="Try a different name or clear your search." />
+                        </td>
+                    </tr>
                 </tbody>
             </x-data-table>
             <div class="mt-4 px-1">
@@ -1181,10 +1389,10 @@
                                         </x-slot>
                                         <x-slot name="content">
                                             <template x-for="option in [5, 10, 15, 30, 50, 100]">
-                                                <x-dropdown-link href="#" @click.prevent="expiryPerPage = option; expiryCurrentPage = 1;">
-                                                    <span x-text="option"></span>
-                                                </x-dropdown-link>
-                                            </template>
+    <x-dropdown-link href="#" x-on:click.prevent="expiryPerPage = option; expiryCurrentPage = 1; dropdownOpen = false;">
+        <span x-text="option"></span>
+    </x-dropdown-link>
+</template>
                                         </x-slot>
                                     </x-dropdown>
                                 </div>
@@ -1261,6 +1469,8 @@
 
                     // Client-side search and pagination
                     stockSearch: '',
+                    stockStatusFilter: '',
+                    stockCategoryFilter: '',
                     stockCurrentPage: 1,
                     stockPerPage: 5,
                     ingredientsList: [],
@@ -1270,11 +1480,19 @@
                     expiryCurrentPage: 1,
                     expiryPerPage: 5,
                     batchesList: [],
+                    stockCategoryLabels: @js($allIngredientCategories->pluck('name', 'id')),
 
                     get filteredIngredientIds() {
                         const query = this.stockSearch.toLowerCase().trim();
+                        const status = this.stockStatusFilter;
+                        const category = this.stockCategoryFilter;
                         return this.ingredientsList
-                            .filter(i => !query || i.name.toLowerCase().includes(query))
+                            .filter(i => {
+                                const matchesSearch = !query || i.name.toLowerCase().includes(query);
+                                const matchesStatus = !status || i.status === status;
+                                const matchesCategory = !category || String(i.category_id) === String(category);
+                                return matchesSearch && matchesStatus && matchesCategory;
+                            })
                             .map(i => i.id);
                     },
                     get paginatedIngredientIds() {
@@ -1340,12 +1558,18 @@
                         }
                     },
 
-                     init() {
+                    init() {
                         // Run slidingTabs init for panel indicator
                         if (tabState.init) tabState.init.call(this);
 
                         // Reset page on search
                         this.$watch('stockSearch', () => {
+                            this.stockCurrentPage = 1;
+                        });
+                        this.$watch('stockStatusFilter', () => {
+                            this.stockCurrentPage = 1;
+                        });
+                        this.$watch('stockCategoryFilter', () => {
                             this.stockCurrentPage = 1;
                         });
                         this.$watch('expirySearchText', () => {
@@ -1356,6 +1580,8 @@
                         });
                         this.$watch('panel', () => {
                             this.stockSearch = '';
+                            this.stockStatusFilter = '';
+                            this.stockCategoryFilter = '';
                             this.stockCurrentPage = 1;
                             this.expirySearchText = '';
                             this.expiryStatus = 'all';

@@ -22,7 +22,7 @@ class QrCodeHelper
         try {
             $qrCode = new QrCode($data);
             $qrCode->setSize($size);
-            $qrCode->setMargin(0);
+            $qrCode->setMargin(4);
             
             $writer = new \Endroid\QrCode\Writer\SvgWriter();
             $result = $writer->write($qrCode);

@@ -6,9 +6,7 @@
 @endphp
 
 {{-- Table Container --}}
-<div id="order-table-{{ $tabName ?? 'all' }}" class="mt-2 relative"
-     wire:loading.class="opacity-50 pointer-events-none"
-     wire:target="statusFilter, applyQuickDateFilter, startDate, endDate, previousPage, nextPage, gotoPage, setPage">
+<div id="order-table-{{ $tabName ?? 'all' }}" class="mt-2 relative">
     
     <x-data-table>
         <x-slot name="header">

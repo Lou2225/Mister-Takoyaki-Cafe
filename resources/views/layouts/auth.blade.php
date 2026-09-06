@@ -4,14 +4,28 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
+        <meta name="theme-color" content="#f59e0b">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="default">
+        <meta name="apple-mobile-web-app-title" content="{{ config('app.name', 'Laravel') }}">
 
         <title>{{ config('app.name', 'Laravel') }}</title>
+
+        <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800&display=swap" rel="stylesheet" />
 
         <!-- Scripts -->
+        <script>
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    for (var r of registrations) { r.unregister(); }
+                });
+            }
+        </script>
         @vite(['resources/js/app.js'])
         @livewireStyles
 
@@ -46,14 +60,38 @@
                 opacity: 0.5;
             }
             
-            @keyframes fadeSlideForm {
+             @keyframes fadeSlideForm {
                 from { opacity: 0; transform: translateX(10px); }
                 to { opacity: 1; transform: translateX(0); }
             }
             .animate-form-enter { animation: fadeSlideForm 0.3s cubic-bezier(0.4, 0, 0.2, 1) both; }
+
+                        /* Split panels via @keyframes instead of transitions — the whole
+               timeline (position AND opacity) is baked into one declarative
+               rule per element, so there's nothing left to race or get
+               silently overridden. Each panel stays fully opaque while it
+               visibly slides (0%–65%), then fades only in the last stretch
+               once it's mostly off-canvas (65%–100%). */
+            @keyframes authSlideLeft {
+                0%   { transform: translateX(0);        opacity: 1; }
+                65%  { transform: translateX(-115%);    opacity: 1; }
+                100% { transform: translateX(-115%);    opacity: 0; }
+            }
+            @keyframes authSlideRight {
+                0%   { transform: translateX(0);        opacity: 1; }
+                65%  { transform: translateX(115%);     opacity: 1; }
+                100% { transform: translateX(115%);     opacity: 0; }
+            }
+            .auth-anim-left {
+                animation: authSlideLeft 0.7s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+            }
+            .auth-anim-right {
+                animation: authSlideRight 0.7s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+                animation-delay: 0.05s;
+            }
         </style>
     </head>
-    <body class="font-sans text-gray-900 antialiased bg-indigo-950 overflow-hidden min-h-screen flex items-center justify-center p-4 sm:p-8 relative">
+                <body x-data="{ splitting: false }" x-on:auth-split.window="splitting = true" class="font-sans text-gray-900 antialiased bg-indigo-950 overflow-x-hidden overflow-y-auto min-h-screen flex items-center justify-center p-4 sm:p-8 relative">
         
         <!-- Full-page Bubble Background -->
         <div class="auth-bubbles pointer-events-none fixed inset-0">
@@ -63,13 +101,25 @@
             <div class="bubble w-80 h-80 top-1/2 -left-40" style="animation-delay: -10s; background: rgba(255, 255, 255, 0.03);"></div>
         </div>
 
-        <!-- Centered Glass/Shadow Container -->
-        <div class="relative w-full max-w-[1000px] h-[600px] rounded-3xl bg-white overflow-hidden flex flex-col md:flex-row z-10 shadow-[0_0_50px_rgba(0,0,0,0.3)] border border-white/10">
+                       <!-- Full-screen catch overlay: fades to solid after the panels split,
+             so the swap to the dashboard happens underneath a solid color
+             instead of a hard visual cut. -->
+        <div x-data="{ visible: false }"
+             x-on:auth-split.window="visible = true"
+             class="fixed inset-0 bg-indigo-950 z-20 pointer-events-none transition-opacity duration-500 delay-700 ease-out"
+             :class="visible ? 'opacity-100' : 'opacity-0'">
+        </div>
+                <!-- Centered Glass/Shadow Container — stays fully visible and doesn't
+             fade itself; only its two child panels animate (slide apart), so
+             the split is actually visible before the overlay fades everything
+             out afterward. -->
+                                <div class="relative w-full max-w-[1000px] h-auto min-h-[560px] sm:h-[600px] my-4 sm:my-0 rounded-3xl bg-white overflow-hidden flex flex-col md:flex-row z-10 shadow-[0_0_50px_rgba(0,0,0,0.3)] border border-white/10">
             
             <div class="container-glow bg-white/20"></div>
 
-            <!-- Left Side: Marketing Cover -->
-            <div class="hidden md:flex md:w-1/2 relative overflow-hidden flex-col justify-between p-10 group bg-indigo-600">
+                       <!-- Left Side: Marketing Cover -->
+            <div :class="splitting ? 'auth-anim-left' : ''"
+                 class="hidden md:flex md:w-1/2 relative overflow-hidden flex-col justify-between p-10 group bg-indigo-600">
                 <img src="{{ asset('images/mtc-logo-only.png') }}" alt="{{ \App\Services\ConfigurationService::getBusinessName() }}" class="absolute inset-0 w-full h-full object-cover" />
                 <!-- Overlay for readability -->
                 <div class="absolute inset-0 bg-black/45"></div>
@@ -85,8 +135,9 @@
                 </div>
             </div>
 
-            <!-- Right Side: Form -->
-            <div class="w-full md:w-1/2 flex flex-col p-8 sm:p-12 relative bg-white h-full overflow-y-auto no-scrollbar">
+                            <!-- Right Side: Form -->
+            <div :class="splitting ? 'auth-anim-right' : ''"
+                 class="w-full md:w-1/2 flex flex-col p-6 sm:p-10 lg:p-12 relative bg-white h-full overflow-y-auto no-scrollbar">
                 <div class="flex-1 flex flex-col justify-center max-w-[380px] mx-auto w-full animate-form-enter">
                     <!-- Mobile only logo -->
                     <div class="flex items-center gap-2 mb-8 md:hidden justify-center hover:opacity-80 transition-opacity">

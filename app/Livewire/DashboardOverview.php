@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Services\ConfigurationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 
 use App\Traits\HandlesExports;
@@ -24,6 +25,7 @@ use App\Traits\HandlesExports;
 class DashboardOverview extends Component
 {
     use HandlesExports;
+    use \App\Traits\ResolvesIngredientCosts;
 
     public ?int $selectedBranchId = null;
     public bool $isSuperAdmin = false;
@@ -35,11 +37,21 @@ class DashboardOverview extends Component
     public string $dateError = '';
 
     // Breakdown Sidebar
-    public $showBreakdown = false;
+        public $showBreakdown = false;
     public $selectedMetric = 'Revenue';
     public $selectedChartMetric = 'Sales'; // Sales, Volume, Profit
     public $breakdownData = [];
     public $stockTab = 'deficiency';
+    /**
+     * Mirrors BusinessIntelligence's $analyticsCache pattern: a plain PHP
+     * array, not a Cache::remember() store. It only survives for the
+     * current request/render — so it still avoids recalculating the same
+     * segment twice in one page load (e.g. once for the KPI cards, once
+     * for a chart), but every fresh request or Livewire action always
+     * recomputes from the live database. No TTL, no stale data, no
+     * version-bump plumbing required.
+     */
+    protected array $segmentCache = [];
 
 
     public function setChartMetric(string $metric): void
@@ -51,14 +63,18 @@ class DashboardOverview extends Component
     public function openBreakdown(string $metric): void
     {
         $this->selectedMetric = $metric;
-        $this->breakdownData = match($metric) {
-            'Revenue' => $this->getRevenueBreakdown(),
-            'COGS'    => $this->getCogsBreakdown(),
-            'AOV'     => $this->getAovBreakdown(),
-            'Profit'  => $this->getProfitBreakdown(),
-            'Margin'  => $this->getMarginBreakdown(),
-            default   => [],
-        };
+
+        $this->breakdownData = $this->cachedDashboardSegment("breakdown-{$metric}", 5, function () use ($metric) {
+            return match($metric) {
+                'Revenue' => $this->getRevenueBreakdown(),
+                'COGS'    => $this->getCogsBreakdown(),
+                'AOV'     => $this->getAovBreakdown(),
+                'Profit'  => $this->getProfitBreakdown(),
+                'Margin'  => $this->getMarginBreakdown(),
+                default   => [],
+            };
+        });
+
         $this->showBreakdown = true;
         $this->dispatch('open-modal', name: 'kpi-breakdown');
     }
@@ -76,9 +92,10 @@ class DashboardOverview extends Component
         $categories = [];
         $untrackedRevenue = 0;
         
-        $service = $orders->sum('service_charge');
+                $service = $orders->sum('service_charge');
         $delivery = $orders->sum('delivery_fee');
         $discounts = $orders->sum('discount_amount');
+        $refunds = $orders->sum('refunded_amount');
 
         foreach ($orders as $order) {
             if ($order->items->count() > 0) {
@@ -94,9 +111,10 @@ class DashboardOverview extends Component
 
         $breakdown = collect($categories)->map(fn($val, $key) => ['category' => $key, 'total' => (float)$val])->values()->toArray();
         
-        if ($service > 0) $breakdown[] = ['category' => 'Service Charges', 'total' => (float)$service];
+                if ($service > 0) $breakdown[] = ['category' => 'Service Charges', 'total' => (float)$service];
         if ($delivery > 0) $breakdown[] = ['category' => 'Delivery Deductions', 'total' => (float)-$delivery];
         if ($discounts > 0) $breakdown[] = ['category' => 'Discounts Applied', 'total' => (float)-$discounts];
+        if ($refunds > 0) $breakdown[] = ['category' => 'Refunds Deducted', 'total' => (float)-$refunds];
         if ($untrackedRevenue > 0) $breakdown[] = ['category' => 'Untracked Sales', 'total' => (float)$untrackedRevenue];
 
         usort($breakdown, fn($a, $b) => abs($b['total']) <=> abs($a['total']));
@@ -108,11 +126,7 @@ class DashboardOverview extends Component
         $branchId = $this->selectedBranchId;
         $orderItems = $this->fetchBreakdownOrderItems($branchId);
         
-        $branchCosts = IngredientCost::query()
-            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
-            ->get()
-            ->groupBy('branch_id')
-            ->map(fn($g) => $g->pluck('unit_cost', 'ingredient_id'));
+                $branchCosts = $this->buildBranchCostMap($branchId);
 
         $purchaseCosts = $this->fetchPurchasePrices($branchId);
         $globalCosts = Ingredient::pluck('cost', 'id');
@@ -150,7 +164,7 @@ class DashboardOverview extends Component
                   ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
                   ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId));
             })
-            ->with(['product.recipes', 'options.option.recipes', 'modifiers.modifier.recipes'])
+            ->with(['order:id,branch_id', 'product.recipes', 'options.option.recipes', 'modifiers.modifier.recipes'])
             ->get();
     }
 
@@ -181,12 +195,9 @@ class DashboardOverview extends Component
     {
         $branchId = $this->selectedBranchId;
         $orders = $this->fetchFinancialOrders($branchId);
+        $completedOrders = $orders->where('status', Order::STATUS_COMPLETED);
         
-        $branchCosts = IngredientCost::query()
-            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
-            ->get()
-            ->groupBy('branch_id')
-            ->map(fn($g) => $g->pluck('unit_cost', 'ingredient_id'));
+                $branchCosts = $this->buildBranchCostMap($branchId);
 
         $purchaseCosts = $this->fetchPurchasePrices($branchId);
         $globalCosts = Ingredient::pluck('cost', 'id');
@@ -194,13 +205,13 @@ class DashboardOverview extends Component
         $categoryProfit = [];
         $untrackedProfit = 0;
 
-        foreach ($orders as $order) {
+                        foreach ($completedOrders as $order) {
             $bid = $order->branch_id;
             if ($order->items->count() > 0) {
                 foreach ($order->items as $item) {
                     $productCostMap = []; $optionCostMap = []; $modifierCostMap = [];
                     $itemCost = $this->calculateItemCogs($item, $branchCosts, $globalCosts, $purchaseCosts, $productCostMap, $optionCostMap, $modifierCostMap, $bid);
-                    $itemProfit = ($item->price - $itemCost) * $item->quantity;
+                    $itemProfit = ($item->unit_price - $itemCost) * $item->quantity;
 
                     $categoryName = $item->product->category->name ?? 'Uncategorized';
                     $categoryProfit[$categoryName] = ($categoryProfit[$categoryName] ?? 0) + $itemProfit;
@@ -212,9 +223,13 @@ class DashboardOverview extends Component
 
         // Adjust profit for discounts (Discounts reduce profit directly)
         $discounts = $orders->sum('discount_amount');
-        if ($discounts > 0) {
-            $categoryProfit['Discounts Impact'] = ($categoryProfit['Discounts Impact'] ?? 0) - $discounts;
-        }
+$refunds = $orders->sum('refunded_amount');
+if ($discounts > 0) {
+    $categoryProfit['Discounts Impact'] = ($categoryProfit['Discounts Impact'] ?? 0) - $discounts;
+}
+if ($refunds > 0) {
+    $categoryProfit['Refunds Impact'] = ($categoryProfit['Refunds Impact'] ?? 0) - $refunds;
+}
 
         $breakdown = collect($categoryProfit)->map(fn($val, $key) => ['category' => $key, 'total' => (float)$val])->values()->toArray();
         if ($untrackedProfit > 0) $breakdown[] = ['category' => 'Untracked Profit', 'total' => (float)$untrackedProfit];
@@ -227,12 +242,9 @@ class DashboardOverview extends Component
     {
         $branchId = $this->selectedBranchId;
         $orders = $this->fetchFinancialOrders($branchId);
+        $completedOrders = $orders->where('status', Order::STATUS_COMPLETED);
         
-        $branchCosts = IngredientCost::query()
-            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
-            ->get()
-            ->groupBy('branch_id')
-            ->map(fn($g) => $g->pluck('unit_cost', 'ingredient_id'));
+               $branchCosts = $this->buildBranchCostMap($branchId);
 
         $purchaseCosts = $this->fetchPurchasePrices($branchId);
         $globalCosts = Ingredient::pluck('cost', 'id');
@@ -241,15 +253,15 @@ class DashboardOverview extends Component
         $categoryRevenue = [];
         $categoryProfit = [];
 
-        foreach ($orders as $order) {
+                   foreach ($completedOrders as $order) {
             $bid = $order->branch_id;
             foreach ($order->items as $item) {
                 $productCostMap = []; $optionCostMap = []; $modifierCostMap = [];
                 $itemCost = $this->calculateItemCogs($item, $branchCosts, $globalCosts, $purchaseCosts, $productCostMap, $optionCostMap, $modifierCostMap, $bid);
-                $itemProfit = ($item->price - $itemCost) * $item->quantity;
+                $itemProfit = ($item->unit_price - $itemCost) * $item->quantity;
 
                 $categoryName = $item->product->category->name ?? 'Uncategorized';
-                $categoryRevenue[$categoryName] = ($categoryRevenue[$categoryName] ?? 0) + ($item->price * $item->quantity);
+                $categoryRevenue[$categoryName] = ($categoryRevenue[$categoryName] ?? 0) + ($item->unit_price * $item->quantity);
                 $categoryProfit[$categoryName] = ($categoryProfit[$categoryName] ?? 0) + $itemProfit;
             }
         }
@@ -270,7 +282,7 @@ class DashboardOverview extends Component
         return $margins;
     }
 
-    public function mount()
+        public function mount()
     {
         $user = auth()->user();
         $this->isSuperAdmin = $user && $user->role_id === 1;
@@ -288,6 +300,93 @@ class DashboardOverview extends Component
         $this->activeFilter = 'All Time';
 
         $this->updateHeader();
+    }
+
+        /**
+     * Every dashboard cache entry is tagged with this version number. Instead
+     * of hunting down and deleting every possible cached key (one per user,
+     * branch, and date-range combination — impossible to enumerate cheaply),
+     * we bump this single counter whenever an order completes. That makes
+     * every existing cache entry's key stop matching, so the next dashboard
+     * load recalculates fresh — an instant, driver-agnostic invalidation.
+     */
+        /**
+     * Deprecated no-op — the persistent Cache::remember() layer this method
+     * once bumped has been removed so the Dashboard always queries live
+     * data, the same way Business Intelligence does. Kept as a harmless
+     * no-op only so any existing call site (e.g. Order::booted()) doesn't
+     * error; it can be deleted once those call sites are cleaned up.
+     */
+    public static function bumpDashboardCacheVersion(): void
+    {
+        // Intentionally empty — caching removed.
+    }
+
+    /**
+     * Mirrors BusinessIntelligence's getAnalytics() null-check pattern:
+     * compute once per request/render and reuse within that same request,
+     * but never persist across requests. Every new page load, poll tick,
+     * or Livewire action always recalculates fresh from the database.
+     */
+    private function cachedDashboardSegment(string $segment, int $ttlMinutes, callable $callback): mixed
+    {
+        $branchKey = $this->selectedBranchId ?? 'all';
+        $rangeKey = md5(json_encode([$this->startDate, $this->endDate, $this->selectedChartMetric]));
+        $key = "{$segment}:branch={$branchKey}:range={$rangeKey}";
+
+        if (array_key_exists($key, $this->segmentCache)) {
+            return $this->segmentCache[$key];
+        }
+
+        return $this->segmentCache[$key] = $callback();
+    }
+
+    private function withOptimizedOrderItemRelations($query)
+    {
+        return $query->with([
+            'items' => function ($query) {
+                $query->select('id', 'order_id', 'product_id', 'unit_price', 'quantity', 'subtotal')
+                    ->with([
+                        'product' => function ($query) {
+                            $query->select('id', 'category_id')
+                                ->with([
+                                    'recipes' => function ($query) {
+                                        $query->select('id', 'product_id', 'ingredient_id', 'quantity')
+                                            ->whereNull('product_option_id')
+                                            ->whereNull('modifier_id');
+                                    },
+                                    'category' => fn ($query) => $query->select('id', 'name'),
+                                ]);
+                        },
+                        'options' => function ($query) {
+                            $query->select('id', 'order_item_id', 'product_option_id')
+                                ->with([
+                                    'option' => function ($query) {
+                                        $query->select('id')
+                                            ->with([
+                                                'recipes' => function ($query) {
+                                                    $query->select('id', 'product_option_id', 'ingredient_id', 'quantity');
+                                                },
+                                            ]);
+                                    },
+                                ]);
+                        },
+                        'modifiers' => function ($query) {
+                            $query->select('id', 'order_item_id', 'modifier_id')
+                                ->with([
+                                    'modifier' => function ($query) {
+                                        $query->select('id')
+                                            ->with([
+                                                'recipes' => function ($query) {
+                                                    $query->select('id', 'modifier_id', 'ingredient_id', 'quantity');
+                                                },
+                                            ]);
+                                    },
+                                ]);
+                        },
+                    ]);
+            },
+        ]);
     }
 
     public function updatedSelectedBranchId(?int $value): void
@@ -351,14 +450,7 @@ class DashboardOverview extends Component
                 return;
             }
 
-            // Maximum range validation (e.g., 90 days)
-            $diff = $start->diff($end)->days;
-            if ($diff > 90) {
-                $this->dateError = 'Date range cannot exceed 90 days.';
-                return;
-            }
-
-            $this->activeFilter = 'All Time';
+            $this->activeFilter = 'Custom Range';
         }
     }
 
@@ -394,7 +486,6 @@ class DashboardOverview extends Component
     {
         $chartData = $this->getChartData();
         $this->dispatch('update-sales-chart', chart: $chartData);
-        $this->dispatch('branchSelectionUpdated');
     }
 
     public function resetDates()
@@ -414,7 +505,7 @@ class DashboardOverview extends Component
         );
     }
 
-    public function render()
+            public function render()
     {
         $user = auth()->user();
         if (!$user) return redirect('/login');
@@ -453,30 +544,34 @@ class DashboardOverview extends Component
      * Fetches orders once and calculates Revenue, AOV, COGS, and Profit.
      */
     private function getFinancialIntelligence(): array
-    {
+{
+    return $this->cachedDashboardSegment('financial-intelligence', 5, function () {
         $branchId = $this->selectedBranchId;
-        $orders = $this->fetchFinancialOrders($branchId);
-        
-        $branchCosts = IngredientCost::query()
-            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
-            ->get()
-            ->groupBy('branch_id')
-            ->map(fn($g) => $g->pluck('unit_cost', 'ingredient_id'));
+        $orders = $this->fetchFinancialOrders($branchId); // Completed + Refunded + Partially Refunded
+        $completedOrders = $orders->where('status', Order::STATUS_COMPLETED);
+
+                $branchCosts = $this->buildBranchCostMap($branchId);
 
         $purchaseCosts = $this->fetchPurchasePrices($branchId);
         $globalCosts = Ingredient::pluck('cost', 'id');
 
-        $totalRevenue = $orders->sum('total_amount');
-        $deliveryFees = $orders->sum('delivery_fee');
+        // Revenue base = ALL orders in range (matches BusinessIntelligence)
+        $totalCollected = $orders->sum('total_amount');
+        $deliveryFees   = $orders->sum('delivery_fee');
         $totalDiscounts = $orders->sum('discount_amount');
-        $orderCount = $orders->count();
-        $totalCogs = 0;
+        $refunds        = $orders->sum('refunded_amount');
+        $netSales       = $totalCollected - $deliveryFees - $refunds;
+        $grossSales     = $netSales + $totalDiscounts;
+
+        // Order count + COGS come from fully-completed, unrefunded orders only
+        $orderCount = $completedOrders->count();
+        $totalCogs  = 0;
 
         $productCostMap = [];
         $optionCostMap = [];
         $modifierCostMap = [];
 
-        foreach ($orders as $order) {
+        foreach ($completedOrders as $order) {
             $bid = $order->branch_id;
             foreach ($order->items as $item) {
                 $itemCost = $this->calculateItemCogs($item, $branchCosts, $globalCosts, $purchaseCosts, $productCostMap, $optionCostMap, $modifierCostMap, $bid);
@@ -484,7 +579,6 @@ class DashboardOverview extends Component
             }
         }
 
-        // Calculate Waste Cost
         $start = $this->startDate ? Carbon::parse($this->startDate)->startOfDay() : null;
         $end = $this->endDate ? Carbon::parse($this->endDate)->endOfDay() : null;
 
@@ -493,25 +587,21 @@ class DashboardOverview extends Component
             ->when($end, fn($q) => $q->where('created_at', '<=', $end))
             ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->get()
-            ->sum(function($movement) {
-                return abs($movement->quantity) * ($movement->unit_cost ?? 0);
-            });
+            ->sum(fn($movement) => abs($movement->quantity) * ($movement->unit_cost ?? 0));
 
-        $aov = $orderCount > 0 ? ($totalRevenue / $orderCount) : 0;
-        
-        // Profit = (Revenue - Delivery) - COGS - Waste
-        $grossProfit = ($totalRevenue - $deliveryFees) - $totalCogs - $wasteCost;
-        $margin = ($totalRevenue - $deliveryFees) > 0 ? ($grossProfit / ($totalRevenue - $deliveryFees)) * 100 : 0;
+        $aov = $orderCount > 0 ? ($completedOrders->sum('total_amount') / $orderCount) : 0;
 
-        $netSales = $totalRevenue - $deliveryFees;
-        $grossSales = $netSales + $totalDiscounts;
+        // Gross Profit = Net Sales - COGS - Waste (matches BusinessIntelligence)
+        $grossProfit = $netSales - $totalCogs - $wasteCost;
+        $margin = $netSales > 0 ? ($grossProfit / $netSales) * 100 : 0;
 
         return [
-            'revenue' => $totalRevenue,
+            'revenue' => $totalCollected,
             'net_sales' => $netSales,
             'gross_sales' => $grossSales,
             'delivery_fees' => $deliveryFees,
             'total_discounts' => $totalDiscounts,
+            'refunds' => $refunds,
             'order_count' => $orderCount,
             'aov' => $aov,
             'total_cogs' => $totalCogs,
@@ -519,18 +609,12 @@ class DashboardOverview extends Component
             'gross_profit' => $grossProfit,
             'profit_margin_pct' => round($margin, 2),
         ];
-    }
+    });
+}
 
-    private function fetchPurchasePrices(?int $branchId): Collection
+        private function fetchPurchasePrices(?int $branchId): Collection
     {
-        return StockMovement::where('type', 'in')
-            ->whereNotNull('unit_cost')
-            ->where('unit_cost', '>', 0)
-            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
-            ->orderBy('created_at', 'desc')
-            ->get()
-            ->groupBy('branch_id')
-            ->map(fn($g) => $g->unique('ingredient_id')->pluck('unit_cost', 'ingredient_id'));
+        return $this->buildPurchasePriceMap($branchId);
     }
 
     private function fetchFinancialOrders(?int $branchId): Collection
@@ -538,13 +622,14 @@ class DashboardOverview extends Component
         $start = $this->startDate ? $this->startDate . ' 00:00:00' : null;
         $end = $this->endDate ? $this->endDate . ' 23:59:59' : null;
 
-        return Order::where('status', Order::STATUS_COMPLETED)
-            ->when($start, fn($q) => $q->where('created_at', '>=', $start))
-            ->when($end, fn($q) => $q->where('created_at', '<=', $end))
-            ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
-            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
-            ->with(['items.product.recipes', 'items.options.option.recipes', 'items.modifiers.modifier.recipes'])
-            ->get();
+        return $this->withOptimizedOrderItemRelations(
+    Order::select('id', 'branch_id', 'created_at', 'status', 'total_amount', 'delivery_fee', 'discount_amount', 'refunded_amount')
+        ->whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
+        ->when($start, fn($q) => $q->where('created_at', '>=', $start))
+        ->when($end, fn($q) => $q->where('created_at', '<=', $end))
+        ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
+        ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
+)->get();
     }
 
     private function getKpis(): array
@@ -552,9 +637,12 @@ class DashboardOverview extends Component
         $branchId = $this->selectedBranchId;
 
         $activeStaff = User::where('is_active', 1)
+            ->where('role_id', '!=', 4)
             ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
             ->count();
-        $totalStaff = User::when($branchId, fn($q) => $q->where('branch_id', $branchId))->count();
+        $totalStaff = User::where('role_id', '!=', 4)
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->count();
 
         $query = DB::table('ingredients')
             ->leftJoin('branch_ingredient_stocks', function ($join) use ($branchId) {
@@ -570,7 +658,12 @@ class DashboardOverview extends Component
         $lowStockCount = $query->count();
 
         return [
-            'active_products'   => Product::where('is_active', 1)->count(),
+            'active_products'   => Product::where('is_active', 1)
+                ->when($branchId, fn($q) => $q->where(function ($q2) use ($branchId) {
+                    $q2->where('scope', 'global')
+                       ->orWhereHas('branches', fn($b) => $b->where('branches.id', $branchId));
+                }))
+                ->count(),
             'total_ingredients' => Ingredient::count(),
             'low_stock_count'   => $lowStockCount,
             'staff_active'      => "{$activeStaff} / {$totalStaff}",
@@ -589,57 +682,61 @@ class DashboardOverview extends Component
 
     private function getLowStockAlerts(): array
     {
-        $branchId = $this->selectedBranchId;
+        return $this->cachedDashboardSegment('low-stock-alerts', 5, function () {
+            $branchId = $this->selectedBranchId;
 
-        $query = DB::table('ingredients')
-            ->select('ingredients.name','ingredients.minimum_stock','ingredients.unit',
-                DB::raw('COALESCE(branch_ingredient_stocks.stock_quantity, 0) as current_qty'),
-                'branches.branch_name')
-            ->leftJoin('branch_ingredient_stocks', 'ingredients.id', '=', 'branch_ingredient_stocks.ingredient_id')
-            ->leftJoin('branches', 'branch_ingredient_stocks.branch_id', '=', 'branches.id')
-            ->whereRaw('COALESCE(branch_ingredient_stocks.stock_quantity, 0) < ingredients.minimum_stock');
+            $query = DB::table('ingredients')
+                ->select('ingredients.name','ingredients.minimum_stock','ingredients.unit',
+                    DB::raw('COALESCE(branch_ingredient_stocks.stock_quantity, 0) as current_qty'),
+                    'branches.branch_name')
+                ->leftJoin('branch_ingredient_stocks', 'ingredients.id', '=', 'branch_ingredient_stocks.ingredient_id')
+                ->leftJoin('branches', 'branch_ingredient_stocks.branch_id', '=', 'branches.id')
+                ->whereRaw('COALESCE(branch_ingredient_stocks.stock_quantity, 0) < ingredients.minimum_stock');
 
-        if (!$this->isSuperAdmin) {
-            $query->where('branch_ingredient_stocks.branch_id', auth()->user()->branch_id);
-        } elseif ($branchId) {
-            $query->where('branch_ingredient_stocks.branch_id', $branchId);
-        }
+            if (!$this->isSuperAdmin) {
+                $query->where('branch_ingredient_stocks.branch_id', auth()->user()->branch_id);
+            } elseif ($branchId) {
+                $query->where('branch_ingredient_stocks.branch_id', $branchId);
+            }
 
-        return $query->orderBy('current_qty', 'asc')->limit(8)->get()->map(fn($row) => [
-            'ingredient' => $row->name,
-            'branch'     => $row->branch_name ?? 'Global',
-            'current'    => number_format($row->current_qty, 2) . ' ' . $row->unit,
-            'min'        => number_format($row->minimum_stock, 2) . ' ' . $row->unit,
-        ])->toArray();
+            return $query->orderBy('current_qty', 'asc')->limit(8)->get()->map(fn($row) => [
+                'ingredient' => $row->name,
+                'branch'     => $row->branch_name ?? 'Global',
+                'current'    => number_format($row->current_qty, 2) . ' ' . $row->unit,
+                'min'        => number_format($row->minimum_stock, 2) . ' ' . $row->unit,
+            ])->toArray();
+        });
     }
 
     private function getBestSellers(): array
     {
-        $branchId = $this->selectedBranchId;
-        $start = $this->startDate . ' 00:00:00';
-        $end = $this->endDate . ' 23:59:59';
+        return $this->cachedDashboardSegment('best-sellers', 5, function () {
+            $branchId = $this->selectedBranchId;
+            $start = $this->startDate . ' 00:00:00';
+            $end = $this->endDate . ' 23:59:59';
 
-        return OrderItem::join('products', 'order_items.product_id', '=', 'products.id')
-            ->join('orders', 'order_items.order_id', '=', 'orders.id')
-            ->leftJoin('product_categories', 'products.category_id', '=', 'product_categories.id')
-            ->where('orders.status', Order::STATUS_COMPLETED)
-            ->when($this->startDate, fn($q) => $q->where('orders.created_at', '>=', $this->startDate . ' 00:00:00'))
-            ->when($this->endDate, fn($q) => $q->where('orders.created_at', '<=', $this->endDate . ' 23:59:59'))
-            ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
-            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
-            ->select('products.name', 'product_categories.name as category_name', 'order_items.product_id', 
-                     DB::raw('SUM(order_items.quantity) as total_sold'),
-                     DB::raw('SUM(order_items.subtotal) as total_revenue'))
-            ->groupBy('order_items.product_id', 'products.name', 'product_categories.name')
-            ->orderByDesc('total_sold')
-            ->limit(5)
-            ->get()
-            ->map(fn($row) => [
-                'name'     => $row->name,
-                'category' => $row->category_name ?? 'Uncategorized',
-                'revenue'  => '₱ ' . number_format($row->total_revenue, 2),
-                'sold'     => number_format($row->total_sold) . ' pcs',
-            ])->toArray();
+            return OrderItem::join('products', 'order_items.product_id', '=', 'products.id')
+                ->join('orders', 'order_items.order_id', '=', 'orders.id')
+                ->leftJoin('product_categories', 'products.category_id', '=', 'product_categories.id')
+                ->where('orders.status', Order::STATUS_COMPLETED)
+                ->when($this->startDate, fn($q) => $q->where('orders.created_at', '>=', $this->startDate . ' 00:00:00'))
+                ->when($this->endDate, fn($q) => $q->where('orders.created_at', '<=', $this->endDate . ' 23:59:59'))
+                ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
+                ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
+                ->select('products.name', 'product_categories.name as category_name', 'order_items.product_id', 
+                         DB::raw('SUM(order_items.quantity) as total_sold'),
+                         DB::raw('SUM(order_items.subtotal) as total_revenue'))
+                ->groupBy('order_items.product_id', 'products.name', 'product_categories.name')
+                ->orderByDesc('total_sold')
+                ->limit(5)
+                ->get()
+                ->map(fn($row) => [
+                    'name'     => $row->name,
+                    'category' => $row->category_name ?? 'Uncategorized',
+                    'revenue'  => '₱ ' . number_format($row->total_revenue, 2),
+                    'sold'     => number_format($row->total_sold) . ' pcs',
+                ])->toArray();
+        });
     }
 
     private function getBranches(bool $isSuperAdmin): Collection
@@ -649,45 +746,37 @@ class DashboardOverview extends Component
 
     private function getBranchMapData(): array
     {
-        $branchId = $this->selectedBranchId;
-        $start = $this->startDate . ' 00:00:00';
-        $end = $this->endDate . ' 23:59:59';
+        return $this->cachedDashboardSegment('branch-map-data', 5, function () {
+            $branchId = $this->selectedBranchId;
+            $start = $this->startDate . ' 00:00:00';
+            $end = $this->endDate . ' 23:59:59';
 
-        // Query branches with their total completed sales in the current date range
-        $branchesSales = Branch::leftJoin('orders', function($join) use ($start, $end) {
+                   // Query branches with their total completed sales in the current date range
+                    $branchesSales = Branch::leftJoin('orders', function($join) use ($start, $end) {
             $join->on('branches.id', '=', 'orders.branch_id')
-                ->where('orders.status', Order::STATUS_COMPLETED)
+                ->whereIn('orders.status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
                 ->when($this->startDate, fn($q) => $q->where('orders.created_at', '>=', $start))
                 ->when($this->endDate, fn($q) => $q->where('orders.created_at', '<=', $end));
         })
-        ->select('branches.id', 'branches.branch_name', DB::raw('COALESCE(SUM(orders.total_amount), 0) as total_sales'))
-        ->groupBy('branches.id', 'branches.branch_name')
+        ->select('branches.id', 'branches.branch_name', 'branches.address', DB::raw('COALESCE(SUM(orders.total_amount), 0) as total_sales'))
+        ->groupBy('branches.id', 'branches.branch_name', 'branches.address')
         ->get();
 
         $totalSales = $branchesSales->sum('total_sales');
 
-        // Geolocation coordinates mapping for Laguna branches (Calauan, Bay, Pila, Calamba)
-        // coordinates range within visual SVG viewbox: Left (x%): 15% - 85%, Top (y%): 15% - 85%
-        $coordinateMap = [
-            'Calauan' => ['left' => '55%', 'top' => '62%', 'color' => 'bg-emerald-500'],
-            'Bay'     => ['left' => '38%', 'top' => '48%', 'color' => 'bg-blue-500'],
-            'Pila'    => ['left' => '78%', 'top' => '38%', 'color' => 'bg-emerald-500'],
-            'Calamba' => ['left' => '20%', 'top' => '25%', 'color' => 'bg-blue-500'],
-        ];
-
         // Determine highest sales to toggle the glowing double-bubble ping
         $maxSales = $branchesSales->max('total_sales');
 
-        return $branchesSales->map(function($branch) use ($totalSales, $coordinateMap, $maxSales) {
+        return $branchesSales->map(function($branch) use ($totalSales, $maxSales) {
             $name = $branch->branch_name;
             $cleanName = trim(str_ireplace('Branch', '', $name));
-            
-            // Assign coordinate dynamically by hashing name if it is a new branch
-            $coords = $coordinateMap[$cleanName] ?? [
-                'left' => (abs(crc32($cleanName)) % 50 + 25) . '%',
-                'top'  => (abs(crc32($cleanName . 'y')) % 50 + 25) . '%',
-                'color' => 'bg-indigo-500'
-            ];
+
+            // Use the branch's real saved coordinates (same address JSON
+            // Branch Management writes via the map picker / PSGC geocoding)
+            // instead of a hardcoded lookup table or hashed placeholder.
+            $addr = is_array($branch->address) ? $branch->address : json_decode($branch->address, true);
+            $lat = isset($addr['lat']) ? (float) $addr['lat'] : null;
+            $lng = isset($addr['lng']) ? (float) $addr['lng'] : null;
 
             $pct = $totalSales > 0 ? round(($branch->total_sales / $totalSales) * 100, 1) : 0;
 
@@ -697,12 +786,13 @@ class DashboardOverview extends Component
                 'clean_name' => $cleanName,
                 'total_sales' => (float)$branch->total_sales,
                 'sales_pct' => $pct,
-                'left' => $coords['left'],
-                'top' => $coords['top'],
-                'color' => $coords['color'],
+                'lat' => $lat,
+                'lng' => $lng,
+                'color' => 'bg-blue-500',
                 'is_highest' => ($branch->total_sales > 0 && $branch->total_sales == $maxSales),
             ];
         })->sortByDesc('total_sales')->values()->toArray();
+        });
     }
 
     private function getThemeAssets(string $roleName): array
@@ -721,37 +811,49 @@ class DashboardOverview extends Component
         ];
     }
 
-    private function getChartData(): array
+        private function getChartData(): array
     {
-        $branchId = $this->selectedBranchId;
-        [$start, $end] = $this->prepareChartDateRange($branchId);
-        
-        $orders = $this->fetchChartOrders($start, $end, $branchId);
-        
-        $branchCosts = IngredientCost::query()
-            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
-            ->get()
-            ->groupBy('branch_id')
-            ->map(fn($g) => $g->pluck('unit_cost', 'ingredient_id'));
+        return $this->cachedDashboardSegment('chart-data', 5, function () {
+            $branchId = $this->selectedBranchId;
+            [$start, $end] = $this->prepareChartDateRange($branchId);
+            
+            $orders = $this->fetchChartOrders($start, $end, $branchId);
+            
+                    $branchCosts = $this->buildBranchCostMap($branchId);
 
-        $purchaseCosts = $this->fetchPurchasePrices($branchId);
-        $globalCosts = Ingredient::pluck('cost', 'id');
+            $purchaseCosts = $this->fetchPurchasePrices($branchId);
+            $globalCosts = Ingredient::pluck('cost', 'id');
 
-        if ($start->toDateString() === $end->toDateString()) {
-            $hourlyData = $this->aggregateHourlyChartData($orders, $branchCosts, $globalCosts, $purchaseCosts);
-            return $this->formatHourlyChartOutput($start, $end, $hourlyData, $orders);
-        }
+            // Real waste events for the same window, so the chart's "Profit"
+            // line matches the KPI card's Gross Profit exactly instead of
+            // silently running above it by the omitted waste amount.
+            $wasteMovements = $this->fetchChartWasteMovements($start, $end, $branchId);
 
-        $dailyData = $this->aggregateDailyChartData($orders, $branchCosts, $globalCosts, $purchaseCosts);
-        
-        return $this->formatChartOutput($start, $end, $dailyData, $orders);
+            if ($start->toDateString() === $end->toDateString()) {
+                $hourlyData = $this->aggregateHourlyChartData($orders, $branchCosts, $globalCosts, $purchaseCosts, $wasteMovements);
+                return $this->formatHourlyChartOutput($start, $end, $hourlyData, $orders);
+            }
+
+            $dailyData = $this->aggregateDailyChartData($orders, $branchCosts, $globalCosts, $purchaseCosts, $wasteMovements);
+            
+            return $this->formatChartOutput($start, $end, $dailyData, $orders);
+        });
     }
 
-    private function aggregateHourlyChartData(Collection $orders, Collection $branchCostMap, Collection $globalCostMap, Collection $purchaseCostMap): array
+    private function fetchChartWasteMovements(Carbon $start, Carbon $end, ?int $branchId): Collection
+    {
+        return StockMovement::whereIn('type', ['waste', 'waste_expired', 'out', 'return_to_supplier'])
+            ->whereBetween('created_at', [$start, $end])
+            ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
+            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->get(['branch_id', 'ingredient_id', 'quantity', 'unit_cost', 'created_at']);
+    }
+
+        private function aggregateHourlyChartData(Collection $orders, Collection $branchCostMap, Collection $globalCostMap, Collection $purchaseCostMap, Collection $wasteMovements): array
     {
         $hourlyData = [];
         for ($h = 0; $h < 24; $h++) {
-            $hourlyData[$h] = ['sales' => 0, 'volume' => 0, 'profit' => 0, 'cogs' => 0];
+            $hourlyData[$h] = ['sales' => 0, 'volume' => 0, 'profit' => 0, 'cogs' => 0, 'waste' => 0];
         }
 
         $productCostMap = [];
@@ -773,6 +875,14 @@ class DashboardOverview extends Component
             $hourlyData[$hour]['cogs'] += $orderCogs;
             // Profit = (Total Amount - Delivery Fee) - COGS
             $hourlyData[$hour]['profit'] += ($order->total_amount - $order->delivery_fee - $orderCogs);
+        }
+
+        // Net real waste events into the hour they happened.
+        foreach ($wasteMovements as $movement) {
+            $hour = (int)Carbon::parse($movement->created_at)->hour;
+            $wasteAmt = abs((float)$movement->quantity) * ((float)($movement->unit_cost ?? 0));
+            $hourlyData[$hour]['waste'] += $wasteAmt;
+            $hourlyData[$hour]['profit'] -= $wasteAmt;
         }
         
         return $hourlyData;
@@ -924,12 +1034,13 @@ class DashboardOverview extends Component
 
     private function fetchChartOrders(Carbon $start, Carbon $end, ?int $branchId): Collection
     {
-        return Order::where('status', Order::STATUS_COMPLETED)
-            ->whereBetween('created_at', [$start, $end])
-            ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
-            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
-            ->with(['items.product.recipes', 'items.options.option.recipes', 'items.modifiers.modifier.recipes'])
-            ->get();
+        return $this->withOptimizedOrderItemRelations(
+            Order::select('id', 'branch_id', 'created_at', 'status', 'total_amount', 'delivery_fee', 'discount_amount', 'payment_method', 'order_type')
+                ->where('status', Order::STATUS_COMPLETED)
+                ->whereBetween('created_at', [$start, $end])
+                ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
+                ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
+        )->get();
     }
 
     private function fetchChartStandardCosts(?int $branchId): Collection
@@ -940,7 +1051,7 @@ class DashboardOverview extends Component
             ->get();
     }
 
-    private function aggregateDailyChartData(Collection $orders, Collection $branchCostMap, Collection $globalCostMap, Collection $purchaseCostMap): array
+        private function aggregateDailyChartData(Collection $orders, Collection $branchCostMap, Collection $globalCostMap, Collection $purchaseCostMap, Collection $wasteMovements): array
     {
         $dailyData = [];
         $productCostMap = [];
@@ -950,7 +1061,7 @@ class DashboardOverview extends Component
         foreach ($orders as $order) {
             $date = Carbon::parse($order->created_at)->toDateString();
             $bid = $order->branch_id;
-            if (!isset($dailyData[$date])) $dailyData[$date] = ['sales' => 0, 'volume' => 0, 'profit' => 0, 'cogs' => 0];
+            if (!isset($dailyData[$date])) $dailyData[$date] = ['sales' => 0, 'volume' => 0, 'profit' => 0, 'cogs' => 0, 'waste' => 0];
             
             $dailyData[$date]['sales'] += $order->total_amount;
             $dailyData[$date]['volume'] += 1;
@@ -963,6 +1074,17 @@ class DashboardOverview extends Component
             $dailyData[$date]['cogs'] += $orderCogs;
             // Profit = (Total Amount - Delivery Fee) - COGS
             $dailyData[$date]['profit'] += ($order->total_amount - $order->delivery_fee - $orderCogs);
+        }
+
+        // Net real waste events into the same day they happened, so this
+        // profit series equals Net Sales - COGS - Waste, matching the KPI card.
+        $dailyWaste = $wasteMovements->groupBy(fn($m) => Carbon::parse($m->created_at)->toDateString())
+            ->map(fn($g) => $g->sum(fn($m) => abs((float)$m->quantity) * ((float)($m->unit_cost ?? 0))));
+
+        foreach ($dailyWaste as $date => $wasteAmt) {
+            if (!isset($dailyData[$date])) $dailyData[$date] = ['sales' => 0, 'volume' => 0, 'profit' => 0, 'cogs' => 0, 'waste' => 0];
+            $dailyData[$date]['waste'] = $wasteAmt;
+            $dailyData[$date]['profit'] -= $wasteAmt;
         }
         
         return $dailyData;
@@ -1080,19 +1202,22 @@ class DashboardOverview extends Component
      */
     private function getLiveOrders(): array
     {
-        $branchId = $this->selectedBranchId;
+        return $this->cachedDashboardSegment('live-orders', 1, function () {
+            $branchId = $this->selectedBranchId;
 
-        return Order::orderByDesc('created_at')
-            ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
-            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
-            ->limit(10)
-            ->get()
-            ->map(fn($o) => [
-                'id' => "#" . $o->reference_no,
-                'time' => $o->created_at->diffForHumans(),
-                'status' => $o->status,
-                'amount' => '₱' . number_format($o->total_amount, 2)
-            ])->toArray();
+            return Order::select('id', 'reference_no', 'created_at', 'status', 'total_amount', 'branch_id')
+                ->orderByDesc('created_at')
+                ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
+                ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
+                ->limit(10)
+                ->get()
+                ->map(fn($o) => [
+                    'id' => "#" . $o->reference_no,
+                    'time' => $o->created_at->diffForHumans(),
+                    'status' => $o->status,
+                    'amount' => '₱' . number_format($o->total_amount, 2)
+                ])->toArray();
+        });
     }
 
     /**
@@ -1100,23 +1225,29 @@ class DashboardOverview extends Component
      */
     private function getExpirationAlerts(): array
     {
-        $branchId = $this->selectedBranchId;
-        $threshold = now()->addDays(7);
+        return $this->cachedDashboardSegment('expiration-alerts', 5, function () {
+            $branchId = $this->selectedBranchId;
+            $threshold = now()->addDays(7);
 
-        return StockBatch::with('ingredient', 'branch')
-            ->where('current_quantity', '>', 0)
-            ->where('expiry_date', '<=', $threshold) // Include already expired
-            ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
-            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
-            ->orderBy('expiry_date', 'asc')
-            ->get()
-            ->map(fn($b) => [
-                'ingredient' => $b->ingredient->name ?? 'Unknown',
-                'branch'     => $b->branch->branch_name ?? 'Global',
-                'quantity'   => number_format($b->current_quantity, 2) . ' ' . ($b->ingredient->unit ?? ''),
-                'days_left'  => (int) now()->startOfDay()->diffInDays(Carbon::parse($b->expiry_date)->startOfDay(), false),
-                'expiry'     => Carbon::parse($b->expiry_date)->format('M d, Y')
-            ])->toArray();
+            return StockBatch::select('id', 'ingredient_id', 'branch_id', 'current_quantity', 'expiry_date')
+                ->with([
+                    'ingredient' => fn($q) => $q->select('id', 'name', 'unit'),
+                    'branch' => fn($q) => $q->select('id', 'branch_name'),
+                ])
+                ->where('current_quantity', '>', 0)
+                ->where('expiry_date', '<=', $threshold) // Include already expired
+                ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
+                ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
+                ->orderBy('expiry_date', 'asc')
+                ->get()
+                ->map(fn($b) => [
+                    'ingredient' => $b->ingredient->name ?? 'Unknown',
+                    'branch'     => $b->branch->branch_name ?? 'Global',
+                    'quantity'   => number_format($b->current_quantity, 2) . ' ' . ($b->ingredient->unit ?? ''),
+                    'days_left'  => (int) now()->startOfDay()->diffInDays(Carbon::parse($b->expiry_date)->startOfDay(), false),
+                    'expiry'     => Carbon::parse($b->expiry_date)->format('M d, Y')
+                ])->toArray();
+        });
     }
 
     /**
@@ -1124,71 +1255,73 @@ class DashboardOverview extends Component
      */
     private function getInventoryIntelligence(): array
     {
-        $branchId = $this->selectedBranchId;
-        [$filterStart, $filterEnd, $days] = $this->resolveInventoryIntelDateWindow($branchId);
-        [$branchCostMap, $globalCostMap] = $this->resolveInventoryIntelCostMaps($branchId);
+        return $this->cachedDashboardSegment('inventory-intelligence', 5, function () {
+            $branchId = $this->selectedBranchId;
+            [$filterStart, $filterEnd, $days] = $this->resolveInventoryIntelDateWindow($branchId);
+            [$branchCostMap, $globalCostMap] = $this->resolveInventoryIntelCostMaps($branchId);
 
-        // 1. Consumption Velocity (Top 5 fastest moving ingredients)
-        $velocity = StockMovement::where('type', 'order') // 'order' represents sales deduction
-            ->when($filterStart, fn($q) => $q->where('created_at', '>=', $filterStart))
-            ->when($filterEnd, fn($q) => $q->where('created_at', '<=', $filterEnd))
-            ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
-            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
-            ->select('ingredient_id', DB::raw('SUM(ABS(quantity)) as total_consumed'))
-            ->groupBy('ingredient_id')
-            ->orderByDesc('total_consumed')
-            ->limit(5)
-            ->with('ingredient')
-            ->get()
-            ->map(fn($m) => [
-                'name'     => $m->ingredient->name ?? 'Unknown',
-                'daily'    => round($m->total_consumed / $days) . ' ' . ($m->ingredient->unit ?? ''),
-                'total'    => number_format($m->total_consumed, 0),
-                'progress' => min(100, ($m->total_consumed / ($m->ingredient->minimum_stock ?: 1)) * 10) // Visualization proxy
-            ])->toArray();
+            // 1. Consumption Velocity (Top 5 fastest moving ingredients)
+            $velocity = StockMovement::where('type', 'order') // 'order' represents sales deduction
+                ->when($filterStart, fn($q) => $q->where('created_at', '>=', $filterStart))
+                ->when($filterEnd, fn($q) => $q->where('created_at', '<=', $filterEnd))
+                ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
+                ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
+                ->select('ingredient_id', DB::raw('SUM(ABS(quantity)) as total_consumed'))
+                ->groupBy('ingredient_id')
+                ->orderByDesc('total_consumed')
+                ->limit(5)
+                ->with('ingredient')
+                ->get()
+                ->map(fn($m) => [
+                    'name'     => $m->ingredient->name ?? 'Unknown',
+                    'daily'    => round($m->total_consumed / $days) . ' ' . ($m->ingredient->unit ?? ''),
+                    'total'    => number_format($m->total_consumed, 0),
+                    'progress' => min(100, ($m->total_consumed / ($m->ingredient->minimum_stock ?: 1)) * 10) // Visualization proxy
+                ])->toArray();
 
-        // 2. Health Index: compare real loss events against consumed inventory value.
-        $salesMovements = StockMovement::where('type', 'order')
-            ->when($filterStart, fn($q) => $q->where('created_at', '>=', $filterStart))
-            ->when($filterEnd, fn($q) => $q->where('created_at', '<=', $filterEnd))
-            ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
-            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
-            ->get(['branch_id', 'ingredient_id', 'quantity']);
+            // 2. Health Index: compare real loss events against consumed inventory value.
+            $salesMovements = StockMovement::where('type', 'order')
+                ->when($filterStart, fn($q) => $q->where('created_at', '>=', $filterStart))
+                ->when($filterEnd, fn($q) => $q->where('created_at', '<=', $filterEnd))
+                ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
+                ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
+                ->get(['branch_id', 'ingredient_id', 'quantity']);
 
-        // Exclude generic "adjust" records here because positive reconciliations store
-        // the final counted stock level, which would distort loss calculations.
-        $wasteMovements = StockMovement::whereIn('type', ['waste', 'waste_expired', 'out', 'return_to_supplier'])
-            ->when($filterStart, fn($q) => $q->where('created_at', '>=', $filterStart))
-            ->when($filterEnd, fn($q) => $q->where('created_at', '<=', $filterEnd))
-            ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
-            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
-            ->get(['branch_id', 'ingredient_id', 'quantity']);
+            // Exclude generic "adjust" records here because positive reconciliations store
+            // the final counted stock level, which would distort loss calculations.
+            $wasteMovements = StockMovement::whereIn('type', ['waste', 'waste_expired', 'out', 'return_to_supplier'])
+                ->when($filterStart, fn($q) => $q->where('created_at', '>=', $filterStart))
+                ->when($filterEnd, fn($q) => $q->where('created_at', '<=', $filterEnd))
+                ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
+                ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
+                ->get(['branch_id', 'ingredient_id', 'quantity']);
 
-        $salesValue = $salesMovements->sum(fn ($movement) => abs((float) $movement->quantity) * $this->resolveInventoryIntelUnitCost(
-            (int) $movement->branch_id,
-            (int) $movement->ingredient_id,
-            $branchCostMap,
-            $globalCostMap
-        ));
+            $salesValue = $salesMovements->sum(fn ($movement) => abs((float) $movement->quantity) * $this->resolveInventoryIntelUnitCost(
+                (int) $movement->branch_id,
+                (int) $movement->ingredient_id,
+                $branchCostMap,
+                $globalCostMap
+            ));
 
-        $wasteValue = $wasteMovements->sum(fn ($movement) => abs((float) $movement->quantity) * $this->resolveInventoryIntelUnitCost(
-            (int) $movement->branch_id,
-            (int) $movement->ingredient_id,
-            $branchCostMap,
-            $globalCostMap
-        ));
+            $wasteValue = $wasteMovements->sum(fn ($movement) => abs((float) $movement->quantity) * $this->resolveInventoryIntelUnitCost(
+                (int) $movement->branch_id,
+                (int) $movement->ingredient_id,
+                $branchCostMap,
+                $globalCostMap
+            ));
 
-        $variancePct = $salesValue > 0
-            ? ($wasteValue / $salesValue) * 100
-            : ($wasteValue > 0 ? 100 : 0);
+            $variancePct = $salesValue > 0
+                ? ($wasteValue / $salesValue) * 100
+                : ($wasteValue > 0 ? 100 : 0);
 
-        return [
-            'velocity' => $velocity,
-            'variance_pct' => round($variancePct, 2),
-            'sales_value' => round($salesValue, 2),
-            'waste_value' => round($wasteValue, 2),
-            'health_score' => round(max(0, 100 - $variancePct), 2)
-        ];
+            return [
+                'velocity' => $velocity,
+                'variance_pct' => round($variancePct, 2),
+                'sales_value' => round($salesValue, 2),
+                'waste_value' => round($wasteValue, 2),
+                'health_score' => round(max(0, 100 - $variancePct), 2)
+            ];
+        });
     }
 
     private function resolveInventoryIntelDateWindow(?int $branchId): array
@@ -1216,22 +1349,11 @@ class DashboardOverview extends Component
         return [$start, $end, max(1, $start->diffInDays($end) + 1)];
     }
 
-    private function resolveInventoryIntelCostMaps(?int $branchId): array
+        private function resolveInventoryIntelCostMaps(?int $branchId): array
     {
-        $branchCosts = IngredientCost::query()
-            ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
-            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
-            ->get()
-            ->groupBy('branch_id')
-            ->map(function (Collection $costs) {
-                return $costs->mapWithKeys(function ($cost): array {
-                    $resolvedCost = (float) ($cost->cost_per_base_unit ?: $cost->unit_cost ?: 0);
-
-                    return [$cost->ingredient_id => $resolvedCost];
-                });
-            });
-
-        $globalCosts = Ingredient::pluck('cost', 'id')->map(fn ($cost): float => (float) $cost);
+        $effectiveBranchId = !$this->isSuperAdmin ? auth()->user()->branch_id : $branchId;
+        $branchCosts = $this->buildBranchCostMap($effectiveBranchId);
+        $globalCosts = $this->buildGlobalCostMap();
 
         return [$branchCosts, $globalCosts];
     }
@@ -1369,7 +1491,7 @@ class DashboardOverview extends Component
                 'Avg. Order Value' => 'PHP ' . number_format($kpi['aov'], 2),
                 'Total COGS'       => 'PHP ' . number_format($kpi['total_cogs'], 2),
                 'Waste'            => 'PHP ' . number_format($kpi['waste_cost'] ?? 0, 2),
-                'Net Profit'       => 'PHP ' . number_format($kpi['gross_profit'], 2),
+                                'Gross Profit'     => 'PHP ' . number_format($kpi['gross_profit'], 2),
                 'Profit Margin'    => number_format($kpi['profit_margin_pct'], 2) . '%',
                 'Completed Orders' => number_format($kpi['order_count']),
                 'Active Products'  => number_format($kpi['active_products']),

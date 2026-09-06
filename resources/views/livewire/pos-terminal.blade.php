@@ -1,8 +1,9 @@
-<div class="flex flex-col h-[calc(100vh-58px)] sm:h-[calc(100vh-65px)] overflow-hidden bg-gray-100" 
+<div id="pos-terminal-root" class="flex flex-col h-[calc(100vh-58px)] sm:h-[calc(100vh-65px)] overflow-hidden bg-gray-100" 
     wire:key="pos-terminal-root"
     x-data="{ 
+        isMobile: window.matchMedia('(max-width: 767px)').matches,
         searchQuery: '',
-        activeCategoryId: null,
+        activeCategoryId: sessionStorage.getItem('pos_active_category') ? parseInt(sessionStorage.getItem('pos_active_category')) : null,
         get filteredProductsCount() {
             const query = this.searchQuery ? this.searchQuery.toLowerCase().trim() : '';
             return Object.values(this.productsData).filter(p => {
@@ -15,9 +16,12 @@
         cartExpanded: false,
         isEditMode: @entangle('isEditMode').live,
         cart: @entangle('cart'),
-        paymentMethod: @entangle('paymentMethod').live,
-        amountTendered: @entangle('amountTendered').live,
+        paymentMethod: @entangle('paymentMethod'),
+        gcashVerified: @entangle('gcashVerified').live,
+        amountTendered: @entangle('amountTendered'),
         serviceChargeRate: {{ $serviceChargeRate }},
+        discountPercent: {{ $discountPercent }},
+        seniorDiscountRate: {{ $seniorDiscountRate }},
         orderType: @entangle('orderType'),
         get subtotal() {
             return Object.values(this.cart).reduce((sum, item) => sum + (item.price * item.qty), 0);
@@ -25,67 +29,74 @@
         get serviceCharge() {
             return this.orderType === 'Dine-in' ? (this.subtotal * this.serviceChargeRate) : 0;
         },
-        get total() {
-            return this.subtotal + this.serviceCharge;
+        get discountTotal() {
+            return Object.values(this.cart).reduce((sum, item) => {
+                const itemTotal = item.price * item.qty;
+                let discount = 0;
+                if (item.apply_regular_discount) discount += itemTotal * this.discountPercent;
+                if (item.apply_senior_discount) discount += itemTotal * this.seniorDiscountRate;
+                return sum + discount;
+            }, 0);
         },
-        productsData: {{ $products->keyBy('id')->toJson() }},
+        get total() {
+            return (this.subtotal - this.discountTotal) + this.serviceCharge;
+        },
+                productsData: {},
         activeProduct: null,
         selectedOptions: {},
         selectedModifierIds: [],
+        pendingDeleteKey: null,
         categorySortable: null,
         categorySortableTimeout: null,
         setupCategorySortable() {
-            if (this.categorySortableTimeout) clearTimeout(this.categorySortableTimeout);
-            if (!this.isEditMode) {
-                if (this.categorySortable) { 
-                    try { this.categorySortable.destroy(); } catch(e) {}
-                    this.categorySortable = null; 
-                }
-                return;
+    if (this.categorySortableTimeout) clearTimeout(this.categorySortableTimeout);
+    if (!this.isEditMode) {
+        if (this.categorySortable) {
+            try { this.categorySortable.destroy(); } catch(e) {}
+            this.categorySortable = null;
+        }
+        return;
+    }
+    this.categorySortableTimeout = setTimeout(() => {
+        const el = document.getElementById('category-sortable-tabs');
+        if (!el || this.categorySortable) return;
+        this.categorySortable = Sortable.create(el, {
+            filter: '#pos_tab_all',
+            animation: 150,
+            ghostClass: 'opacity-50',
+            onEnd: () => {
+                const ids = Array.from(el.querySelectorAll('.pos-category-tab'))
+                    .map(tab => tab.dataset.id)
+                    .filter(id => id);
+                setTimeout(() => { $wire.reorderCategories(ids); }, 100);
             }
-            this.categorySortableTimeout = setTimeout(() => {
-                const el = document.getElementById('category-sortable-tabs');
-                if (!el || this.categorySortable) return;
-                this.categorySortable = new Sortable(el, {
-                    draggable: '.pos-category-tab',
-                    filter: '#pos_tab_all',
-                    animation: 150,
-                    ghostClass: 'bg-' + this.primaryColor + '-50',
-                    onEnd: (evt) => {
-                        const ids = Array.from(el.querySelectorAll('.pos-category-tab'))
-                            .map(tab => tab.dataset.id)
-                            .filter(id => id);
-                        setTimeout(() => { $wire.reorderCategories(ids); }, 100);
-                    }
-                });
-            }, 50);
-        },
+        });
+    }, 50);
+},
         primaryColor: @js($primaryColor),
         productSortable: null,
         productSortableTimeout: null,
         setupProductSortable() {
-            if (this.productSortableTimeout) clearTimeout(this.productSortableTimeout);
-            if (!this.isEditMode) {
-                if (this.productSortable) { 
-                    try { this.productSortable.destroy(); } catch(e) {}
-                    this.productSortable = null; 
-                }
-                return;
-            }
-            this.productSortableTimeout = setTimeout(() => {
-                const el = document.getElementById('product-sortable-grid');
-                if (!el || this.productSortable) return;
-                
-                this.productSortable = new Sortable(el, {
-                    draggable: '.product-card',
-                    handle: '.drag-handle',
-                    animation: 150,
-                    ghostClass: 'bg-' + this.primaryColor + '-50',
-                    chosenClass: 'shadow-2xl',
-                    dragClass: 'opacity-0',
-                });
-            }, 50);
-        },
+    if (this.productSortableTimeout) clearTimeout(this.productSortableTimeout);
+    if (!this.isEditMode) {
+        if (this.productSortable) {
+            try { this.productSortable.destroy(); } catch(e) {}
+            this.productSortable = null;
+        }
+        return;
+    }
+    this.productSortableTimeout = setTimeout(() => {
+        const el = document.getElementById('product-sortable-grid');
+        if (!el || this.productSortable) return;
+        this.productSortable = Sortable.create(el, {
+            handle: '.drag-handle',
+            animation: 150,
+            ghostClass: 'opacity-50',
+            chosenClass: 'shadow-2xl',
+            dragClass: 'opacity-0',
+        });
+    }, 50);
+},
         openQuickOptions(pid) {
             const product = this.productsData[pid];
             if (!product) return;
@@ -102,21 +113,29 @@
             this.selectedOptions = {};
             this.selectedModifierIds = [];
 
-            // Initialize defaults
+            const availability = product.option_availability || {};
+            const isAvailable = (opt, group) => group.no_recipe_required || (availability[opt.id] ?? 0) > 0;
+
+            // Initialize defaults — never pre-select an option that's out
+            // of stock or has no ingredients mapped to it (unless its
+            // group is flagged 'No Recipe Required').
             const productOptionGroups = product.option_groups || product.optionGroups || [];
             if (productOptionGroups) {
                 productOptionGroups.forEach(group => {
-                    const def = group.options.find(o => o.is_default);
+                    const def = group.options.find(o => o.is_default && isAvailable(o, group));
                     if (def) {
                         this.selectedOptions[group.id] = group.price_mode === 'additive' ? [def.id] : def.id;
                     } else if (group.is_required) {
-                        const first = group.options[0];
-                        this.selectedOptions[group.id] = group.price_mode === 'additive' ? [first.id] : first.id;
+                        const firstAvailable = group.options.find(o => isAvailable(o, group));
+                        this.selectedOptions[group.id] = firstAvailable
+                            ? (group.price_mode === 'additive' ? [firstAvailable.id] : firstAvailable.id)
+                            : (group.price_mode === 'additive' ? [] : null);
                     } else {
                         this.selectedOptions[group.id] = group.price_mode === 'additive' ? [] : null;
                     }
                 });
             }
+            
             // State is handled entirely by Alpine now for instant reactivity
             this.$dispatch('open-options-modal', product);
             this.$dispatch('open-modal', 'pos-options');
@@ -125,6 +144,96 @@
             return Object.values(this.cart)
                 .filter(item => item.id == pid)
                 .reduce((sum, item) => sum + item.qty, 0);
+        },
+        getProductRecipes(product, optionIds = [], modifierIds = []) {
+            const recipes = product?.recipes || [];
+            return recipes.filter(recipe => {
+                if (!recipe.product_option_id && !recipe.modifier_id) return true;
+                if (recipe.product_option_id) return optionIds.includes(Number(recipe.product_option_id));
+                if (recipe.modifier_id) return modifierIds.includes(Number(recipe.modifier_id));
+                return false;
+            });
+        },
+        getCartIngredientUsage(excludeProductId = null) {
+            const usage = {};
+
+            Object.values(this.cart || {}).forEach(item => {
+            if (excludeProductId !== null && Number(item.id) === Number(excludeProductId)) return;
+
+                const product = this.productsData[item.id];
+                if (!product) return;
+
+                const optionIds = (item.options || []).map(option => Number(option.id));
+                const modifierIds = (item.modifiers || []).map(modifier => Number(modifier.id));
+                this.getProductRecipes(product, optionIds, modifierIds).forEach(recipe => {
+                    const ingredientId = recipe.ingredient_id;
+                    usage[ingredientId] = (usage[ingredientId] || 0) + (Number(recipe.quantity) * Number(item.qty || 0));
+                });
+            });
+
+            return usage;
+        },
+        remainingStock(pid) {
+            const product = this.productsData[pid];
+            if (!product) return 0;
+
+            const recipes = this.getProductRecipes(product);
+            const stock = product.prefetched_stocks || {};
+            const usage = this.getCartIngredientUsage(pid);
+
+            if (recipes.length === 0) {
+                const maxAvailable = Number(product.max_available ?? product.available_quantity ?? 0);
+                return Math.max(0, maxAvailable - this.getCartQty(pid));
+            }
+
+            const maxAvailable = recipes.reduce((maximum, recipe) => {
+                const recipeQuantity = Number(recipe.quantity);
+                if (recipeQuantity <= 0) return maximum;
+
+                const availableIngredient = Math.max(0, Number(stock[recipe.ingredient_id] || 0) - Number(usage[recipe.ingredient_id] || 0));
+                return Math.min(maximum, Math.floor(availableIngredient / recipeQuantity));
+            }, Number.MAX_SAFE_INTEGER);
+
+            return Math.max(0, maxAvailable - this.getCartQty(pid));
+        },
+        maxAvailableForProduct(pid) {
+            return this.getCartQty(pid) + this.remainingStock(pid);
+        },
+                remainingOptionStock(product, optionId) {
+            if (!product) return 0;
+            const groups = product?.option_groups || product?.optionGroups || [];
+            const owningGroup = groups.find(g => (g.options || []).some(o => o.id === optionId));
+            if (owningGroup && owningGroup.no_recipe_required) {
+                return Infinity;
+            }
+
+            const recipes = (product?.recipes || []).filter(recipe => Number(recipe.product_option_id) === Number(optionId));
+            if (recipes.length === 0) return 0;
+
+            const stock = product.prefetched_stocks || {};
+            const usage = this.getCartIngredientUsage();
+            return Math.max(0, recipes.reduce((maximum, recipe) => {
+                const recipeQuantity = Number(recipe.quantity);
+                if (recipeQuantity <= 0) return maximum;
+
+                const availableIngredient = Math.max(0, Number(stock[recipe.ingredient_id] || 0) - Number(usage[recipe.ingredient_id] || 0));
+                return Math.min(maximum, Math.floor(availableIngredient / recipeQuantity));
+            }, Number.MAX_SAFE_INTEGER));
+        },
+        remainingModifierStock(product, modifierId) {
+            if (!product) return 0;
+            const recipes = (product?.recipes || []).filter(recipe => Number(recipe.modifier_id) === Number(modifierId));
+            if (recipes.length === 0) return 0;
+
+            const stock = product.prefetched_stocks || {};
+            const usage = this.getCartIngredientUsage();
+            return Math.max(0, recipes.reduce((maximum, recipe) => {
+                const recipeQuantity = Number(recipe.quantity);
+                if (recipeQuantity <= 0) return maximum;
+
+                const availableIngredient = Math.max(0, Number(stock[recipe.ingredient_id] || 0) - Number(usage[recipe.ingredient_id] || 0));
+                return Math.min(maximum, Math.floor(availableIngredient / recipeQuantity));
+            }, Number.MAX_SAFE_INTEGER));
         },
         toggleOpt(groupId, optId, isAdditive, isRequired) {
             if (isAdditive) {
@@ -144,6 +253,19 @@
         optimisticAddToCart(pid, selectedOptionsObj = {}, selectedModifierIds = []) {
             const product = this.productsData[pid];
             if (!product) return;
+
+            const maxAvailable = Number(product.max_available ?? product.available_quantity ?? 999);
+            const currentCartQtyForProduct = Object.values(this.cart)
+                .filter(item => item.id == pid)
+                .reduce((sum, item) => sum + Number(item.qty || 0), 0);
+
+            if (this.remainingStock(pid) <= 0 || maxAvailable <= 0) {
+                return;
+            }
+
+            if ((currentCartQtyForProduct + 1) > maxAvailable) {
+                return;
+            }
 
             // Flatten options IDs
             let optionIds = [];
@@ -224,7 +346,26 @@
             }
             return this.selectedOptions[groupId] === optId;
         },
+        canAddToOrder(product) {
+            if (!product) return false;
+
+            const maxAvailable = this.remainingStock(product.id);
+            if (maxAvailable <= 0) return false;
+
+            const groups = product.option_groups || product.optionGroups || [];
+            // Every required group must have a real, in-stock selection.
+            return groups.every(group => {
+                if (!group.is_required) return true;
+                const sel = this.selectedOptions[group.id];
+                const hasSelection = Array.isArray(sel) ? sel.length > 0 : !!sel;
+                return hasSelection;
+            });
+        },
         init() {
+            const mq = window.matchMedia('(max-width: 767px)');
+            this.isMobile = mq.matches;
+            mq.addEventListener('change', (e) => { this.isMobile = e.matches; });
+
             this.$watch('cart', value => { 
                 if (!value || Object.keys(value).length === 0) {
                     this.cartExpanded = false; 
@@ -237,45 +378,90 @@
             });
 
             const applySearchFilter = () => {
-                const query = this.searchQuery ? this.searchQuery.toLowerCase().trim() : '';
-                document.querySelectorAll('.product-card').forEach(card => {
-                    const name = card.dataset.searchName || '';
-                    const catId = card.dataset.categoryId;
-                    
-                    const matchesCategory = this.activeCategoryId === null || catId == this.activeCategoryId;
-                    const matchesSearch = !query || name.includes(query);
-                    
-                    card.style.display = (matchesCategory && matchesSearch) ? '' : 'none';
-                });
-            };
+    const query = this.searchQuery ? this.searchQuery.toLowerCase().trim() : '';
+    requestAnimationFrame(() => {
+        document.querySelectorAll('.product-card').forEach(card => {
+            const name = card.dataset.searchName || '';
+            const catId = card.dataset.categoryId;
+
+            const matchesCategory = this.activeCategoryId === null || catId == this.activeCategoryId;
+            const matchesSearch = !query || name.includes(query);
+            const visible = matchesCategory && matchesSearch;
+
+            card.style.display = visible ? '' : 'none';
+        });
+    });
+};
 
             this.$watch('searchQuery', applySearchFilter);
-            this.$watch('activeCategoryId', applySearchFilter);
+            this.$watch('activeCategoryId', (val) => {
+    if (val === null) {
+        sessionStorage.removeItem('pos_active_category');
+    } else {
+        sessionStorage.setItem('pos_active_category', val);
+    }
+    applySearchFilter();
+});
 
             const syncProducts = () => {
-                const el = document.getElementById('hidden-products-data');
-                if (el) {
-                    try {
-                        this.productsData = JSON.parse(el.getAttribute('data-products'));
-                    } catch (e) {
-                        console.error('Failed to parse products data', e);
-                    }
-                }
-                setTimeout(applySearchFilter, 50);
-            };
+    const el = document.getElementById('hidden-products-data');
+    if (el) {
+        try {
+            this.productsData = JSON.parse(el.getAttribute('data-products'));
+        } catch (e) {
+            console.error('Failed to parse products data', e);
+        }
+    }
+    // Run twice: once immediately, once after DOM fully paints
+    applySearchFilter();
+    requestAnimationFrame(() => applySearchFilter());
+};
 
             syncProducts();
 
-            document.addEventListener('livewire:navigated', syncProducts);
+            // wire:navigate can restore this page from Livewire's own
+            // in-memory navigate cache instead of hitting the server.
+            // Keep one global listener, while replacing the sync callback
+            // whenever the POS component is initialized again.
+            window.__posSyncProducts = syncProducts;
+            window.__posWire = this.$wire;
+            const refreshCurrentPos = () => {
+                if (!document.getElementById('pos-terminal-root')) return;
+                const refreshResult = window.__posWire?.refreshPosData?.();
+                Promise.resolve(refreshResult).then(() => window.__posSyncProducts?.());
+            };
+
+            if (!window.__posNavigatedListenerAttached) {
+                window.__posNavigatedListenerAttached = true;
+                document.addEventListener('livewire:navigated', refreshCurrentPos);
+
+                // Browser back/forward can restore this page from bfcache
+                // without firing livewire:navigated.
+                window.addEventListener('pageshow', (event) => {
+                    if (event.persisted) refreshCurrentPos();
+                });
+            }
             
             const setupHook = () => {
-                Livewire.hook('commit', ({ succeed }) => {
-                    succeed(() => setTimeout(syncProducts, 50));
+                window.Livewire?.hook?.('commit', ({ succeed }) => {
+                    succeed(() => {
+                        setTimeout(() => window.__posSyncProducts?.(), 50);
+                        requestAnimationFrame(() => window.__posSyncProducts?.());
+                    });
                 });
             };
-            
-            if (window.Livewire) setupHook();
-            else document.addEventListener('livewire:initialized', setupHook);
+
+            if (!window.__posCommitHookAttached) {
+                window.__posCommitHookAttached = true;
+                if (window.Livewire) setupHook();
+                else document.addEventListener('livewire:initialized', setupHook, { once: true });
+            }
+        },
+        destroy() {
+            if (window.__posWire === this.$wire) {
+                window.__posWire = null;
+                window.__posSyncProducts = null;
+            }
         }
     }"
     @cart-expanded.window="cartExpanded = true"
@@ -283,8 +469,96 @@
     @cart-toggle.window="cartExpanded = !cartExpanded"
     @cart-reset.window="cartExpanded = false"
 >
-    <script src="{{ asset('js/Sortable.min.js') }}"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
     <div id="hidden-products-data" class="hidden" data-products="{{ $products->keyBy('id')->toJson() }}"></div>
+
+        <script>
+        window.thermalReceiptPopupFeatures = window.thermalReceiptPopupFeatures || 'width=450,height=700,menubar=no,toolbar=no,location=no,status=no';
+
+        // The order is saved through an asynchronous Livewire request. Browsers
+        // can block a popup opened after that request has completed, so reserve
+        // an empty receipt window during the cashier's click and navigate it
+        // only after the order ID is returned.
+        window.prepareThermalReceiptWindow = window.prepareThermalReceiptWindow || (() => {
+            const existing = window.pendingThermalReceiptWindow;
+            if (existing && !existing.closed) {
+                existing.focus();
+                return existing;
+            }
+
+            const receiptWindow = window.open('about:blank', 'thermal_receipt_pending', window.thermalReceiptPopupFeatures);
+            if (!receiptWindow) return null;
+
+            receiptWindow.document.title = 'Preparing receipt…';
+            receiptWindow.document.body.innerHTML = '<p style="font-family: sans-serif; padding: 24px;">Preparing receipt…</p>';
+            window.pendingThermalReceiptWindow = receiptWindow;
+
+            window.setTimeout(() => {
+                if (window.pendingThermalReceiptWindow === receiptWindow && !receiptWindow.closed) {
+                    receiptWindow.close();
+                    window.pendingThermalReceiptWindow = null;
+                }
+            }, 30000);
+
+                        return receiptWindow;
+        });
+
+        // wire:navigate re-executes this inline <script> block on every visit
+        // to this page (POS or Order Management, once added there too), and
+        // addEventListener has no built-in dedupe — without this guard,
+        // repeated navigation would stack up duplicate listeners and cause
+        // one placed/accepted order to trigger multiple print jobs.
+        if (!window.__thermalPrintListenerAttached) {
+        window.__thermalPrintListenerAttached = true;
+        window.addEventListener('send-thermal-print', async (e) => {
+            const { order_id, receipt_type = 'all' } = e.detail || {};
+            if (!order_id) return;
+
+            console.log('📋 POS Terminal: Print event triggered', { order_id, receipt_type });
+
+            try {
+                // 1. If Web Bluetooth thermal printer is connected, print directly over Bluetooth
+                if (window.thermalBluetoothPrinter && window.thermalBluetoothPrinter.characteristic) {
+                    console.log('📋 POS Terminal: Bluetooth printer connected, fetching receipt data...');
+                    const res = await fetch(`/pos/orders/${order_id}/receipt-data`);
+                    if (!res.ok) throw new Error('Could not load receipt data.');
+                    const data = await res.json();
+                    await window.thermalBluetoothPrinter.printReceipt(data.order, data.settings, data.receipts || []);
+                    window.dispatchEvent(new CustomEvent('notify', {
+                        detail: { type: 'success', message: 'Receipt printed via Bluetooth.' }
+                    }));
+                    return;
+                }
+
+                // 2. If Bluetooth is not connected, open and print the thermal-receipt.blade template
+                const receiptUrl = `/receipts/${order_id}/thermal?autoprint=1`;
+                const pendingWindow = window.pendingThermalReceiptWindow;
+                const printWindow = pendingWindow && !pendingWindow.closed
+                    ? pendingWindow
+                    : window.open(receiptUrl, 'thermal_receipt_' + order_id, window.thermalReceiptPopupFeatures);
+
+                window.pendingThermalReceiptWindow = null;
+
+                if (pendingWindow && printWindow) {
+                    printWindow.name = 'thermal_receipt_' + order_id;
+                    printWindow.location.replace(receiptUrl);
+                    printWindow.focus();
+                }
+
+                if (!printWindow || printWindow.closed || typeof printWindow.closed === 'undefined') {
+                    window.dispatchEvent(new CustomEvent('notify', {
+                        detail: { type: 'info', message: 'Order placed! Popup was blocked — please allow popups to auto-open receipt.' }
+                    }));
+                }
+            } catch (err) {
+                console.error('Receipt print failed:', err);
+                window.dispatchEvent(new CustomEvent('notify', {
+                    detail: { type: 'error', message: 'Print failed: ' + err.message }
+                }));
+            }
+        });
+        }
+    </script>
 
     {{-- ══════════════════════════════════════════════
          FULL-WIDTH CATEGORY TAB CARD
@@ -336,12 +610,39 @@
                         class="pl-8 pr-3 py-1.5 w-full sm:w-36 text-[12px] font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:border-gray-300 placeholder-gray-400 transition-all sm:focus:w-44">
                 </div>
 
-                <button type="button" @click="$dispatch('open-modal', 'pos-drafts-list')" title="Held Orders" class="relative p-2 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all border border-indigo-100 flex items-center justify-center">
+                                <button type="button" @click="$dispatch('open-modal', 'pos-drafts-list')" title="Held Orders" class="relative p-2 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all border border-indigo-100 flex items-center justify-center">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     @if($this->drafts->count() > 0)
                         <span class="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] font-black text-white shadow-sm ring-2 ring-white animate-bounce">{{ $this->drafts->count() }}</span>
                     @endif
                 </button>
+
+                {{-- Bluetooth Thermal Printer connect/status --}}
+                                <div x-data="{
+                        connected: !!(window.thermalBluetoothPrinter && window.thermalBluetoothPrinter.characteristic),
+                        connecting: false,
+                        supported: 'bluetooth' in navigator,
+                        printerName: localStorage.getItem('thermal_printer_name') || ''
+                    }"
+                    x-init="window.addEventListener('thermal-bt-disconnected', () => { connected = false; })"
+                    class="shrink-0">
+                    <button type="button"
+                        :disabled="!supported || connecting"
+                        :title="!supported ? 'Bluetooth printing needs Chrome/Edge (not supported in this browser)' : (connected ? ('Connected: ' + printerName) : 'Connect Bluetooth Printer')"
+                        @click="
+                            connecting = true;
+                            window.thermalBluetoothPrinter.connect()
+                                .then(name => { connected = true; printerName = name; $dispatch('notify', { type: 'success', message: 'Connected to ' + name }); })
+                                .catch(err => { $dispatch('notify', { type: 'error', message: err.message }); })
+                                .finally(() => connecting = false);
+                        "
+                        class="relative p-2 rounded-lg transition-all border flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
+                        :class="connected ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'">
+                        <svg x-show="!connecting" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6.5 6.5l11 11L12 23V1l5.5 5.5-11 11" /></svg>
+                        <svg x-show="connecting" x-cloak class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        <span x-show="connected" class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white"></span>
+                    </button>
+                </div>
 
                 @if(auth()->user()->role_id === 1 || auth()->user()->role_id === 2)
                 {{-- Done button: visible in edit mode --}}
@@ -390,7 +691,7 @@
                 @endphp
                 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"
                     id="product-sortable-grid"
-                    wire:key="pos-grid-{{ $selectedCategoryId ?? 'all' }}"
+                    wire:key="pos-grid-static"
                     x-init="setupProductSortable()">
                     @foreach($products as $product)
                         @php
@@ -422,19 +723,15 @@
 
                                 {{-- Availability Badge --}}
                                 <div class="absolute top-2 right-2">
-                                    @if($availability === 'unavailable' || $maxAvailable <= 0)
-                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/90 text-red-600 shadow-sm border border-red-100">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>Out of Stock
-                                        </span>
-                                    @elseif($availability === 'low_stock')
-                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/90 text-amber-600 shadow-sm border border-amber-100">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></span>Low ({{ $maxAvailable }} left)
-                                        </span>
-                                    @else
-                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/90 text-emerald-600 shadow-sm border border-emerald-100">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>{{ $maxAvailable }} left
-                                        </span>
-                                    @endif
+                                    <span x-show="remainingStock({{ $pid }}) <= 0" x-cloak class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/90 text-red-600 shadow-sm border border-red-100">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>Out of Stock
+                                    </span>
+                                    <span x-show="remainingStock({{ $pid }}) > 0 && remainingStock({{ $pid }}) <= 10" x-cloak class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/90 text-amber-600 shadow-sm border border-amber-100">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></span>Low (<span x-text="remainingStock({{ $pid }})"></span> left)
+                                    </span>
+                                    <span x-show="remainingStock({{ $pid }}) > 10" x-cloak class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/90 text-emerald-600 shadow-sm border border-emerald-100">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span><span x-text="remainingStock({{ $pid }})"></span> left
+                                    </span>
                                 </div>
                             </div>
 
@@ -458,7 +755,7 @@
                                     @else
                                         {{-- Max Qty Reached --}}
                                         <x-danger-button type="button" disabled class="w-full justify-center" 
-                                            x-show="getCartQty({{ $pid }}) >= {{ $maxAvailable }}">
+                                            x-show="remainingStock({{ $pid }}) <= 0">
                                             <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                                             </svg>
@@ -468,10 +765,10 @@
                                         {{-- Add More --}}
                                         <x-secondary-button type="button" 
                                             @click="!isEditMode && {{ $clickAction }}" 
-                                            x-show="getCartQty({{ $pid }}) > 0 && getCartQty({{ $pid }}) < {{ $maxAvailable }}"
+                                            x-show="getCartQty({{ $pid }}) > 0 && remainingStock({{ $pid }}) > 0"
                                             :class="isEditMode ? 'opacity-50 cursor-not-allowed' : ''"
                                             id="pos_addmore_{{ $pid }}" class="w-full justify-center">
-                                            Add More (<span x-text="getCartQty({{ $pid }})"></span>/{{ $maxAvailable }})
+                                            Add More (<span x-text="getCartQty({{ $pid }})"></span>/<span x-text="maxAvailableForProduct({{ $pid }})"></span>)
                                         </x-secondary-button>
 
                                         {{-- Add to Cart --}}
@@ -507,14 +804,14 @@
         <div x-show="isMobile && cartExpanded" 
              x-transition.opacity.duration.300ms
              @click="cartExpanded = false"
-             class="fixed inset-0 bg-gray-900/60 z-[115] backdrop-blur-sm lg:hidden"
+             class="fixed inset-0 bg-gray-900/60 z-30 backdrop-blur-sm md:hidden"
              x-cloak>
         </div>
 
         {{-- RIGHT: Order Summary Card --}}
         <div 
             :class="[
-                isMobile ? 'fixed inset-x-0 bottom-0 z-[120] transition-transform duration-500 ease-in-out' : 'w-full md:w-[300px] xl:w-[320px] flex-shrink-0 flex flex-col min-h-0',
+                isMobile ? 'fixed inset-x-0 bottom-0 z-40 transition-transform duration-500 ease-in-out' : 'w-full md:w-[300px] xl:w-[320px] flex-shrink-0 flex flex-col min-h-0',
                 isMobile ? (cartExpanded ? 'translate-y-0' : 'translate-y-[calc(100%-65px)]') : ''
             ]"
             class="flex flex-col h-[85vh] md:h-auto"
@@ -535,7 +832,7 @@
                         </template>
                     </div>
                     <div class="flex items-center gap-2">
-                        <span class="text-[11px] font-black text-gray-900 font-mono tracking-tighter uppercase">#{{ $referenceNo }}</span>
+                        <span class="text-[11px] font-black text-gray-900 font-mono tracking-tighter uppercase">{{ $referenceNo ? '#' . $referenceNo : 'New Order' }}</span>
                         <button type="button" title="Hold Order" class="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 transition-all" :disabled="Object.keys(cart).length === 0" @click.stop="isSavingDraft = true; $wire.saveDraft().finally(() => { isSavingDraft = false; cartExpanded = false })">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
                         </button>
@@ -587,7 +884,7 @@
                                                     <span class="absolute top-1 right-1 w-1.5 h-1.5 bg-amber-500 rounded-full border border-white"></span>
                                                 </template>
                                             </button>
-                                            <button @click="delete cart[key]" class="p-1.5 text-gray-300 hover:text-red-500 transition-all rounded-lg hover:bg-red-50">
+                                                                                        <button @click="pendingDeleteKey = key; $dispatch('open-modal', 'confirm-delete-item')" class="p-1.5 text-gray-300 hover:text-red-500 transition-all rounded-lg hover:bg-red-50">
                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                                             </button>
                                         </div>
@@ -600,7 +897,11 @@
                                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4"/></svg>
                                             </button>
                                             <span class="px-1 text-[12px] font-black text-gray-900 min-w-[20px] text-center font-mono" x-text="item.qty"></span>
-                                            <button @click="cart[key].qty++" 
+                                            <button @click="
+                                                const productQty = getCartQty(item.id);
+                                                const maxQty = maxAvailableForProduct(item.id);
+                                                if (remainingStock(item.id) > 0 && productQty < maxQty) { cart[key].qty++; cart = {...cart} }
+                                                else { $dispatch('notify', { type: 'warning', message: 'Maximum available stock reached' }) }"
                                                 class="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all active:scale-95">
                                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
                                             </button>
@@ -684,22 +985,34 @@
                                 class="text-[12px] font-bold text-gray-800 bg-transparent border-0 p-0 focus:ring-0 text-right w-24 placeholder-gray-300 {{ $errors->has('tableNumber') ? 'text-red-500 placeholder-red-300' : '' }}">
                         </div>
 
-                     {{-- Confirm Payment --}}
-                    <x-primary-button type="button" @click="$wire.amountTendered = total; $wire.paymentReference = ''; $dispatch('open-modal', 'pos-payment')" x-bind:disabled="Object.keys(cart).length === 0" id="pos_confirm_payment_btn" class="w-full mt-2 justify-center">
+                                          {{-- Confirm Payment --}}
+                    <x-primary-button type="button"
+                        @click="
+                            if (Object.keys(cart).length === 0) return;
+                            amountTendered = total;
+                            $wire.paymentReference = '';
+                            $dispatch('open-modal', 'pos-payment');
+                            $wire.openPaymentModal();
+                        "
+                        x-bind:disabled="Object.keys(cart).length === 0" id="pos_confirm_payment_btn" class="w-full mt-2 justify-center">
                         <span x-show="Object.keys(cart).length > 0">Proceed to Payment</span>
                         <span x-show="Object.keys(cart).length === 0">Add Items to Order</span>
                     </x-primary-button>
 
 
                     <div x-show="Object.keys(cart).length > 0">
-                        <x-secondary-button type="button" @click="cart = {}; $wire.clearCart()" wire:loading.attr="disabled" id="pos_clear_cart_btn" class="w-full mt-1.5 justify-center text-red-600">
+                                                <x-secondary-button type="button"
+                            @click="$dispatch('open-modal', 'confirm-clear-order')"
+                            x-bind:class="(paymentMethod === 'GCash' && gcashVerified) ? 'opacity-50 cursor-not-allowed' : ''"
+                            wire:loading.attr="disabled" id="pos_clear_cart_btn" class="w-full mt-1.5 justify-center text-red-600">
                             Clear Order
                         </x-secondary-button>
                     </div>
-                </div>
 
-            </div>
-        </div>{{-- end RIGHT --}}
+                    </div>{{-- close pt-2 space-y-3 order meta --}}
+                </div>{{-- close border-t px-4 pt-3 pb-4 totals section --}}
+            </div>{{-- close flex flex-col bg-white rounded card --}}
+        </div>{{-- close RIGHT panel --}}
 
     </div>{{-- end content row --}}
 
@@ -713,109 +1026,123 @@
         <x-modal name="pos-options" maxWidth="2xl" focusable>
             <div x-data="{ localProduct: null }" 
                  @open-options-modal.window="localProduct = $event.detail"
-                 x-show="localProduct" class="p-8 relative">
-                <div class="h-1 w-full bg-gradient-to-r from-indigo-500 to-blue-600 rounded-t-xl absolute top-0 left-0"></div>
-                
-                <div class="mb-8">
-                    <div class="flex items-start justify-between mb-4">
-                        <div>
-                            <h2 class="text-[22px] font-black text-gray-900" x-text="localProduct ? localProduct.name : ''"></h2>
-                            <p class="text-[13px] text-gray-500 mt-1">Customize your order</p>
-                        </div>
-                        <template x-if="localProduct && localProduct.image_url">
-                            <img :src="localProduct.image_url" :alt="localProduct.name" 
-                                class="w-20 h-20 rounded-lg object-cover border border-gray-100 shadow-sm">
-                        </template>
-                    </div>
-                </div>
-
-                {{-- Option Groups --}}
-                <div class="space-y-8 mb-8" x-show="localProduct && (localProduct.option_groups || localProduct.optionGroups)">
-                    <template x-for="group in localProduct ? (localProduct.option_groups || localProduct.optionGroups || []) : []" :key="group.id">
-                        <div>
-                            <div class="flex items-center justify-between mb-4">
+                 class="relative">
+                <template x-if="localProduct">
+                    <div class="p-8 relative">
+                        <div class="h-1 w-full bg-gradient-to-r from-indigo-500 to-blue-600 rounded-t-xl absolute top-0 left-0"></div>
+                        
+                        <div class="mb-8">
+                            <div class="flex items-start justify-between mb-4">
                                 <div>
-                                    <p class="text-[14px] font-bold text-gray-900" x-text="group.name"></p>
-                                    <template x-if="group.is_required">
-                                        <span class="text-[11px] font-semibold text-red-600 mt-0.5 block">Required selection</span>
-                                    </template>
-                                    <template x-if="group.price_mode === 'additive'">
-                                        <span class="text-[11px] font-semibold text-blue-600 mt-0.5 block">Multiple allowed</span>
-                                    </template>
+                                    <h2 class="text-[22px] font-black text-gray-900" x-text="localProduct ? localProduct.name : ''"></h2>
+                                    <p class="text-[13px] text-gray-500 mt-1">Customize your order</p>
                                 </div>
-                            </div>
-                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                <template x-for="opt in group.options" :key="opt.id">
-                                    <div @click="(localProduct.option_availability || {})[opt.id] > 0 && toggleOpt(group.id, opt.id, group.price_mode === 'additive', group.is_required)" 
-                                        class="relative flex flex-col p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 hover:shadow-md"
-                                        :class="{
-                                            'opacity-50 cursor-not-allowed border-gray-200 bg-gray-50': (localProduct.option_availability || {})[opt.id] <= 0,
-                                            'border-indigo-500 bg-indigo-50 shadow-md': isSelected(group.id, opt.id),
-                                            'border-gray-200 bg-white hover:border-gray-300': !isSelected(group.id, opt.id) && (localProduct.option_availability || {})[opt.id] > 0
-                                        }">
-
-                                        <span class="text-[13px] font-bold text-gray-900" x-text="opt.name"></span>
-                                        <span class="text-[13px] font-black text-indigo-600 mt-2" 
-                                              x-text="group.price_mode === 'fixed' ? '{{ $currencySymbol }}' + parseFloat(opt.price).toFixed(2) : (opt.price > 0 ? '+' + '{{ $currencySymbol }}' + parseFloat(opt.price).toFixed(2) : 'Free')"></span>
-                                        
-                                        {{-- Availability Badge --}}
-                                        <div class="mt-2 flex items-center justify-between">
-                                            <template x-if="(localProduct.option_availability || {})[opt.id] <= 0">
-                                                <span class="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded uppercase tracking-tighter">Out of Stock</span>
-                                            </template>
-                                            <template x-if="(localProduct.option_availability || {})[opt.id] > 0">
-                                                <span class="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded uppercase tracking-tighter" 
-                                                      x-text="'Available: ' + (localProduct.option_availability || {})[opt.id]"></span>
-                                            </template>
-                                        </div>
-                                        
-                                        <template x-if="isSelected(group.id, opt.id)">
-                                            <div class="absolute top-2 right-2">
-                                                <div class="w-5 h-5 bg-indigo-500 rounded flex items-center justify-center shadow-md"
-                                                     :class="group.price_mode === 'additive' ? 'rounded' : 'rounded-full'">
-                                                    <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
-                                                </div>
-                                            </div>
-                                        </template>
-                                    </div>
+                                <template x-if="localProduct && localProduct.image_url">
+                                    <img :src="localProduct.image_url" :alt="localProduct.name" 
+                                        class="w-20 h-20 rounded-lg object-cover border border-gray-100 shadow-sm">
                                 </template>
                             </div>
                         </div>
-                    </template>
-                </div>
 
-                {{-- Modifiers --}}
-                <div class="mb-8" x-show="localProduct && localProduct.modifiers && localProduct.modifiers.length > 0">
-                    <p class="text-[14px] font-bold text-gray-900 mb-4">Add-ons (Optional)</p>
-                    <div class="space-y-2">
-                        <template x-for="m in localProduct ? localProduct.modifiers : []" :key="m.id">
-                            <label @click="(localProduct.modifier_availability || {})[m.id] > 0 && toggleMod(m.id)" 
-                                class="flex items-center justify-between p-4 rounded-lg border border-gray-200 cursor-pointer transition-all hover:bg-gray-50 hover:border-gray-300"
-                                :class="(localProduct.modifier_availability || {})[m.id] <= 0 ? 'opacity-50 cursor-not-allowed bg-gray-50' : (selectedModifierIds.includes(m.id) ? 'border-indigo-500 bg-indigo-50' : '')">
-                                <div class="flex items-center gap-3">
-                                    <input type="checkbox" :checked="selectedModifierIds.includes(m.id)" :disabled="(localProduct.modifier_availability || {})[m.id] <= 0"
-                                        class="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 pointer-events-none">
-                                    <div>
-                                        <span class="text-[13px] font-semibold text-gray-800" x-text="m.name"></span>
-                                        <template x-if="(localProduct.modifier_availability || {})[m.id] <= 0">
-                                            <span class="ml-2 text-[9px] font-black bg-red-100 text-red-600 px-1.5 py-0.5 rounded uppercase tracking-widest">Out of Stock</span>
+                        {{-- Option Groups --}}
+                        <div class="space-y-8 mb-8" x-show="localProduct && (localProduct.option_groups || localProduct.optionGroups)">
+                            <template x-for="group in localProduct ? (localProduct.option_groups || localProduct.optionGroups || []) : []" :key="group.id">
+                                <div>
+                                    <div class="flex items-center justify-between mb-4">
+                                        <div>
+                                            <p class="text-[14px] font-bold text-gray-900" x-text="group.name"></p>
+                                            <template x-if="group.is_required">
+                                                <span class="text-[11px] font-semibold text-red-600 mt-0.5 block">Required selection</span>
+                                            </template>
+                                            <template x-if="group.price_mode === 'additive'">
+                                                <span class="text-[11px] font-semibold text-blue-600 mt-0.5 block">Multiple allowed</span>
+                                            </template>
+                                        </div>
+                                    </div>
+                                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                        <template x-for="opt in group.options" :key="opt.id">
+                                            <div @click="remainingOptionStock(localProduct, opt.id) > 0 && toggleOpt(group.id, opt.id, group.price_mode === 'additive', group.is_required)"
+                                                class="relative flex flex-col p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 hover:shadow-md"
+                                                :class="{
+                                                    'opacity-50 cursor-not-allowed border-gray-200 bg-gray-50': remainingOptionStock(localProduct, opt.id) <= 0,
+                                                    'border-indigo-500 bg-indigo-50 shadow-md': isSelected(group.id, opt.id),
+                                                    'border-gray-200 bg-white hover:border-gray-300': !isSelected(group.id, opt.id) && remainingOptionStock(localProduct, opt.id) > 0
+                                                }">
+
+                                                <span class="text-[13px] font-bold text-gray-900" x-text="opt.name"></span>
+                                                <span class="text-[13px] font-black text-indigo-600 mt-2" 
+                                                      x-text="group.price_mode === 'fixed' ? '{{ $currencySymbol }}' + parseFloat(opt.price).toFixed(2) : (opt.price > 0 ? '+' + '{{ $currencySymbol }}' + parseFloat(opt.price).toFixed(2) : 'Free')"></span>
+                                                
+                                                {{-- Availability Badge --}}
+                                                <div class="mt-2 flex items-center justify-between">
+                                                    <template x-if="!group.no_recipe_required && remainingOptionStock(localProduct, opt.id) <= 0">
+                                                        <span class="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded uppercase tracking-tighter">Out of Stock</span>
+                                                    </template>
+                                                    <template x-if="!group.no_recipe_required && remainingOptionStock(localProduct, opt.id) > 0">
+                                                        <span class="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded uppercase tracking-tighter" 
+                                                              x-text="'Available: ' + remainingOptionStock(localProduct, opt.id)"></span>
+                                                    </template>
+                                                    <template x-if="group.no_recipe_required">
+                                                        <span class="text-[10px] font-bold text-sky-600 bg-sky-50 px-2 py-1 rounded uppercase tracking-tighter">Always Available</span>
+                                                    </template>
+                                                </div>
+                                                
+                                                <template x-if="isSelected(group.id, opt.id)">
+                                                    <div class="absolute top-2 right-2">
+                                                        <div class="w-5 h-5 bg-indigo-500 rounded flex items-center justify-center shadow-md"
+                                                             :class="group.price_mode === 'additive' ? 'rounded' : 'rounded-full'">
+                                                            <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </div>
                                         </template>
                                     </div>
                                 </div>
-                                <span class="text-[12px] font-bold text-gray-900 font-mono" x-text="'+{{ $currencySymbol }}' + parseFloat(m.price).toFixed(2)"></span>
-                            </label>
-                        </template>
-                    </div>
-                </div>
+                            </template>
+                        </div>
 
-                <div class="flex gap-3 pt-2 border-t border-gray-100">
-                    <x-secondary-button type="button" @click="$dispatch('close-modal', 'pos-options'); localProduct = null" class="flex-1 justify-center">
-                        Cancel
-                    </x-secondary-button>
-                    <x-primary-button type="button" @click="optimisticAddToCart(localProduct.id, selectedOptions, selectedModifierIds); $dispatch('close-modal', 'pos-options'); localProduct = null" class="flex-1 justify-center">
-                        Add to Order
-                    </x-primary-button>
-                </div>
+                        {{-- Modifiers --}}
+                        <div class="mb-8" x-show="localProduct && localProduct.modifiers && localProduct.modifiers.length > 0">
+                            <p class="text-[14px] font-bold text-gray-900 mb-4">Add-ons (Optional)</p>
+                            <div class="space-y-2">
+                                <template x-for="m in localProduct ? localProduct.modifiers : []" :key="m.id">
+                                    <label @click="remainingModifierStock(localProduct, m.id) > 0 && toggleMod(m.id)"
+                                        class="flex items-center justify-between p-4 rounded-lg border border-gray-200 cursor-pointer transition-all hover:bg-gray-50 hover:border-gray-300"
+                                        :class="remainingModifierStock(localProduct, m.id) <= 0 ? 'opacity-50 cursor-not-allowed bg-gray-50' : (selectedModifierIds.includes(m.id) ? 'border-indigo-500 bg-indigo-50' : '')">
+                                        <div class="flex items-center gap-3">
+                                            <input type="checkbox" :checked="selectedModifierIds.includes(m.id)" :disabled="remainingModifierStock(localProduct, m.id) <= 0"
+                                                class="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 pointer-events-none">
+                                            <div>
+                                                <span class="text-[13px] font-semibold text-gray-800" x-text="m.name"></span>
+                                                <template x-if="remainingModifierStock(localProduct, m.id) <= 0">
+                                                    <span class="ml-2 text-[9px] font-black bg-red-100 text-red-600 px-1.5 py-0.5 rounded uppercase tracking-widest">Out of Stock</span>
+                                                </template>
+                                            </div>
+                                        </div>
+                                        <span class="text-[12px] font-bold text-gray-900 font-mono" x-text="'+{{ $currencySymbol }}' + parseFloat(m.price).toFixed(2)"></span>
+                                    </label>
+                                </template>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-3 pt-2 border-t border-gray-100">
+                            <x-secondary-button type="button" @click="$dispatch('close-modal', 'pos-options'); localProduct = null" class="flex-1 justify-center">
+                                Cancel
+                            </x-secondary-button>
+                            <x-primary-button type="button"
+                                x-bind:disabled="!canAddToOrder(localProduct)"
+                                x-bind:class="!canAddToOrder(localProduct) ? 'opacity-50 cursor-not-allowed' : ''"
+                                @click="canAddToOrder(localProduct) && (optimisticAddToCart(localProduct.id, selectedOptions, selectedModifierIds), $dispatch('close-modal', 'pos-options'), localProduct = null)"
+                                class="flex-1 justify-center">
+                                Add to Order
+                            </x-primary-button>
+                        </div>
+                        <p x-show="!canAddToOrder(localProduct)" class="text-[11px] text-red-500 font-semibold mt-2 text-center">
+                            A required option is out of stock — please choose an available selection.
+                        </p>
+                    </div>
+                </template>
             </div>
         </x-modal>
 
@@ -941,10 +1268,22 @@
                         </div>
                     </div>
 
+                    {{-- Custom Payment Method: Reference Number --}}
+                    <div x-show="paymentMethod !== 'Cash' && paymentMethod !== 'GCash'" class="space-y-4">
+                        <div>
+                            <x-input-label for="pos_payment_reference" class="text-[11px] font-semibold text-gray-600 uppercase tracking-wide mb-2 block">Payment Reference / Confirmation No.</x-input-label>
+                            <x-text-input id="pos_payment_reference" wire:model.blur="paymentReference" type="text" class="block w-full text-[14px] py-2.5 px-3 font-mono font-bold" placeholder="e.g. Transaction ID" />
+                            <x-input-error :messages="$errors->get('paymentReference')" class="mt-1" />
+                        </div>
+                    </div>
+
                     {{-- GCash Details (PayMongo + Static QR Fallback) --}}
-                    <div x-show="paymentMethod === 'GCash'"
-                         x-data="{ gcashUrl: null, gcashPaid: @entangle('gcashVerified').live, showStatic: false }"
-                         @gcash-url-ready.window="gcashUrl = $event.detail.url; showStatic = false">
+                                        <div x-show="paymentMethod === 'GCash'"
+                         wire:key="gcash-panel-{{ $referenceNo ?: 'new' }}"
+                         x-data="{ gcashUrl: null, gcashPaid: @js($gcashVerified), showStatic: false }"
+                         @gcash-url-ready.window="gcashUrl = $event.detail.url; showStatic = false"
+                         @gcash-verified.window="gcashPaid = true"
+                         @gcash-reset.window="gcashUrl = null; gcashPaid = false; showStatic = false">
 
                         {{-- Step 1: No URL yet — show options --}}
                         <div x-show="!gcashUrl && !gcashPaid && !showStatic" class="space-y-4"
@@ -959,7 +1298,9 @@
                                 <p class="text-[11px] text-blue-500 mb-5">Choose how you want to collect the payment.</p>
                                 
                                 <div class="w-full space-y-3">
-                                    {{-- PayMongo Option --}}
+                                                                        {{-- PayMongo Option — disabled for now, kept for future production use.
+                                         Re-enable by removing the @if(false)/@endif wrapper below. --}}
+                                    @if(false)
                                     <button type="button" 
                                         @click="isGenerating = true; $wire.initiateGCashPayment()" 
                                         :disabled="isGenerating"
@@ -973,6 +1314,7 @@
                                             Generating...
                                         </span>
                                     </button>
+                                    @endif
 
                                     {{-- Static QR Fallback --}}
                                     <button type="button" @click="showStatic = true"
@@ -1011,14 +1353,16 @@
                                 </button>
                             </div>
 
-                            <button type="button" wire:click="verifyStaticPayment" wire:loading.attr="disabled"
-                                class="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[14px] font-black flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-200">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            <button type="button" wire:click="verifyStaticPayment" wire:loading.attr="disabled" wire:target="verifyStaticPayment"
+                                class="w-full h-14 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[14px] font-black transition-all shadow-lg shadow-emerald-200 disabled:opacity-70 disabled:cursor-not-allowed">
+                                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                 Verify & Lock Payment
                             </button>
                         </div>
 
-                        {{-- Step 2: URL generated — show dynamic QR --}}
+                                                {{-- Step 2: URL generated — show dynamic QR — disabled for now, kept for
+                             future production use. Re-enable by removing the @if(false)/@endif wrapper. --}}
+                        @if(false)
                         <div x-show="gcashUrl && !gcashPaid" class="space-y-4"
                              x-init="
                                 let pollInterval = null;
@@ -1056,28 +1400,40 @@
                                     <svg class="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                                     Waiting for customer payment...
                                 </div>
-
-                                <x-input-error :messages="$errors->get('gcashVerified')" class="mt-2 text-center" />
                             </div>
                         </div>
+                        @endif
 
-                        {{-- Step 3: Paid —  show success --}}
-                        <div x-show="gcashPaid" class="bg-emerald-50 rounded-2xl p-5 border border-emerald-100 space-y-4">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
-                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-                                </div>
-                                <div>
-                                    <p class="text-[13px] font-black text-emerald-900 leading-none">GCash Payment Received</p>
-                                    @if($isManualGcash)
-                                        <p class="text-[11px] text-emerald-600 font-bold mt-1 uppercase tracking-tighter italic">Verified Manually by Cashier</p>
-                                    @else
-                                        <p class="text-[11px] text-emerald-600 font-bold mt-1 uppercase tracking-tighter">Verified via PayMongo</p>
-                                    @endif
-                                </div>
+                        {{-- Step 3: Paid — show success (x-if so the draw-in animation replays every time) --}}
+                        <template x-if="gcashPaid">
+                            <div class="bg-emerald-50 rounded-2xl p-6 border border-emerald-100 flex flex-col items-center text-center gcash-success-pop">
+                                <svg class="w-16 h-16 mb-3" viewBox="0 0 52 52">
+                                    <circle class="gcash-success-circle" cx="26" cy="26" r="24" fill="none" stroke="#059669" stroke-width="3"/>
+                                    <path class="gcash-success-check" fill="none" stroke="#059669" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M14 27l7 7 17-17"/>
+                                </svg>
+                                <p class="text-[14px] font-black text-emerald-900 leading-none">Confirmed Payment</p>
+                                @if(!$isManualGcash)
+                                    <p class="text-[11px] text-emerald-600 font-bold mt-1.5 uppercase tracking-tighter">Verified</p>
+                                @endif
                             </div>
-                        </div>
+                        </template>
 
+                    <x-input-error :messages="$errors->get('gcashVerified')" class="mt-3 text-center" />
+
+                        <style>
+                            .gcash-success-pop { animation: gcashPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+                            @keyframes gcashPop { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
+                            .gcash-success-circle {
+                                stroke-dasharray: 151; stroke-dashoffset: 151;
+                                animation: gcashCircle 0.5s cubic-bezier(0.65, 0, 0.45, 1) 0.1s forwards;
+                            }
+                            .gcash-success-check {
+                                stroke-dasharray: 36; stroke-dashoffset: 36;
+                                animation: gcashCheck 0.35s ease-out 0.55s forwards;
+                            }
+                            @keyframes gcashCircle { to { stroke-dashoffset: 0; } }
+                            @keyframes gcashCheck { to { stroke-dashoffset: 0; } }
+                        </style>
                     </div>{{-- end GCash --}}
                 </div>{{-- end payment details scrollable --}}
                 {{-- Total Due Display --}}
@@ -1088,12 +1444,19 @@
             </div>
         </div>
 
+        @if($errors->has('gcashCancel'))
+            <div class="mb-3 flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                <svg class="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                <p class="text-[12px] font-semibold text-amber-800 leading-snug">{{ $errors->first('gcashCancel') }}</p>
+            </div>
+        @endif
+
         {{-- Action Buttons --}}
         <div class="flex gap-3">
-            <x-secondary-button type="button" @click="$dispatch('close-modal', 'pos-payment')" class="flex-1 justify-center">
+            <x-secondary-button type="button" wire:click="cancelPaymentModal" wire:loading.attr="disabled" class="flex-1 justify-center">
                 Cancel
             </x-secondary-button>
-            <x-primary-button type="button" wire:click.prevent="confirmPayment" wire:loading.attr="disabled" id="pos_submit_payment_btn" class="flex-1 justify-center">
+            <x-primary-button type="button" @click.capture="if (!window.thermalBluetoothPrinter?.characteristic) window.prepareThermalReceiptWindow?.()" wire:click.prevent="confirmPayment" wire:loading.attr="disabled" id="pos_submit_payment_btn" class="flex-1 justify-center">
                 Place Order
             </x-primary-button>
         </div>
@@ -1138,7 +1501,7 @@
             {{-- Discount Selection for this item --}}
             <div class="space-y-2">
                 @if($discountPercent > 0)
-                <div x-data="{ isRegularDiscount: @entangle('applyRegularDiscount').live }" 
+<div x-data="{ isRegularDiscount: @entangle('applyRegularDiscount') }"
                      class="bg-gray-50 rounded-xl px-4 py-3 border border-blue-100 shadow-sm transition-all duration-300"
                      :class="!isRegularDiscount ? 'opacity-60 grayscale' : 'ring-2 ring-indigo-500/20'">
                     <div class="flex items-center justify-between">
@@ -1158,7 +1521,7 @@
                         
                         <div class="flex items-center">
                             <label class="inline-flex relative items-center cursor-pointer scale-90">
-                                <input type="checkbox" wire:model.live="applyRegularDiscount" class="sr-only peer">
+                                <input type="checkbox" wire:model="applyRegularDiscount" class="sr-only peer">
                                 <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
                             </label>
                         </div>
@@ -1167,7 +1530,7 @@
                 @endif
 
                 @if($seniorDiscountRate > 0)
-                <div x-data="{ isSeniorDiscount: @entangle('applySeniorDiscount').live }" 
+                <div x-data="{ isSeniorDiscount: @entangle('applySeniorDiscount') }"
                      class="bg-gray-50 rounded-xl px-4 py-3 border border-purple-100 shadow-sm transition-all duration-300"
                      :class="!isSeniorDiscount ? 'opacity-60 grayscale' : 'ring-2 ring-purple-500/20'">
                     <div class="flex items-center justify-between">
@@ -1187,7 +1550,7 @@
                         
                         <div class="flex items-center">
                             <label class="inline-flex relative items-center cursor-pointer scale-90">
-                                <input type="checkbox" wire:model.live="applySeniorDiscount" class="sr-only peer">
+                                <input type="checkbox" wire:model="applySeniorDiscount" class="sr-only peer">
                                 <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
                             </label>
                         </div>
@@ -1207,6 +1570,65 @@
         </div>
     </div>
 </x-modal>
+    {{-- ══════════════════════════════════════════════
+         CONFIRM DELETE ITEM MODAL
+    ══════════════════════════════════════════════ --}}
+    <x-modal name="confirm-delete-item" maxWidth="sm" focusable>
+        <div class="h-1 w-full bg-gradient-to-r from-rose-500 to-red-600 rounded-t-lg"></div>
+        <div class="p-6">
+            <div class="flex items-start gap-4 mb-4">
+                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-red-50 border border-red-100 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-[15px] font-bold text-gray-900 leading-tight">Remove Item</h3>
+                    <p class="mt-1 text-[13px] text-gray-500 leading-relaxed">
+                        Remove <span class="font-bold text-gray-800" x-text="cart[pendingDeleteKey]?.name || 'this item'"></span> from the order?
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 mt-6">
+                <x-secondary-button @click="pendingDeleteKey = null; $dispatch('close-modal', 'confirm-delete-item')" class="h-10">Cancel</x-secondary-button>
+                <button type="button"
+                    @click="delete cart[pendingDeleteKey]; cart = {...cart}; pendingDeleteKey = null; $dispatch('close-modal', 'confirm-delete-item')"
+                    class="h-10 px-4 inline-flex items-center justify-center rounded-lg bg-red-600 hover:bg-red-700 text-white text-[13px] font-bold transition-colors">
+                    Remove Item
+                </button>
+            </div>
+        </div>
+    </x-modal>
+
+    {{-- ══════════════════════════════════════════════
+         CONFIRM CLEAR ORDER MODAL
+    ══════════════════════════════════════════════ --}}
+    <x-modal name="confirm-clear-order" maxWidth="sm" focusable>
+        <div class="h-1 w-full bg-gradient-to-r from-rose-500 to-red-600 rounded-t-lg"></div>
+        <div class="p-6">
+            <div class="flex items-start gap-4 mb-4">
+                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-red-50 border border-red-100 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-[15px] font-bold text-gray-900 leading-tight">Clear Order</h3>
+                    <p class="mt-1 text-[13px] text-gray-500 leading-relaxed">This will remove all items from the current order. This can't be undone.</p>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 mt-6">
+                <x-secondary-button @click="$dispatch('close-modal', 'confirm-clear-order')" class="h-10">Cancel</x-secondary-button>
+                <button type="button"
+                    @click="(paymentMethod === 'GCash' && gcashVerified) ? $wire.clearCart() : (cart = {}, $wire.clearCart()); $dispatch('close-modal', 'confirm-clear-order')"
+                    class="h-10 px-4 inline-flex items-center justify-center rounded-lg bg-red-600 hover:bg-red-700 text-white text-[13px] font-bold transition-colors">
+                    Clear Order
+                </button>
+            </div>
+        </div>
+    </x-modal>
     <x-modal name="pos-drafts-list" maxWidth="2xl" focusable>
         <div class="h-1 w-full bg-gradient-to-r from-indigo-500 to-purple-600 rounded-t-xl"></div>
         <div class="p-8">
@@ -1218,7 +1640,7 @@
                     </h2>
                     <p class="text-[13px] text-gray-500 mt-1">Review or reload previously saved orders for this branch.</p>
                 </div>
-                <button @click="isModalOpen = false" class="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-all">
+                <button @click="$dispatch('close-modal', 'pos-drafts-list')" class="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-all">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
@@ -1281,13 +1703,61 @@
                 @endforelse
             </div>
 
-            <div class="mt-8 pt-6 border-t border-gray-100">
-                <x-secondary-button @click="isModalOpen = false" class="w-full justify-center py-3">
+                        <div class="mt-8 pt-6 border-t border-gray-100">
+                <x-secondary-button @click="$dispatch('close-modal', 'pos-drafts-list')" class="w-full justify-center py-3">
                     Close Monitor
                 </x-secondary-button>
             </div>
         </div>
     </x-modal>
+
+    {{-- ══════════════════════════════════════════════
+         TEAR-OFF CONFIRMATION MODAL (multi-slip printing)
+    ══════════════════════════════════════════════ --}}
+    <div x-data="{
+        show: false,
+        sectionType: '',
+        secondsLeft: 0,
+        countdownTimer: null,
+        get label() { return this.sectionType === 'barista' ? 'Barista Slip' : 'Kitchen Slip'; },
+        startCountdown(timeoutMs) {
+            this.secondsLeft = Math.ceil((timeoutMs || 15000) / 1000);
+            clearInterval(this.countdownTimer);
+            this.countdownTimer = setInterval(() => {
+                this.secondsLeft = Math.max(0, this.secondsLeft - 1);
+                if (this.secondsLeft <= 0) clearInterval(this.countdownTimer);
+            }, 1000);
+        }
+    }"
+    x-init="
+        window.addEventListener('thermal-print-waiting', (e) => {
+            sectionType = e.detail.sectionType;
+            startCountdown(e.detail.timeoutMs);
+            show = true;
+        });
+        window.addEventListener('thermal-print-resumed', () => {
+            show = false;
+            clearInterval(countdownTimer);
+        });
+    "
+    x-show="show" x-cloak
+    class="fixed inset-0 z-[9999] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
+        <div class="w-14 h-14 mx-auto rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-500 mb-4">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+        </div>
+        <h3 class="text-[16px] font-black text-gray-900 mb-1" x-text="label + ' Printed'"></h3>
+        <p class="text-[13px] text-gray-500 mb-4">Tear off the slip, then tap Continue to print the next one.</p>
+        <p class="text-[12px] font-bold text-amber-600 mb-6">
+            Auto-continuing in <span x-text="secondsLeft" class="font-mono"></span>s…
+        </p>
+        <button type="button"
+            @click="window.thermalBluetoothPrinter.confirmContinue()"
+            class="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[14px] font-black transition-all active:scale-[0.98]">
+            Continue Printing
+        </button>
+    </div>
+</div>
 </div>{{-- end modals container --}}
 
 </div>{{-- end outer container --}}

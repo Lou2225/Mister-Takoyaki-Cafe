@@ -12,87 +12,87 @@
         {{-- Header Section --}}
         <div class="mb-5 flex items-center justify-between">
             <div>
-                <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Customer Reviews</h2>
+                <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Customer Feedbacks</h2>
                 <p class="text-[12px] text-gray-500 font-medium">System Overview: <span class="{{ $primaryText }} font-bold">{{ $stats['total'] }} interactions</span></p>
             </div>
         </div>
 
         {{-- KPI Cards Section (Matching Dashboard Premium Aesthetic - Compact Footprint) --}}
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-8">
             {{-- Total Feedback --}}
-            <div class="p-4 bg-gradient-to-br from-{{ $primaryColor }}-500/10 via-{{ $primaryColor }}-500/5 to-white border border-{{ $primaryColor }}-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Reviews</span>
+            <div class="p-3 sm:p-4 bg-gradient-to-br from-{{ $primaryColor }}-500/10 via-{{ $primaryColor }}-500/5 to-white border border-{{ $primaryColor }}-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                <div class="flex items-center justify-between mb-1 sm:mb-2">
+                    <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Feedbacks</span>
                     <div class="w-7 h-7 rounded-lg bg-white border border-{{ $primaryColor }}-100 flex items-center justify-center {{ $primaryText }} shadow-sm">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"/></svg>
                     </div>
                 </div>
-                <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $stats['total'] }}</h3>
-                <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Aggregated customer submissions</p>
+                <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $stats['total'] }}</h3>
+                <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Aggregated customer submissions</p>
             </div>
 
             {{-- Average Rating --}}
-            <div class="p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Global Average</span>
+            <div class="p-3 sm:p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                <div class="flex items-center justify-between mb-1 sm:mb-2">
+                    <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Average</span>
                     <div class="w-7 h-7 rounded-lg bg-white border border-amber-100 flex items-center justify-center text-amber-500 shadow-sm">
                         <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
                     </div>
                 </div>
                 <div class="flex items-baseline gap-1">
-                    <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($stats['average'], 1) }}</h3>
-                    <span class="text-[11px] font-bold text-slate-400">/ 5.0 Rating</span>
+                    <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($stats['average'], 1) }}</h3>
+                    <span class="text-[10px] sm:text-[11px] font-bold text-slate-400">/ 5.0</span>
                 </div>
-                <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Overall satisfaction index</p>
+                <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Overall satisfaction index</p>
             </div>
 
             {{-- Branch Specific Volume --}}
-            <div class="p-4 bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-white border border-blue-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Scope Volume</span>
+            <div class="p-3 sm:p-4 bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-white border border-blue-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                <div class="flex items-center justify-between mb-1 sm:mb-2">
+                    <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Scope</span>
                     <div class="w-7 h-7 rounded-lg bg-white border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                     </div>
                 </div>
-                <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $stats['branch_count'] }}</h3>
-                <p class="text-[10px] text-slate-400 font-semibold mt-1.5 leading-none">Interactions in active scope</p>
+                <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $stats['branch_count'] }}</h3>
+                <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Interactions in active scope</p>
             </div>
 
             {{-- Latest Activity --}}
-            <div class="p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Latest Activity</span>
+            <div class="p-3 sm:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                <div class="flex items-center justify-between mb-1 sm:mb-2">
+                    <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Latest</span>
                     <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </div>
                 </div>
-                <h3 class="text-[13px] font-black text-slate-900 tracking-tight leading-none uppercase truncate" title="{{ $stats['latest'] }}">{{ $stats['latest'] }}</h3>
-                <p class="text-[10px] text-slate-400 font-semibold mt-2.5 leading-none">Most recent event logged</p>
+                <h3 class="text-[12px] sm:text-[13px] font-black text-slate-900 tracking-tight leading-none uppercase truncate" title="{{ $stats['latest'] }}">{{ $stats['latest'] }}</h3>
+                <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-2 sm:mt-2.5 leading-none">Most recent event logged</p>
             </div>
         </div>
 
         {{-- macOS Style Unified Toolbar --}}
-        <div class="relative z-20 flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm mx-1">
+        <div class="relative z-20 flex flex-row items-center justify-between mb-6 gap-2 sm:gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm mx-1">
             
             {{-- Left: Search Bar --}}
-            <div class="flex flex-1 w-full lg:w-auto">
+            <div class="flex flex-1 min-w-0 lg:flex-initial">
                 <x-search-bar wireModel="search" placeholder="Find records..." width="w-full lg:w-72" />
             </div>
 
             {{-- Right: Filters --}}
-            <div class="flex flex-wrap items-center lg:justify-end gap-2">
+            <div class="flex flex-nowrap items-center justify-end gap-1.5 sm:gap-2 shrink-0">
                 {{-- 3-in-1 Date Filter Component --}}
                 <x-date-filter startModel="startDate" endModel="endDate" activeModel="activeFilter" />
 
                 @if(auth()->user()->isSuperAdmin())
                     <x-dropdown align="right" width="48" wire:key="filter-branch">
                         <x-slot name="trigger">
-                            <x-secondary-button type="button" class="gap-1.5 h-9 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
+                            <x-secondary-button type="button" class="gap-0 sm:gap-1.5 h-10 !px-2.5 sm:!px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
                                 <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                 </svg>
-                                <span class="text-[12px] whitespace-nowrap">{{ $selectedBranchId ? ($branches->firstWhere('id', $selectedBranchId)->branch_name ?? 'Branch Scope') : 'All Branches' }}</span>
-                                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <span class="hidden sm:inline text-[12px] whitespace-nowrap">{{ $selectedBranchId ? ($branches->firstWhere('id', $selectedBranchId)->branch_name ?? 'Branch Scope') : 'All Branches' }}</span>
+                                <svg class="hidden sm:block w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                                 </svg>
                             </x-secondary-button>
@@ -152,7 +152,19 @@
                                 <div class="flex items-center gap-1.5">
                                     <div class="flex text-amber-400">
                                         @for($i = 1; $i <= 5; $i++)
-                                            <svg class="w-3 h-3 {{ $i <= round($avg) ? 'fill-current' : 'text-slate-200 fill-current' }}" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                                            @php
+                                                // Proportional fill instead of round($avg): rounding half-up
+                                                // made a 3.5-star average render as 4 fully-lit stars and a
+                                                // 4.5 render as 5 — visually overstating the score to anyone
+                                                // scanning icons rather than reading the numeric average.
+                                                $fillPct = max(0, min(1, $avg - ($i - 1))) * 100;
+                                            @endphp
+                                            <span class="relative inline-block w-3 h-3">
+                                                <svg class="absolute inset-0 w-3 h-3 text-slate-200 fill-current" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                                                <span class="absolute inset-0 overflow-hidden" style="width: {{ $fillPct }}%">
+                                                    <svg class="w-3 h-3 fill-current" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                                                </span>
+                                            </span>
                                         @endfor
                                     </div>
                                     <span class="text-[14px] font-black text-slate-900">{{ number_format($avg, 1) }}</span>
@@ -175,7 +187,7 @@
                 @empty
                     <tr>
                         <td colspan="5" class="py-0">
-                            <x-empty-state title="No Reviews Yet" description="Feedback will appear here." icon="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
+                            <x-empty-state title="No Feedbacks Yet" description="Feedback will appear here." icon="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
                         </td>
                     </tr>
                 @endforelse

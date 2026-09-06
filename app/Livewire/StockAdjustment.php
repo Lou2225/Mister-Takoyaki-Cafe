@@ -99,8 +99,6 @@ class StockAdjustment extends Component
         // Handle direct deep-link or event trigger
         if ($id) {
             $this->handleQuickAdjustment($id);
-        } else {
-            $this->generateReference();
         }
 
         // Identify the Dynamic Main Branch
@@ -196,8 +194,7 @@ class StockAdjustment extends Component
     public function handleQuickAdjustment($ingredientId = null)
     {
         $this->reset(['rows', 'globalReference', 'globalRemarks', 'newItemId', 'newItemQty', 'newItemType', 'newItemCost', 'newItemExpiry']);
-        $this->globalReference = 'ADJ-' . now()->format('Ymd') . '-' . str_pad(rand(1, 99), 2, '0', STR_PAD_LEFT);
-        
+
         if ($ingredientId) {
             $this->newItemId = $ingredientId;
             $ing = Ingredient::find($ingredientId);
@@ -280,6 +277,10 @@ class StockAdjustment extends Component
             }
         }
 
+        if (empty($this->globalReference)) {
+            $this->generateReference();
+        }
+
         $this->rows[] = [
             'ingredient_id'   => $ing->id,
             'ingredient_name' => $ing->name,
@@ -309,7 +310,6 @@ class StockAdjustment extends Component
     {
         $this->panel = 'list';
         $this->reset(['rows', 'globalReference', 'globalRemarks', 'newItemId', 'newItemQty']);
-        $this->generateReference();
     }
 
     // ── Physical Count Reconciliation ──────────────────────────────
@@ -318,6 +318,7 @@ class StockAdjustment extends Component
     {
         if (empty($this->selectedBranchId)) return;
 
+        $this->globalReference = '';
         $this->bulkAdjustments = [];
         $ingredients = Ingredient::orderBy('name')->get();
         $stocks = BranchIngredientStock::where('branch_id', $this->selectedBranchId)
@@ -346,6 +347,9 @@ class StockAdjustment extends Component
             $actual = $this->bulkAdjustments[$id]['actual'] === '' ? null : (float)$this->bulkAdjustments[$id]['actual'];
             
             if ($actual !== null) {
+                if (empty($this->globalReference)) {
+                    $this->generateReference();
+                }
                 $current = $this->bulkAdjustments[$id]['current'];
                 $this->bulkAdjustments[$id]['variance'] = $actual - $current;
             } else {
@@ -358,6 +362,11 @@ class StockAdjustment extends Component
 
     public function validateBeforeCommit()
     {
+        if (empty($this->rows)) {
+            $this->dispatch('notify', type: 'error', message: 'Add at least one item to the queue before saving.');
+            return;
+        }
+
         $rules = [
             'globalReference' => ['required', 'string', 'max:50'],
             'rows.*.ingredient_id' => 'required|exists:ingredients,id',
@@ -374,6 +383,11 @@ class StockAdjustment extends Component
 
     public function commitAdjustment()
     {
+        if (empty($this->rows)) {
+            $this->dispatch('notify', type: 'error', message: 'Add at least one item to the queue before saving.');
+            return;
+        }
+
         $this->validate([
             'globalReference' => ['required', 'string', 'max:50'],
             'rows.*.ingredient_id' => 'required|exists:ingredients,id',
@@ -426,6 +440,9 @@ class StockAdjustment extends Component
 
     public function commitReconcile()
     {
+        if (empty($this->globalReference)) {
+            $this->generateReference();
+        }
         $modifiedCount = 0;
         try {
             DB::transaction(function () use (&$modifiedCount) {
@@ -444,7 +461,7 @@ class StockAdjustment extends Component
                         null, // cost
                         null, // expiry
                         "Physical Count Reconciliation (from {$data['current']} to {$data['actual']})", // remarks
-                        'RECON-' . now()->format('Ymd') // ref
+                        $this->globalReference // ref — same generation scheme as Stock Adjustment
                     );
                     $modifiedCount++;
                 }

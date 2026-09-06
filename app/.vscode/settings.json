@@ -1,0 +1,26 @@
+{
+  "css.lint.compatibleVendorPrefixes": "off",
+  "css.lint.vendorPrefix": "off",
+  "css.lint.universalSelector": "off",
+  "css.lint.zeroUnits": "off",
+  "css.lint.important": "off",
+  "html.validate.styles": false,
+  "html.validate.scripts": false,
+  "[blade]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[php]": {
+    "editor.defaultFormatter": "junstyle.php-cs-fixer"
+  },
+  "files.associations": {
+    "*.blade.php": "blade"
+  },
+  "cSpell.enabled": true,
+  "cSpell.configPath": "${workspaceFolder}/.cspell.json",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "intelephense.diagnostics.undefinedMethods": false
+}
+
+

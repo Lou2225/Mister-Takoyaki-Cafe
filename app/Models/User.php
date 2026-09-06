@@ -167,7 +167,12 @@ class User extends Authenticatable
     {
         return $this->hasMany(Order::class, 'rider_id');
     }
-
+    
+    public function addresses()
+    {
+        return $this->hasMany(\App\Models\UserAddress::class);
+    }
+    
     /**
      * Stock movements performed by this user (Admin/Manager).
      */

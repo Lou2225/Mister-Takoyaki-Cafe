@@ -9,9 +9,104 @@
 <div 
     x-data="{
         ...slidingTabs(@entangle('sourceFilter').live, 'sourceFilter'),
-        selectedOrderId: null
+                selectedOrderId: @entangle('selectedOrderId').live,
+        deliveryMapUrl: '',
+        deliveryMapExternalUrl: '',
+        openDeliveryLocation(lat, lng) {
+            this.deliveryMapUrl = `https://www.google.com/maps?q=${lat},${lng}&z=16&output=embed`;
+            this.deliveryMapExternalUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+            this.$dispatch('open-modal', 'delivery-location-modal');
+        },
+        proofPhotoUrl: '',
+        proofPhotoCaption: '',
+        openProofPhoto(url, caption) {
+            this.proofPhotoUrl = url;
+            this.proofPhotoCaption = caption || '';
+            this.$dispatch('open-modal', 'proof-photo-modal');
+        }
     }"
-    class="relative overflow-hidden">
+        class="relative overflow-hidden">
+
+    @script
+<script>
+    // Shared with pos-terminal.blade.php — both pages need this listener
+    // so an order can be auto-printed from either module, using whichever
+    // printer is currently paired via window.thermalBluetoothPrinter.
+    window.thermalReceiptPopupFeatures = window.thermalReceiptPopupFeatures || 'width=450,height=700,menubar=no,toolbar=no,location=no,status=no';
+
+        window.prepareThermalReceiptWindow = window.prepareThermalReceiptWindow || (() => {
+            const existing = window.pendingThermalReceiptWindow;
+            if (existing && !existing.closed) {
+                existing.focus();
+                return existing;
+            }
+
+            const receiptWindow = window.open('about:blank', 'thermal_receipt_pending', window.thermalReceiptPopupFeatures);
+            if (!receiptWindow) return null;
+
+            receiptWindow.document.title = 'Preparing receipt…';
+            receiptWindow.document.body.innerHTML = '<p style="font-family: sans-serif; padding: 24px;">Preparing receipt…</p>';
+            window.pendingThermalReceiptWindow = receiptWindow;
+
+            window.setTimeout(() => {
+                if (window.pendingThermalReceiptWindow === receiptWindow && !receiptWindow.closed) {
+                    receiptWindow.close();
+                    window.pendingThermalReceiptWindow = null;
+                }
+            }, 30000);
+
+            return receiptWindow;
+        });
+
+        // Guarded against duplicate registration across wire:navigate visits
+        // to this page (or POS) — see pos-terminal.blade.php for the same guard.
+        if (!window.__thermalPrintListenerAttached) {
+        window.__thermalPrintListenerAttached = true;
+        window.addEventListener('send-thermal-print', async (e) => {
+            const { order_id, receipt_type = 'all' } = e.detail || {};
+            if (!order_id) return;
+
+            try {
+                if (window.thermalBluetoothPrinter && window.thermalBluetoothPrinter.characteristic) {
+                    const res = await fetch(`/pos/orders/${order_id}/receipt-data`);
+                    if (!res.ok) throw new Error('Could not load receipt data.');
+                    const data = await res.json();
+                    await window.thermalBluetoothPrinter.printReceipt(data.order, data.settings, data.receipts || []);
+                    window.dispatchEvent(new CustomEvent('notify', {
+                        detail: { type: 'success', message: 'Receipt printed via Bluetooth.' }
+                    }));
+                    return;
+                }
+
+                const receiptUrl = `/receipts/${order_id}/thermal?autoprint=1`;
+                const pendingWindow = window.pendingThermalReceiptWindow;
+                const printWindow = pendingWindow && !pendingWindow.closed
+                    ? pendingWindow
+                    : window.open(receiptUrl, 'thermal_receipt_' + order_id, window.thermalReceiptPopupFeatures);
+
+                window.pendingThermalReceiptWindow = null;
+
+                if (pendingWindow && printWindow) {
+                    printWindow.name = 'thermal_receipt_' + order_id;
+                    printWindow.location.replace(receiptUrl);
+                    printWindow.focus();
+                }
+
+                if (!printWindow || printWindow.closed || typeof printWindow.closed === 'undefined') {
+                    window.dispatchEvent(new CustomEvent('notify', {
+                        detail: { type: 'info', message: 'Order placed! Popup was blocked — please allow popups to auto-open receipt.' }
+                    }));
+                }
+            } catch (err) {
+                console.error('Receipt print failed:', err);
+                window.dispatchEvent(new CustomEvent('notify', {
+                    detail: { type: 'error', message: 'Print failed: ' + err.message }
+                }));
+            }
+        });
+        }
+    </script>
+@endscript
 
     <div class="relative min-h-[600px]">
 
@@ -44,9 +139,18 @@
                         {{ $info[0] }}
                         @if($val === 'App')
                             @php
+                                // Match the exact logic from OrderManagement::buildOrdersQuery('App')
+                                // Count active orders + recently completed within 1-hour void/refund window
+                                $voidRefundCutoff = now()->subHour();
                                 $deliveryCount = \App\Models\Order::where('source', 'App')
                                     ->where('branch_id', auth()->user()->branch_id)
-                                    ->whereIn('status', ['Pending', 'Preparing'])
+                                    ->where(function ($q) use ($voidRefundCutoff) {
+                                        $q->whereNotIn('status', ['Completed', 'Cancelled', 'Void', 'Refunded', 'Partially Refunded'])
+                                          ->orWhere(function ($q2) use ($voidRefundCutoff) {
+                                              $q2->whereIn('status', ['Completed', 'Cancelled', 'Void', 'Refunded', 'Partially Refunded'])
+                                                 ->where('created_at', '>=', $voidRefundCutoff);
+                                          });
+                                    })
                                     ->count();
                             @endphp
                             @if($deliveryCount > 0)
@@ -54,9 +158,18 @@
                             @endif
                         @elseif($val === 'POS')
                             @php
+                                // Match the exact logic from OrderManagement::buildOrdersQuery('POS')
+                                // Count Pending + Drafted + recently completed within 1-hour void/refund window
+                                $voidRefundCutoff = now()->subHour();
                                 $posCount = \App\Models\Order::where('source', 'POS')
                                     ->where('branch_id', auth()->user()->branch_id)
-                                    ->whereIn('status', ['Drafted', 'Void'])
+                                    ->where(function ($q) use ($voidRefundCutoff) {
+                                        $q->whereIn('status', ['Pending', 'Drafted'])
+                                          ->orWhere(function ($q2) use ($voidRefundCutoff) {
+                                              $q2->where('status', 'Completed')
+                                                 ->where('created_at', '>=', $voidRefundCutoff);
+                                          });
+                                    })
                                     ->count();
                             @endphp
                             @if($posCount > 0)
@@ -92,21 +205,46 @@
                     <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Placed orders count</p>
                 </div>
                 
-                {{-- Pending Orders --}}
-                @php
-                    $pendingCount = \App\Models\Order::where('branch_id', auth()->user()->branch_id)
-                        ->whereIn('status', ['Pending', 'Preparing'])
+                {{-- Active / Unresolved Orders (covers the full lifecycle before Completed —
+                     previously only counted Pending/Preparing, which meant an order stuck at
+                     "Handed to Rider" or "Out for Delivery" was invisible here) --}}
+                                @php
+                    $unresolvedStatuses = ['Pending', 'Preparing', 'Ready', 'Handed to Rider', 'Out for Delivery'];
+                    $activeOrdersQuery = \App\Models\Order::where('branch_id', auth()->user()->branch_id)
+                        ->whereIn('status', $unresolvedStatuses);
+                    // Scope to the currently selected tab's source (App/POS) so this
+                    // card always matches what's actually visible in the table below.
+                    // Previously it counted unresolved orders across BOTH channels
+                    // regardless of the open tab, so switching to a channel with zero
+                    // active orders still showed a stale count from the other
+                    // channel — the exact "1 active but table is empty" mismatch.
+                    if (in_array($this->sourceFilter, ['App', 'POS'])) {
+                        $activeOrdersQuery->where('source', $this->sourceFilter);
+                    }
+                    $pendingCount = (clone $activeOrdersQuery)->count();
+                    // Flag anything that's been sitting unresolved for a long time (24h+)
+                    // so a stuck order can't silently age out of view.
+                    $staleCount = (clone $activeOrdersQuery)
+                        ->where('created_at', '<', now()->subHours(24))
                         ->count();
                 @endphp
                 <div class="p-3 sm:p-4 bg-gradient-to-br {{ $pendingCount > 0 ? 'from-amber-500/10 via-amber-500/5 to-white border-amber-500/10' : 'from-emerald-500/10 via-emerald-500/5 to-white border-emerald-500/10' }} border rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                    @if($staleCount > 0)
+                        <span class="absolute top-2.5 right-2.5 flex h-2 w-2">
+                            <span class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-red-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                        </span>
+                    @endif
                     <div class="flex items-center justify-between mb-1 sm:mb-2">
-                        <span class="text-[10px] sm:text-[11px] font-bold {{ $pendingCount > 0 ? 'text-amber-600/90' : 'text-emerald-600/90' }} uppercase tracking-wider">Pending</span>
+                        <span class="text-[10px] sm:text-[11px] font-bold {{ $pendingCount > 0 ? 'text-amber-600/90' : 'text-emerald-600/90' }} uppercase tracking-wider">Active Orders</span>
                         <div class="w-7 h-7 rounded-lg bg-white border {{ $pendingCount > 0 ? 'border-amber-100 text-amber-600' : 'border-emerald-100 text-emerald-600' }} flex items-center justify-center shadow-sm shrink-0">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </div>
                     </div>
                     <h3 class="text-xl sm:text-2xl font-black {{ $pendingCount > 0 ? 'text-amber-600' : 'text-emerald-600' }} tracking-tight leading-none">{{ number_format($pendingCount) }}</h3>
-                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Awaiting kitchen service</p>
+                    <p class="text-[9px] sm:text-[10px] {{ $staleCount > 0 ? 'text-red-500 font-bold' : 'text-slate-400 font-semibold' }} mt-1 sm:mt-1.5 leading-none">
+                        {{ $staleCount > 0 ? $staleCount . ' unresolved 24h+' : 'Not yet completed' }}
+                    </p>
                 </div>
 
                 {{-- Completed Orders Today --}}
@@ -131,8 +269,12 @@
                 @php
                     $todayRevenue = \App\Models\Order::where('branch_id', auth()->user()->branch_id)
                         ->where('payment_status', 'Paid')
+                        ->whereNotIn('status', [
+                            \App\Models\Order::STATUS_VOID,
+                        ])
                         ->whereDate('created_at', today())
-                        ->sum('total_amount');
+                        ->selectRaw('SUM(total_amount - refunded_amount) as net_revenue')
+                        ->value('net_revenue') ?? 0;
                 @endphp
                 <div class="p-3 sm:p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
                     <div class="flex items-center justify-between mb-1 sm:mb-2">
@@ -157,29 +299,29 @@
                 {{-- Right: Filters --}}
                 <div class="w-full lg:w-auto">
                     <div class="flex items-center gap-2 w-full lg:w-auto justify-between lg:justify-end">
-                        {{-- 3-in-1 Date Filter Component --}}
-                        <div class="w-full lg:w-auto">
+                        {{-- 3-in-1 Date Filter Component — History only, since active orders (App/POS) aren't date-scoped --}}
+                        <div class="w-full lg:w-auto" x-show="sourceFilter === 'History'" x-cloak>
                             <x-date-filter startModel="startDate" endModel="endDate" activeModel="activeFilter" />
                         </div>
 
                         {{-- Status Filter Dropdown --}}
-                        <div class="w-[140px] sm:w-[160px]">
-                            <x-dropdown align="right" width="full" containerClasses="w-full">
+                        <div class="w-auto">
+                            <x-dropdown align="right" width="56" containerClasses="w-auto">
                                 <x-slot name="trigger">
-                                    <x-secondary-button type="button" class="w-full gap-1.5 h-10 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none justify-between truncate">
-                                        <div class="flex items-center gap-1.5 truncate">
+                                    <x-secondary-button type="button" class="gap-1.5 h-10 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none justify-between whitespace-nowrap">
+                                        <div class="flex items-center gap-1.5">
                                             <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-                                            <span class="text-[12px] truncate">{{ $statusFilter ?: 'All Status' }}</span>
+                                            <span class="text-[12px] truncate max-w-[120px]">{{ $statusFilter ?: 'All Status' }}</span>
                                         </div>
                                         <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                                     </x-secondary-button>
                                 </x-slot>
                                 <x-slot name="content">
-                                    <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', '')">All Status</x-dropdown-link>
-                                    <hr class="my-1 border-slate-100">
-                                    @foreach($statuses as $status => $label)
-                                        <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', '{{ $status }}')">{{ $label }}</x-dropdown-link>
-                                    @endforeach
+                                    <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', '')" x-on:click="dropdownOpen = false">All Status</x-dropdown-link>
+<hr class="my-1 border-slate-100">
+@foreach($statuses as $status => $label)
+    <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', '{{ $status }}')" x-on:click="dropdownOpen = false">{{ $label }}</x-dropdown-link>
+@endforeach
                                 </x-slot>
                             </x-dropdown>
                         </div>
@@ -187,19 +329,19 @@
                 </div>
             </div>
 
-            <div class="w-full animate-fadeIn relative">
+            <div class="w-full relative">
                 {{-- App Orders Tab Content --}}
-                <div x-show="sourceFilter === 'App'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" class="w-full">
+                <div x-show="sourceFilter === 'App'" class="w-full">
                     @include('livewire.order-list-table', ['orders' => $appOrders])
                 </div>
 
                 {{-- POS Orders Tab Content --}}
-                <div x-show="sourceFilter === 'POS'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" class="w-full" x-cloak>
+                <div x-show="sourceFilter === 'POS'" class="w-full" x-cloak>
                     @include('livewire.order-list-table', ['orders' => $posOrders])
                 </div>
 
                 {{-- History Orders Tab Content --}}
-                <div x-show="sourceFilter === 'History'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" class="w-full" x-cloak>
+                <div x-show="sourceFilter === 'History'" class="w-full" x-cloak>
                     @include('livewire.order-list-table', ['orders' => $historyOrders])
                 </div>
             </div>
@@ -317,7 +459,71 @@
                                 </div>
                                 @endif
                             </div>
-
+                            
+                            @if($order->proofOfDelivery)
+                            <div class="mt-4 pt-4 pl-8 pr-4 border-t border-slate-100">
+                                <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-2">
+                                    Proof of Delivery
+                                </span>
+                            
+                                                                <div class="flex items-start gap-3">
+                                    <button
+                                        type="button"
+                                        @click="openProofPhoto('{{ $order->proofOfDelivery->photo_url }}', 'Order #{{ $order->reference_no }}')"
+                                        class="shrink-0 group"
+                                    >
+                                        <img
+                                            src="{{ $order->proofOfDelivery->photo_url }}"
+                                            alt="Proof of delivery photo for order #{{ $order->reference_no }}"
+                                            loading="lazy"
+                                            class="w-20 h-20 rounded-xl object-cover border border-slate-200 shadow-sm group-hover:opacity-90 transition-opacity"
+                                        >
+                                    </button>
+                            
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-[11px] font-bold text-slate-700">
+                                            Captured {{ $order->proofOfDelivery->captured_at?->format('M d, Y • h:i A') }}
+                                        </p>
+                            
+                                        @if($order->proofOfDelivery->rider)
+                                            <p class="text-[11px] text-slate-500 mt-0.5">
+                                                By {{ $order->proofOfDelivery->rider->first_name }}
+                                                {{ $order->proofOfDelivery->rider->last_name }}
+                                            </p>
+                                        @endif
+                            
+                                                                                @if($order->proofOfDelivery->latitude && $order->proofOfDelivery->longitude)
+                                            <button
+                                                type="button"
+                                                @click="openDeliveryLocation({{ $order->proofOfDelivery->latitude }}, {{ $order->proofOfDelivery->longitude }})"
+                                                class="inline-flex items-center gap-1 text-[11px] text-indigo-600 font-bold mt-1 hover:underline"
+                                            >
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path
+                                                        stroke-linecap="round"
+                                                        stroke-linejoin="round"
+                                                        stroke-width="2.5"
+                                                        d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                                                    />
+                                                    <path
+                                                        stroke-linecap="round"
+                                                        stroke-linejoin="round"
+                                                        stroke-width="2.5"
+                                                        d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                                                    />
+                                                </svg>
+                                                View delivery location
+                                            </button>
+                                        @endif
+                            
+                                        <p class="text-[10px] text-slate-400 mt-1 truncate">
+                                            Tap photo to view full size
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            @endif
+                                
                             {{-- Itemized Breakdown Section --}}
                             <div class="p-6">
                                 <div class="flex items-center justify-between mb-6">
@@ -463,8 +669,8 @@
                     <div class="p-5 border-t border-slate-100 bg-white grid grid-cols-2 gap-2 shrink-0" x-show="activeTab === 'summary'">
                         {{-- 1. App Specific Progress Actions --}}
                         @if($order->source === 'App')
-                            @if($order->status === 'Pending')
-                                <x-primary-button wire:click="acceptOrder({{ $order->id }})" class="col-span-1 h-10 justify-center">
+                                                        @if($order->status === 'Pending')
+                                <x-primary-button @click.capture="if (!window.thermalBluetoothPrinter?.characteristic) window.prepareThermalReceiptWindow?.()" wire:click="acceptOrder({{ $order->id }})" class="col-span-1 h-10 justify-center">
                                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                     Accept
                                 </x-primary-button>
@@ -735,7 +941,7 @@
                             <p class="text-[7px] text-gray-500 mt-0.5">{{ $businessAddress }}</p>
                         @endif
                         @if(!empty($businessPhone))
-                            <p class="text-[7px] text-gray-500">Tel: +63 {{ ltrim(trim($businessPhone), '+63') }}</p>
+                            <p class="text-[7px] text-gray-500">Tel: +63 {{ preg_replace('/^\+?63/', '', trim($businessPhone)) }}</p>
                         @endif
                         @if(!empty($businessEmail))
                             <p class="text-[7px] text-gray-500">{{ $businessEmail }}</p>
@@ -780,7 +986,7 @@
                     <div class="border-t border-dashed border-gray-200 pt-1.5 mb-3 space-y-0.5">
                         <div class="flex justify-between">
                             <span>Subtotal</span>
-                            <span>₱{{ number_format($order->total_amount + $order->discount_amount, 2) }}</span>
+                            <span>₱{{ number_format($order->total_amount - $order->delivery_fee + $order->discount_amount, 2) }}</span>
                         </div>
 
                         @if($order->discount_amount > 0)
@@ -833,14 +1039,86 @@
             <x-secondary-button @click="$dispatch('close-modal', 'receipt-modal')" class="h-11">
                 Close
             </x-secondary-button>
-            <x-primary-button @click="window.printOrderReceipt(selectedOrderId)" class="h-11 font-black uppercase tracking-widest text-[11px]">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-                Print Receipt
-            </x-primary-button>
+            <x-primary-button @click="window.printOrderReceipt(selectedOrderId); $dispatch('close-modal', 'receipt-modal')" class="h-11 font-black uppercase tracking-widest text-[11px]">
+    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+    Print Receipt
+</x-primary-button>
         </div>
     </div>
 </x-modal>
 
+{{-- Delivery Location Modal --}}
+<x-modal name="delivery-location-modal" maxWidth="lg" focusable>
+    <div class="h-1 w-full bg-gradient-to-r from-indigo-400 to-blue-500 rounded-t-lg"></div>
+    <div class="p-6">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-[15px] font-bold text-gray-900">Delivery Location</h3>
+                    <p class="mt-1 text-[12px] text-gray-500">Captured drop-off coordinates</p>
+                </div>
+            </div>
+            <button type="button" @click="$dispatch('close-modal', 'delivery-location-modal')" class="text-gray-400 hover:text-gray-600 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <div class="rounded-xl overflow-hidden border border-gray-200 shadow-inner bg-gray-50" style="height: 360px;">
+            <iframe
+                x-show="deliveryMapUrl"
+                :src="deliveryMapUrl"
+                class="w-full h-full"
+                style="border:0;"
+                loading="lazy"
+                referrerpolicy="no-referrer-when-downgrade"
+            ></iframe>
+        </div>
+
+        <div class="mt-4 flex items-center justify-end gap-2">
+            <a :href="deliveryMapExternalUrl" target="_blank" rel="noopener" class="text-[12px] font-bold text-indigo-600 hover:underline">
+                Open in Google Maps ↗
+            </a>
+        </div>
+    </div>
+</x-modal>
+{{-- Proof of Delivery Photo Modal --}}
+<x-modal name="proof-photo-modal" maxWidth="lg" focusable>
+    <div class="h-1 w-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-t-lg"></div>
+    <div class="p-6">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-[15px] font-bold text-gray-900">Proof of Delivery</h3>
+                    <p class="mt-1 text-[12px] text-gray-500" x-text="proofPhotoCaption"></p>
+                </div>
+            </div>
+            <button type="button" @click="$dispatch('close-modal', 'proof-photo-modal')" class="text-gray-400 hover:text-gray-600 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <div class="rounded-xl overflow-hidden border border-gray-200 shadow-inner bg-gray-50 flex items-center justify-center" style="max-height: 70vh;">
+            <img :src="proofPhotoUrl" alt="Proof of delivery photo" class="max-w-full max-h-[70vh] object-contain">
+        </div>
+
+        <div class="mt-4 flex items-center justify-end gap-2">
+            <a :href="proofPhotoUrl" target="_blank" rel="noopener" class="text-[12px] font-bold text-indigo-600 hover:underline">
+                Open full size in new tab ↗
+            </a>
+        </div>
+    </div>
+</x-modal>
 {{-- Hand to Rider Modal --}}
 <x-modal name="hand-to-rider-modal" maxWidth="sm" focusable>
     <div class="h-1 w-full bg-gradient-to-r from-indigo-400 to-blue-500 rounded-t-lg"></div>
@@ -888,8 +1166,40 @@
     </div>
 </x-modal>
 
+@script
 <script>
-window.printOrderReceipt = function(orderId) {
+window.printOrderReceipt = async function(orderId) {
+    // Try Bluetooth first — same check used for Accept Order's auto-print.
+    if (window.thermalBluetoothPrinter && window.thermalBluetoothPrinter.characteristic) {
+        try {
+            const res = await fetch(`/pos/orders/${orderId}/receipt-data`);
+            if (!res.ok) throw new Error('Could not load receipt data.');
+            const data = await res.json();
+
+            // This button is used from any tab (App/POS/History) purely to
+            // hand the customer a copy — it should never re-print kitchen or
+            // barista slips, which only happen once, at Accept time. Filter
+            // the full receipt bundle down to the customer section only.
+            const allReceipts = data.receipts || [];
+            const customerOnly = allReceipts.filter(r => r.type === 'customer');
+            const receiptsToPrint = customerOnly.length > 0
+                ? customerOnly
+                : [{ type: 'customer', title: data.settings?.business_name || 'Receipt', items: data.order?.items || [] }];
+
+            await window.thermalBluetoothPrinter.printReceipt(data.order, data.settings, receiptsToPrint);
+            window.dispatchEvent(new CustomEvent('notify', {
+                detail: { type: 'success', message: 'Receipt printed via Bluetooth.' }
+            }));
+            return;
+        } catch (err) {
+            console.error('Bluetooth print failed, falling back to browser print:', err);
+            window.dispatchEvent(new CustomEvent('notify', {
+                detail: { type: 'error', message: 'Bluetooth print failed, using browser print instead.' }
+            }));
+            // fall through to the browser/iframe print below
+        }
+    }
+
     const element = document.getElementById('receipt_paper_' + orderId);
     if (!element) return;
 
@@ -906,12 +1216,65 @@ window.printOrderReceipt = function(orderId) {
         document.body.appendChild(iframe);
     }
 
-    const doc = iframe.contentWindow.document;
+        const doc = iframe.contentWindow.document;
     doc.open();
-    doc.write("<html><head><title>Print Receipt</title><style>@page { size: 80mm auto; margin: 0; } body { font-family: 'Courier New', Courier, monospace; font-size: 11px; color: #000; margin: 0; padding: 10px; background: #fff; width: 72mm; } .text-center { text-align: center; } .mb-2 { margin-bottom: 8px; } .mb-4 { margin-bottom: 16px; } .mt-2 { margin-top: 8px; } .mt-4 { margin-top: 16px; } .py-1.5 { padding-top: 6px; padding-bottom: 6px; } .pt-1 { padding-top: 4px; } .pt-2 { padding-top: 8px; } .pl-3 { padding-left: 12px; } .font-bold { font-weight: bold; } .italic { font-style: italic; } .border-y { border-top: 1px dashed #000; border-bottom: 1px dashed #000; } .border-t { border-top: 1px dashed #000; } .space-y-0.5 > * + * { margin-top: 2px; } .space-y-1 > * + * { margin-top: 4px; } .flex { display: flex; } .justify-between { justify-content: space-between; } .items-start { align-items: flex-start; } .flex-col { flex-direction: column; } .gap-0.5 { gap: 2px; } .gap-2 { gap: 8px; } .flex-1 { flex: 1; } .pr-2 { padding-right: 8px; } .whitespace-nowrap { white-space: nowrap; } .whitespace-normal { white-space: normal; } .leading-tight { line-height: 1.25; } .uppercase { text-transform: uppercase; } .text-[7px] { font-size: 8px; } .text-[8px] { font-size: 9px; } .text-[9px] { font-size: 10px; } .text-[10px] { font-size: 11px; } .text-[11px] { font-size: 12px; } img { max-width: 40px; height: auto; }</style></head><body>" + element.innerHTML + "<script>window.onload = function() { window.focus(); window.print(); };<\/script></body></html>");
+    doc.write("<html><head><title>Print Receipt</title><style>@page { size: 58mm auto; margin: 0; } * { box-sizing: border-box; } body { font-family: 'Courier New', Courier, monospace; font-size: 10px; line-height: 1.25; color: #000; margin: 0; padding: 4px 6px; background: #fff; width: 58mm; max-width: 58mm; } .text-center { text-align: center; } .mb-2 { margin-bottom: 6px; } .mb-4 { margin-bottom: 10px; } .mt-2 { margin-top: 6px; } .mt-4 { margin-top: 10px; } .py-1.5 { padding-top: 4px; padding-bottom: 4px; } .pt-1 { padding-top: 2px; } .pt-2 { padding-top: 4px; } .pl-3 { padding-left: 8px; } .font-bold { font-weight: bold; } .italic { font-style: italic; } .border-y { border-top: 1px dashed #000; border-bottom: 1px dashed #000; } .border-t { border-top: 1px dashed #000; } .space-y-0.5 > * + * { margin-top: 2px; } .space-y-1 > * + * { margin-top: 3px; } .flex { display: flex; } .justify-between { justify-content: space-between; align-items: baseline; } .items-start { align-items: flex-start; } .flex-col { flex-direction: column; } .gap-0.5 { gap: 2px; } .gap-2 { gap: 4px; } .flex-1 { flex: 1; } .pr-2 { padding-right: 4px; } .whitespace-nowrap { white-space: nowrap; flex-shrink: 0; } .whitespace-normal { white-space: normal; } .leading-tight { line-height: 1.2; } .uppercase { text-transform: uppercase; } .text-[7px] { font-size: 7px; } .text-[8px] { font-size: 8px; } .text-[9px] { font-size: 9px; } .text-[10px] { font-size: 10px; } .text-[11px] { font-size: 11px; } img { max-width: 100px; height: auto; display: block; margin: 0 auto; }</style></head><body>" + element.innerHTML + "<script>window.onload = function() { window.focus(); window.print(); };<\/script></body></html>");
     doc.close();
+
+    window.dispatchEvent(new CustomEvent('notify', {
+        detail: { type: 'success', message: 'Receipt sent to printer.' }
+    }));
 }
 </script>
+@endscript
+
+{{-- ══════════════════════════════════════════════
+     TEAR-OFF CONFIRMATION MODAL (multi-slip printing, with auto-resume countdown)
+══════════════════════════════════════════════ --}}
+<div x-data="{
+        show: false,
+        sectionType: '',
+        secondsLeft: 0,
+        countdownTimer: null,
+        get label() { return this.sectionType === 'barista' ? 'Barista Slip' : 'Kitchen Slip'; },
+        startCountdown(timeoutMs) {
+            this.secondsLeft = Math.ceil((timeoutMs || 15000) / 1000);
+            clearInterval(this.countdownTimer);
+            this.countdownTimer = setInterval(() => {
+                this.secondsLeft = Math.max(0, this.secondsLeft - 1);
+                if (this.secondsLeft <= 0) clearInterval(this.countdownTimer);
+            }, 1000);
+        }
+    }"
+    x-init="
+        window.addEventListener('thermal-print-waiting', (e) => {
+            sectionType = e.detail.sectionType;
+            startCountdown(e.detail.timeoutMs);
+            show = true;
+        });
+        window.addEventListener('thermal-print-resumed', () => {
+            show = false;
+            clearInterval(countdownTimer);
+        });
+    "
+    x-show="show" x-cloak
+    class="fixed inset-0 z-[9999] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
+        <div class="w-14 h-14 mx-auto rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-500 mb-4">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+        </div>
+        <h3 class="text-[16px] font-black text-gray-900 mb-1" x-text="label + ' Printed'"></h3>
+        <p class="text-[13px] text-gray-500 mb-4">Tear off the slip, then tap Continue to print the next one.</p>
+        <p class="text-[12px] font-bold text-amber-600 mb-6">
+            Auto-continuing in <span x-text="secondsLeft" class="font-mono"></span>s…
+        </p>
+        <button type="button"
+            @click="window.thermalBluetoothPrinter.confirmContinue()"
+            class="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[14px] font-black transition-all active:scale-[0.98]">
+            Continue Printing
+        </button>
+    </div>
+</div>
 
 </div>{{-- end root wrapper --}}
 

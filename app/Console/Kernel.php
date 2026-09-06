@@ -15,7 +15,9 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        $schedule->command('stock:check-alerts')->dailyAt('08:00');
+        $schedule->command('stock:check-alerts')
+    ->dailyAt('08:00')
+    ->appendOutputTo(storage_path('logs/stock-alerts.log'));
         $schedule->command('orders:auto-reject')->everyMinute();
     }
 
