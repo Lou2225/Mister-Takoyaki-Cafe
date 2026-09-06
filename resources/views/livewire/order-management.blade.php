@@ -349,7 +349,9 @@
         </div>
         <x-side-panel name="view-order-detail" width="max-w-md">
             @if($selectedOrder)
-                @php($order = $selectedOrder)
+                @php
+                    $order = $selectedOrder;
+                @endphp
                 <div class="flex flex-col h-full bg-white relative"
                     x-data="{ 
                         ...slidingTabs('summary', 'activeTab'), 
@@ -415,7 +417,6 @@
                                                 'Refunded' => 'bg-orange-500',
                                                 'Partially Refunded' => 'bg-orange-500',
                                             ];
-                                            $dotColor = $dotColors[$order->status] ?? 'bg-slate-400';
                                             $textColors = [
                                                 'Pending' => 'text-amber-600',
                                                 'Preparing' => 'text-blue-600',
@@ -430,11 +431,10 @@
                                                 'Refunded' => 'text-orange-600',
                                                 'Partially Refunded' => 'text-orange-600',
                                             ];
-                                            $textColor = $textColors[$order->status] ?? 'text-slate-600';
                                         @endphp
                                         <div class="flex items-center gap-1.5 mt-1.5">
-                                            <span class="h-1.5 w-1.5 rounded-full {{ $dotColor }}"></span>
-                                            <span class="text-[11px] font-bold {{ $textColor }} uppercase">{{ $order->status }}</span>
+                                            <span class="h-1.5 w-1.5 rounded-full {{ $dotColors[$order->status] ?? 'bg-slate-400' }}"></span>
+                                            <span class="text-[11px] font-bold {{ $textColors[$order->status] ?? 'text-slate-600' }} uppercase">{{ $order->status }}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -900,7 +900,9 @@
         </div>
 
         @if($selectedOrder)
-            @php($order = $selectedOrder)
+            @php
+                $order = $selectedOrder;
+            @endphp
             <div class="flex justify-center bg-gray-50 rounded-xl p-6 border border-gray-100 shadow-inner overflow-hidden mb-4">
                 <div id="receipt_paper_{{ $order->id }}" class="w-full max-w-[260px] bg-white shadow-md p-4 pt-6 pb-8 font-mono text-[10px] text-gray-800 relative receipt-paper border border-gray-100">
                     @php
