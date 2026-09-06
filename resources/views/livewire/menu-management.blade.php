@@ -323,7 +323,7 @@
                                             }"
                                             @click.outside="open = false"
                                             @keydown.escape.window="open = false"
-                                            @scroll.window="open && position()"
+                                            @scroll.capture.window="open && position()"
                                             @resize.window="open && position()">
 
                                             <button type="button" x-ref="ingredientTrigger" @click="open ? (open = false) : openDropdown()"
