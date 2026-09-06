@@ -1,5 +1,7 @@
 <div id="pos-terminal-root" class="flex flex-col h-[calc(100vh-58px)] sm:h-[calc(100vh-65px)] overflow-hidden bg-gray-100" 
     wire:key="pos-terminal-root"
+    @cart-loaded.window="cart = $event.detail.cart || {}"
+    @cart-reset.window="cart = {}; cartExpanded = false"
     x-data="{ 
         isMobile: window.matchMedia('(max-width: 767px)').matches,
         searchQuery: '',
@@ -15,7 +17,7 @@
         isSavingDraft: false,
         cartExpanded: false,
         isEditMode: @entangle('isEditMode').live,
-        cart: @entangle('cart'),
+        cart: @js($cart),
         paymentMethod: @entangle('paymentMethod'),
         gcashVerified: @entangle('gcashVerified').live,
         amountTendered: @entangle('amountTendered'),
@@ -42,6 +44,8 @@
             return (this.subtotal - this.discountTotal) + this.serviceCharge;
         },
                 productsData: {},
+            cartUsageCacheKey: '',
+            cartUsageCache: {},
             stockData: @js($stockData),
         activeProduct: null,
         selectedOptions: {},
@@ -156,6 +160,20 @@
             });
         },
         getCartIngredientUsage(excludeProductId = null) {
+            const cartSignature = Object.entries(this.cart || {})
+                .map(([key, item]) => `${key}:${item.qty}`)
+                .join('|');
+
+            if (this.cartUsageCacheKey !== cartSignature) {
+                this.cartUsageCacheKey = cartSignature;
+                this.cartUsageCache = {};
+            }
+
+            const cacheKey = excludeProductId === null ? 'all' : String(excludeProductId);
+            if (Object.prototype.hasOwnProperty.call(this.cartUsageCache, cacheKey)) {
+                return this.cartUsageCache[cacheKey];
+            }
+
             const usage = {};
 
             Object.values(this.cart || {}).forEach(item => {
@@ -172,6 +190,7 @@
                 });
             });
 
+            this.cartUsageCache[cacheKey] = usage;
             return usage;
         },
         remainingStock(pid) {
@@ -363,9 +382,17 @@
             });
         },
         init() {
-            const mq = window.matchMedia('(max-width: 767px)');
-            this.isMobile = mq.matches;
-            mq.addEventListener('change', (e) => { this.isMobile = e.matches; });
+            const syncViewport = () => {
+                this.isMobile = window.innerWidth < 768;
+            };
+            syncViewport();
+            window.addEventListener('resize', syncViewport);
+            window.visualViewport?.addEventListener('resize', syncViewport);
+
+            this.$el.addEventListener('alpine:destroy', () => {
+                window.removeEventListener('resize', syncViewport);
+                window.visualViewport?.removeEventListener('resize', syncViewport);
+            });
 
             this.$watch('cart', value => { 
                 if (!value || Object.keys(value).length === 0) {
@@ -833,18 +860,18 @@
                     </div>
                     <div class="flex items-center gap-2">
                         <span class="text-[11px] font-black text-gray-900 font-mono tracking-tighter uppercase">{{ $referenceNo ? '#' . $referenceNo : 'New Order' }}</span>
-                        <button type="button" title="Hold Order" class="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 transition-all" :disabled="Object.keys(cart).length === 0" @click.stop="isSavingDraft = true; $wire.saveDraft().finally(() => { isSavingDraft = false; cartExpanded = false })">
+                        <button type="button" title="Hold Order" class="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 transition-all" :disabled="Object.keys(cart).length === 0" @click.stop="isSavingDraft = true; $wire.cart = cart; $wire.saveDraft().finally(() => { isSavingDraft = false; cartExpanded = false })">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
                         </button>
                         <div class="flex items-center md:hidden ml-2">
-                             <span class="text-[14px] font-black text-indigo-600 font-mono" x-show="!cartExpanded">{{ $currencySymbol }}{{ number_format($total, 2) }}</span>
+                             <span class="text-[14px] font-black text-indigo-600 font-mono" x-show="!cartExpanded">{{ $currencySymbol }}<span x-text="total.toFixed(2)"></span></span>
                              <svg class="w-4 h-4 ml-1 text-gray-400 transition-transform duration-300" :class="cartExpanded ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
                         </div>
                     </div>
                 </div>
 
                 {{-- Cart Items --}}
-                <div class="flex-1 overflow-y-auto px-3 py-1 divide-y divide-gray-50 min-h-0 relative">
+                <div wire:ignore class="flex-1 overflow-y-auto px-3 py-1 divide-y divide-gray-50 min-h-0 relative">
                     {{-- Saving Overlay --}}
                     <div x-show="isSavingDraft" class="absolute inset-0 flex flex-col items-center justify-center bg-white/80 z-10 backdrop-blur-sm">
                         <svg class="animate-spin w-8 h-8 text-amber-500 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
@@ -856,7 +883,7 @@
                             <div class="flex items-start gap-2.5 py-3">
                                 {{-- Thumbnail --}}
                                 <div class="w-11 h-11 rounded-lg overflow-hidden bg-gray-100 shrink-0 border border-gray-100">
-                                    <img :src="item.image ? '{{ asset('storage') }}/' + item.image : '{{ asset('images/placeholder-product.png') }}'" class="w-full h-full object-cover" :alt="item.name">
+                                    <img :src="item.image ? (item.image.startsWith('http') ? item.image : '{{ asset('storage') }}/' + item.image.replace(/^\/?storage\//, '')) : '{{ asset('images/placeholder-product.png') }}'" class="w-full h-full object-cover" :alt="item.name">
                                 </div>
 
                                 {{-- Details --}}
@@ -878,7 +905,7 @@
                                             </template>
                                         </div>
                                         <div class="flex items-center gap-0.5 shrink-0">
-                                            <button type="button" @click="$wire.editCartItemId = key; $wire.editCartItemQty = cart[key].qty; $wire.editCartItemNotes = cart[key].instructions || ''; $wire.applyRegularDiscount = cart[key].apply_regular_discount || false; $wire.applySeniorDiscount = cart[key].apply_senior_discount || false; $dispatch('open-modal', 'edit-cart-item')" class="relative p-1.5 text-gray-400 hover:text-amber-500 transition-all rounded-lg hover:bg-amber-50">
+                                            <button type="button" @click="$wire.cart = cart; $wire.editCartItemId = key; $wire.editCartItemQty = cart[key].qty; $wire.editCartItemNotes = cart[key].instructions || ''; $wire.applyRegularDiscount = cart[key].apply_regular_discount || false; $wire.applySeniorDiscount = cart[key].apply_senior_discount || false; $dispatch('open-modal', 'edit-cart-item')" class="relative p-1.5 text-gray-400 hover:text-amber-500 transition-all rounded-lg hover:bg-amber-50">
                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
                                                 <template x-if="item.instructions">
                                                     <span class="absolute top-1 right-1 w-1.5 h-1.5 bg-amber-500 rounded-full border border-white"></span>
@@ -990,6 +1017,7 @@
                         @click="
                             if (Object.keys(cart).length === 0) return;
                             amountTendered = total;
+                            $wire.cart = cart;
                             $wire.paymentReference = '';
                             $dispatch('open-modal', 'pos-payment');
                             $wire.openPaymentModal();
@@ -1004,7 +1032,7 @@
                                                 <x-secondary-button type="button"
                             @click="$dispatch('open-modal', 'confirm-clear-order')"
                             x-bind:class="(paymentMethod === 'GCash' && gcashVerified) ? 'opacity-50 cursor-not-allowed' : ''"
-                            wire:loading.attr="disabled" id="pos_clear_cart_btn" class="w-full mt-1.5 justify-center text-red-600">
+                                                    id="pos_clear_cart_btn" class="w-full mt-1.5 justify-center text-red-600">
                             Clear Order
                         </x-secondary-button>
                     </div>
@@ -1162,7 +1190,7 @@
                     <h3 class="text-[13px] font-bold text-gray-900">Order Summary</h3>
                 </div>
                 
-                <div class="flex-1 overflow-y-auto px-4 py-3 max-h-[30vh] md:max-h-[50vh]">
+                <div wire:ignore class="flex-1 overflow-y-auto px-4 py-3 max-h-[30vh] md:max-h-[50vh]">
                     <div x-show="Object.keys(cart).length > 0" class="space-y-3">
                         <template x-for="(item, key) in cart" :key="key">
                             <div class="bg-gray-50 rounded-lg p-3 border border-gray-100 hover:border-gray-200 transition-all">
@@ -1189,30 +1217,24 @@
                     </div>
                 </div>
 
-                @if(!empty($cart))
-                    <div class="border-t border-gray-100 px-4 py-3 bg-gray-50 space-y-2">
+                    <div x-show="Object.keys(cart).length > 0" class="border-t border-gray-100 px-4 py-3 bg-gray-50 space-y-2">
                         <div class="flex items-center justify-between text-[12px]">
                             <span class="text-gray-600">Subtotal</span>
-                            <span class="font-bold text-gray-900">{{ $currencySymbol }}{{ number_format($subtotal, 2) }}</span>
+                            <span class="font-bold text-gray-900">{{ $currencySymbol }}<span x-text="subtotal.toFixed(2)"></span></span>
                         </div>
-                        @if($discountPercent > 0 && $discountAmount > 0)
-                            <div class="flex items-center justify-between text-[12px]">
+                            <div x-show="discountTotal > 0" class="flex items-center justify-between text-[12px]">
                                 <span class="text-gray-600">Discount</span>
-                                <span class="font-bold text-emerald-600">-{{ $currencySymbol }}{{ number_format($discountAmount, 2) }}</span>
+                                <span class="font-bold text-emerald-600">-{{ $currencySymbol }}<span x-text="discountTotal.toFixed(2)"></span></span>
                             </div>
-                        @endif
-                        @if($serviceChargeAmount > 0)
-                            <div class="flex items-center justify-between text-[12px]">
+                            <div x-show="serviceCharge > 0" class="flex items-center justify-between text-[12px]">
                                 <span class="text-gray-600">Service Charge ({{ round($serviceChargeRate * 100) }}%)</span>
-                                <span class="font-bold text-gray-900">{{ $currencySymbol }}{{ number_format($serviceChargeAmount, 2) }}</span>
+                                <span class="font-bold text-gray-900">{{ $currencySymbol }}<span x-text="serviceCharge.toFixed(2)"></span></span>
                             </div>
-                        @endif
                         <div class="flex items-center justify-between text-[13px] font-bold bg-indigo-100 rounded-lg p-2.5 border border-indigo-200">
                             <span class="text-indigo-900">Total</span>
-                            <span class="text-indigo-900">{{ $currencySymbol }}{{ number_format($total, 2) }}</span>
+                            <span class="text-indigo-900">{{ $currencySymbol }}<span x-text="total.toFixed(2)"></span></span>
                         </div>
                     </div>
-                @endif
             </div>
 
             {{-- RIGHT CARD: Payment Details --}}
@@ -1456,13 +1478,11 @@
         {{-- Action Buttons --}}
         <div class="flex gap-3">
             <x-secondary-button type="button"
-                @click="if (!paymentLocked) $dispatch('close-modal', 'pos-payment')"
-                wire:click="cancelPaymentModal"
-                wire:loading.attr="disabled"
+                @click="if (!paymentLocked) { $dispatch('close-modal', 'pos-payment'); $dispatch('gcash-reset'); }"
                 class="flex-1 justify-center">
                 Cancel
             </x-secondary-button>
-            <x-primary-button type="button" @click.capture="if (!window.thermalBluetoothPrinter?.characteristic) window.prepareThermalReceiptWindow?.()" wire:click.prevent="confirmPayment" wire:loading.attr="disabled" id="pos_submit_payment_btn" class="flex-1 justify-center">
+                            <x-primary-button type="button" @click=" $wire.cart = cart" @click.capture="if (!window.thermalBluetoothPrinter?.characteristic) window.prepareThermalReceiptWindow?.()" wire:click.prevent="confirmPayment" wire:loading.attr="disabled" id="pos_submit_payment_btn" class="flex-1 justify-center">
                 Place Order
             </x-primary-button>
         </div>

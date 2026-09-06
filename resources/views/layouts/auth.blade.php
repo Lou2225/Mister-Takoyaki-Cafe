@@ -19,13 +19,6 @@
         <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800&display=swap" rel="stylesheet" />
 
         <!-- Scripts -->
-        <script>
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                    for (var r of registrations) { r.unregister(); }
-                });
-            }
-        </script>
         @vite(['resources/js/app.js'])
         @livewireStyles
 

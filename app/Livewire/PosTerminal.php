@@ -601,6 +601,7 @@ public function change(): float
             unset($this->cart[$key]);
         }
 
+        $this->dispatch('cart-loaded', cart: $this->cart);
         $this->closeEditItemModal();
     }
 
@@ -632,6 +633,7 @@ public function change(): float
         $this->cart = [];
         $this->referenceNo = '';
         $this->resetGCashState();
+        $this->dispatch('cart-reset');
     }
 
     // ─── Draft Order Management ────────────────────────────────────────────
@@ -796,6 +798,8 @@ public function change(): float
                     'apply_senior_discount' => false,
                 ];
             }
+
+            $this->dispatch('cart-loaded', cart: $this->cart);
 
             $this->dispatch('close-modal', name: 'pos-drafts-list');
             
@@ -1320,6 +1324,8 @@ public function change(): float
                 'id' => $product->id,
                 'name' => $product->name,
                 'category_id' => $product->category_id,
+                'price' => (float) $product->getPriceAt((int) $this->branchId),
+                'image' => $product->image_url,
                 'image_url' => $product->image_url,
                 'max_available' => (int) ($product->max_available ?? 999),
                 'option_availability' => $product->option_availability ?? [],
@@ -1338,6 +1344,7 @@ public function change(): float
                     'no_recipe_required' => (bool) $group->no_recipe_required,
                     'options' => $group->options->map(fn ($option) => [
                         'id' => $option->id,
+                        'group_id' => $group->id,
                         'name' => $option->name,
                         'price' => (float) $option->price,
                         'is_default' => (bool) $option->is_default,

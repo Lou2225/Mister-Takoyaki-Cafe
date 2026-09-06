@@ -4,6 +4,15 @@ import ApexCharts from 'apexcharts';
 
 window.ApexCharts = ApexCharts;
 
+if ('serviceWorker' in navigator && !window.__mtcSwRegistrationAttached) {
+    window.__mtcSwRegistrationAttached = true;
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch((error) => {
+            console.warn('Service worker registration failed:', error);
+        });
+    }, { once: true });
+}
+
 /**
  * ──────────────────────────────────────────────────────────
  * GLOBAL BOOTSTRAP
@@ -23,7 +32,10 @@ const triggerRefresh = () => {
     }
 };
 
-window.addEventListener('resize', triggerRefresh);
+if (!window.__mtcResizeListenerAttached) {
+    window.__mtcResizeListenerAttached = true;
+    window.addEventListener('resize', triggerRefresh);
+}
 
 
 /**
@@ -33,7 +45,9 @@ window.addEventListener('resize', triggerRefresh);
  */
 
 // Scroll to error
-window.addEventListener('scroll-to-error', () => {
+if (!window.__mtcScrollErrorListenerAttached) {
+    window.__mtcScrollErrorListenerAttached = true;
+    window.addEventListener('scroll-to-error', () => {
     setTimeout(() => {
         const errorEl = document.querySelector('p.text-sm.text-red-600:not(:empty), .text-red-500:not(:empty)');
         if (errorEl) {
@@ -42,12 +56,16 @@ window.addEventListener('scroll-to-error', () => {
             container.scrollTo({ top, behavior: 'smooth' });
         }
     }, 150);
-});
+    });
+}
 
 // Print Page
-window.addEventListener('print-page', () => {
-    window.print();
-});
+if (!window.__mtcPrintPageListenerAttached) {
+    window.__mtcPrintPageListenerAttached = true;
+    window.addEventListener('print-page', () => {
+        window.print();
+    });
+}
 
 import thermalBluetoothPrinter from './thermal-bluetooth';
 window.thermalBluetoothPrinter = thermalBluetoothPrinter;
@@ -55,7 +73,9 @@ window.dispatchEvent(new CustomEvent('thermal-bt-client-ready'));
 
 // Bluetooth pairing must happen from a real user click (browser security
 // requirement) — trigger this from a "Connect Printer" button in Settings.
-window.addEventListener('connect-thermal-bluetooth', async () => {
+if (!window.__mtcBluetoothListenerAttached) {
+    window.__mtcBluetoothListenerAttached = true;
+    window.addEventListener('connect-thermal-bluetooth', async () => {
     try {
         const name = await thermalBluetoothPrinter.connect();
         window.dispatchEvent(new CustomEvent('thermal-bt-connected', { detail: { name } }));
@@ -63,7 +83,8 @@ window.addEventListener('connect-thermal-bluetooth', async () => {
         console.error('❌ Bluetooth connection failed:', error.message);
         window.dispatchEvent(new CustomEvent('thermal-bt-error', { detail: { message: error.message } }));
     }
-});
+    });
+}
 
 // Thermal Receipt Printing (Automatic - no user interaction)
 if (!window.__thermalPrintListenerAttached) {
@@ -129,7 +150,9 @@ if (!window.__thermalPrintListenerAttached) {
 }
 
 // Receipt Pop-up (Legacy - kept for manual receipt viewing)
-window.addEventListener('open-receipt', (e) => {
+if (!window.__mtcOpenReceiptListenerAttached) {
+    window.__mtcOpenReceiptListenerAttached = true;
+    window.addEventListener('open-receipt', (e) => {
     const url = e.detail?.url || e.detail;
     if (url) {
         // Small delay to allow Livewire to finish DOM morphing/clearing state
@@ -137,6 +160,7 @@ window.addEventListener('open-receipt', (e) => {
             window.open(url, '_blank', 'width=450,height=650');
         }, 300);
     }
-});
+    });
+}
 
 

@@ -478,7 +478,7 @@ class ThermalPrinterService
         $content .= "\nOrder #: " . $order->reference_no . "\n";
         $content .= "Date: " . $order->created_at->format('d/m/y H:i') . "\n";
         $content .= "Type: " . strtoupper($order->order_type) . "\n";
-                if ($order->customer_name) {
+        if ($order->order_type === 'Delivery' && $order->customer_name) {
             $content .= "Customer: " . $order->customer_name . "\n";
         }
         $content .= "Payment: " . $order->payment_method . "\n";

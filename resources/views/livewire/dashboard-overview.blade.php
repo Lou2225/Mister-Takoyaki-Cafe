@@ -1,5 +1,4 @@
 <div>
-    <div wire:poll.10s="$refresh" style="display:none;"></div>
     <!-- ApexCharts Library -->
 
 
