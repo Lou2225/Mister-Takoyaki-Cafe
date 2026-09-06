@@ -216,11 +216,8 @@ class OrderManagement extends Component
             });
         } else {
             // App / Delivery Orders — this is the active/live view. Recently
-            // resolved orders (completed, cancelled, voided, refunded) stay
-            // visible here for the same 1-hour window POS gets, so staff
-            // investigating a dispute don't need to already know to check
-            // Order History separately. After the window, they roll off to
-            // History same as before.
+            // completed, voided, or refunded orders remain visible briefly,
+            // but cancelled/rejected orders go straight to Order History.
             $query->where('source', $sourceTab);
             $query->where(function ($q) use ($voidRefundCutoff) {
                 $q->whereNotIn('status', [
@@ -233,7 +230,6 @@ class OrderManagement extends Component
                     ->orWhere(function ($q2) use ($voidRefundCutoff) {
                         $q2->whereIn('status', [
                                 Order::STATUS_COMPLETED,
-                                Order::STATUS_CANCELLED,
                                 Order::STATUS_VOID,
                                 Order::STATUS_REFUNDED,
                                 Order::STATUS_PARTIALLY_REFUNDED,

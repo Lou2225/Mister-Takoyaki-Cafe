@@ -835,34 +835,29 @@
                     </div>
 
                     {{-- Order Details --}}
-                                        {{-- Order Details --}}
                     <div class="receipt-meta">
                         <div class="receipt-meta-row">
                             <span class="font-bold">Order #: {{ $order->reference_no }}</span>
                         </div>
                         <div class="receipt-meta-row">
-                                                <div class="receipt-meta-row">
                             <span>Date: {{ $order->created_at->format('d/m/y H:i') }}</span>
                             <span class="font-bold uppercase">{{ $order->order_type }}</span>
                         </div>
                         @if($order->customer_name)
-                        @if($order->table_number)
                             <div class="receipt-meta-row">
                                 <span>Customer: <strong>{{ $order->customer_name }}</strong></span>
+                                @if($order->table_number)
+                                    <span>Table: <strong>{{ $order->table_number }}</strong></span>
+                                @endif
+                            </div>
+                        @endif
+                        @if($order->table_number && !$order->customer_name)
+                            <div class="receipt-meta-row">
                                 <span>Table: <strong>{{ $order->table_number }}</strong></span>
                             </div>
                         @endif
-                        @if($order->order_type === 'Delivery' && $order->delivery_address)
-                        @if($order->customer_name)
-                            <div class="receipt-meta-row">
-                                <span>Deliver to: {{ $order->delivery_address }}</span>
-                                <span>Customer: <strong>{{ $order->customer_name }}</strong></span>
-                            </div>
-                        @endif
-                        @if($order->order_type === 'Delivery' && $order->delivery_notes)
                         @if($order->customer_phone)
                             <div class="receipt-meta-row">
-                                <span>Notes: {{ $order->delivery_notes }}</span>
                                 <span>Phone: {{ $order->customer_phone }}</span>
                             </div>
                         @endif
@@ -909,7 +904,6 @@
                                     @endforeach
                                 @endif
                                 @if($item->modifiers && $item->modifiers->count() > 0)
-                                                                @if($item->modifiers && $item->modifiers->count() > 0)
                                     @foreach($item->modifiers as $mod)
                                         <div class="receipt-item-sub">
                                             + {{ $mod->modifier->name }}

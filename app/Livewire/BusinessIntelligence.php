@@ -423,19 +423,41 @@ class BusinessIntelligence extends Component
      */
     private function buildSalesBreakdown(Collection $completedOrders): array
     {
-        $paymentMethods = $completedOrders->groupBy('payment_method')
-            ->map(fn($g, $method) => (object)[
-                'payment_method' => $method ?: 'Unknown',
-                'count'          => $g->count(),
-                'total'          => $g->sum('total_amount'),
-            ])->values();
+        $paymentGroups = $completedOrders->groupBy(function ($order) {
+            $method = strtolower(trim((string) $order->payment_method));
 
-        $orderSources = $completedOrders->groupBy('order_type')
-            ->map(fn($g, $source) => (object)[
-                'source' => $source ?: 'Unknown',
-                'count'  => $g->count(),
-                'total'  => $g->sum('total_amount'),
-            ])->values();
+            return in_array($method, ['cod', 'cash on delivery'], true)
+                ? 'Cash on Delivery'
+                : ($order->payment_method ?: 'Unknown');
+        });
+        $paymentLabels = collect(['Cash', 'GCash', 'Cash on Delivery'])
+            ->merge($paymentGroups->keys())
+            ->unique()
+            ->values();
+        $paymentMethods = $paymentLabels->map(fn($method) => (object)[
+                'payment_method' => $method,
+                'count'          => $paymentGroups->get($method, collect())->count(),
+                'total'          => $paymentGroups->get($method, collect())->sum('total_amount'),
+            ])
+            ->filter(fn($row) => $row->count > 0 || in_array($row->payment_method, ['Cash', 'GCash', 'Cash on Delivery'], true))
+            ->values();
+
+        $sourceGroups = $completedOrders->groupBy(function ($order) {
+            $source = strtolower(trim((string) $order->order_type));
+
+            return $source === 'delivery' ? 'Delivery' : ($order->order_type ?: 'Unknown');
+        });
+        $sourceLabels = collect(['Dine-in', 'Take-out', 'Delivery'])
+            ->merge($sourceGroups->keys())
+            ->unique()
+            ->values();
+        $orderSources = $sourceLabels->map(fn($source) => (object)[
+                'source' => $source,
+                'count'  => $sourceGroups->get($source, collect())->count(),
+                'total'  => $sourceGroups->get($source, collect())->sum('total_amount'),
+            ])
+            ->filter(fn($row) => $row->count > 0 || in_array($row->source, ['Dine-in', 'Take-out', 'Delivery'], true))
+            ->values();
 
         $topItems = collect();
         if ($completedOrders->isNotEmpty()) {

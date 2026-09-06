@@ -894,12 +894,10 @@ class ThermalBluetoothPrinter {
                         }
 
                         for (const opt of item.options || []) {
-                            ln('  + ' + (opt.name || opt.option_name || 'Option'));
                             const optName = opt.name || opt.option_name || 'Option';
                             ln('  + ' + (optName.length > this.charsPerLine - 6 ? optName.slice(0, this.charsPerLine - 9).trimEnd() + '…' : optName));
                         }
                         for (const mod of item.modifiers || []) {
-                            ln('  + ' + (mod.name || mod.modifier_name || 'Modifier'));
                             const modName = mod.name || mod.modifier_name || 'Modifier';
                             ln('  + ' + (modName.length > this.charsPerLine - 6 ? modName.slice(0, this.charsPerLine - 9).trimEnd() + '…' : modName));
                         }
@@ -923,7 +921,6 @@ class ThermalBluetoothPrinter {
                         ln(this.twoColumns('Delivery Fee', this.money(order.delivery_fee, sym)));
 
                     ln(this.divider('='));
-                                        ln(this.divider('='));
                     push(CMD.boldOn());
                     ln(this.twoColumns('TOTAL', this.money(order.total ?? order.total_amount ?? 0, sym)));
                     push(CMD.boldOff());
@@ -992,7 +989,6 @@ class ThermalBluetoothPrinter {
                 }
             }
 
-            await this.write(bytes);
             console.log('✅ Thermal receipt sent successfully.');
         } finally {
             this.isPrinting = false;

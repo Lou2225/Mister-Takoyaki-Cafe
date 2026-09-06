@@ -6,10 +6,7 @@
 @endphp
 <div
     x-data="slidingTabs($wire.entangle('activeTab').live, 'activeTab')"
-<<<<<<< HEAD
     wire:ignore.self
-=======
->>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
     class="relative overflow-hidden">
 
     <div class="px-1">
@@ -17,15 +14,9 @@
         <div class="mb-4 flex items-center justify-between gap-3">
             <div class="min-w-0 shrink">
                 <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Business Reports</h2>
-<<<<<<< HEAD
                 <p class="hidden sm:block text-[12px] text-gray-500 font-medium whitespace-nowrap overflow-hidden text-ellipsis">Consolidated analytics and <span class="{{ $primaryText }} font-bold">forecasting insights</span></p>
             </div>
             <div class="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2 shrink-0">
-=======
-                <p class="text-[12px] text-gray-500 font-medium whitespace-nowrap overflow-hidden text-ellipsis">Consolidated analytics and <span class="{{ $primaryText }} font-bold">forecasting insights</span></p>
-            </div>
-            <div class="flex flex-wrap items-center gap-2">
->>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                 <x-date-filter startModel="startDate" endModel="endDate" activeModel="activeFilter" refreshAction="applyQuickDateFilter" />
                 <x-report-dropdown module="BI Report" />
 
@@ -33,7 +24,6 @@
                 @if(auth()->user()->role_id === 1)
                     <x-dropdown align="right" width="48">
                         <x-slot name="trigger">
-<<<<<<< HEAD
                             <button type="button" class="inline-flex items-center gap-0 sm:gap-1.5 lg:gap-2 px-2.5 sm:px-3 lg:px-4 text-[11px] lg:text-[12px] font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:border-gray-300 focus:outline-none shadow-sm transition-colors h-10 shrink-0">
                                 <svg class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
                                 <span class="hidden sm:inline whitespace-nowrap max-w-[90px] lg:max-w-none truncate">{{ $selectedBranchId === 'all' ? 'All Branches' : ($branches->firstWhere('id', $selectedBranchId)?->branch_name ?? 'Select Branch') }}</span>
@@ -44,16 +34,6 @@
                             <x-dropdown-link href="#" wire:click.prevent="$set('selectedBranchId', 'all')">
                                 All Branches
                             </x-dropdown-link>
-=======
-                            <button type="button" class="inline-flex items-center gap-2 px-4 py-1.5 text-[12px] font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:border-gray-300 focus:outline-none shadow-sm transition-colors h-10">
-                                <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                                <span>{{ $selectedBranchId === 'all' ? 'All Branches' : ($branches->firstWhere('id', $selectedBranchId)?->branch_name ?? 'Select Branch') }}</span>
-                                <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-                            </button>
-                        </x-slot>
-                        <x-slot name="content">
-
->>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                             
                             @foreach($branches as $branch)
                                 <x-dropdown-link href="#" wire:click.prevent="$set('selectedBranchId', {{ $branch->id }})">
@@ -110,7 +90,7 @@
                                 <div class="flex items-center justify-between gap-3">
                                     <div>
                                         <p class="text-[11px] font-black uppercase tracking-[0.18em] text-gray-400">{{ $branch->branch_name }}</p>
-                                        <p class="mt-2 text-[18px] font-black text-gray-900">₱{{ number_format($branch->revenue, 2) }}</p>
+                                        <p class="mt-2 text-[18px] font-black text-gray-900">&#8369;{{ number_format($branch->revenue, 2) }}</p>
                                     </div>
                                     <div class="rounded-full bg-indigo-50 px-2 py-1 text-[10px] font-black text-indigo-700">{{ number_format(($branch->revenue / max($performance['gross_sales'], 1)) * 100, 1) }}%</div>
                                 </div>
@@ -119,7 +99,7 @@
                                 </div>
                                 <div class="mt-3 flex items-center justify-between text-[10px] font-bold text-gray-500 uppercase tracking-[0.14em]">
                                     <span>{{ $branch->order_count }} orders</span>
-                                    <span>avg ₱{{ number_format($branch->avg_ticket, 2) }}</span>
+                                    <span>avg &#8369;{{ number_format($branch->avg_ticket, 2) }}</span>
                                 </div>
                             </div>
                         @endforeach
@@ -138,7 +118,7 @@
         <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
     </div>
 </div>
-<h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">₱{{ number_format($performance['gross_sales'], 2) }}</h3>
+<h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">&#8369;{{ number_format($performance['gross_sales'], 2) }}</h3>
 <p class="text-[9px] sm:text-[10px] md:text-[11px] text-slate-500 font-semibold mt-1 sm:mt-1.5 leading-none">Consolidated overall gross inflow</p>
                     </div>
                 </div>
@@ -152,8 +132,8 @@
         <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
     </div>
 </div>
-<h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">₱{{ number_format($performance['net_sales'], 2) }}</h3>
-<p class="text-[9px] sm:text-[10px] md:text-[11px] text-slate-500 font-semibold mt-1 sm:mt-1.5 leading-none">Excl. ₱{{ number_format($performance['delivery_fees'], 2) }} delivery</p>
+<h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">&#8369;{{ number_format($performance['net_sales'], 2) }}</h3>
+<p class="text-[9px] sm:text-[10px] md:text-[11px] text-slate-500 font-semibold mt-1 sm:mt-1.5 leading-none">Excl. &#8369;{{ number_format($performance['delivery_fees'], 2) }} delivery</p>
                     </div>
                 </div>
 
@@ -166,7 +146,7 @@
         <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
     </div>
 </div>
-<h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">₱{{ number_format($performance['gross_profit'], 2) }}</h3>
+<h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">&#8369;{{ number_format($performance['gross_profit'], 2) }}</h3>
 <p class="text-[9px] sm:text-[10px] md:text-[11px] text-slate-500 font-semibold mt-1 sm:mt-1.5 leading-none">Earnings margin after raw ingredient costs</p>
                     </div>
                 </div>
@@ -181,7 +161,7 @@
     </div>
     <div class="min-w-0">
         <span class="block text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Discounts</span>
-        <span class="block text-[13px] sm:text-[15px] font-black text-rose-600 leading-none truncate">-₱{{ number_format($performance['total_discounts'], 2) }}</span>
+        <span class="block text-[13px] sm:text-[15px] font-black text-rose-600 leading-none truncate">-&#8369;{{ number_format($performance['total_discounts'], 2) }}</span>
     </div>
 </div>
 
@@ -192,7 +172,7 @@
     </div>
     <div class="min-w-0">
         <span class="block text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Delivery</span>
-        <span class="block text-[13px] sm:text-[15px] font-black text-amber-600 leading-none truncate">₱{{ number_format($performance['delivery_fees'], 2) }}</span>
+        <span class="block text-[13px] sm:text-[15px] font-black text-amber-600 leading-none truncate">&#8369;{{ number_format($performance['delivery_fees'], 2) }}</span>
     </div>
 </div>
 
@@ -203,7 +183,7 @@
     </div>
     <div class="min-w-0">
         <span class="block text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Refunds</span>
-        <span class="block text-[13px] sm:text-[15px] font-black text-rose-600 leading-none truncate">-₱{{ number_format($performance['refunds'], 2) }}</span>
+        <span class="block text-[13px] sm:text-[15px] font-black text-rose-600 leading-none truncate">-&#8369;{{ number_format($performance['refunds'], 2) }}</span>
     </div>
 </div>
 
@@ -214,7 +194,7 @@
     </div>
     <div class="min-w-0">
         <span class="block text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Spoilage</span>
-        <span class="block text-[13px] sm:text-[15px] font-black text-rose-600 leading-none truncate">-₱{{ number_format($performance['waste_cost'] ?? 0, 2) }}</span>
+        <span class="block text-[13px] sm:text-[15px] font-black text-rose-600 leading-none truncate">-&#8369;{{ number_format($performance['waste_cost'] ?? 0, 2) }}</span>
     </div>
 </div>
 
@@ -225,7 +205,7 @@
     </div>
     <div class="min-w-0">
         <span class="block text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Avg Ticket</span>
-        <span class="block text-[13px] sm:text-[15px] font-black text-gray-900 leading-none truncate">₱{{ number_format($performance['avg_order_value'], 2) }}</span>
+        <span class="block text-[13px] sm:text-[15px] font-black text-gray-900 leading-none truncate">&#8369;{{ number_format($performance['avg_order_value'], 2) }}</span>
     </div>
 </div>
         </div>
@@ -252,7 +232,7 @@
                     <td class="py-3 px-4 border-r border-gray-100 font-bold text-[13px] text-gray-900 whitespace-nowrap">{{ $order->reference_no }}</td>
                     <td class="py-3 px-4 border-r border-gray-100 text-[12px] font-semibold text-gray-600 whitespace-nowrap">{{ $order->branch->branch_name }}</td>
                     <td class="py-3 px-4 border-r border-gray-100 text-[12px] font-bold text-gray-700 whitespace-nowrap">{{ $order->customer_name ?: 'Walk-in' }}</td>
-                    <td class="py-3 px-4 border-r border-gray-100 text-right font-black text-[13px] text-gray-900 font-mono whitespace-nowrap">₱{{ number_format($order->total_amount, 2) }}</td>
+                    <td class="py-3 px-4 border-r border-gray-100 text-right font-black text-[13px] text-gray-900 font-mono whitespace-nowrap">&#8369;{{ number_format($order->total_amount, 2) }}</td>
                     <td class="py-3 px-4 border-r border-gray-100 text-center whitespace-nowrap">
                         @php
                             $s = match($order->status) {
@@ -283,7 +263,6 @@
         </div>
     </div>
 
-<<<<<<< HEAD
     <div x-cloak x-show="activeTab === 'forecasting'" class="space-y-6">
 
         {{-- Reference Guide --}}
@@ -312,14 +291,14 @@
                                 <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                                 <div>
                                     <p class="text-[11px] font-black text-emerald-700">High</p>
-                                    <p class="text-[10px] text-emerald-600/70">60+ days of data, R² ≥ 0.70</p>
+                                    <p class="text-[10px] text-emerald-600/70">60+ days of data, RÂ² â‰¥ 0.70</p>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2 px-3 py-2 bg-amber-50 rounded-lg border border-amber-100">
                                 <span class="w-2 h-2 rounded-full bg-amber-500"></span>
                                 <div>
                                     <p class="text-[11px] font-black text-amber-700">Medium</p>
-                                    <p class="text-[10px] text-amber-600/70">30+ days of data, R² ≥ 0.40</p>
+                                    <p class="text-[10px] text-amber-600/70">30+ days of data, RÂ² â‰¥ 0.40</p>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2 px-3 py-2 bg-rose-50 rounded-lg border border-rose-100">
@@ -339,15 +318,15 @@
                         </div>
                     </div>
 
-                    {{-- R² display if available --}}
+                    {{-- RÂ² display if available --}}
                     @if(isset($forecasting['short_term']['r_squared']))
                     <div class="pt-4 border-t border-slate-100">
                         <div class="bg-indigo-50 rounded-xl p-4">
                             <div class="flex items-center justify-between mb-2">
-                                <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Model Quality (R² Score)</p>
+                                <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Model Quality (RÂ² Score)</p>
                                 <p class="text-[18px] font-black text-indigo-900">{{ number_format($forecasting['short_term']['r_squared'] * 100, 1) }}%</p>
                             </div>
-                            <p class="text-[10px] text-slate-600 leading-relaxed">R² measures how well the regression model fits your historical sales data on a scale of 0-100%. Higher scores indicate more reliable forecasts. Typically, 70%+ = Strong, 40-70% = Moderate, Below 40% = Weak.</p>
+                            <p class="text-[10px] text-slate-600 leading-relaxed">RÂ² measures how well the regression model fits your historical sales data on a scale of 0-100%. Higher scores indicate more reliable forecasts. Typically, 70%+ = Strong, 40-70% = Moderate, Below 40% = Weak.</p>
                         </div>
                     </div>
                     @endif
@@ -372,41 +351,20 @@
                 <div>
                     <p class="text-[10px] font-black uppercase tracking-[0.22em] text-gray-400">Benchmarking</p>
                     <h4 class="mt-1 text-[15px] font-bold text-gray-900 tracking-tight">Forecast accuracy vs. baseline</h4>
-=======
-    <div x-cloak x-show="activeTab === 'forecasting'" class="space-y-6 animate-fadeIn">
-        @php
-            $fc = $forecasting ?? ['short_term' => ['forecast' => []], 'long_term' => ['forecast' => []], 'restock_insights' => []];
-            $restock = $fc['restock_insights'] ?? [];
-        @endphp
-
-        <div class="grid grid-cols-1 xl:grid-cols-[1.75fr_1fr] gap-6">
-            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
-                    <div class="flex-1">
-                        <h4 class="text-[15px] font-bold text-gray-900 tracking-tight">Forecasting Analytics</h4>
-                        <p class="text-[11px] text-gray-400 font-medium">Short-term sales forecast for the selected period and branch.</p>
-                    </div>
-
-                    <div class="hidden sm:flex items-center gap-2">
-                        <button x-on:click.prevent="$dispatch('set-forecast-metric', { metric: 'Volume' })" class="px-3 py-1 rounded-lg text-[11px] font-black uppercase tracking-widest bg-white shadow-sm">Volume</button>
-                        <button x-on:click.prevent="$dispatch('set-forecast-metric', { metric: 'Profit' })" class="px-3 py-1 rounded-lg text-[11px] font-black uppercase tracking-widest bg-white shadow-sm">Profit</button>
-                    </div>
->>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                 </div>
                 <div class="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700">
                     {{ number_format($accuracy['model_improvement_pct'] ?? 0, 1) }}% better
                 </div>
             </div>
 
-<<<<<<< HEAD
             <div class="grid grid-cols-2 xl:grid-cols-4 gap-3">
                 <div class="rounded-2xl border border-gray-100 bg-indigo-50 p-4">
                     <p class="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-500">MAE</p>
-                    <p class="mt-2 text-[24px] font-black text-indigo-900">₱{{ number_format($accuracy['mae'] ?? 0, 2) }}</p>
+                    <p class="mt-2 text-[24px] font-black text-indigo-900">&#8369;{{ number_format($accuracy['mae'] ?? 0, 2) }}</p>
                 </div>
                 <div class="rounded-2xl border border-gray-100 bg-slate-50 p-4">
                     <p class="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">RMSE</p>
-                    <p class="mt-2 text-[24px] font-black text-slate-900">₱{{ number_format($accuracy['rmse'] ?? 0, 2) }}</p>
+                    <p class="mt-2 text-[24px] font-black text-slate-900">&#8369;{{ number_format($accuracy['rmse'] ?? 0, 2) }}</p>
                 </div>
                 <div class="rounded-2xl border border-gray-100 bg-amber-50 p-4">
                     <p class="text-[10px] font-black uppercase tracking-[0.18em] text-amber-600">Model MAPE</p>
@@ -435,42 +393,6 @@
                     <div class="flex-1">
                         <div class="h-2.5 rounded-full bg-indigo-100 overflow-hidden">
                             <div class="h-full rounded-full bg-indigo-500" style="width: {{ min(100, max(10, (float)($accuracy['mape'] ?? 0) * 3.5)) }}%"></div>
-=======
-                {{-- Forecast summary: trend / confidence / baseline vs predicted --}}
-                @php
-                    $summary = $fc['short_term'] ?? ['trend'=>'N/A','growth_rate'=>0,'confidence'=>'Low','baseline_avg'=>0];
-                    $predicted_sum = collect($fc['short_term']['forecast'] ?? [])->sum('predicted');
-                    $baseline_week = ($summary['baseline_avg'] ?? 0) * 7;
-                @endphp
-                <div class="mb-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div class="bg-gray-50/50 rounded-xl p-3 flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center border border-gray-100">
-                            <svg class="w-5 h-5 text-{{ $primaryColor }}-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3v18h18"/></svg>
-                        </div>
-                        <div>
-                            <div class="text-[11px] text-gray-500">Trend</div>
-                            <div class="text-[14px] font-black text-gray-900">{{ $summary['trend'] ?? 'N/A' }} <span class="text-[12px] font-bold text-gray-400">({{ $summary['confidence'] ?? 'Low' }})</span></div>
-                        </div>
-                    </div>
-
-                    <div class="bg-gray-50/50 rounded-xl p-3 flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center border border-gray-100">
-                            <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v8m4-4H8"/></svg>
-                        </div>
-                        <div>
-                            <div class="text-[11px] text-gray-500">Baseline vs Predicted (7d)</div>
-                            <div class="text-[14px] font-black text-gray-900">₱{{ number_format($baseline_week,0) }} → ₱{{ number_format($predicted_sum,0) }}</div>
-                        </div>
-                    </div>
-
-                    <div class="bg-gray-50/50 rounded-xl p-3 flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center border border-gray-100">
-                            <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                        </div>
-                        <div>
-                            <div class="text-[11px] text-gray-500">Growth Rate</div>
-                            <div class="text-[14px] font-black text-gray-900">{{ round($summary['growth_rate'] ?? 0,2) }}</div>
->>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                         </div>
                     </div>
                     <div class="w-16 text-right text-[12px] font-black text-indigo-700">
@@ -503,7 +425,6 @@
                 @endif
             </div>
 
-<<<<<<< HEAD
             <p class="mt-4 text-[11px] leading-relaxed text-gray-500">
                 Benchmark uses the previous-period average as the simple baseline. The model is evaluated using MAE, RMSE, and MAPE, then compared against that baseline to show whether the forecasting logic adds practical value.
             </p>
@@ -569,15 +490,15 @@
                                 </div>
                                 <div class="min-w-0">
                                     <div class="text-[10px] text-gray-500 font-medium">7-Day Forecast</div>
-                                    <div class="text-[13px] font-black text-gray-900 truncate">₱{{ number_format($predicted_sum, 0) }}</div>
-                                    <div class="text-[9px] text-gray-400">vs ₱{{ number_format($baseline_week, 0) }} baseline</div>
+                                    <div class="text-[13px] font-black text-gray-900 truncate">&#8369;{{ number_format($predicted_sum, 0) }}</div>
+                                    <div class="text-[9px] text-gray-400">vs &#8369;{{ number_format($baseline_week, 0) }} baseline</div>
                                 </div>
                             </div>
                         </div>
 
                         <div class="text-[10px] text-gray-500 space-y-1 bg-blue-50/50 border border-blue-100 rounded-lg p-3 mb-4">
                             <p><span class="font-bold text-gray-700">Trend:</span> Direction of daily sales change (60-day history analyzed)</p>
-                            <p><span class="font-bold text-gray-700">Baseline:</span> Average of last 7 days × 7 (reference for comparison)</p>
+                            <p><span class="font-bold text-gray-700">Baseline:</span> Average of last 7 days Ã— 7 (reference for comparison)</p>
                             <p><span class="font-bold text-gray-700">Method:</span> Weighted Linear Regression with exponential recent-data emphasis + day-of-week seasonal adjustment</p>
                         </div>
 
@@ -644,7 +565,7 @@
                                 </div>
                                 <div class="min-w-0">
                                     <div class="text-[10px] text-gray-500 font-medium">6-Month Total</div>
-                                    <div class="text-[13px] font-black text-gray-900 truncate">₱{{ number_format($long_total, 0) }}</div>
+                                    <div class="text-[13px] font-black text-gray-900 truncate">&#8369;{{ number_format($long_total, 0) }}</div>
                                     <div class="text-[9px] text-gray-400">Projected revenue</div>
                                 </div>
                             </div>
@@ -684,27 +605,18 @@
             </div>
         </div>
 
-        {{-- Restock Insight — sits to the right of the flip card, filling the space instead of leaving it empty --}}
+        {{-- Restock Insight â€” sits to the right of the flip card, filling the space instead of leaving it empty --}}
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-col h-full overflow-hidden">
                 <div class="flex items-center justify-between gap-3 mb-4 shrink-0">
-=======
-            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                <div class="flex items-center justify-between gap-3 mb-4">
->>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                     <div>
                         <h4 class="text-[15px] font-bold text-gray-900 tracking-tight">Restock Insight</h4>
                         <p class="text-[11px] text-gray-400 font-medium">Ingredient demand recommendations based on the forecasted sales trend.</p>
                     </div>
-<<<<<<< HEAD
                     <span class="inline-flex items-center rounded-full bg-{{ $primaryColor }}-50 text-{{ $primaryColor }}-700 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 shrink-0">
-=======
-                    <span class="inline-flex items-center rounded-full bg-{{ $primaryColor }}-50 text-{{ $primaryColor }}-700 text-[10px] font-black uppercase tracking-widest px-2.5 py-1">
->>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                         Forecast-driven
                     </span>
                 </div>
 
-<<<<<<< HEAD
                 <div class="relative flex-1 min-h-0">
                     @if(count($restock) > 0)
                         <div class="absolute inset-0 space-y-3 overflow-y-auto custom-scrollbar pr-2">
@@ -735,41 +647,11 @@
                         </div>
                     @endif
                 </div>
-=======
-                @if(count($restock) > 0)
-                    <div class="space-y-3">
-                        @foreach($restock as $item)
-                            <div class="rounded-3xl border border-gray-100 p-4 flex items-center justify-between gap-4">
-                                <div class="min-w-0">
-                                    <p class="text-[13px] font-bold text-gray-900 truncate">{{ $item['name'] }} <span class="text-[10px] uppercase tracking-widest font-black text-gray-400">({{ $item['unit'] }})</span></p>
-                                    @php
-                                        $p = strtolower($item['priority'] ?? 'medium');
-                                        $badge = match($p) {
-                                            'high' => 'bg-red-50 text-red-700',
-                                            'medium' => 'bg-amber-50 text-amber-700',
-                                            default => 'bg-gray-50 text-gray-600'
-                                        };
-                                    @endphp
-                                    <p class="text-[11px] text-gray-500 mt-1">Priority: <span class="font-black px-2 py-0.5 rounded-full text-[11px] {{ $badge }}">{{ $item['priority'] }}</span></p>
-                                </div>
-                                <div class="text-right">
-                                    <p class="text-[16px] font-black text-gray-900">{{ number_format($item['amount'], 0) }}</p>
-                                    <p class="text-[10px] uppercase text-gray-400 tracking-widest">Next 14 days</p>
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                @else
-                    <div class="p-6">
-                        <x-empty-state title="No restock insight" description="Not enough historical order data to generate ingredient demand recommendations." />
-                    </div>
-                @endif
->>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
             </div>
         </div>
         </div>
 
-    {{-- ── Product Insights Tab ── --}}
+    {{-- â”€â”€ Product Insights Tab â”€â”€ --}}
     <div x-cloak x-show="activeTab === 'products'" class="space-y-6">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 px-1 items-stretch">
 {{-- Star Products --}}
@@ -794,7 +676,7 @@
                             </div>
                         </div>
                         <div class="text-right">
-                            <span class="block text-[13px] font-black text-gray-900 leading-none mb-1">₱{{ number_format($product->revenue, 2) }}</span>
+                            <span class="block text-[13px] font-black text-gray-900 leading-none mb-1">&#8369;{{ number_format($product->revenue, 2) }}</span>
                             <span class="block text-[10px] font-black uppercase text-{{ $primaryColor }}-500 tracking-widest">Revenue</span>
                         </div>
                     </div>
@@ -819,7 +701,7 @@
                         <div class="space-y-2 group">
                             <div class="flex items-center justify-between text-[11px] font-black uppercase tracking-widest leading-none">
                                 <span class="text-gray-500 group-hover:text-gray-900 transition-colors">{{ $cat->name }}</span>
-                                <span class="text-gray-900">₱{{ number_format($cat->revenue, 2) }}</span>
+                                <span class="text-gray-900">&#8369;{{ number_format($cat->revenue, 2) }}</span>
                             </div>
                             <div class="w-full h-2 bg-gray-50 rounded-full overflow-hidden">
                                 <div class="h-full bg-{{ $primaryColor }}-500 rounded-full transition-all duration-1000 group-hover:opacity-80 shadow-sm" style="width: {{ ($cat->revenue / $totalRev) * 100 }}%"></div>
@@ -836,13 +718,13 @@
             </div>
         </div>
 
-        {{-- Product Seasonality (Weekly / Monthly) — unified chart --}}
+        {{-- Product Seasonality (Weekly / Monthly) â€” unified chart --}}
         <div class="bg-white border border-gray-200 rounded-2xl shadow-sm mx-1 mt-6 overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/30">
                 <div>
                     <h4 class="text-[14px] font-bold text-gray-900 tracking-tight">Product Seasonality</h4>
                     <p class="text-[11px] text-gray-400 font-medium italic">
-                        {{ $seasonalityMode === 'weekly' ? 'Units sold per day of week — top 3 products' : 'Units sold per month — top 3 products' }}
+                        {{ $seasonalityMode === 'weekly' ? 'Units sold per day of week â€” top 3 products' : 'Units sold per month â€” top 3 products' }}
                     </p>
                 </div>
                 {{-- Weekly / Monthly Toggle --}}
@@ -967,12 +849,8 @@
         </div>
     </div>{{-- end products tab --}}
 
-    {{-- ── Operations Tab ── --}}
-<<<<<<< HEAD
+    {{-- â”€â”€ Operations Tab â”€â”€ --}}
     <div x-cloak x-show="activeTab === 'operations'" class="space-y-6">
-=======
-    <div x-cloak x-show="activeTab === 'operations'" class="space-y-6 animate-fadeIn">
->>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
         {{-- Hours Intensity Chart (above Network Performance) --}}
         <div class="mx-1">
             <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
@@ -1000,12 +878,8 @@
                          wire:key="hours-intensity-top-{{ $selectedBranchId }}-{{ $startDate }}-{{ $endDate }}-{{ str_replace(' ', '-', $activeFilter) }}"
                          x-init="init()"
                          class="w-full">
-<<<<<<< HEAD
                         <div x-ref="hoursChartTop" class="w-full h-[380px]"></div>
                         <div x-ref="hoursHeatmapTop" class="w-full h-[48px] mt-2"></div>
-=======
-                        <div x-ref="hoursChartTop" class="w-full h-[320px]"></div>
->>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                     </div>
                 @else
                     <div class="p-6">
@@ -1045,7 +919,7 @@
                         <span class="block text-[13px] font-bold text-gray-900 leading-none">{{ $branch->branch->branch_name }}</span>
                         <span class="block text-[10px] text-gray-400 font-medium italic mt-1">{{ $branch->branch->branch_code }}</span>
                     </td>
-                    <td class="py-3 px-6 border-r border-gray-100 text-right font-black text-[13px] text-gray-900 font-mono whitespace-nowrap">₱{{ number_format($branch->revenue, 2) }}</td>
+                    <td class="py-3 px-6 border-r border-gray-100 text-right font-black text-[13px] text-gray-900 font-mono whitespace-nowrap">&#8369;{{ number_format($branch->revenue, 2) }}</td>
                     <td class="py-3 px-6 border-r border-gray-100 text-center text-[12px] font-bold text-gray-600 whitespace-nowrap">{{ $branch->count }}</td>
                     <td class="py-3 px-6 text-right whitespace-nowrap">
                         <div class="flex items-center justify-end gap-3">
@@ -1075,12 +949,8 @@
 
 
 
-    {{-- ── Sales Report Tab ── --}}
-<<<<<<< HEAD
+    {{-- â”€â”€ Sales Report Tab â”€â”€ --}}
     <div x-cloak x-show="activeTab === 'sales'" class="space-y-6">
-=======
-    <div x-cloak x-show="activeTab === 'sales'" class="space-y-6 animate-fadeIn">
->>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
         <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <div>
@@ -1133,7 +1003,7 @@
                                         <p class="text-[11px] text-gray-400 font-medium">{{ $pm->count }} transactions</p>
                                     </div>
                                 </div>
-                                <p class="text-[14px] font-black text-gray-900">₱{{ number_format($pm->total, 2) }}</p>
+                                <p class="text-[14px] font-black text-gray-900">&#8369;{{ number_format($pm->total, 2) }}</p>
                             </div>
                         @empty
                             <x-empty-state title="No payment data" description="No completed orders in this period." />
@@ -1147,7 +1017,7 @@
                         @forelse($salesData['order_sources'] as $src)
                             <div class="p-4 rounded-xl bg-gray-50 border border-gray-100">
                                 <p class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{{ $src->source }}</p>
-                                <h5 class="text-lg font-black text-gray-900 mt-1">₱{{ number_format($src->total, 2) }}</h5>
+                                <h5 class="text-lg font-black text-gray-900 mt-1">&#8369;{{ number_format($src->total, 2) }}</h5>
                                 <p class="text-[11px] text-gray-400 mt-1 font-medium">{{ $src->count }} orders</p>
                             </div>
                         @empty
@@ -1168,7 +1038,7 @@
                         </div>
                         <div class="flex justify-between items-center pb-3 border-b border-gray-100">
                             <span class="text-[12px] text-gray-600 font-medium">Avg. Order Value</span>
-                            <span class="text-[13px] font-bold text-gray-900">₱{{ number_format($salesData['avg_order_value'], 2) }}</span>
+                            <span class="text-[13px] font-bold text-gray-900">&#8369;{{ number_format($salesData['avg_order_value'], 2) }}</span>
                         </div>
                     </div>
                 </div>
@@ -1185,7 +1055,7 @@
                                         <p class="text-[11px] text-gray-400 font-medium">{{ $item->total_quantity }} sold</p>
                                     </div>
                                 </div>
-                                <p class="text-[13px] font-bold text-gray-900">₱{{ number_format($item->total_sales, 2) }}</p>
+                                <p class="text-[13px] font-bold text-gray-900">&#8369;{{ number_format($item->total_sales, 2) }}</p>
                             </div>
                         @empty
                             <x-empty-state title="No items" description="" />
@@ -1196,7 +1066,7 @@
         </div>
     </div>
 
-    {{-- ─── Breakdown Side Panel ────────────────────────────────────────── --}}
+    {{-- â”€â”€â”€ Breakdown Side Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ --}}
     <x-side-panel name="kpi-breakdown" width="max-w-md">
         <div class="flex flex-col h-full bg-white">
             {{-- Premium Header --}}
@@ -1230,7 +1100,7 @@
                                     <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Formula:</span>
                                     <code class="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
                                         @if($selectedMetric === 'Gross Revenue')
-                                            Σ (Sales Price × Qty)
+                                            Î£ (Sales Price Ã— Qty)
                                         @elseif($selectedMetric === 'Net Sales')
                                             Gross Revenue - Deductions
                                         @elseif($selectedMetric === 'Gross Profit')
@@ -1258,21 +1128,21 @@
                             <div class="p-5 rounded-2xl bg-white border border-slate-100 shadow-sm">
                                 <span class="text-[10px] font-black text-indigo-600 uppercase tracking-widest block mb-1">Net Sales inflow</span>
                                 <div class="flex items-baseline gap-2">
-                                    <p class="text-2xl font-black text-slate-900">₱ {{ number_format($gpData['net_sales'] ?? 0, 2) }}</p>
+                                    <p class="text-2xl font-black text-slate-900">&#8369; {{ number_format($gpData['net_sales'] ?? 0, 2) }}</p>
                                     <span class="text-[10px] font-bold text-slate-400">Total Net</span>
                                 </div>
                             </div>
                             <div class="p-5 rounded-2xl bg-white border border-slate-100 shadow-sm">
                                 <span class="text-[10px] font-black text-rose-600 uppercase tracking-widest block mb-1">Ingredient Cost (COGS)</span>
                                 <div class="flex items-baseline gap-2">
-                                    <p class="text-2xl font-black text-slate-900">- ₱ {{ number_format($gpData['total_cogs'] ?? 0, 2) }}</p>
+                                    <p class="text-2xl font-black text-slate-900">- &#8369; {{ number_format($gpData['total_cogs'] ?? 0, 2) }}</p>
                                     <span class="text-[10px] font-bold text-slate-400">Raw Expense</span>
                                 </div>
                             </div>
                             <div class="p-5 rounded-2xl bg-white border border-slate-100 shadow-sm">
                                 <span class="text-[10px] font-black text-amber-600 uppercase tracking-widest block mb-1">Waste & Spoilage Cost</span>
                                 <div class="flex items-baseline gap-2">
-                                    <p class="text-2xl font-black text-slate-900">- ₱ {{ number_format($gpData['waste_cost'] ?? 0, 2) }}</p>
+                                    <p class="text-2xl font-black text-slate-900">- &#8369; {{ number_format($gpData['waste_cost'] ?? 0, 2) }}</p>
                                     <span class="text-[10px] font-bold text-slate-400">Spoiled Raw</span>
                                 </div>
                             </div>
@@ -1281,7 +1151,7 @@
                                     <div class="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full -mr-16 -mt-16"></div>
                                     <div class="relative z-10">
                                         <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-1">Gross Margin Result</span>
-                                        <p class="text-3xl font-black text-white">₱ {{ number_format($gpData['gross_profit'] ?? 0, 2) }}</p>
+                                        <p class="text-3xl font-black text-white">&#8369; {{ number_format($gpData['gross_profit'] ?? 0, 2) }}</p>
                                     </div>
                                     <div class="relative z-10 text-right">
                                         <span class="px-3 py-1.5 rounded-xl bg-white/10 text-white text-[14px] font-black backdrop-blur-md">{{ number_format($gpData['profit_margin_pct'] ?? 0, 1) }}%</span>
@@ -1328,7 +1198,7 @@
                                     </div>
                                     <div class="text-right">
                                         <p class="text-[14px] font-black text-slate-900">
-                                            ₱ {{ number_format($item['total'], 2) }}
+                                            &#8369; {{ number_format($item['total'], 2) }}
                                         </p>
                                         <p class="text-[9px] font-black text-slate-400 uppercase mt-0.5 tracking-tighter">
                                             Contribution
@@ -1359,13 +1229,9 @@
 
     <div id="bi-chart-data" style="display:none;" data-state='{{ $biChartDataState }}'></div>
 
-<<<<<<< HEAD
-</div>{{-- ← THIS closes x-data="slidingTabs(...)" --}}
+</div>{{-- â† THIS closes x-data="slidingTabs(...)" --}}
 
 @push('scripts')
-=======
-    @push('scripts')
->>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
     <script>
         function salesReportTrend(initialData) {
             return {
@@ -1389,7 +1255,6 @@
                             zoom: { enabled: false },
                             animations: {
                                 enabled: true,
-<<<<<<< HEAD
                                 easing: 'easeout',
                                 speed: 900,
                                 animateGradually: {
@@ -1400,12 +1265,6 @@
                                     enabled: true,
                                     speed: 500,
                                 }
-=======
-                                easing: 'easeinout',
-                                speed: 800,
-                                animateGradually: { enabled: false },
-                                dynamicAnimation: { enabled: false }
->>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                             }
                         },
                         dataLabels: { enabled: false },
@@ -1436,9 +1295,9 @@
                                 style: { colors: '#9CA3AF', fontSize: '11px' },
                                 formatter: (val) => {
                                     if (val >= 1000) {
-                                        return '₱' + (val / 1000).toFixed(1) + 'k';
+                                        return '\u20B1' + (val / 1000).toFixed(1) + 'k';
                                     }
-                                    return '₱' + val.toFixed(0);
+                                    return '\u20B1' + val.toFixed(0);
                                 }
                             }
                         },
@@ -1457,7 +1316,7 @@
                         tooltip: {
                             theme: 'dark',
                             y: {
-                                formatter: (val) => '₱ ' + Number(val).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                formatter: (val) => '\u20B1 ' + Number(val).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                             }
                         }
                     };
@@ -1515,7 +1374,6 @@
                             type: 'area',
                             height: 320,
                             toolbar: { show: false },
-<<<<<<< HEAD
                             zoom: { enabled: false },
                             animations: {
                                 enabled: true,
@@ -1524,9 +1382,6 @@
                                 animateGradually: { enabled: true, delay: 100 },
                                 dynamicAnimation: { enabled: true, speed: 450 }
                             }
-=======
-                            zoom: { enabled: false }
->>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                         },
                         dataLabels: { enabled: false },
                         stroke: { curve: 'smooth', width: 3 },
@@ -1589,35 +1444,22 @@
             };
         }
 
-<<<<<<< HEAD
         function forecastingChart(initialData, color) {
             return {
                 chartRef: null,
                 chartData: initialData || { categories: [], predicted: [] },
                 chartColor: color || '#6366F1',
-=======
-        function forecastingChart(initialData) {
-            return {
-                chartRef: null,
-                chartData: initialData || { categories: [], predicted: [] },
->>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
 
                 init() {
                     if (typeof window.ApexCharts === 'undefined' || !this.$refs.forecastChart) return;
 
-<<<<<<< HEAD
                     const self = this;
                     const options = {
                         series: [{ name: 'Forecast', data: self.chartData.predicted }],
-=======
-                    const options = {
-                        series: [{ name: 'Forecast', data: this.chartData.predicted }],
->>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                         chart: {
                             type: 'area',
                             height: 320,
                             toolbar: { show: false },
-<<<<<<< HEAD
                             zoom: { enabled: false },
                             animations: {
                                 enabled: true,
@@ -1660,8 +1502,8 @@
                             labels: {
                                 style: { colors: '#9CA3AF', fontSize: '11px' },
                                 formatter: (val) => {
-                                    if (val >= 1000) return '₱' + (val / 1000).toFixed(1) + 'k';
-                                    return '₱' + Math.round(val);
+                                    if (val >= 1000) return '\u20B1' + (val / 1000).toFixed(1) + 'k';
+                                    return '\u20B1' + Math.round(val);
                                 }
                             }
                         },
@@ -1669,7 +1511,7 @@
                         tooltip: {
                             theme: 'dark',
                             y: {
-                                formatter: (val) => '₱ ' + Number(val).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                formatter: (val) => '\u20B1 ' + Number(val).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                             }
                         },
                         grid: {
@@ -1689,28 +1531,8 @@
 
                     self.chartRef = new ApexCharts(self.$refs.forecastChart, options);
                     self.chartRef.render();
-=======
-                            zoom: { enabled: false }
-                        },
-                        dataLabels: { enabled: false },
-                        stroke: { curve: 'smooth', width: 3 },
-                        fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.28, opacityTo: 0.03, stops: [0,80,100] } },
-                        xaxis: { categories: this.chartData.categories, labels: { rotate: -45, style: { fontSize: '11px', colors: '#9CA3AF' } } },
-                        yaxis: { labels: { formatter: (val) => Math.round(val) } },
-                        colors: ['#6366F1'],
-                        tooltip: { y: { formatter: (val) => '₱ ' + Number(val).toLocaleString() } },
-                        grid: { borderColor: '#f8fafc' }
-                    };
-
-                    this.chartRef = new ApexCharts(this.$refs.forecastChart, options);
-                    this.chartRef.render();
->>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                 }
             };
         }
     </script>
     @endpush
-<<<<<<< HEAD
-=======
-</div>
->>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2

@@ -147,7 +147,7 @@
                                     ->where(function ($q) use ($voidRefundCutoff) {
                                         $q->whereNotIn('status', ['Completed', 'Cancelled', 'Void', 'Refunded', 'Partially Refunded'])
                                           ->orWhere(function ($q2) use ($voidRefundCutoff) {
-                                              $q2->whereIn('status', ['Completed', 'Cancelled', 'Void', 'Refunded', 'Partially Refunded'])
+                                              $q2->whereIn('status', ['Completed', 'Void', 'Refunded', 'Partially Refunded'])
                                                  ->where('created_at', '>=', $voidRefundCutoff);
                                           });
                                     })

@@ -957,7 +957,11 @@ if ($refunds > 0) {
         }
 
         $channelsRaw = $orders->groupBy('order_type')->map->count();
-        $channelLabels = $posConfig['order_types'] ?? ['Dine-in', 'Take-out'];
+        $channelLabels = collect($posConfig['order_types'] ?? ['Dine-in', 'Take-out'])
+            ->merge(['Delivery'])
+            ->unique()
+            ->values()
+            ->all();
         $channelSeries = [];
         foreach ($channelLabels as $label) {
             $channelSeries[] = (int)($channelsRaw[$label] ?? 0);
@@ -1158,7 +1162,11 @@ if ($refunds > 0) {
 
         // Revenue Channels (Order Types)
         $channelsRaw = $orders->groupBy('order_type')->map->count();
-        $channelLabels = $posConfig['order_types'] ?? ['Dine-in', 'Take-out'];
+        $channelLabels = collect($posConfig['order_types'] ?? ['Dine-in', 'Take-out'])
+            ->merge(['Delivery'])
+            ->unique()
+            ->values()
+            ->all();
         $channelSeries = [];
         foreach ($channelLabels as $label) {
             $channelSeries[] = (int)($channelsRaw[$label] ?? 0);
