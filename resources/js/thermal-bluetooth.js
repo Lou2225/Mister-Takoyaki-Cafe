@@ -348,7 +348,7 @@ const QREngine = (function() {
         [2, 146, 116], [3, 58, 36, 2, 59, 37], [4, 36, 16, 4, 37, 17], [4, 36, 12, 4, 37, 13],
         [2, 86, 68, 2, 87, 69], [4, 69, 43, 1, 70, 44], [6, 43, 19, 2, 44, 20], [6, 43, 15, 2, 44, 16]
     ];
-        QRRSBlock.getRSBlocks = function(typeNumber, errorCorrectLevel) {
+    QRRSBlock.getRSBlocks = function(typeNumber, errorCorrectLevel) {
         let offset;
         switch (errorCorrectLevel) {
             case QRErrorCorrectLevel.L: offset = 0; break;
@@ -388,6 +388,9 @@ const QREngine = (function() {
 })();
 
 /**
+ * Generate a large, crystal-clear 1-bit monochrome ESC/POS raster QR Code (GS v 0).
+ * Scaled up to ~300 dots with 7-8 dots per module and a 4-module quiet zone,
+ * allowing instant scanning by any camera on 58mm & 80mm thermal paper.
  * Generate a clean, medium-sized 1-bit monochrome ESC/POS raster QR Code (GS v 0).
  * Slightly more whitespace between modules and a stronger white border to keep the black squares
  * crisp and readable on thermal paper without making the pattern feel dense or muddy.
@@ -408,6 +411,7 @@ function generateQrRasterBytes(text, charsPerLine = 32) {
         const maxDots = charsPerLine > 32 ? 220 : 180;
         const dotScale = Math.max(8, Math.min(12, Math.floor(maxDots / totalModules)));
         const rawWidth = totalModules * dotScale;
+        // Width in bytes must be integer multiple of 8
         const bytesPerLine = Math.ceil(rawWidth / 8);
         const heightDots = totalModules * dotScale;
 
@@ -656,7 +660,7 @@ class ThermalBluetoothPrinter {
         return this.device.name;
     }
 
-        async disconnect() {
+    async disconnect() {
         if (this.device?.gatt?.connected) this.device.gatt.disconnect();
     }
 
@@ -697,6 +701,11 @@ class ThermalBluetoothPrinter {
     divider(c = '-') { return c.repeat(this.charsPerLine); }
 
     twoColumns(left, right) {
+        const r = String(right || '');
+        const maxL = this.charsPerLine - r.length - 1;
+        const l = (left || '').length > maxL ? (left || '').slice(0, maxL) : (left || '');
+        const spaces = this.charsPerLine - l.length - r.length;
+        return l + ' '.repeat(Math.max(1, spaces)) + r;
         const label = String(left || '');
         const value = String(right || '');
         const priceWidth = Math.min(Math.max(value.length + 1, 10), this.charsPerLine);
@@ -738,7 +747,7 @@ class ThermalBluetoothPrinter {
     /**
      * Print receipt sections received from /pos/orders/{id}/receipt-data.
      */
-        async printReceipt(order, settings, receipts = [], options = {}) {
+    async printReceipt(order, settings, receipts = [], options = {}) {
         if (this.isPrinting) {
             console.warn('⚠️ Thermal print already in progress, skipping duplicate request.');
             return;
@@ -758,7 +767,7 @@ class ThermalBluetoothPrinter {
             const savedWidth = localStorage.getItem('pos_receipt_width_pref') || '58mm';
             this.charsPerLine = savedWidth === '80mm' ? 42 : 32;
 
-                        const sections = receipts && receipts.length
+            const sections = receipts && receipts.length
                 ? receipts
                 : [{ type: 'customer', title: settings.business_name || 'Receipt', items: order.items || [] }];
 
@@ -769,7 +778,7 @@ class ThermalBluetoothPrinter {
 
             const sym = (settings.currency_symbol || 'P').replace(/\u20b1/g, 'P');
 
-                        let bytes = [];
+            let bytes = [];
             const push = arr => { bytes = bytes.concat(arr); };
             // CRITICAL: Always use \r\n (CRLF) for thermal printers to advance newlines properly
             const ln = str => push(textToBytes((str || '') + '\r\n'));
@@ -781,7 +790,7 @@ class ThermalBluetoothPrinter {
                 logoBytes = await imageToRasterBytes(settings.logo_data_uri, maxLogoWidth);
             }
 
-                        for (let sIdx = 0; sIdx < sections.length; sIdx++) {
+            for (let sIdx = 0; sIdx < sections.length; sIdx++) {
                 const section = sections[sIdx];
                 const copiesForThisSection = section.type === 'customer' ? customerCopies : 1;
 
@@ -850,7 +859,7 @@ class ThermalBluetoothPrinter {
                     ln('Payment: ' + order.payment_method);
                 }
 
-                                // ── Delivery Address (customer receipt only) ──
+                // ── Delivery Address (customer receipt only) ──
                 const orderType = (order.type || order.order_type || '').toLowerCase();
                 if (section.type === 'customer' && orderType === 'delivery' && order.delivery_address) {
                     ln(this.divider('-'));
@@ -885,10 +894,12 @@ class ThermalBluetoothPrinter {
                         }
 
                         for (const opt of item.options || []) {
+                            ln('  + ' + (opt.name || opt.option_name || 'Option'));
                             const optName = opt.name || opt.option_name || 'Option';
                             ln('  + ' + (optName.length > this.charsPerLine - 6 ? optName.slice(0, this.charsPerLine - 9).trimEnd() + '…' : optName));
                         }
                         for (const mod of item.modifiers || []) {
+                            ln('  + ' + (mod.name || mod.modifier_name || 'Modifier'));
                             const modName = mod.name || mod.modifier_name || 'Modifier';
                             ln('  + ' + (modName.length > this.charsPerLine - 6 ? modName.slice(0, this.charsPerLine - 9).trimEnd() + '…' : modName));
                         }
@@ -911,6 +922,7 @@ class ThermalBluetoothPrinter {
                     if (Number(order.delivery_fee) > 0)
                         ln(this.twoColumns('Delivery Fee', this.money(order.delivery_fee, sym)));
 
+                    ln(this.divider('='));
                                         ln(this.divider('='));
                     push(CMD.boldOn());
                     ln(this.twoColumns('TOTAL', this.money(order.total ?? order.total_amount ?? 0, sym)));
@@ -936,18 +948,24 @@ class ThermalBluetoothPrinter {
                         }
                     }
 
+                    // QR Code — Large, Crystal-Clear 1-Bit Monochrome Raster QR with 4-Module Quiet Zone
                                         // QR Code — center aligned, tight spacing (no blank lines above/below the code itself)
                     const qrTarget = settings.qr_url || '';
                     if (settings.show_receipt_qr_code !== false && qrTarget) {
                         push(CMD.alignCenter());
+                        ln('');
                         ln(this.divider('-'));
                         ln('SCAN TO REVIEW & RATE ORDER');
                         ln(this.divider('-'));
+                        ln('');
+                        // Generate enlarged, high-contrast 1-bit raster QR code bytes
                         const qrBytes = generateQrRasterBytes(qrTarget, this.charsPerLine);
                         if (qrBytes.length > 0) {
                             push(qrBytes);
                         }
+                        ln('');
                         ln(this.wrap(qrTarget));
+                        ln('');
                     }
                 }
 
@@ -972,6 +990,7 @@ class ThermalBluetoothPrinter {
                 }
             }
 
+            await this.write(bytes);
             console.log('✅ Thermal receipt sent successfully.');
         } finally {
             this.isPrinting = false;
