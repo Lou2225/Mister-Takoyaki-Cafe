@@ -21,6 +21,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Mail;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Response;
+use Illuminate\Support\Facades\Log;
 
 class StockManagement extends Component
 {
