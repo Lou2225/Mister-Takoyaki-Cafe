@@ -19,14 +19,14 @@ $maxWidth = [
     'full' => 'sm:max-w-full',
 ][$maxWidth ?? '2xl'];
 @endphp
-
+ 
 <div
     wire:ignore.self
     x-data="modal({ name: '{{ $name }}', show: @js($show) })"
     x-on:open-modal.window="open($event.detail)"
     x-on:close-modal.window="close($event.detail)"
-    x-on:close.stop="typeof isModalOpen !== 'undefined' && (isModalOpen = false)"
-    x-on:keydown.escape.window="typeof isModalOpen !== 'undefined' && (isModalOpen = false)"
+    x-on:close.stop="typeof isModalOpen !== 'undefined' && (typeof cartLocked === 'undefined' || !cartLocked) && (isModalOpen = false)"
+    x-on:keydown.escape.window="typeof isModalOpen !== 'undefined' && (typeof cartLocked === 'undefined' || !cartLocked) && (isModalOpen = false)"
     x-on:keydown.tab.prevent="$event.shiftKey || nextFocusable()?.focus()"
     x-on:keydown.shift.tab.prevent="prevFocusable()?.focus()"
     x-show="isModalOpen"
@@ -37,7 +37,7 @@ $maxWidth = [
     <div
     x-show="isModalOpen"
     class="fixed inset-0 transform transition-all"
-    x-on:click.self="isModalOpen = false"
+    x-on:click.self="(typeof cartLocked !== 'undefined' && cartLocked) ? $dispatch('notify', { type: 'warning', message: 'This payment is already verified — you must Place the Order to complete it.' }) : (isModalOpen = false)"
     x-transition:enter="ease-out duration-300"
     x-transition:enter-start="opacity-0"
     x-transition:enter-end="opacity-100"

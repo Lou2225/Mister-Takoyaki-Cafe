@@ -19,8 +19,10 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Renderless;
 use App\Traits\HandlesValidations;
 use App\Helpers\ValidationHelper;
+
 
 class PosTerminal extends Component
 {
@@ -157,6 +159,7 @@ public function resetGCashState(): void
  * record at all. In that state the only way out is to place the
  * order, then void it afterward in Order Management if needed.
  */
+        #[Renderless]
     public function cancelPaymentModal(): void
     {
         if ($this->paymentMethod === 'GCash' && $this->gcashVerified) {
@@ -187,6 +190,7 @@ public function resetGCashState(): void
  * database. If that verification fails, it closes the modal it never
  * actually needed to open in the first place.
  */
+#[Renderless]
 public function openPaymentModal(): void
 {
     $this->resetErrorBag('gcashCancel');
@@ -576,7 +580,18 @@ public function change(): float
 
     // ─── Cart Actions ──────────────────────────────────────────────────────
 
+#[Renderless]
+public function openEditItem(string $key, array $item): void
+{
+    $this->cart[$key] = $item;
+    $this->editCartItemId = $key;
+    $this->editCartItemQty = $item['qty'] ?? 1;
+    $this->editCartItemNotes = $item['instructions'] ?? '';
+    $this->applyRegularDiscount = $item['apply_regular_discount'] ?? false;
+    $this->applySeniorDiscount = $item['apply_senior_discount'] ?? false;
+}
 
+       #[Renderless]
     public function saveEditItem(): void
     {
         $key = $this->editCartItemId;
@@ -741,7 +756,6 @@ public function change(): float
             }
 
             // Load draft data into POS
-            // Load draft data into POS
             // Note: branchId is intentionally NOT overwritten here — drafts are
             // already scoped to the cashier's current branch in getDraftsProperty(),
             // and reassigning it forces an oversized re-render mid-modal.
@@ -754,6 +768,9 @@ public function change(): float
             $this->cart = [];
             foreach ($draft->items as $item) {
                 $product = $item->product;
+                if (!$product) {
+                    throw new \RuntimeException("Draft item {$item->id} references a missing product.");
+                }
                 
                 $optionIds = $item->options->pluck('product_option_id')->sort()->toArray();
                 $modifierIds = $item->modifiers->pluck('modifier_id')->sort()->toArray();
@@ -810,7 +827,7 @@ public function change(): float
                 type: 'success',
                 message: "Draft order #{$draft->reference_no} loaded successfully!"
             );
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->dispatch('notify', 
                 type: 'error',
                 message: 'Failed to load draft: ' . $e->getMessage()
@@ -915,6 +932,7 @@ public function change(): float
      * Manually verifies a static GCash payment.
      * Used when the cashier shows their own QR and checks their phone.
      */
+        #[Renderless]
     public function verifyStaticPayment(): void
     {
         $this->gcashVerified = true;
@@ -1110,9 +1128,14 @@ public function change(): float
         return $verifiedCart;
     }
 
-    public function confirmPayment(): void
+        #[Renderless]
+    public function confirmPayment(?array $cartData = null): void
     {
         $this->resetErrorBag('gcashCancel');
+
+        if ($cartData !== null) {
+            $this->cart = $cartData;
+        }
 
         if ($this->gcashVerified && $this->paymentMethod !== 'GCash') {
             $this->paymentMethod = 'GCash';

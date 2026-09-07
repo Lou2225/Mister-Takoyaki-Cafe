@@ -2,10 +2,14 @@
     wire:key="pos-terminal-root"
     @cart-loaded.window="cart = $event.detail.cart || {}"
     @cart-reset.window="cart = {}; cartExpanded = false"
+    @pos-category-sortable-init.window="setupCategorySortable()"
     x-data="{ 
         isMobile: window.matchMedia('(max-width: 767px)').matches,
         searchQuery: '',
         activeCategoryId: sessionStorage.getItem('pos_active_category') ? parseInt(sessionStorage.getItem('pos_active_category')) : null,
+        selectCategory(id) {
+            this.activeCategoryId = id;
+        },
         get filteredProductsCount() {
             const query = this.searchQuery ? this.searchQuery.toLowerCase().trim() : '';
             return Object.values(this.productsData).filter(p => {
@@ -15,15 +19,16 @@
             }).length;
         },
         isSavingDraft: false,
+        isSubmitting: false,
         cartExpanded: false,
         isEditMode: @entangle('isEditMode').live,
         cart: @js($cart),
         paymentMethod: @entangle('paymentMethod'),
         gcashVerified: @entangle('gcashVerified').live,
         amountTendered: @entangle('amountTendered'),
-        serviceChargeRate: {{ $serviceChargeRate }},
-        discountPercent: {{ $discountPercent }},
-        seniorDiscountRate: {{ $seniorDiscountRate }},
+        serviceChargeRate: @entangle('serviceChargeRate').live,
+        discountPercent: @entangle('discountPercent').live,
+        seniorDiscountRate: @entangle('seniorDiscountRate').live,
         orderType: @entangle('orderType'),
         get subtotal() {
             return Object.values(this.cart).reduce((sum, item) => sum + (item.price * item.qty), 0);
@@ -40,15 +45,21 @@
                 return sum + discount;
             }, 0);
         },
-        get total() {
+                get total() {
             return (this.subtotal - this.discountTotal) + this.serviceCharge;
+        },
+        get cartLocked() {
+            return this.paymentMethod === 'GCash' && this.gcashVerified;
         },
                 productsData: {},
             cartUsageCacheKey: '',
             cartUsageCache: {},
             stockData: @js($stockData),
-        activeProduct: null,
-        selectedOptions: {},
+activeProduct: null,
+editingItem: null,
+pendingDeleteDraftId: null,
+hiddenDraftIds: [],
+selectedOptions: {},
         selectedModifierIds: [],
         pendingDeleteKey: null,
         categorySortable: null,
@@ -495,7 +506,12 @@
     @cart-expanded.window="cartExpanded = true"
     @cart-collapsed.window="cartExpanded = false"
     @cart-toggle.window="cartExpanded = !cartExpanded"
-    @cart-reset.window="cartExpanded = false"
+    @close-modal.window="
+        if ($event.detail === 'pos-payment' && cartLocked) {
+            $nextTick(() => $dispatch('open-modal', 'pos-payment'));
+            $dispatch('notify', { type: 'warning', message: 'This payment is already verified — you must Place the Order to complete it.' });
+        }
+    "
 >
         <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
     <script id="hidden-products-data" type="application/json">@json($productData)</script>
@@ -598,13 +614,13 @@
             <div 
                 id="category-sortable-tabs"
                 class="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-1 min-w-0"
-                x-init="setupCategorySortable()"
+                x-init="$dispatch('pos-category-sortable-init')"
             >
 
                 {{-- All Tab --}}
                 {{-- All Tab --}}
                 <button type="button" 
-                    @click="activeCategoryId = null"
+                    @click="selectCategory(null)"
                     id="pos_tab_all" 
                     class="pos-category-tab inline-flex items-center justify-center px-4 py-2 border rounded-md font-semibold text-xs uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-offset-2 transition ease-in-out duration-150 gap-1.5 whitespace-nowrap shrink-0"
                     :class="activeCategoryId === null ? 'bg-{{ $primaryColor }}-600 text-white border-transparent hover:bg-{{ $primaryColor }}-700 focus:bg-{{ $primaryColor }}-700 active:bg-{{ $primaryColor }}-800 focus:ring-{{ $primaryColor }}-500' : 'bg-white text-gray-700 border-gray-300 shadow-sm hover:bg-gray-50 focus:ring-{{ $primaryColor }}-500 disabled:opacity-25'">
@@ -614,7 +630,7 @@
 
                 @foreach($categories as $cat)
                     <button type="button" 
-                        @click="activeCategoryId = {{ $cat->id }}"
+                        @click="selectCategory({{ $cat->id }})"
                         id="pos_tab_cat_{{ $cat->id }}" 
                         class="pos-category-tab inline-flex items-center justify-center px-4 py-2 border rounded-md font-semibold text-xs uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-offset-2 transition ease-in-out duration-150 gap-1.5 whitespace-nowrap shrink-0 {{ $isEditMode ? 'border-dashed border-gray-300 cursor-move' : '' }}" 
                         data-id="{{ $cat->id }}"
@@ -860,8 +876,7 @@
                     </div>
                     <div class="flex items-center gap-2">
                         <span class="text-[11px] font-black text-gray-900 font-mono tracking-tighter uppercase">{{ $referenceNo ? '#' . $referenceNo : 'New Order' }}</span>
-                        <button type="button" title="Hold Order" class="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 transition-all" :disabled="Object.keys(cart).length === 0" @click.stop="isSavingDraft = true; $wire.cart = cart; $wire.saveDraft().finally(() => { isSavingDraft = false; cartExpanded = false })">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
+<button type="button" title="Hold Order" class="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed" :disabled="Object.keys(cart).length === 0 || cartLocked" @click.stop="!cartLocked && (isSavingDraft = true, $wire.cart = cart, $wire.saveDraft().finally(() => { isSavingDraft = false; cartExpanded = false }))">                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
                         </button>
                         <div class="flex items-center md:hidden ml-2">
                              <span class="text-[14px] font-black text-indigo-600 font-mono" x-show="!cartExpanded">{{ $currencySymbol }}<span x-text="total.toFixed(2)"></span></span>
@@ -870,8 +885,8 @@
                     </div>
                 </div>
 
-                {{-- Cart Items --}}
-                <div wire:ignore class="flex-1 overflow-y-auto px-3 py-1 divide-y divide-gray-50 min-h-0 relative">
+                                 {{-- Cart Items --}}
+                <div class="flex-1 overflow-y-auto px-3 py-1 divide-y divide-gray-50 min-h-0 relative">
                     {{-- Saving Overlay --}}
                     <div x-show="isSavingDraft" class="absolute inset-0 flex flex-col items-center justify-center bg-white/80 z-10 backdrop-blur-sm">
                         <svg class="animate-spin w-8 h-8 text-amber-500 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
@@ -905,35 +920,33 @@
                                             </template>
                                         </div>
                                         <div class="flex items-center gap-0.5 shrink-0">
-                                            <button type="button" @click="$wire.cart = cart; $wire.editCartItemId = key; $wire.editCartItemQty = cart[key].qty; $wire.editCartItemNotes = cart[key].instructions || ''; $wire.applyRegularDiscount = cart[key].apply_regular_discount || false; $wire.applySeniorDiscount = cart[key].apply_senior_discount || false; $dispatch('open-modal', 'edit-cart-item')" class="relative p-1.5 text-gray-400 hover:text-amber-500 transition-all rounded-lg hover:bg-amber-50">
-                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
-                                                <template x-if="item.instructions">
-                                                    <span class="absolute top-1 right-1 w-1.5 h-1.5 bg-amber-500 rounded-full border border-white"></span>
-                                                </template>
-                                            </button>
-                                                                                        <button @click="pendingDeleteKey = key; $dispatch('open-modal', 'confirm-delete-item')" class="p-1.5 text-gray-300 hover:text-red-500 transition-all rounded-lg hover:bg-red-50">
-                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                            </button>
-                                        </div>
+    <button type="button" @click="!cartLocked && (editingItem = item, $dispatch('open-modal', 'edit-cart-item'), $wire.openEditItem(key, item))" class="relative p-1.5 text-gray-400 hover:text-amber-500 transition-all rounded-lg hover:bg-amber-50 disabled:opacity-40" :disabled="cartLocked">        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
+        <template x-if="item.instructions">
+            <span class="absolute top-1 right-1 w-1.5 h-1.5 bg-amber-500 rounded-full border border-white"></span>
+        </template>
+    </button>
+    <button @click="!cartLocked && (pendingDeleteKey = key, $dispatch('open-modal', 'confirm-delete-item'))" class="p-1.5 text-gray-300 hover:text-red-500 transition-all rounded-lg hover:bg-red-50 disabled:opacity-40" :disabled="cartLocked">        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+    </button>
+</div>
                                     </div>
                                     
                                     <div class="flex items-center justify-between mt-2.5">
                                         <div class="flex items-center gap-1">
-                                            <button @click="if(cart[key].qty > 1) { cart[key].qty-- } else { delete cart[key] }" 
-                                                class="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all active:scale-95">
+                                            <button @click="!cartLocked && (item.qty > 1 ? (item.qty--, cart = {...cart}) : (delete cart[key], cart = {...cart}))"
+                                                class="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all active:scale-95 disabled:opacity-40" :disabled="cartLocked">
                                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4"/></svg>
                                             </button>
                                             <span class="px-1 text-[12px] font-black text-gray-900 min-w-[20px] text-center font-mono" x-text="item.qty"></span>
                                             <button @click="
+                                                if (cartLocked) { $dispatch('notify', { type: 'warning', message: 'Order is locked — payment already verified.' }); return; }
                                                 const productQty = getCartQty(item.id);
                                                 const maxQty = maxAvailableForProduct(item.id);
-                                                if (remainingStock(item.id) > 0 && productQty < maxQty) { cart[key].qty++; cart = {...cart} }
+                                                if (remainingStock(item.id) > 0 && productQty < maxQty) { item.qty++; cart = {...cart} }
                                                 else { $dispatch('notify', { type: 'warning', message: 'Maximum available stock reached' }) }"
-                                                class="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all active:scale-95">
+                                                class="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all active:scale-95 disabled:opacity-40" :disabled="cartLocked">
                                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
                                             </button>
                                         </div>
-
                                         <div class="flex items-center">
                                             <span class="text-[13px] font-black text-gray-900 font-mono tracking-tight" x-text="'{{ $currencySymbol }}' + (item.qty * item.price).toFixed(2)"></span>
                                         </div>
@@ -970,7 +983,7 @@
 
                     <template x-if="serviceCharge > 0">
                         <div class="flex items-center justify-between mt-1">
-                            <span class="text-[12px] text-gray-500">Service Charge ({{ round($serviceChargeRate * 100) }}%)</span>
+                            <span class="text-[12px] text-gray-500" x-text="'Service Charge (' + Math.round(serviceChargeRate * 100) + '%)'">Service Charge ({{ round($serviceChargeRate * 100) }}%)</span>
                             <span class="text-[12px] font-bold text-gray-900 font-mono">{{ $currencySymbol }}<span x-text="serviceCharge.toFixed(2)">{{ number_format($serviceChargeAmount, 2) }}</span></span>
                         </div>
                     </template>
@@ -989,16 +1002,20 @@
                             <x-dropdown align="right" width="48">
                                 <x-slot name="trigger">
                                     <button id="pos_order_type_trigger" type="button"
-                                        class="inline-flex items-center gap-1 text-[12px] font-semibold text-gray-800 focus:outline-none hover:text-gray-900 transition-colors">
-                                        {{ $orderType }}
-                                        <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                                        </svg>
-                                    </button>
+    class="inline-flex items-center gap-1 text-[12px] font-semibold text-gray-800 focus:outline-none hover:text-gray-900 transition-colors">
+    <span x-text="orderType">{{ $orderType }}</span>
+    <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+    </svg>
+</button>
                                 </x-slot>
                                 <x-slot name="content">
                                     @foreach($orderTypes as $type)
-                                    <x-dropdown-link href="#" wire:click.prevent="$set('orderType', '{{ $type }}')" wire:loading.attr="disabled">{{ $type }}</x-dropdown-link>
+                                    <button type="button"
+                                        @click.stop="dropdownOpen = false; orderType = @js($type)"
+                                        class="block w-full px-4 py-2 text-left text-sm leading-5 text-gray-700 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 transition duration-150 ease-in-out">
+                                        {{ $type }}
+                                    </button>
                                     @endforeach
                                 </x-slot>
                             </x-dropdown>
@@ -1180,9 +1197,19 @@
 <x-modal name="pos-payment" maxWidth="4xl" focusable>
     <div class="h-1 w-full bg-gradient-to-r from-gray-800 to-gray-600 rounded-t-xl"></div>
     
-    <div class="p-6" x-data="{ paymentLocked: @entangle('gcashVerified') }">
+    <div class="p-6">
         <h2 class="text-[18px] font-bold text-gray-900 mb-6">Confirm Payment</h2>
-        
+
+        <template x-if="cartLocked">
+            <div class="mb-6 flex items-start gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+                <svg class="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                <div>
+                    <p class="text-[13px] font-black text-emerald-800">Payment Already Verified via GCash</p>
+                    <p class="text-[12px] text-emerald-700 mt-0.5 leading-snug">The money has already been received. This order is locked and can no longer be edited or cancelled — please click <span class="font-bold">Place Order</span> below to complete it.</p>
+                </div>
+            </div>
+        </template>
+
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6">
             {{-- LEFT CARD: Order Summary --}}
             <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
@@ -1190,7 +1217,7 @@
                     <h3 class="text-[13px] font-bold text-gray-900">Order Summary</h3>
                 </div>
                 
-                <div wire:ignore class="flex-1 overflow-y-auto px-4 py-3 max-h-[30vh] md:max-h-[50vh]">
+                <div class="flex-1 overflow-y-auto px-4 py-3 max-h-[30vh] md:max-h-[50vh]">
                     <div x-show="Object.keys(cart).length > 0" class="space-y-3">
                         <template x-for="(item, key) in cart" :key="key">
                             <div class="bg-gray-50 rounded-lg p-3 border border-gray-100 hover:border-gray-200 transition-all">
@@ -1227,7 +1254,7 @@
                                 <span class="font-bold text-emerald-600">-{{ $currencySymbol }}<span x-text="discountTotal.toFixed(2)"></span></span>
                             </div>
                             <div x-show="serviceCharge > 0" class="flex items-center justify-between text-[12px]">
-                                <span class="text-gray-600">Service Charge ({{ round($serviceChargeRate * 100) }}%)</span>
+                                <span class="text-gray-600" x-text="'Service Charge (' + Math.round(serviceChargeRate * 100) + '%)'">Service Charge ({{ round($serviceChargeRate * 100) }}%)</span>
                                 <span class="font-bold text-gray-900">{{ $currencySymbol }}<span x-text="serviceCharge.toFixed(2)"></span></span>
                             </div>
                         <div class="flex items-center justify-between text-[13px] font-bold bg-indigo-100 rounded-lg p-2.5 border border-indigo-200">
@@ -1248,7 +1275,7 @@
                     <div>
                         <p class="text-[11px] font-semibold text-gray-600 uppercase tracking-wide mb-2">Order Type</p>
                         <div class="px-3 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
-                            <p class="text-[13px] font-bold text-gray-900">{{ $orderType }}</p>
+                            <p class="text-[13px] font-bold text-gray-900" x-text="orderType">{{ $orderType }}</p>
                         </div>
                     </div>
 
@@ -1274,7 +1301,7 @@
                     <div x-show="paymentMethod === 'Cash'" class="space-y-4">
                         <div>
                             <x-input-label for="pos_amount_tendered" class="text-[11px] font-semibold text-gray-600 uppercase tracking-wide mb-2 block">Amount Tendered</x-input-label>
-                            <x-text-input id="pos_amount_tendered" wire:model.blur="amountTendered" x-model="amountTendered" type="number" min="0" step="0.01"
+                            <x-text-input id="pos_amount_tendered" x-model="amountTendered" type="number" min="0" step="0.01"
                                 class="block w-full text-[14px] py-2.5 px-3 font-mono font-bold" placeholder="0.00"/>
                         </div>
                         
@@ -1302,15 +1329,14 @@
                     </div>
 
                     {{-- GCash Details (PayMongo + Static QR Fallback) --}}
-                                        <div x-show="paymentMethod === 'GCash'"
+                    <div x-show="paymentMethod === 'GCash'"
                          wire:key="gcash-panel-{{ $referenceNo ?: 'new' }}"
-                         x-data="{ gcashUrl: null, gcashPaid: @js($gcashVerified), showStatic: false }"
+                         x-data="{ gcashUrl: null, showStatic: false }"
                          @gcash-url-ready.window="gcashUrl = $event.detail.url; showStatic = false"
-                         @gcash-verified.window="gcashPaid = true"
-                         @gcash-reset.window="gcashUrl = null; gcashPaid = false; showStatic = false">
+                         @gcash-reset.window="gcashUrl = null; showStatic = false">
 
                         {{-- Step 1: No URL yet — show options --}}
-                        <div x-show="!gcashUrl && !gcashPaid && !showStatic" class="space-y-4"
+                        <div x-show="!gcashUrl && !gcashVerified && !showStatic" class="space-y-4"
                              x-data="{ isGenerating: false }"
                              @gcash-url-ready.window="isGenerating = false"
                              @notify.window="if($event.detail.type === 'error') isGenerating = false">
@@ -1351,7 +1377,7 @@
                         </div>
 
                         {{-- Static QR Display Panel --}}
-                        <div x-show="showStatic && !gcashPaid" class="space-y-4">
+                        <div x-show="showStatic && !gcashVerified" class="space-y-4">
                             <div class="bg-blue-50 rounded-2xl p-5 border border-blue-100 flex flex-col items-center text-center">
                                 <p class="text-[11px] font-black text-blue-600 uppercase tracking-widest mb-3">Scan Personal QR</p>
 
@@ -1387,19 +1413,19 @@
                                                 {{-- Step 2: URL generated — show dynamic QR — disabled for now, kept for
                              future production use. Re-enable by removing the @if(false)/@endif wrapper. --}}
                         @if(false)
-                        <div x-show="gcashUrl && !gcashPaid" class="space-y-4"
+                        <div x-show="gcashUrl && !gcashVerified" class="space-y-4"
                              x-init="
                                 let pollInterval = null;
                                 const startPolling = () => {
                                     clearInterval(pollInterval);
                                     pollInterval = setInterval(() => {
-                                        if (gcashPaid) { clearInterval(pollInterval); return; }
+                                        if (gcashVerified) { clearInterval(pollInterval); return; }
                                         $wire.pollGCashStatus();
                                     }, 4000);
                                 };
-                                if (gcashUrl && !gcashPaid) startPolling();
-                                $watch('gcashUrl', (url) => { url && !gcashPaid ? startPolling() : clearInterval(pollInterval); });
-                                $watch('gcashPaid', (paid) => { if (paid) clearInterval(pollInterval); });
+                                if (gcashUrl && !gcashVerified) startPolling();
+                                $watch('gcashUrl', (url) => { url && !gcashVerified ? startPolling() : clearInterval(pollInterval); });
+                                $watch('gcashVerified', (paid) => { if (paid) clearInterval(pollInterval); });
                              ">
                             <div class="bg-blue-50 rounded-2xl p-5 border border-blue-100 flex flex-col items-center text-center">
                                 <p class="text-[11px] font-black text-blue-600 uppercase tracking-widest mb-3">Scan to Pay with GCash</p>
@@ -1429,7 +1455,7 @@
                         @endif
 
                         {{-- Step 3: Paid — show success (x-if so the draw-in animation replays every time) --}}
-                        <template x-if="gcashPaid">
+                        <template x-if="gcashVerified">
                             <div class="bg-emerald-50 rounded-2xl p-6 border border-emerald-100 flex flex-col items-center text-center gcash-success-pop">
                                 <svg class="w-16 h-16 mb-3" viewBox="0 0 52 52">
                                     <circle class="gcash-success-circle" cx="26" cy="26" r="24" fill="none" stroke="#059669" stroke-width="3"/>
@@ -1477,13 +1503,28 @@
 
         {{-- Action Buttons --}}
         <div class="flex gap-3">
-            <x-secondary-button type="button"
-                @click="if (!paymentLocked) { $dispatch('close-modal', 'pos-payment'); $dispatch('gcash-reset'); }"
+<x-secondary-button type="button"
+    @click="if (!gcashVerified) { $dispatch('close-modal', 'pos-payment'); $dispatch('gcash-reset'); } else { $wire.cancelPaymentModal(); }"
+    x-bind:class="cartLocked ? '!bg-gray-100 !text-gray-400 !border-gray-200 cursor-not-allowed' : ''"
+    x-bind:title="cartLocked ? 'This payment is verified and locked — place the order to complete it.' : ''"
+    class="flex-1 justify-center">
+    <svg x-show="cartLocked" class="w-3.5 h-3.5 mr-1.5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+    <span x-text="cartLocked ? 'Locked' : 'Cancel'"></span>
+</x-secondary-button>
+            <x-primary-button type="button"
+@click.capture="if (!isSubmitting && !window.thermalBluetoothPrinter?.characteristic) window.prepareThermalReceiptWindow?.()"
+@click.prevent="
+    if (isSubmitting) return;
+    isSubmitting = true;
+    $wire.confirmPayment(JSON.parse(JSON.stringify(cart)))
+        .finally(() => { isSubmitting = false; });
+"
+                x-bind:disabled="isSubmitting"
+                wire:loading.attr="disabled"
+                id="pos_submit_payment_btn"
                 class="flex-1 justify-center">
-                Cancel
-            </x-secondary-button>
-                            <x-primary-button type="button" @click=" $wire.cart = cart" @click.capture="if (!window.thermalBluetoothPrinter?.characteristic) window.prepareThermalReceiptWindow?.()" wire:click.prevent="confirmPayment" wire:loading.attr="disabled" id="pos_submit_payment_btn" class="flex-1 justify-center">
-                Place Order
+                <span x-show="!isSubmitting">Place Order</span>
+                <span x-show="isSubmitting" x-cloak>Processing...</span>
             </x-primary-button>
         </div>
     </div>
@@ -1504,12 +1545,12 @@
             </div>
         </div>
 
-        @if($editCartItemId && isset($cart[$editCartItemId]))
-            <div class="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <p class="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-1">Applying to</p>
-                <p class="text-[14px] font-bold text-gray-900 leading-tight">{{ $cart[$editCartItemId]['name'] }}</p>
-            </div>
-        @endif
+        <template x-if="editingItem">
+    <div class="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-100">
+        <p class="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-1">Applying to</p>
+        <p class="text-[14px] font-bold text-gray-900 leading-tight" x-text="editingItem?.name"></p>
+    </div>
+</template>
 
         <div class="space-y-4 mb-8">
             <label for="pos_edit_item_notes" class="sr-only">Instructions</label>
@@ -1655,7 +1696,7 @@
             </div>
         </div>
     </x-modal>
-    <x-modal name="pos-drafts-list" maxWidth="2xl" focusable>
+                <x-modal name="pos-drafts-list" maxWidth="2xl" focusable>
         <div class="h-1 w-full bg-gradient-to-r from-indigo-500 to-purple-600 rounded-t-xl"></div>
         <div class="p-8">
             <div class="flex items-center justify-between mb-8">
@@ -1673,8 +1714,9 @@
 
             <div class="max-h-[450px] overflow-y-auto pr-2 custom-scrollbar">
                 @forelse($this->drafts as $draft)
-                    <div wire:key="draft-item-{{ $draft->id }}" 
-                        class="mb-3 bg-white border border-gray-100 p-5 rounded-2xl shadow-sm hover:shadow-md hover:border-indigo-100 transition-all group/item">
+    <div wire:key="draft-item-{{ $draft->id }}" 
+        x-show="!hiddenDraftIds.includes({{ $draft->id }})"
+        class="mb-3 bg-white border border-gray-100 p-5 rounded-2xl shadow-sm hover:shadow-md hover:border-indigo-100 transition-all group/item">
                         <div class="flex items-start justify-between">
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center gap-2 mb-1.5">
@@ -1704,12 +1746,16 @@
                                     <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-1">Order value</p>
                                 </div>
                                 <div class="flex gap-2">
-                                    <x-secondary-button wire:click="deleteDraft({{ $draft->id }})" wire:loading.attr="disabled" class="!px-3 !py-1.5 text-red-500 hover:text-red-700 bg-red-50/50 border-red-100 hover:bg-red-50 transition-all">
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                    </x-secondary-button>
-                                    <x-primary-button wire:click="loadDraft({{ $draft->id }})" wire:loading.attr="disabled" class="!px-5 !py-1.5 shadow-none border-none min-w-[110px] justify-center">
-                                        <span wire:loading.remove wire:target="loadDraft({{ $draft->id }})">Load Order</span>
-                                        <span wire:loading wire:target="loadDraft({{ $draft->id }})" class="flex items-center justify-center gap-1.5">
+                                    <x-secondary-button type="button" @click="pendingDeleteDraftId = {{ $draft->id }}; $dispatch('open-modal', 'confirm-delete-draft')" class="!px-3 !py-1.5 text-red-500 hover:text-red-700 bg-red-50/50 border-red-100 hover:bg-red-50 transition-all">
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+</x-secondary-button>
+                                    <x-primary-button type="button"
+                                        x-data="{ loading: false }"
+                                        @click="loading = true; $wire.loadDraft({{ $draft->id }}).finally(() => loading = false)"
+                                        x-bind:disabled="loading"
+                                        class="!px-5 !py-1.5 shadow-none border-none min-w-[110px] justify-center">
+                                        <span x-show="!loading">Load Order</span>
+                                        <span x-show="loading" x-cloak class="flex items-center justify-center gap-1.5">
                                             <svg class="animate-spin w-3.5 h-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                                             Loading...
                                         </span>
@@ -1730,9 +1776,35 @@
             </div>
 
                         <div class="mt-8 pt-6 border-t border-gray-100">
-                <x-secondary-button @click="$dispatch('close-modal', 'pos-drafts-list')" class="w-full justify-center py-3">
+                                <x-secondary-button @click="$dispatch('close-modal', 'pos-drafts-list')" class="w-full justify-center py-3">
                     Close Monitor
                 </x-secondary-button>
+            </div>
+        </div>
+    </x-modal>
+
+    <x-modal name="confirm-delete-draft" maxWidth="sm" focusable>
+        <div class="h-1 w-full bg-gradient-to-r from-rose-500 to-red-600 rounded-t-lg"></div>
+        <div class="p-6">
+            <div class="flex items-start gap-4 mb-4">
+                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-red-50 border border-red-100 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-[15px] font-bold text-gray-900 leading-tight">Delete Draft</h3>
+                    <p class="mt-1 text-[13px] text-gray-500 leading-relaxed">This will permanently delete this saved order. This can't be undone.</p>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 mt-6">
+                <x-secondary-button @click="pendingDeleteDraftId = null; $dispatch('close-modal', 'confirm-delete-draft')" class="h-10">Cancel</x-secondary-button>
+                <button type="button"
+                    @click="hiddenDraftIds.push(pendingDeleteDraftId); $wire.deleteDraft(pendingDeleteDraftId); $dispatch('close-modal', 'confirm-delete-draft'); pendingDeleteDraftId = null"
+                    class="h-10 px-4 inline-flex items-center justify-center rounded-lg bg-red-600 hover:bg-red-700 text-white text-[13px] font-bold transition-colors">
+                    Delete Draft
+                </button>
             </div>
         </div>
     </x-modal>
