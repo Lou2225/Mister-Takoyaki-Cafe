@@ -9,6 +9,12 @@
         activeCategoryId: sessionStorage.getItem('pos_active_category') ? parseInt(sessionStorage.getItem('pos_active_category')) : null,
         selectCategory(id) {
             this.activeCategoryId = id;
+            if (id === null) {
+                sessionStorage.removeItem('pos_active_category');
+            } else {
+                sessionStorage.setItem('pos_active_category', id);
+            }
+            this.applySearchFilter?.();
         },
         get filteredProductsCount() {
             const query = this.searchQuery ? this.searchQuery.toLowerCase().trim() : '';
@@ -416,7 +422,7 @@ selectedOptions: {},
                 this.setupCategorySortable();
             });
 
-            const applySearchFilter = () => {
+                this.applySearchFilter = () => {
     const query = this.searchQuery ? this.searchQuery.toLowerCase().trim() : '';
     requestAnimationFrame(() => {
         document.querySelectorAll('.product-card').forEach(card => {
@@ -432,14 +438,14 @@ selectedOptions: {},
     });
 };
 
-            this.$watch('searchQuery', applySearchFilter);
+            this.$watch('searchQuery', this.applySearchFilter);
             this.$watch('activeCategoryId', (val) => {
     if (val === null) {
         sessionStorage.removeItem('pos_active_category');
     } else {
         sessionStorage.setItem('pos_active_category', val);
     }
-    applySearchFilter();
+    this.applySearchFilter();
 });
 
             const syncProducts = () => {
@@ -452,8 +458,8 @@ selectedOptions: {},
         }
     }
     // Run twice: once immediately, once after DOM fully paints
-    applySearchFilter();
-    requestAnimationFrame(() => applySearchFilter());
+    this.applySearchFilter();
+    requestAnimationFrame(() => this.applySearchFilter());
 };
 
             syncProducts();

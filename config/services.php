@@ -38,7 +38,8 @@ return [
     ],
     
     'google' => [
-    'directions_key' => env('GOOGLE_DIRECTIONS_KEY'),
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'directions_key' => env('GOOGLE_DIRECTIONS_KEY'),
     ],
 
 ];
