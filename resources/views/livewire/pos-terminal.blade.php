@@ -99,6 +99,7 @@
         if (!el || this.categorySortable) return;
         this.categorySortable = Sortable.create(el, {
             filter: '#pos_tab_all',
+            handle: '.category-drag-handle',
             animation: 150,
             ghostClass: 'opacity-50',
             // Persistence is deferred to the Done button — see its @click
@@ -843,9 +844,15 @@
                     <button type="button" 
                         @click="selectCategory({{ $cat->id }})"
                         id="pos_tab_cat_{{ $cat->id }}" 
-                        class="pos-category-tab inline-flex items-center justify-center px-4 py-2 border rounded-md font-semibold text-xs uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-offset-2 transition ease-in-out duration-150 gap-1.5 whitespace-nowrap shrink-0 {{ $isEditMode ? 'border-dashed border-gray-300 cursor-move' : '' }}" 
-                        data-id="{{ $cat->id }}"
-                        :class="activeCategoryId === {{ $cat->id }} ? 'bg-{{ $primaryColor }}-600 text-white border-transparent hover:bg-{{ $primaryColor }}-700 focus:bg-{{ $primaryColor }}-700 active:bg-{{ $primaryColor }}-800 focus:ring-{{ $primaryColor }}-500' : 'bg-white text-gray-700 border-gray-300 shadow-sm hover:bg-gray-50 focus:ring-{{ $primaryColor }}-500 disabled:opacity-25'">
+                        class="pos-category-tab inline-flex items-center justify-center px-4 py-2 border rounded-md font-semibold text-xs uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-offset-2 transition ease-in-out duration-150 gap-1.5 whitespace-nowrap shrink-0"
+                        :class="[
+                            isEditMode ? 'border-dashed border-gray-300' : '',
+                            activeCategoryId === {{ $cat->id }} ? 'bg-{{ $primaryColor }}-600 text-white border-transparent hover:bg-{{ $primaryColor }}-700 focus:bg-{{ $primaryColor }}-700 active:bg-{{ $primaryColor }}-800 focus:ring-{{ $primaryColor }}-500' : 'bg-white text-gray-700 border-gray-300 shadow-sm hover:bg-gray-50 focus:ring-{{ $primaryColor }}-500 disabled:opacity-25'
+                        ]"
+                        data-id="{{ $cat->id }}">
+                        <span x-show="isEditMode" x-cloak @click.stop class="category-drag-handle cursor-move -ml-1 mr-0.5 opacity-60 hover:opacity-100" title="Drag to reorder">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                        </span>
                         {{ $cat->name }}
                         <span class="text-[10px] font-bold" :class="activeCategoryId === {{ $cat->id }} ? 'text-white' : 'text-gray-400'">{{ $cat->products_count }}</span>
                     </button>
