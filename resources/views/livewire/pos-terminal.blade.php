@@ -1,6 +1,14 @@
 <div id="pos-terminal-root" class="flex flex-col h-[calc(100vh-58px)] sm:h-[calc(100vh-65px)] overflow-hidden bg-gray-100" 
     wire:key="pos-terminal-root"
     @cart-loaded.window="cart = $event.detail.cart || {}"
+    @cart-item-updated.window="
+        if ($event.detail.remove) {
+            delete cart[$event.detail.key];
+        } else if (cart[$event.detail.key]) {
+            Object.assign(cart[$event.detail.key], $event.detail.item);
+        }
+        cart = { ...cart };
+    "
     @cart-reset.window="cart = {}; cartExpanded = false"
     @pos-category-sortable-init.window="setupCategorySortable()"
     x-data="{ 
@@ -25,6 +33,7 @@
             }).length;
         },
         isSavingDraft: false,
+        isSavingLayout: false,
         isSubmitting: false,
         cartExpanded: false,
         isEditMode: @entangle('isEditMode').live,
@@ -57,15 +66,21 @@
         get cartLocked() {
             return this.paymentMethod === 'GCash' && this.gcashVerified;
         },
-                productsData: {},
-            cartUsageCacheKey: '',
-            cartUsageCache: {},
-            stockData: @js($stockData),
-activeProduct: null,
-editingItem: null,
-pendingDeleteDraftId: null,
-hiddenDraftIds: [],
-selectedOptions: {},
+        productsData: {},
+        cartUsageCacheKey: '',
+        cartUsageCache: {},
+        stockData: @js($stockData),
+        activeProduct: null,
+        editingItem: null,
+        editingKey: null,
+        editingProduct: null,
+        editQty: 1,
+        editSelectedOptions: {},
+        editSelectedModifierIds: [],
+        isSavingNote: false,
+        pendingDeleteDraftId: null,
+        hiddenDraftIds: [],
+        selectedOptions: {},
         selectedModifierIds: [],
         pendingDeleteKey: null,
         categorySortable: null,
@@ -86,12 +101,9 @@ selectedOptions: {},
             filter: '#pos_tab_all',
             animation: 150,
             ghostClass: 'opacity-50',
-            onEnd: () => {
-                const ids = Array.from(el.querySelectorAll('.pos-category-tab'))
-                    .map(tab => tab.dataset.id)
-                    .filter(id => id);
-                setTimeout(() => { $wire.reorderCategories(ids); }, 100);
-            }
+            // Persistence is deferred to the Done button — see its @click
+            // handler, which reads both product and category order together
+            // and saves them in one call with one toast.
         });
     }, 50);
 },
@@ -100,16 +112,20 @@ selectedOptions: {},
         productSortableTimeout: null,
         setupProductSortable() {
     if (this.productSortableTimeout) clearTimeout(this.productSortableTimeout);
+    // Always tear down any existing instance first — SortableJS gets
+    // confused mixing visible/hidden (display:none) siblings once the
+    // active category filter changes, so we rebuild fresh every time
+    // instead of reusing a stale binding.
+    if (this.productSortable) {
+        try { this.productSortable.destroy(); } catch(e) {}
+        this.productSortable = null;
+    }
     if (!this.isEditMode) {
-        if (this.productSortable) {
-            try { this.productSortable.destroy(); } catch(e) {}
-            this.productSortable = null;
-        }
         return;
     }
     this.productSortableTimeout = setTimeout(() => {
         const el = document.getElementById('product-sortable-grid');
-        if (!el || this.productSortable) return;
+        if (!el) return;
         this.productSortable = Sortable.create(el, {
             handle: '.drag-handle',
             animation: 150,
@@ -287,6 +303,187 @@ selectedOptions: {},
             if (idx > -1) this.selectedModifierIds.splice(idx, 1);
             else this.selectedModifierIds.push(modId);
         },
+        // ── Edit Order modal (options + qty + notes + discount, all in one) ──
+        openEditOrder(key, item) {
+            const product = this.productsData[item.id];
+            this.editingKey = key;
+            this.editingProduct = product || null;
+            this.editingItem = { ...item };
+            this.editQty = item.qty;
+            this.editSelectedModifierIds = (item.modifiers || []).map(m => m.id);
+            this.editSelectedOptions = {};
+            if (product) {
+                const groups = product.option_groups || product.optionGroups || [];
+                groups.forEach(g => {
+                    const selectedIds = (item.options || [])
+                        .filter(o => g.options.some(go => go.id === o.id))
+                        .map(o => o.id);
+                    this.editSelectedOptions[g.id] = g.price_mode === 'additive' ? selectedIds : (selectedIds[0] ?? null);
+                });
+            }
+            this.$dispatch('open-modal', 'edit-cart-item');
+        },
+        toggleEditOpt(groupId, optId, isAdditive, isRequired) {
+            if (isAdditive) {
+                if (!this.editSelectedOptions[groupId]) this.editSelectedOptions[groupId] = [];
+                const idx = this.editSelectedOptions[groupId].indexOf(optId);
+                if (idx > -1) this.editSelectedOptions[groupId].splice(idx, 1);
+                else this.editSelectedOptions[groupId].push(optId);
+            } else {
+                this.editSelectedOptions[groupId] = (this.editSelectedOptions[groupId] === optId && !isRequired) ? null : optId;
+            }
+        },
+        toggleEditMod(modId) {
+            const idx = this.editSelectedModifierIds.indexOf(modId);
+            if (idx > -1) this.editSelectedModifierIds.splice(idx, 1);
+            else this.editSelectedModifierIds.push(modId);
+        },
+        isEditSelected(groupId, optId) {
+            if (!this.editSelectedOptions[groupId]) return false;
+            if (Array.isArray(this.editSelectedOptions[groupId])) return this.editSelectedOptions[groupId].includes(optId);
+            return this.editSelectedOptions[groupId] === optId;
+        },
+        // Stock helpers that exclude the line currently being edited, so the
+        // cashier can raise qty / swap options up to what's actually free —
+        // not double-counting this item's own existing reservation in the cart.
+        getCartIngredientUsageExcludingKey(excludeKey) {
+            const usage = {};
+            Object.entries(this.cart || {}).forEach(([key, item]) => {
+                if (key === excludeKey) return;
+                const product = this.productsData[item.id];
+                if (!product) return;
+                const optionIds = (item.options || []).map(o => Number(o.id));
+                const modifierIds = (item.modifiers || []).map(m => Number(m.id));
+                this.getProductRecipes(product, optionIds, modifierIds).forEach(recipe => {
+                    const ingredientId = recipe.ingredient_id;
+                    usage[ingredientId] = (usage[ingredientId] || 0) + (Number(recipe.quantity) * Number(item.qty || 0));
+                });
+            });
+            return usage;
+        },
+        remainingStockForEdit(product) {
+            if (!product) return 0;
+            const recipes = this.getProductRecipes(product);
+            const stock = this.stockData || {};
+            const usage = this.getCartIngredientUsageExcludingKey(this.editingKey);
+            if (recipes.length === 0) {
+                return Number(product.max_available ?? product.available_quantity ?? 0);
+            }
+            return recipes.reduce((maximum, recipe) => {
+                const recipeQuantity = Number(recipe.quantity);
+                if (recipeQuantity <= 0) return maximum;
+                const availableIngredient = Math.max(0, Number(stock[recipe.ingredient_id] || 0) - Number(usage[recipe.ingredient_id] || 0));
+                return Math.min(maximum, Math.floor(availableIngredient / recipeQuantity));
+            }, Number.MAX_SAFE_INTEGER);
+        },
+        remainingOptionStockForEdit(product, optionId) {
+            if (!product) return 0;
+            const groups = product?.option_groups || product?.optionGroups || [];
+            const owningGroup = groups.find(g => (g.options || []).some(o => o.id === optionId));
+            if (owningGroup && owningGroup.no_recipe_required) return Infinity;
+            const recipes = (product?.recipes || []).filter(r => Number(r.product_option_id) === Number(optionId));
+            if (recipes.length === 0) return 0;
+            const stock = this.stockData || {};
+            const usage = this.getCartIngredientUsageExcludingKey(this.editingKey);
+            return Math.max(0, recipes.reduce((maximum, recipe) => {
+                const recipeQuantity = Number(recipe.quantity);
+                if (recipeQuantity <= 0) return maximum;
+                const availableIngredient = Math.max(0, Number(stock[recipe.ingredient_id] || 0) - Number(usage[recipe.ingredient_id] || 0));
+                return Math.min(maximum, Math.floor(availableIngredient / recipeQuantity));
+            }, Number.MAX_SAFE_INTEGER));
+        },
+        remainingModifierStockForEdit(product, modifierId) {
+            if (!product) return 0;
+            const recipes = (product?.recipes || []).filter(r => Number(r.modifier_id) === Number(modifierId));
+            if (recipes.length === 0) return 0;
+            const stock = this.stockData || {};
+            const usage = this.getCartIngredientUsageExcludingKey(this.editingKey);
+            return Math.max(0, recipes.reduce((maximum, recipe) => {
+                const recipeQuantity = Number(recipe.quantity);
+                if (recipeQuantity <= 0) return maximum;
+                const availableIngredient = Math.max(0, Number(stock[recipe.ingredient_id] || 0) - Number(usage[recipe.ingredient_id] || 0));
+                return Math.min(maximum, Math.floor(availableIngredient / recipeQuantity));
+            }, Number.MAX_SAFE_INTEGER));
+        },
+        canSaveEditOrder() {
+            if (!this.editingProduct) return false;
+            if (this.remainingStockForEdit(this.editingProduct) < this.editQty) return false;
+            const groups = this.editingProduct.option_groups || this.editingProduct.optionGroups || [];
+            return groups.every(group => {
+                if (!group.is_required) return true;
+                const sel = this.editSelectedOptions[group.id];
+                return Array.isArray(sel) ? sel.length > 0 : !!sel;
+            });
+        },
+        saveEditOrder() {
+            if (!this.editingKey || !this.editingProduct || !this.canSaveEditOrder()) return;
+            const product = this.editingProduct;
+            const qty = Math.max(1, parseInt(this.editQty) || 1);
+            const groups = product.option_groups || product.optionGroups || [];
+
+            let optionIds = [];
+            Object.values(this.editSelectedOptions).forEach(val => {
+                if (Array.isArray(val)) optionIds = optionIds.concat(val);
+                else if (val) optionIds.push(val);
+            });
+
+            let allOptions = [];
+            groups.forEach(g => { allOptions = allOptions.concat(g.options); });
+            const selectedOptions = allOptions.filter(o => optionIds.includes(o.id));
+            const selectedModifiers = (product.modifiers || []).filter(m => this.editSelectedModifierIds.includes(m.id));
+
+            const hasFixed = selectedOptions.some(o => {
+                const group = groups.find(g => g.id === o.group_id);
+                return group && group.price_mode === 'fixed';
+            });
+            let basePrice = parseFloat(product.price || 0);
+            if (hasFixed) {
+                basePrice = selectedOptions.filter(o => {
+                    const group = groups.find(g => g.id === o.group_id);
+                    return group && group.price_mode === 'fixed';
+                }).reduce((sum, o) => sum + parseFloat(o.price || 0), 0);
+            }
+            const additivePrice = selectedOptions.filter(o => {
+                const group = groups.find(g => g.id === o.group_id);
+                return group && group.price_mode === 'additive';
+            }).reduce((sum, o) => sum + parseFloat(o.price || 0), 0);
+            const modifiersPrice = selectedModifiers.reduce((sum, m) => sum + parseFloat(m.price || 0), 0);
+            const finalPrice = basePrice + additivePrice + modifiersPrice;
+
+            const optKey = optionIds.length > 0 ? '-' + optionIds.slice().sort().join(',') : '';
+            const modKey = this.editSelectedModifierIds.length > 0 ? '-' + this.editSelectedModifierIds.slice().sort().join(',') : '';
+            const newKey = 'p' + product.id + optKey + modKey;
+
+            const updatedLine = {
+                id: product.id,
+                name: product.name,
+                price: finalPrice,
+                qty: qty,
+                image: product.image,
+                options: selectedOptions.map(o => ({ id: o.id, name: o.name, price: parseFloat(o.price) })),
+                modifiers: selectedModifiers.map(m => ({ id: m.id, name: m.name, price: parseFloat(m.price) })),
+                instructions: this.editingItem?.instructions || '',
+                apply_regular_discount: !!this.editingItem?.apply_regular_discount,
+                apply_senior_discount: !!this.editingItem?.apply_senior_discount,
+            };
+
+            if (newKey === this.editingKey) {
+                this.cart[newKey] = updatedLine;
+            } else {
+                delete this.cart[this.editingKey];
+                if (this.cart[newKey]) {
+                    this.cart[newKey].qty += qty;
+                } else {
+                    this.cart[newKey] = updatedLine;
+                }
+            }
+            this.cart = { ...this.cart };
+
+            this.editingItem = null;
+            this.editingKey = null;
+            this.editingProduct = null;
+            this.$dispatch('close-modal', 'edit-cart-item');
+        },
         optimisticAddToCart(pid, selectedOptionsObj = {}, selectedModifierIds = []) {
             const product = this.productsData[pid];
             if (!product) return;
@@ -314,7 +511,11 @@ selectedOptions: {},
             // 1. Generate Key
             const optKey = optionIds.length > 0 ? '-' + optionIds.sort().join(',') : '';
             const modKey = selectedModifierIds.length > 0 ? '-' + selectedModifierIds.sort().join(',') : '';
-            const key = pid + optKey + modKey;
+            // Prefixed with a letter so this key is never treated as a
+            // numeric array index — plain JS objects always sort
+            // integer-like string keys ascending, ignoring insertion
+            // order, which silently reshuffled the cart display.
+            const key = 'p' + pid + optKey + modKey;
 
             // 2. Calculate Price (Replicate PHP logic)
             // Need to find the actual option/modifier objects from product data
@@ -420,6 +621,10 @@ selectedOptions: {},
             this.$watch('isEditMode', () => {
                 this.setupProductSortable();
                 this.setupCategorySortable();
+            });
+
+            this.$watch('activeCategoryId', () => {
+                if (this.isEditMode) this.setupProductSortable();
             });
 
                 this.applySearchFilter = () => {
@@ -699,11 +904,22 @@ selectedOptions: {},
                 <button type="button"
                     x-show="isEditMode"
                     x-cloak
-                    @click="const el = document.getElementById('product-sortable-grid'); if(el) { const ids = Array.from(el.querySelectorAll('.product-card')).map(c => c.dataset.id); $wire.saveLayout(ids); isEditMode = false; } else { isEditMode = false; }"
+                    :disabled="isSavingLayout"
+                    :class="isSavingLayout ? 'opacity-70 cursor-not-allowed' : ''"
+                    @click="
+                        if (isSavingLayout) return;
+                        const productEl = document.getElementById('product-sortable-grid');
+                        const categoryEl = document.getElementById('category-sortable-tabs');
+                        const productIds = productEl ? Array.from(productEl.querySelectorAll('.product-card')).map(c => c.dataset.id) : [];
+                        const categoryIds = categoryEl ? Array.from(categoryEl.querySelectorAll('.pos-category-tab[data-id]')).map(c => c.dataset.id) : [];
+                        isSavingLayout = true;
+                        $wire.saveLayout(productIds, categoryIds).finally(() => { isSavingLayout = false; isEditMode = false; });
+                    "
                     title="Save Layout"
                     class="h-9 px-3 rounded-lg transition-all border flex items-center gap-2 bg-emerald-500 text-white border-emerald-600 shadow-lg">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
-                    <span class="text-[11px] font-black uppercase tracking-wider">Done</span>
+                    <svg x-show="!isSavingLayout" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                    <svg x-show="isSavingLayout" x-cloak class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <span class="text-[11px] font-black uppercase tracking-wider" x-text="isSavingLayout ? 'Saving...' : 'Done'"></span>
                 </button>
                 {{-- Sort button: visible when NOT in edit mode --}}
                 <button type="button"
@@ -899,7 +1115,7 @@ selectedOptions: {},
                         <span class="text-[12px] font-bold text-amber-600">Holding Order...</span>
                     </div>
 
-                    <div x-show="Object.keys(cart).length > 0 && !isSavingDraft">
+<div wire:ignore x-show="Object.keys(cart).length > 0 && !isSavingDraft">
                         <template x-for="(item, key) in cart" :key="key">
                             <div class="flex items-start gap-2.5 py-3">
                                 {{-- Thumbnail --}}
@@ -926,7 +1142,7 @@ selectedOptions: {},
                                             </template>
                                         </div>
                                         <div class="flex items-center gap-0.5 shrink-0">
-    <button type="button" @click="!cartLocked && (editingItem = item, $dispatch('open-modal', 'edit-cart-item'), $wire.openEditItem(key, item))" class="relative p-1.5 text-gray-400 hover:text-amber-500 transition-all rounded-lg hover:bg-amber-50 disabled:opacity-40" :disabled="cartLocked">        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
+<button type="button" @click="!cartLocked && openEditOrder(key, item)" class="relative p-1.5 text-gray-400 hover:text-amber-500 transition-all rounded-lg hover:bg-amber-50 disabled:opacity-40" :disabled="cartLocked">        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
         <template x-if="item.instructions">
             <span class="absolute top-1 right-1 w-1.5 h-1.5 bg-amber-500 rounded-full border border-white"></span>
         </template>
@@ -979,12 +1195,12 @@ selectedOptions: {},
                         <span class="text-[12px] font-bold text-gray-900 font-mono">{{ $currencySymbol }}<span x-text="subtotal.toFixed(2)">{{ number_format($subtotal, 2) }}</span></span>
                     </div>
 
-                    @if($discountAmount > 0)
+                    <template x-if="discountTotal > 0">
                         <div class="flex items-center justify-between mt-1">
                             <span class="text-[12px] text-emerald-600 font-medium">Discount Applied</span>
-                            <span class="text-[12px] font-bold text-emerald-600 font-mono">-{{ $currencySymbol }}{{ number_format($discountAmount, 2) }}</span>
+                            <span class="text-[12px] font-bold text-emerald-600 font-mono">-{{ $currencySymbol }}<span x-text="discountTotal.toFixed(2)"></span></span>
                         </div>
-                    @endif
+                    </template>
 
 
                     <template x-if="serviceCharge > 0">
@@ -1224,7 +1440,7 @@ selectedOptions: {},
                 </div>
                 
                 <div class="flex-1 overflow-y-auto px-4 py-3 max-h-[30vh] md:max-h-[50vh]">
-                    <div x-show="Object.keys(cart).length > 0" class="space-y-3">
+<div wire:ignore x-show="Object.keys(cart).length > 0" class="space-y-3">
                         <template x-for="(item, key) in cart" :key="key">
                             <div class="bg-gray-50 rounded-lg p-3 border border-gray-100 hover:border-gray-200 transition-all">
                                 <div class="flex items-start justify-between gap-2">
@@ -1539,107 +1755,221 @@ selectedOptions: {},
 {{-- ══════════════════════════════════════════════
      EDIT CART ITEM MODAL
 ══════════════════════════════════════════════ --}}
-<x-modal name="edit-cart-item" maxWidth="md" focusable>
+<x-modal name="edit-cart-item" maxWidth="4xl" focusable>
+    <div class="h-1 w-full bg-gradient-to-r from-amber-400 to-orange-500 rounded-t-xl"></div>
+    <template x-if="editingItem">
     <div class="p-8">
         <div class="flex items-center gap-3 mb-6">
             <div class="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-500 shadow-sm border border-amber-100">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
             </div>
             <div>
-                <h2 class="text-[18px] font-black text-gray-900">Special Instructions</h2>
-                <p class="text-[12px] text-gray-500">Add notes or preferences for this item</p>
+                <h2 class="text-[18px] font-black text-gray-900">Edit Order</h2>
+                <p class="text-[12px] text-gray-500" x-text="editingItem?.name"></p>
             </div>
         </div>
 
-        <template x-if="editingItem">
-    <div class="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-100">
-        <p class="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-1">Applying to</p>
-        <p class="text-[14px] font-bold text-gray-900 leading-tight" x-text="editingItem?.name"></p>
-    </div>
-</template>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
 
-        <div class="space-y-4 mb-8">
-            <label for="pos_edit_item_notes" class="sr-only">Instructions</label>
-            <textarea id="pos_edit_item_notes" wire:model.live.debounce.400ms="editCartItemNotes" rows="4" 
-                placeholder="e.g., No spicy sauce, extra napkins, separate bag..."
-                inputFilter="name_basic"
-                class="w-full px-4 py-3 text-[13px] font-medium text-gray-700 bg-white border border-gray-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all placeholder-gray-400 resize-none {{ $errors->has('editCartItemNotes') ? 'border-red-500 focus:ring-red-500/10 focus:border-red-500' : '' }}"
-            ></textarea>
-            <x-input-error :messages="$errors->get('editCartItemNotes')" class="mt-1" />
-            <p class="text-[11px] text-gray-400 flex items-center gap-1.5 ml-1 mb-2">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                This will be printed on the kitchen ticket.
-            </p>
+            {{-- ══════════ LEFT COLUMN: Options + Modifiers ══════════ --}}
+            <div class="min-w-0 md:max-h-[60vh] md:overflow-y-auto md:pr-2">
 
-            {{-- Discount Selection for this item --}}
-            <div class="space-y-2">
-                @if($discountPercent > 0)
-<div x-data="{ isRegularDiscount: @entangle('applyRegularDiscount') }"
-                     class="bg-gray-50 rounded-xl px-4 py-3 border border-blue-100 shadow-sm transition-all duration-300"
-                     :class="!isRegularDiscount ? 'opacity-60 grayscale' : 'ring-2 ring-indigo-500/20'">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border border-current/10"
-                                 :class="isRegularDiscount ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-200 text-gray-500'">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M17 17h.01M7 17L17 7"/></svg>
+                {{-- Option Groups --}}
+                <div class="space-y-8" x-show="editingProduct && (editingProduct.option_groups || editingProduct.optionGroups || []).length > 0">
+                    <template x-for="group in editingProduct ? (editingProduct.option_groups || editingProduct.optionGroups || []) : []" :key="group.id">
+                        <div>
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <p class="text-[14px] font-bold text-gray-900" x-text="group.name"></p>
+                                    <template x-if="group.is_required">
+                                        <span class="text-[11px] font-semibold text-red-600 mt-0.5 block">Required selection</span>
+                                    </template>
+                                    <template x-if="group.price_mode === 'additive'">
+                                        <span class="text-[11px] font-semibold text-blue-600 mt-0.5 block">Multiple allowed</span>
+                                    </template>
+                                </div>
                             </div>
-                            <div class="min-w-0">
-                                <p class="text-[12px] font-black tracking-tighter uppercase truncate"
-                                   :class="isRegularDiscount ? 'text-indigo-600' : 'text-gray-500'">
-                                    {{ round($discountPercent * 100) }}% REGULAR DISCOUNT
-                                </p>
-                                <p class="text-[10px] text-gray-400 font-bold truncate">Apply to this item</p>
+                            <div class="grid grid-cols-2 gap-3">
+                                <template x-for="opt in group.options" :key="opt.id">
+                                    <div @click="remainingOptionStockForEdit(editingProduct, opt.id) > 0 && toggleEditOpt(group.id, opt.id, group.price_mode === 'additive', group.is_required)"
+                                        class="relative flex flex-col p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 hover:shadow-md"
+                                        :class="{
+                                            'opacity-50 cursor-not-allowed border-gray-200 bg-gray-50': remainingOptionStockForEdit(editingProduct, opt.id) <= 0,
+                                            'border-indigo-500 bg-indigo-50 shadow-md': isEditSelected(group.id, opt.id),
+                                            'border-gray-200 bg-white hover:border-gray-300': !isEditSelected(group.id, opt.id) && remainingOptionStockForEdit(editingProduct, opt.id) > 0
+                                        }">
+                                        <span class="text-[13px] font-bold text-gray-900" x-text="opt.name"></span>
+                                        <span class="text-[13px] font-black text-indigo-600 mt-2"
+                                              x-text="group.price_mode === 'fixed' ? '{{ $currencySymbol }}' + parseFloat(opt.price).toFixed(2) : (opt.price > 0 ? '+' + '{{ $currencySymbol }}' + parseFloat(opt.price).toFixed(2) : 'Free')"></span>
+                                        <div class="mt-2 flex items-center justify-between">
+                                            <template x-if="!group.no_recipe_required && remainingOptionStockForEdit(editingProduct, opt.id) <= 0">
+                                                <span class="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded uppercase tracking-tighter">Out of Stock</span>
+                                            </template>
+                                            <template x-if="!group.no_recipe_required && remainingOptionStockForEdit(editingProduct, opt.id) > 0">
+                                                <span class="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded uppercase tracking-tighter"
+                                                      x-text="'Available: ' + remainingOptionStockForEdit(editingProduct, opt.id)"></span>
+                                            </template>
+                                            <template x-if="group.no_recipe_required">
+                                                <span class="text-[10px] font-bold text-sky-600 bg-sky-50 px-2 py-1 rounded uppercase tracking-tighter">Always Available</span>
+                                            </template>
+                                        </div>
+                                        <template x-if="isEditSelected(group.id, opt.id)">
+                                            <div class="absolute top-2 right-2">
+                                                <div class="w-5 h-5 bg-indigo-500 rounded flex items-center justify-center shadow-md"
+                                                     :class="group.price_mode === 'additive' ? 'rounded' : 'rounded-full'">
+                                                    <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
                             </div>
                         </div>
-                        
-                        <div class="flex items-center">
-                            <label class="inline-flex relative items-center cursor-pointer scale-90">
-                                <input type="checkbox" wire:model="applyRegularDiscount" class="sr-only peer">
-                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                    </template>
+                </div>
+
+                {{-- Modifiers --}}
+                <div class="mt-8" x-show="editingProduct && editingProduct.modifiers && editingProduct.modifiers.length > 0">
+                    <p class="text-[14px] font-bold text-gray-900 mb-4">Add-ons (Optional)</p>
+                    <div class="space-y-2">
+                        <template x-for="m in editingProduct ? editingProduct.modifiers : []" :key="m.id">
+                            <label @click="remainingModifierStockForEdit(editingProduct, m.id) > 0 && toggleEditMod(m.id)"
+                                class="flex items-center justify-between p-4 rounded-lg border border-gray-200 cursor-pointer transition-all hover:bg-gray-50 hover:border-gray-300"
+                                :class="remainingModifierStockForEdit(editingProduct, m.id) <= 0 ? 'opacity-50 cursor-not-allowed bg-gray-50' : (editSelectedModifierIds.includes(m.id) ? 'border-indigo-500 bg-indigo-50' : '')">
+                                <div class="flex items-center gap-3">
+                                    <input type="checkbox" :checked="editSelectedModifierIds.includes(m.id)" :disabled="remainingModifierStockForEdit(editingProduct, m.id) <= 0"
+                                        class="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 pointer-events-none">
+                                    <div>
+                                        <span class="text-[13px] font-semibold text-gray-800" x-text="m.name"></span>
+                                        <template x-if="remainingModifierStockForEdit(editingProduct, m.id) <= 0">
+                                            <span class="ml-2 text-[9px] font-black bg-red-100 text-red-600 px-1.5 py-0.5 rounded uppercase tracking-widest">Out of Stock</span>
+                                        </template>
+                                    </div>
+                                </div>
+                                <span class="text-[12px] font-bold text-gray-900 font-mono" x-text="'+{{ $currencySymbol }}' + parseFloat(m.price).toFixed(2)"></span>
                             </label>
-                        </div>
+                        </template>
                     </div>
                 </div>
-                @endif
 
-                @if($seniorDiscountRate > 0)
-                <div x-data="{ isSeniorDiscount: @entangle('applySeniorDiscount') }"
-                     class="bg-gray-50 rounded-xl px-4 py-3 border border-purple-100 shadow-sm transition-all duration-300"
-                     :class="!isSeniorDiscount ? 'opacity-60 grayscale' : 'ring-2 ring-purple-500/20'">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border border-current/10"
-                                 :class="isSeniorDiscount ? 'bg-purple-100 text-purple-600' : 'bg-gray-200 text-gray-500'">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                            </div>
-                            <div class="min-w-0">
-                                <p class="text-[12px] font-black tracking-tighter uppercase truncate"
-                                   :class="isSeniorDiscount ? 'text-purple-600' : 'text-gray-500'">
-                                    {{ round($seniorDiscountRate * 100) }}% SENIOR / PWD DISCOUNT
-                                </p>
-                                <p class="text-[10px] text-gray-400 font-bold truncate">Apply to this item (VAT-Exempt)</p>
-                            </div>
-                        </div>
-                        
-                        <div class="flex items-center">
-                            <label class="inline-flex relative items-center cursor-pointer scale-90">
-                                <input type="checkbox" wire:model="applySeniorDiscount" class="sr-only peer">
-                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-                @endif
+                <p class="text-[12px] text-gray-400 italic" x-show="editingProduct && (editingProduct.option_groups || editingProduct.optionGroups || []).length === 0 && (!editingProduct.modifiers || editingProduct.modifiers.length === 0)">
+                    This item has no options or add-ons.
+                </p>
             </div>
-        </div>
 
-        <div class="grid grid-cols-2 gap-3">
-            <button type="button" @click="$dispatch('close-modal', 'edit-cart-item')" class="w-full py-3 rounded-2xl text-[13px] font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 transition-all">
-                Discard
-            </button>
-            <x-primary-button type="button" wire:click.prevent="saveEditItem" class="w-full justify-center py-3 shadow-indigo-200/50 shadow-lg !border-none">
-                Save Note
-            </x-primary-button>
+            {{-- ══════════ RIGHT COLUMN: Quantity + Notes + Discount + Actions ══════════ --}}
+            <div class="min-w-0 flex flex-col">
+
+                {{-- Quantity --}}
+                <div class="mb-6">
+                    <p class="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2">Quantity</p>
+                    <div class="flex items-center gap-3">
+                        <button type="button" @click="editQty = Math.max(1, editQty - 1)"
+                            class="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all border border-gray-200">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4"/></svg>
+                        </button>
+                        <span class="w-12 text-center text-[16px] font-black text-gray-900 font-mono" x-text="editQty"></span>
+                        <button type="button"
+                            @click="editingProduct && remainingStockForEdit(editingProduct) > editQty ? editQty++ : $dispatch('notify', { type: 'warning', message: 'Maximum available stock reached' })"
+                            class="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all border border-gray-200">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                        </button>
+                        <span class="text-[11px] text-gray-400 font-semibold ml-1" x-show="editingProduct" x-text="'(' + remainingStockForEdit(editingProduct) + ' available)'"></span>
+                    </div>
+                </div>
+
+                {{-- Special Instructions --}}
+                <div class="space-y-4 mb-6">
+                    <label for="pos_edit_item_notes" class="text-[11px] font-black text-gray-400 uppercase tracking-widest block mb-2">Special Instructions</label>
+                    <textarea id="pos_edit_item_notes" x-model="editingItem.instructions" rows="3"
+                        placeholder="e.g., No spicy sauce, extra napkins, separate bag..."
+                        class="w-full px-4 py-3 text-[13px] font-medium text-gray-700 bg-white border border-gray-200 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all placeholder-gray-400 resize-none"
+                    ></textarea>
+                    <p class="text-[11px] text-gray-400 flex items-center gap-1.5 ml-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        This will be printed on the kitchen ticket.
+                    </p>
+                </div>
+
+                {{-- Discount Selection for this item --}}
+                <div class="space-y-2 mb-6">
+                    @if($discountPercent > 0)
+                    <div class="bg-gray-50 rounded-xl px-4 py-3 border border-blue-100 shadow-sm transition-all duration-300"
+                         :class="!editingItem?.apply_regular_discount ? 'opacity-60 grayscale' : 'ring-2 ring-indigo-500/20'">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border border-current/10"
+                                    :class="editingItem?.apply_regular_discount ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-200 text-gray-500'">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M17 17h.01M7 17L17 7"/></svg>
+                                </div>
+                                <div class="min-w-0">
+                                    <p class="text-[12px] font-black tracking-tighter uppercase truncate"
+                                       :class="editingItem?.apply_regular_discount ? 'text-indigo-600' : 'text-gray-500'">
+                                        {{ round($discountPercent * 100) }}% REGULAR DISCOUNT
+                                    </p>
+                                    <p class="text-[10px] text-gray-400 font-bold truncate">Apply to this item</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center">
+                                <label class="inline-flex relative items-center cursor-pointer scale-90">
+                                    <input type="checkbox" x-model="editingItem.apply_regular_discount" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    @endif
+
+                    @if($seniorDiscountRate > 0)
+                    <div class="bg-gray-50 rounded-xl px-4 py-3 border border-purple-100 shadow-sm transition-all duration-300"
+                         :class="!editingItem?.apply_senior_discount ? 'opacity-60 grayscale' : 'ring-2 ring-purple-500/20'">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border border-current/10"
+                                     :class="editingItem?.apply_senior_discount ? 'bg-purple-100 text-purple-600' : 'bg-gray-200 text-gray-500'">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                </div>
+                                <div class="min-w-0">
+                                    <p class="text-[12px] font-black tracking-tighter uppercase truncate"
+                                       :class="editingItem?.apply_senior_discount ? 'text-purple-600' : 'text-gray-500'">
+                                        {{ round($seniorDiscountRate * 100) }}% SENIOR / PWD DISCOUNT
+                                    </p>
+                                    <p class="text-[10px] text-gray-400 font-bold truncate">Apply to this item (VAT-Exempt)</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center">
+                                <label class="inline-flex relative items-center cursor-pointer scale-90">
+                                    <input type="checkbox" x-model="editingItem.apply_senior_discount" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    @endif
+                </div>
+
+                <div class="mt-auto">
+                    <p x-show="editingProduct && !canSaveEditOrder()" class="text-[11px] text-red-500 font-semibold mb-3 text-center">
+                        A required option is out of stock, or the requested quantity exceeds available stock.
+                    </p>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <button type="button"
+                            @click="editingItem = null; editingKey = null; editingProduct = null; $dispatch('close-modal', 'edit-cart-item')"
+                            class="w-full py-3 rounded-2xl text-[13px] font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 transition-all">
+                            Discard
+                        </button>
+                        <x-primary-button type="button"
+                            x-bind:disabled="!canSaveEditOrder()"
+                            x-bind:class="!canSaveEditOrder() ? 'opacity-50 cursor-not-allowed' : ''"
+                            @click="saveEditOrder()"
+                            class="w-full justify-center py-3 shadow-indigo-200/50 shadow-lg !border-none">
+                            Save Changes
+                        </x-primary-button>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 </x-modal>
@@ -1670,9 +2000,11 @@ selectedOptions: {},
                     class="h-10 px-4 inline-flex items-center justify-center rounded-lg bg-red-600 hover:bg-red-700 text-white text-[13px] font-bold transition-colors">
                     Remove Item
                 </button>
-            </div>
         </div>
-    </x-modal>
+
+    </div>
+    </template>
+</x-modal>
 
     {{-- ══════════════════════════════════════════════
          CONFIRM CLEAR ORDER MODAL

@@ -16,7 +16,8 @@
      ═══════════════════════════════════════════════════════════════════ --}}
 <div
     x-data="{
-        ...window.slidingTabs(@entangle('activeTab').live, 'activeTab'),
+        activeTab: $wire.entangle('activeTab').live,
+        ...(typeof window.slidingTabs === 'function' ? window.slidingTabs(@entangle('activeTab').live, 'activeTab') : {}),
                 _timerInterval: null,
         delayThreshold: @js($delayThresholdMinutes),
         updateTimers() {
@@ -152,7 +153,7 @@
 <div class="bg-white rounded-b-2xl">
 
 {{-- HISTORY TAB --}}
-            <div x-cloak x-show="activeTab === 'history'"
+            <div x-cloak x-show="$wire.activeTab === 'history'"
                  class="p-6 animate-fadeIn"
                  wire:key="kds-history-container">
 
@@ -219,7 +220,7 @@
             </div>
 
             {{-- ACTIVE TAB --}}
-            <div x-cloak x-show="activeTab === 'active'"
+            <div x-cloak x-show="$wire.activeTab === 'active'"
                  class="p-4 md:p-6 animate-fadeIn"
                  wire:key="kds-active-container">
 
@@ -295,7 +296,7 @@
             </div>
 
             {{-- READY TAB --}}
-            <div x-cloak x-show="activeTab === 'ready'"
+            <div x-cloak x-show="$wire.activeTab === 'ready'"
                  class="p-4 md:p-6 animate-fadeIn"
                  wire:key="kds-ready-container">
 

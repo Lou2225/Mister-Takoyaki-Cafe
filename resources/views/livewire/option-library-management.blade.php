@@ -101,9 +101,9 @@
                         </x-secondary-button>
                     </x-slot>
                     <x-slot name="content">
-                        <x-dropdown-link href="#" @click.prevent="priceModeFilter = ''" ::class="priceModeFilter === '' ? 'bg-slate-50 font-bold text-indigo-600' : ''">All Logic</x-dropdown-link>
-                        <x-dropdown-link href="#" @click.prevent="priceModeFilter = 'additive'" ::class="priceModeFilter === 'additive' ? 'bg-slate-50 font-bold text-indigo-600' : ''">Additive</x-dropdown-link>
-                        <x-dropdown-link href="#" @click.prevent="priceModeFilter = 'fixed'" ::class="priceModeFilter === 'fixed' ? 'bg-slate-50 font-bold text-indigo-600' : ''">Fixed</x-dropdown-link>
+                        <x-dropdown-link href="#" @click.prevent="priceModeFilter = ''; $dispatch('close')" ::class="priceModeFilter === '' ? 'bg-slate-50 font-bold text-indigo-600' : ''">All Logic</x-dropdown-link>
+                        <x-dropdown-link href="#" @click.prevent="priceModeFilter = 'additive'; $dispatch('close')" ::class="priceModeFilter === 'additive' ? 'bg-slate-50 font-bold text-indigo-600' : ''">Additive</x-dropdown-link>
+                        <x-dropdown-link href="#" @click.prevent="priceModeFilter = 'fixed'; $dispatch('close')" ::class="priceModeFilter === 'fixed' ? 'bg-slate-50 font-bold text-indigo-600' : ''">Fixed</x-dropdown-link>
                     </x-slot>
                 </x-dropdown>
 

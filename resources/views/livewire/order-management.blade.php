@@ -126,7 +126,7 @@
             </div>
 
             {{-- Tab Navigation --}}
-            <x-sliding-tabs model="sourceFilter" class="mb-5 px-1" wire:ignore>
+            <x-sliding-tabs model="sourceFilter" class="mb-5 px-1" wire:ignore.self>
                 @foreach([
                     'App' => ['Delivery Orders', 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9-4v4m4-4v4', 'text-blue-600'],
                     'POS' => ['POS Orders', 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z', 'text-amber-600'],
@@ -207,45 +207,45 @@
                 
                 {{-- Active / Unresolved Orders (covers the full lifecycle before Completed —
                      previously only counted Pending/Preparing, which meant an order stuck at
-                     "Handed to Rider" or "Out for Delivery" was invisible here) --}}
-                                @php
+                     "Handed to Rider" or "Out for Delivery" was invisible here).
+                     Computed for all three tabs up front (like Total Orders above) and
+                     switched client-side via x-show, so clicking a tab updates this card
+                     instantly instead of waiting for the next Livewire round-trip. --}}
+                @php
                     $unresolvedStatuses = ['Pending', 'Preparing', 'Ready', 'Handed to Rider', 'Out for Delivery'];
-                    $activeOrdersQuery = \App\Models\Order::where('branch_id', auth()->user()->branch_id)
-                        ->whereIn('status', $unresolvedStatuses);
-                    // Scope to the currently selected tab's source (App/POS) so this
-                    // card always matches what's actually visible in the table below.
-                    // Previously it counted unresolved orders across BOTH channels
-                    // regardless of the open tab, so switching to a channel with zero
-                    // active orders still showed a stale count from the other
-                    // channel — the exact "1 active but table is empty" mismatch.
-                    if (in_array($this->sourceFilter, ['App', 'POS'])) {
-                        $activeOrdersQuery->where('source', $this->sourceFilter);
+                    $activeCounts = [];
+                    foreach (['App', 'POS'] as $src) {
+                        $q = \App\Models\Order::where('branch_id', auth()->user()->branch_id)
+                            ->whereIn('status', $unresolvedStatuses)
+                            ->where('source', $src);
+                        $activeCounts[$src] = [
+                            'pending' => (clone $q)->count(),
+                            'stale'   => (clone $q)->where('created_at', '<', now()->subHours(24))->count(),
+                        ];
                     }
-                    $pendingCount = (clone $activeOrdersQuery)->count();
-                    // Flag anything that's been sitting unresolved for a long time (24h+)
-                    // so a stuck order can't silently age out of view.
-                    $staleCount = (clone $activeOrdersQuery)
-                        ->where('created_at', '<', now()->subHours(24))
-                        ->count();
+                    // History tab has no "active" orders by definition — always zero.
+                    $activeCounts['History'] = ['pending' => 0, 'stale' => 0];
                 @endphp
-                <div class="p-3 sm:p-4 bg-gradient-to-br {{ $pendingCount > 0 ? 'from-amber-500/10 via-amber-500/5 to-white border-amber-500/10' : 'from-emerald-500/10 via-emerald-500/5 to-white border-emerald-500/10' }} border rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
-                    @if($staleCount > 0)
-                        <span class="absolute top-2.5 right-2.5 flex h-2 w-2">
-                            <span class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-red-400 opacity-75"></span>
-                            <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                        </span>
-                    @endif
-                    <div class="flex items-center justify-between mb-1 sm:mb-2">
-                        <span class="text-[10px] sm:text-[11px] font-bold {{ $pendingCount > 0 ? 'text-amber-600/90' : 'text-emerald-600/90' }} uppercase tracking-wider">Active Orders</span>
-                        <div class="w-7 h-7 rounded-lg bg-white border {{ $pendingCount > 0 ? 'border-amber-100 text-amber-600' : 'border-emerald-100 text-emerald-600' }} flex items-center justify-center shadow-sm shrink-0">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                @foreach($activeCounts as $tabKey => $counts)
+                    <div x-show="sourceFilter === '{{ $tabKey }}'" @if($tabKey !== 'App') x-cloak @endif class="p-3 sm:p-4 bg-gradient-to-br {{ $counts['pending'] > 0 ? 'from-amber-500/10 via-amber-500/5 to-white border-amber-500/10' : 'from-emerald-500/10 via-emerald-500/5 to-white border-emerald-500/10' }} border rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+                        @if($counts['stale'] > 0)
+                            <span class="absolute top-2.5 right-2.5 flex h-2 w-2">
+                                <span class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-red-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                            </span>
+                        @endif
+                        <div class="flex items-center justify-between mb-1 sm:mb-2">
+                            <span class="text-[10px] sm:text-[11px] font-bold {{ $counts['pending'] > 0 ? 'text-amber-600/90' : 'text-emerald-600/90' }} uppercase tracking-wider">Active Orders</span>
+                            <div class="w-7 h-7 rounded-lg bg-white border {{ $counts['pending'] > 0 ? 'border-amber-100 text-amber-600' : 'border-emerald-100 text-emerald-600' }} flex items-center justify-center shadow-sm shrink-0">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            </div>
                         </div>
+                        <h3 class="text-xl sm:text-2xl font-black {{ $counts['pending'] > 0 ? 'text-amber-600' : 'text-emerald-600' }} tracking-tight leading-none">{{ number_format($counts['pending']) }}</h3>
+                        <p class="text-[9px] sm:text-[10px] {{ $counts['stale'] > 0 ? 'text-red-500 font-bold' : 'text-slate-400 font-semibold' }} mt-1 sm:mt-1.5 leading-none">
+                            {{ $counts['stale'] > 0 ? $counts['stale'] . ' unresolved 24h+' : 'Not yet completed' }}
+                        </p>
                     </div>
-                    <h3 class="text-xl sm:text-2xl font-black {{ $pendingCount > 0 ? 'text-amber-600' : 'text-emerald-600' }} tracking-tight leading-none">{{ number_format($pendingCount) }}</h3>
-                    <p class="text-[9px] sm:text-[10px] {{ $staleCount > 0 ? 'text-red-500 font-bold' : 'text-slate-400 font-semibold' }} mt-1 sm:mt-1.5 leading-none">
-                        {{ $staleCount > 0 ? $staleCount . ' unresolved 24h+' : 'Not yet completed' }}
-                    </p>
-                </div>
+                @endforeach
 
                 {{-- Completed Orders Today --}}
                 @php
@@ -688,18 +688,14 @@
                     <div class="p-5 border-t border-slate-100 bg-white grid grid-cols-2 gap-2 shrink-0" x-show="activeTab === 'summary'">
                         {{-- 1. App Specific Progress Actions --}}
                         @if($order->source === 'App')
-                                                        @if($order->status === 'Pending')
+                            @if($order->status === 'Pending')
                                 <x-primary-button @click.capture="if (!window.thermalBluetoothPrinter?.characteristic) window.prepareThermalReceiptWindow?.()" wire:click="acceptOrder({{ $order->id }})" class="col-span-1 h-10 justify-center">
                                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                     Accept
                                 </x-primary-button>
-                                @if($order->created_at->diffInHours(now()) <= 24)
-                                    <x-secondary-button wire:click="openRejectModal({{ $order->id }})" class="col-span-1 h-10 justify-center text-red-600 border-red-200">
-                                        Reject
-                                    </x-secondary-button>
-                                @else
-                                    <div class="col-span-1"></div>
-                                @endif
+                                <x-secondary-button wire:click="openRejectModal({{ $order->id }})" class="col-span-1 h-10 justify-center text-red-600 border-red-200">
+                                    Reject
+                                </x-secondary-button>
                             @elseif($order->status === 'Preparing')
                                 <x-primary-button wire:click="openHandToRiderModal({{ $order->id }})" class="col-span-2 h-10 justify-center bg-indigo-600 hover:bg-indigo-700">
                                     Hand to Rider

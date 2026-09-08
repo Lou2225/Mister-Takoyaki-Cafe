@@ -1,4 +1,4 @@
-<div class="px-2 py-2 space-y-6" x-data="slidingTabs({ panel: @entangle('panel').live }, ['panel'])" @if($selectedOrderId === null) wire:poll.10s @endif>
+<div class="px-2 py-2 space-y-6" x-data="{ panel: $wire.entangle('panel').live, ...(typeof window.slidingTabs === 'function' ? window.slidingTabs({ panel: $wire.entangle('panel').live }, ['panel']) : {}) }" @if($selectedOrderId === null) wire:poll.10s @endif>
     {{-- ════════════════ DYNAMIC HEADER ════════════════ --}}
     <div class="px-1 pt-2">
         <div class="mb-6 flex items-center justify-between">
@@ -34,7 +34,7 @@
     </div>
 
     <!-- KPI Metrics (Premium Redesigned) -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-8" x-show="panel !== 'analytics'">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-8" x-show="$wire.panel !== 'analytics'">
         {{-- New Requests --}}
         <div class="p-3 sm:p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
             <div class="flex items-center justify-between mb-1 sm:mb-2">
@@ -85,7 +85,7 @@
     </div>
 
     <!-- Analytics KPI Metrics (Premium Redesigned) -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-8" x-show="panel === 'analytics'">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-8" x-show="$wire.panel === 'analytics'">
         {{-- KPI 1: Value Dispatched --}}
         <div class="p-3 sm:p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
             <div class="flex items-center justify-between mb-1 sm:mb-2">
@@ -136,7 +136,7 @@
     </div>
 
     <!-- Toolbar -->
-    <div class="relative z-20 flex flex-row items-center justify-between mb-8 gap-2 sm:gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm" x-show="panel !== 'logistics'">
+    <div class="relative z-20 flex flex-row items-center justify-between mb-8 gap-2 sm:gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm" x-show="$wire.panel !== 'logistics'">
         <div class="flex-1 min-w-0 lg:flex-initial">
             <x-search-bar wireModel="search" placeholder="Find records..." width="w-full lg:w-72" />
         </div>
@@ -164,7 +164,7 @@
     <!-- MAIN PANELS -->
     <div class="relative min-h-[400px]">
         <!-- 1. Inbox Panel -->
-        <div x-show="panel === 'inbox'" class="animate-fadeIn px-1 space-y-4">
+        <div x-show="$wire.panel === 'inbox'" class="animate-fadeIn px-1 space-y-4">
             <x-data-table>
                 <x-slot name="header">
                     <th class="py-3 px-6 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest">Reference / Branch</th>
@@ -211,7 +211,7 @@
         </div>
 
         <!-- 2. Active Panel -->
-        <div x-show="panel === 'active'" class="animate-fadeIn px-1 space-y-4">
+        <div x-show="$wire.panel === 'active'" class="animate-fadeIn px-1 space-y-4">
             <x-data-table>
                 <x-slot name="header">
                     <th class="py-3 px-6 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest">Reference / Branch</th>
@@ -249,7 +249,7 @@
         </div>
 
         <!-- 3. History Panel -->
-        <div x-show="panel === 'history'" class="animate-fadeIn px-1 space-y-4">
+        <div x-show="$wire.panel === 'history'" class="animate-fadeIn px-1 space-y-4">
             <x-data-table>
                 <x-slot name="header">
                     <th class="py-3 px-6 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest">Reference / Branch</th>
@@ -291,7 +291,7 @@
         </div>
 
         <!-- 4. Logistics Management (PROFESSIONAL REDESIGN) -->
-        <div x-show="panel === 'logistics'" class="animate-fadeIn px-1 space-y-8">
+        <div x-show="$wire.panel === 'logistics'" class="animate-fadeIn px-1 space-y-8">
             <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
                 <div class="lg:col-span-3 space-y-6">
                     <div class="bg-white rounded-[2.5rem] shadow-sm border border-slate-200/60 overflow-hidden">
@@ -442,7 +442,7 @@
         </div>
 
         <!-- 5. Analytics -->
-        <div x-show="panel === 'analytics'" 
+        <div x-show="$wire.panel === 'analytics'" 
              x-data="orderInboxAnalytics(@js($analytics))"
              x-effect="updateAnalytics(@js($analytics))"
              class="space-y-8 animate-fadeIn px-1">

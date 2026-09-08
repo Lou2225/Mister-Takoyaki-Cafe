@@ -28,17 +28,17 @@ switch ($width) {
 @endphp
 <div
      {{ $wireKey ? 'wire:key='.$wireKey : '' }}
-     x-data="{ dropdownOpen: false }" 
-     :class="dropdownOpen ? 'z-40' : ''"
+    x-data="{ dropdownOpen: false }" 
+    :class="typeof dropdownOpen !== 'undefined' && dropdownOpen ? 'z-40' : ''"
      @click.away="dropdownOpen = false" 
      @close.stop="dropdownOpen = false" 
      data-has-alpine-state="true"
      {{ $attributes->merge(['class' => 'relative ' . $containerClasses . ' text-left']) }} >
-    <div @click="dropdownOpen = !dropdownOpen" x-ref="trigger" class="relative z-0 w-full">
+    <div @click="typeof dropdownOpen !== 'undefined' && (dropdownOpen = !dropdownOpen)" x-ref="trigger" class="relative z-0 w-full">
         {{ $trigger }}
     </div>
 
-    <div x-show="dropdownOpen" 
+    <div x-show="typeof dropdownOpen !== 'undefined' && dropdownOpen" 
          x-transition:enter="transition ease-out duration-200" 
          x-transition:enter-start="transform opacity-0 -translate-y-1" 
          x-transition:enter-end="transform opacity-100 translate-y-0" 

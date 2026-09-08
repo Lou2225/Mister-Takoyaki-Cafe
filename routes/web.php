@@ -65,9 +65,11 @@ Route::middleware('auth')->group(function () {
             ->middleware('role:super_admin|admin')
             ->name('customers.index');
         
-        Route::get('/reports', \App\Livewire\BusinessIntelligence::class)->name('reports.index');
-        Route::get('/reports/bi', \App\Livewire\BusinessIntelligence::class)->name('intelligence.index');
-        Route::get('/reports/sales', fn() => redirect()->route('reports.index', ['tab' => 'sales']))->name('reports.sales');
+        Route::middleware('role:super_admin|admin')->group(function () {
+            Route::get('/reports', \App\Livewire\BusinessIntelligence::class)->name('reports.index');
+            Route::get('/reports/bi', \App\Livewire\BusinessIntelligence::class)->name('intelligence.index');
+            Route::get('/reports/sales', fn() => redirect()->route('reports.index', ['tab' => 'sales']))->name('reports.sales');
+        });
     });
 
     // Specific Restricted Routes

@@ -9,9 +9,13 @@ use App\Models\OrderItem;
 use App\Models\Branch;
 use App\Models\IngredientCost;
 use App\Models\Ingredient;
+use App\Models\Product;
+use App\Models\BranchIngredientStock;
+use App\Models\StockBatch;
 use App\Models\StockMovement;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
 use App\Traits\HandlesExports;
@@ -22,12 +26,13 @@ class BusinessIntelligence extends Component
     use WithPagination, HandlesExports;
     use \App\Traits\ResolvesIngredientCosts;
 
-    public string $activeTab = 'performance'; // performance, forecasting, products, operations, sales
+    public string $activeTab = 'descriptive'; // descriptive, diagnostic, predictive, prescriptive
     public string $startDate = '';
     public string $endDate = '';
     public string $selectedBranchId = 'all';
     public string $search = '';
     public int $perPage = 5;
+    public int $prescriptivePerPage = 5;
     public string $seasonalityMode = 'weekly'; // weekly | monthly
     public string $activeFilter = 'All Time';
     public string $dateError = '';
@@ -35,11 +40,17 @@ class BusinessIntelligence extends Component
     public bool $showBreakdown = false;
     public string $selectedMetric = 'Gross Revenue';
     public array $breakdownData = [];
+       public array $stockReview = [];
+    public array $stockReviewCache = [];
+    public int $stockReviewPerPage = 5;
+    public array $networkRestockSummary = [];
+    public bool $showNetworkRestockSummary = false;
     
-    protected ?array $analyticsCache = null;
+      protected ?array $analyticsCache = null;
+    protected ?array $forecastingCache = null;
 
     protected $queryString = [
-        'activeTab' => ['except' => 'performance'],
+        'activeTab' => ['except' => 'descriptive'],
         'selectedBranchId' => ['except' => 'all'],
         'startDate' => ['except' => ''],
         'endDate' => ['except' => ''],
@@ -47,18 +58,29 @@ class BusinessIntelligence extends Component
         'activeFilter' => ['except' => 'All Time'],
     ];
 
+    public function boot(): void
+    {
+        $user = auth()->user();
+
+        abort_unless($user && ($user->isSuperAdmin() || $user->isAdmin()), 403, 'Unauthorized access to Business Intelligence.');
+    }
+
     public function mount()
 {
     $user = auth()->user();
-    
-    if ($user->role_id === 3) {
-        abort(403, 'Unauthorized access to Business Intelligence.');
-    }
 
-    $this->activeTab = request()->query('tab', 'performance');
+    $tab = request()->query('tab', 'descriptive');
+    $this->activeTab = match ($tab) {
+        'performance', 'sales' => 'descriptive',
+        'products', 'operations' => 'diagnostic',
+        'forecasting' => 'predictive',
+        default => in_array($tab, ['descriptive', 'diagnostic', 'predictive', 'prescriptive'], true)
+            ? $tab
+            : 'descriptive',
+    };
 
     // Default branch logic
-    if ($user->role_id !== 1) {
+    if (!$user->isSuperAdmin()) {
         $this->selectedBranchId = (string) $user->branch_id;
     } else {
         // Super admins should default to global network view unless a specific branch is requested.
@@ -108,6 +130,8 @@ class BusinessIntelligence extends Component
                 break;
         }
 
+        $this->analyticsCache = null;
+        $this->forecastingCache = null;
         $this->dateError = '';
         $this->resetPage();
         $this->resetPage('branchPage');
@@ -129,11 +153,129 @@ class BusinessIntelligence extends Component
         return $this->redirectRoute('stock.orders', ['ingredient' => $ingredientId], navigate: true);
     }
 
+    public function openStockReview(int $ingredientId): void
+    {
+        if ($this->selectedBranchId === 'all') {
+            return;
+        }
+
+        $branchId = (int) $this->selectedBranchId;
+        $cacheKey = $branchId . ':' . $ingredientId;
+        $this->resetPage('stockReviewPage');
+
+        $cacheTtlSeconds = 30;
+        $cachedAt = $this->stockReviewCache[$cacheKey]['cached_at'] ?? null;
+
+        if ($cachedAt && now()->diffInSeconds($cachedAt) < $cacheTtlSeconds) {
+            $this->stockReview = $this->stockReviewCache[$cacheKey]['data'];
+            $this->dispatch('open-modal', name: 'prescriptive-stock-review');
+            return;
+        }
+
+        $ingredient = Ingredient::findOrFail($ingredientId);
+        $stock = BranchIngredientStock::where('branch_id', $branchId)
+            ->where('ingredient_id', $ingredientId)
+            ->value('stock_quantity');
+
+        $batches = StockBatch::where('branch_id', $branchId)
+            ->where('ingredient_id', $ingredientId)
+            ->where('current_quantity', '>', 0)
+            ->orderBy('expiry_date')
+            ->get()
+            ->map(fn ($batch) => [
+                'batch_number' => $batch->batch_number ?: 'Unassigned',
+                'quantity' => (float) $batch->current_quantity,
+                'expiry_date' => $batch->expiry_date?->format('M d, Y'),
+                'expiry_state' => !$batch->expiry_date
+                    ? 'No expiry'
+                    : ($batch->expiry_date->isPast() ? 'Expired' : ($batch->expiry_date->diffInDays(now()) <= 7 ? 'Expiring soon' : 'Good')),
+            ])
+            ->values()
+            ->all();
+
+        $this->stockReview = [
+            'ingredient_id' => $ingredientId,
+            'branch_id' => $branchId,
+            'ingredient_name' => $ingredient->name,
+            'unit' => $ingredient->unit,
+            'current_stock_display' => $this->formatInventoryQuantity((float) ($stock ?? 0), $ingredient->unit),
+            'batches' => collect($batches)->map(function ($batch) use ($ingredient) {
+                $formatted = $this->formatInventoryQuantity((float) $batch['quantity'], $ingredient->unit);
+                $batch['quantity_display'] = $formatted;
+                return $batch;
+            })->values()->all(),
+            'adjustment_url' => route('stock.adjustment', ['id' => $ingredientId]),
+        ];
+
+        $this->stockReviewCache[$cacheKey] = [
+            'data' => $this->stockReview,
+            'cached_at' => now(),
+        ];
+
+        $this->dispatch('open-modal', name: 'prescriptive-stock-review');
+    }
+
+    public function getStockReviewMovementsProperty(): LengthAwarePaginator
+    {
+        if (empty($this->stockReview['ingredient_id'])) {
+            return new LengthAwarePaginator(collect(), 0, $this->stockReviewPerPage, 1, [
+                'path' => request()->url(),
+                'pageName' => 'stockReviewPage',
+            ]);
+        }
+
+        $ingredient = Ingredient::find($this->stockReview['ingredient_id']);
+        $outgoingTypes = ['order', 'out', 'waste', 'waste_expired', 'return_to_supplier', 'transfer_out'];
+
+        return StockMovement::where('branch_id', $this->stockReview['branch_id'])
+            ->where('ingredient_id', $this->stockReview['ingredient_id'])
+            ->latest()
+            ->paginate($this->stockReviewPerPage, ['*'], 'stockReviewPage')
+            ->through(function ($movement) use ($ingredient, $outgoingTypes) {
+                $quantity = abs((float) $movement->quantity);
+                $signedQuantity = in_array($movement->type, $outgoingTypes, true) ? -$quantity : $quantity;
+
+                return [
+                    'type' => ucfirst(str_replace('_', ' ', $movement->type)),
+                    'quantity' => $signedQuantity,
+                    'quantity_display' => $this->formatInventoryQuantity($signedQuantity, $ingredient?->unit),
+                    'reference' => $movement->reference_id ?: 'No reference',
+                    'date' => $movement->created_at?->format('M d, Y H:i'),
+                ];
+            });
+    }
+
+    private function formatInventoryQuantity(float $quantity, ?string $unit): array
+    {
+        $normalizedUnit = strtolower(trim((string) $unit));
+
+        if (in_array($normalizedUnit, ['g', 'gram', 'grams'], true) && abs($quantity) >= 1000) {
+            return ['value' => round($quantity / 1000, 2), 'unit' => 'kg'];
+        }
+
+        if (in_array($normalizedUnit, ['ml', 'milliliter', 'milliliters'], true) && abs($quantity) >= 1000) {
+            return ['value' => round($quantity / 1000, 2), 'unit' => 'L'];
+        }
+
+        return ['value' => round($quantity, 2), 'unit' => $unit];
+    }
+
     public function updated(string $propertyName)
 {
-    if (in_array($propertyName, ['selectedBranchId', 'search', 'perPage'])) {
+    if ($propertyName === 'selectedBranchId') {
+        if (!auth()->user()->isSuperAdmin()) {
+            $this->selectedBranchId = (string) auth()->user()->branch_id;
+        }
+
+        $this->analyticsCache = null;
+        $this->showNetworkRestockSummary = false;
+        $this->networkRestockSummary = [];
+    }
+
+    if (in_array($propertyName, ['selectedBranchId', 'search', 'perPage', 'prescriptivePerPage'])) {
         $this->resetPage();
         $this->resetPage('branchPage');
+        $this->resetPage('prescriptivePage');
     }
 }
 
@@ -141,8 +283,11 @@ class BusinessIntelligence extends Component
     {
         $this->validateDateRange();
         if (!$this->dateError) {
+            $this->analyticsCache = null;
+            $this->forecastingCache = null;
             $this->resetPage();
             $this->resetPage('branchPage');
+            $this->resetPage('prescriptivePage');
         }
     }
 
@@ -150,8 +295,11 @@ class BusinessIntelligence extends Component
     {
         $this->validateDateRange();
         if (!$this->dateError) {
+            $this->analyticsCache = null;
+            $this->forecastingCache = null;
             $this->resetPage();
             $this->resetPage('branchPage');
+            $this->resetPage('prescriptivePage');
         }
     }
 
@@ -198,9 +346,14 @@ class BusinessIntelligence extends Component
 
     public function render()
     {
+        if (!auth()->user()->isSuperAdmin()) {
+            $this->selectedBranchId = (string) auth()->user()->branch_id;
+        }
+
         $analytics = $this->getAnalytics();
         $isActionable = $this->selectedBranchId !== 'all';
         $forecasting = $this->getForecastingData();
+        $prescriptiveRecommendations = $this->getPrescriptiveRecommendations($forecasting);
 
         $performance = [
             'gross_sales'     => $analytics['gross_sales'],
@@ -233,6 +386,7 @@ class BusinessIntelligence extends Component
             'branches'        => Branch::all(),
             'performance'     => $performance,
             'forecasting'     => $forecasting,
+            'prescriptiveRecommendations' => $prescriptiveRecommendations,
             'executiveSummary'=> $this->getExecutiveSummary($analytics, $forecasting),
             'branchComparison'=> $branchComparison,
             'productInsights' => $this->getProductInsights($analytics),
@@ -483,12 +637,24 @@ class BusinessIntelligence extends Component
     {
         $shortTerm = $this->calculateRegression('daily', 60, 7);
         $longTerm = $this->calculateRegression('monthly', 12, 6);
+        $accuracy = $this->calculateForecastAccuracy($shortTerm['forecast'] ?? []);
+
+        // Attach a simple ± RMSE confidence band to each short-term point so the
+        // chart can show a range instead of a single line pretending to be exact.
+        $rmse = $accuracy['rmse'] ?? 0;
+        if ($rmse > 0) {
+            $shortTerm['forecast'] = collect($shortTerm['forecast'])->map(function ($point) use ($rmse) {
+                $point['lower'] = round(max(0, $point['predicted'] - $rmse), 2);
+                $point['upper'] = round($point['predicted'] + $rmse, 2);
+                return $point;
+            })->all();
+        }
 
         return [
             'short_term' => $shortTerm,
             'long_term'  => $longTerm,
             'restock_insights' => $this->getIngredientDemandForecast($shortTerm),
-            'accuracy' => $this->calculateForecastAccuracy($shortTerm['forecast'] ?? []),
+            'accuracy' => $accuracy,
         ];
     }
 
@@ -852,7 +1018,7 @@ class BusinessIntelligence extends Component
 
             $baseDemand = max(18, (float)($recentSales / max(1, $daysInRange)) * 0.18 * $forecastGrowthFactor);
 
-            return [
+                        return [
                 [
                     'id' => 0,
                     'name' => 'Takoyaki Base Mix',
@@ -861,14 +1027,14 @@ class BusinessIntelligence extends Component
                     'priority' => 'High',
                 ],
                 [
-                    'id' => 1,
+                    'id' => 0,
                     'name' => 'Sauce & Toppings',
                     'unit' => 'bottles',
                     'amount' => (int) ceil($baseDemand * 1.2),
                     'priority' => 'Medium',
                 ],
                 [
-                    'id' => 2,
+                    'id' => 0,
                     'name' => 'Packaging Buffer',
                     'unit' => 'pcs',
                     'amount' => (int) ceil($baseDemand * 0.9),
@@ -887,6 +1053,210 @@ class BusinessIntelligence extends Component
             })
             ->values()
             ->toArray();
+    }
+
+    /**
+     * Historical waste rate per ingredient over a fixed 30-day lookback
+     * (independent of the report's date filter, matching the forecasting
+     * window) — used to shrink the safety-stock buffer for ingredients that
+     * spoil often, since padding those orders just grows what gets wasted.
+     */
+    private function computeWasteRates(int $branchId, array $ingredientIds): array
+    {
+        if (empty($ingredientIds)) return [];
+
+        $lookbackStart = Carbon::now()->subDays(30)->startOfDay();
+
+        $movements = StockMovement::where('branch_id', $branchId)
+            ->whereIn('ingredient_id', $ingredientIds)
+            ->whereIn('type', ['waste', 'waste_expired', 'order', 'out'])
+            ->where('created_at', '>=', $lookbackStart)
+            ->get(['ingredient_id', 'type', 'quantity']);
+
+        $rates = [];
+        foreach ($ingredientIds as $ingredientId) {
+            $ingredientMovements = $movements->where('ingredient_id', $ingredientId);
+            $wasted = $ingredientMovements->whereIn('type', ['waste', 'waste_expired'])
+                ->sum(fn ($m) => abs((float) $m->quantity));
+            $consumed = $ingredientMovements->sum(fn ($m) => abs((float) $m->quantity));
+
+            $rates[$ingredientId] = $consumed > 0 ? $wasted / $consumed : 0.0;
+        }
+
+        return $rates;
+    }
+
+    private function buildPrescriptiveRecommendations(array $forecasting): array
+    {
+        if ($this->selectedBranchId === 'all') {
+            return [[
+                'type' => 'scope',
+                'priority' => 'medium',
+                'title' => 'Select a branch for purchase recommendations',
+                'reason' => 'Current stock is branch-specific, so a network-wide forecast cannot produce a safe purchase quantity.',
+                'action_label' => 'Choose branch',
+                'actionable' => false,
+            ]];
+        }
+
+        $insights = $forecasting['restock_insights'] ?? [];
+        $ingredientIds = collect($insights)->pluck('id')->filter(fn ($id) => (int) $id > 0)->map(fn ($id) => (int) $id)->all();
+        $stock = empty($ingredientIds)
+            ? collect()
+            : Product::getUnexpiredStocks((int) $this->selectedBranchId, $ingredientIds);
+        $wasteRates = $this->computeWasteRates((int) $this->selectedBranchId, $ingredientIds);
+
+        return collect($insights)
+            ->filter(fn ($item) => (int) ($item['id'] ?? 0) > 0)
+            ->map(function (array $item) use ($stock, $wasteRates) {
+                $currentStock = max(0, (float) ($stock[(int) $item['id']] ?? 0));
+
+                // Historical sales understate true demand while an ingredient sits
+                // at zero — there's nothing to sell. Nudge the projection up for
+                // ingredients that are out right now so the recommendation doesn't
+                // perpetually under-order based on suppressed sales.
+                $stockoutSuppressed = $currentStock <= 0;
+                $projectedDemand = max(0, (float) ($item['amount'] ?? 0));
+                if ($stockoutSuppressed) {
+                    $projectedDemand *= 1.3;
+                }
+
+                // High-waste ingredients don't get the same flat 15% safety buffer —
+                // padding the order just grows the amount that ends up spoiling.
+                $wasteRate = min(0.5, max(0, $wasteRates[(int) $item['id']] ?? 0));
+                $safetyStockPct = max(0.05, 0.15 - ($wasteRate * 0.5));
+                $safetyStock = (int) ceil($projectedDemand * $safetyStockPct);
+
+                $recommendedQuantity = max(0, (int) ceil($projectedDemand + $safetyStock - $currentStock));
+                $dailyDemand = max(0.01, $projectedDemand / 14);
+                $coverageDays = $currentStock > 0 ? round($currentStock / $dailyDemand, 1) : 0;
+
+                $priority = match (true) {
+                    $recommendedQuantity <= 0 => 'low',
+                    $currentStock <= 0 => 'critical',
+                    $coverageDays <= 3 => 'high',
+                    $coverageDays <= 7 => 'medium',
+                    default => 'low',
+                };
+
+                $reason = $recommendedQuantity > 0
+                    ? "Projected 14-day demand is {$projectedDemand} {$item['unit']}; current stock covers about {$coverageDays} days."
+                    : "Current stock covers the projected demand plus safety buffer.";
+                if ($stockoutSuppressed) {
+                    $reason .= ' Demand estimate increased — this ingredient is currently out of stock, which likely suppressed recent sales.';
+                }
+                if ($wasteRate > 0.1) {
+                    $reason .= ' Safety buffer reduced due to a history of spoilage for this ingredient.';
+                }
+
+                return [
+                    'type' => 'restock',
+                    'priority' => $priority,
+                    'title' => $recommendedQuantity > 0
+                        ? "Restock {$item['name']}"
+                        : "Monitor {$item['name']}",
+                    'reason' => $reason,
+                    'unit' => $item['unit'],
+                    'current_stock' => round($currentStock, 2),
+                    'current_stock_display' => $this->formatInventoryQuantity($currentStock, $item['unit']),
+                    'projected_demand' => round($projectedDemand, 2),
+                    'projected_demand_display' => $this->formatInventoryQuantity($projectedDemand, $item['unit']),
+                    'safety_stock' => $safetyStock,
+                    'safety_stock_display' => $this->formatInventoryQuantity((float) $safetyStock, $item['unit']),
+                    'coverage_days' => $coverageDays,
+                    'recommended_quantity' => $recommendedQuantity,
+                    'recommended_quantity_display' => $this->formatInventoryQuantity((float) $recommendedQuantity, $item['unit']),
+                    'ingredient_id' => (int) $item['id'],
+                    'stockout_suppressed' => $stockoutSuppressed,
+                    'waste_rate_pct' => round($wasteRate * 100, 1),
+                    'action_label' => $recommendedQuantity > 0 ? 'Open stock workflow' : 'Review stock',
+                    'actionable' => true,
+                ];
+            })
+            ->sortByDesc(fn ($item) => match ($item['priority']) {
+                'critical' => 4,
+                'high' => 3,
+                'medium' => 2,
+                default => 1,
+            })
+            ->values()
+            ->all();
+    }
+
+    private function getPrescriptiveRecommendations(array $forecasting): LengthAwarePaginator
+    {
+        $recommendations = $this->buildPrescriptiveRecommendations($forecasting);
+        $currentPage = $this->getPage('prescriptivePage');
+
+        return new LengthAwarePaginator(
+            collect($recommendations)->forPage($currentPage, $this->prescriptivePerPage)->values(),
+            count($recommendations),
+            $this->prescriptivePerPage,
+            $currentPage,
+            [
+                'path' => request()->url(),
+                'pageName' => 'prescriptivePage',
+            ]
+        );
+    }
+
+    public function loadNetworkRestockSummary(): void
+    {
+        if (auth()->user()->role_id !== 1 || $this->selectedBranchId !== 'all') {
+            return;
+        }
+
+        $this->networkRestockSummary = $this->getNetworkRestockSummary();
+        $this->showNetworkRestockSummary = true;
+    }
+
+    /**
+     * Aggregates each branch's ingredient demand forecast into one network-wide
+     * total. Re-runs the regression once per branch — there's no cheaper way to
+     * get a per-branch demand signal without duplicating the pipeline — so this
+     * stays behind an explicit button rather than running on every render.
+     */
+    private function getNetworkRestockSummary(): array
+    {
+        $branchIds = Branch::pluck('id');
+        $totals = [];
+        $originalBranch = $this->selectedBranchId;
+
+        foreach ($branchIds as $branchId) {
+            $this->selectedBranchId = (string) $branchId;
+
+            $shortTerm = $this->calculateRegression('daily', 60, 7);
+            $insights = $this->getIngredientDemandForecast($shortTerm);
+
+            foreach ($insights as $item) {
+                if ((int) ($item['id'] ?? 0) <= 0) continue;
+
+                $id = (int) $item['id'];
+                if (!isset($totals[$id])) {
+                    $totals[$id] = [
+                        'id' => $id,
+                        'name' => $item['name'],
+                        'unit' => $item['unit'],
+                        'amount' => 0,
+                        'branch_count' => 0,
+                    ];
+                }
+                $totals[$id]['amount'] += $item['amount'];
+                $totals[$id]['branch_count']++;
+            }
+        }
+
+        $this->selectedBranchId = $originalBranch;
+
+        return collect($totals)
+            ->sortByDesc('amount')
+            ->take(15)
+            ->map(function ($item) {
+                $item['amount'] = ceil($item['amount']);
+                return $item;
+            })
+            ->values()
+            ->all();
     }
 
     private function getProductInsights(array $analytics): array
@@ -1167,6 +1537,27 @@ foreach ($topProductIds as $pid) {
     public function exportExcel()
     {
         return $this->exportCsv();
+    }
+
+    public function exportPrescriptiveCsv()
+    {
+        $forecasting = $this->getForecastingData();
+        $recommendations = collect($this->buildPrescriptiveRecommendations($forecasting))
+            ->filter(fn ($r) => $r['actionable'] ?? false)
+            ->map(fn ($r) => [
+                'Ingredient' => $r['title'],
+                'Unit' => $r['unit'] ?? '',
+                'Current Stock' => $r['current_stock'] ?? 0,
+                'Projected 14-Day Demand' => $r['projected_demand'] ?? 0,
+                'Safety Stock' => $r['safety_stock'] ?? 0,
+                'Recommended Quantity' => $r['recommended_quantity'] ?? 0,
+                'Coverage (Days)' => $r['coverage_days'] ?? 0,
+                'Priority' => ucfirst($r['priority'] ?? ''),
+            ])
+            ->values()
+            ->all();
+
+        return $this->generateCsvReport('Restock_List_' . now()->format('Y-m-d') . '.csv', $recommendations);
     }
 
     public function openBreakdown(string $metric): void

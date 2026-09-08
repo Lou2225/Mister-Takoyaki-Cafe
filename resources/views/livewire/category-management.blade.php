@@ -111,10 +111,10 @@
                             </x-secondary-button>
                         </x-slot>
                         <x-slot name="content">
-                            <x-dropdown-link href="#" @click.prevent="filterType = 'all'" ::class="filterType === 'all' ? 'bg-slate-50 font-bold text-indigo-600' : ''">All Types</x-dropdown-link>
+                            <x-dropdown-link href="#" @click.prevent="filterType = 'all'; $dispatch('close')" ::class="filterType === 'all' ? 'bg-slate-50 font-bold text-indigo-600' : ''">All Types</x-dropdown-link>
                             <hr class="border-slate-50">
-                            <x-dropdown-link href="#" @click.prevent="filterType = 'product'" ::class="filterType === 'product' ? 'bg-slate-50 font-bold text-indigo-600' : ''">Product Categories</x-dropdown-link>
-                            <x-dropdown-link href="#" @click.prevent="filterType = 'ingredient'" ::class="filterType === 'ingredient' ? 'bg-slate-50 font-bold text-indigo-600' : ''">Ingredient Categories</x-dropdown-link>
+                            <x-dropdown-link href="#" @click.prevent="filterType = 'product'; $dispatch('close')" ::class="filterType === 'product' ? 'bg-slate-50 font-bold text-indigo-600' : ''">Product Categories</x-dropdown-link>
+                            <x-dropdown-link href="#" @click.prevent="filterType = 'ingredient'; $dispatch('close')" ::class="filterType === 'ingredient' ? 'bg-slate-50 font-bold text-indigo-600' : ''">Ingredient Categories</x-dropdown-link>
                         </x-slot>
                     </x-dropdown>
 

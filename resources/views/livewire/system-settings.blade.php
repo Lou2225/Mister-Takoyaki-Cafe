@@ -484,7 +484,7 @@
                     <div class="xl:col-span-1">
                         <div class="bg-gray-50 rounded-xl p-5 border border-gray-100 flex flex-col items-center">
                             <span class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-4">Live Preview</span>
-                            <div class="w-full max-w-[240px] bg-white shadow-md p-4 pt-6 pb-8 font-mono text-[10px] text-gray-800 relative receipt-paper border border-gray-100"
+                            <div class="w-full max-w-[240px] min-w-0 overflow-hidden bg-white shadow-md p-4 pt-6 pb-8 font-mono text-[10px] text-gray-800 relative receipt-paper border border-gray-100"
                                  x-data="{ 
                                      subtotal: 320.00, 
                                      vatRate: 0,
@@ -514,7 +514,7 @@
                                     </div>
                                     <p class="font-bold text-[11px]" x-text="businessName || 'Your Business Name'"></p>
                                     <p class="text-[8px] text-gray-500 mt-0.5" x-text="'+63 ' + (businessPhone || '912 345 6789')"></p>
-                                    <p class="text-[8px] text-gray-500" x-text="businessEmail || 'contact@mistertakoyaki.com'"></p>
+                                    <p class="w-full min-w-0 break-all text-[8px] text-gray-500 leading-tight" x-text="businessEmail || 'contact@mistertakoyaki.com'"></p>
                                 </div>
 
                                 <div class="border-y border-dashed border-gray-200 py-1.5 mb-3 space-y-0.5 text-[9px]">

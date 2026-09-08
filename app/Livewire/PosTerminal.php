@@ -55,10 +55,9 @@ public $amountTendered = 0;
 
     // ─── UI State ──────────────────────────────────────────────────────────
     public ?string $editCartItemId = null;
+    public ?int $editCartItemProductId = null;
     public $editCartItemQty = 1;
     public string $editCartItemNotes = '';
-    public bool $applyRegularDiscount = false;
-    public bool $applySeniorDiscount = false;
     public array $branches = [];
     public string $gcashAccountName = '';
     public string $gcashAccountNumber = '';
@@ -292,20 +291,39 @@ public function openPaymentModal(): void
         return $roleId === 1 || $roleId === 2;
     }
 
-    public function saveLayout(?array $orderedIds = null): void
+    public function saveLayout(?array $orderedProductIds = null, ?array $orderedCategoryIds = null): void
     {
         if (!$this->canEditLayout()) return;
 
-        if ($orderedIds && $this->branchId) {
-            DB::transaction(function() use ($orderedIds) {
-                foreach ($orderedIds as $index => $id) {
+        $savedSomething = false;
+
+        if ($orderedProductIds && $this->branchId) {
+            DB::transaction(function() use ($orderedProductIds) {
+                foreach ($orderedProductIds as $index => $id) {
                     DB::table('branch_product')->updateOrInsert(
                         ['branch_id' => $this->branchId, 'product_id' => $id],
                         ['sort_order' => $index]
                     );
                 }
             });
-            $this->dispatch('notify', type: 'success', message: 'Branch menu layout saved.');
+            $savedSomething = true;
+        }
+
+        if ($orderedCategoryIds && $this->branchId) {
+            DB::transaction(function() use ($orderedCategoryIds) {
+                foreach ($orderedCategoryIds as $index => $id) {
+                    BranchCategorySort::updateOrCreate(
+                        ['branch_id' => $this->branchId, 'category_id' => $id],
+                        ['sort_order' => $index]
+                    );
+                }
+            });
+            $savedSomething = true;
+        }
+
+        if ($savedSomething) {
+            $this->refreshPosData();
+            $this->dispatch('notify', type: 'success', message: 'Menu layout saved.');
         }
 
         $this->isEditMode = false;
@@ -324,8 +342,6 @@ public function openPaymentModal(): void
                 );
             }
         });
-
-        $this->dispatch('notify', type: 'success', message: 'Branch category layout updated.');
     }
 
     public function refreshPosData(): void
@@ -583,23 +599,20 @@ public function change(): float
 #[Renderless]
 public function openEditItem(string $key, array $item): void
 {
-    $this->cart[$key] = $item;
     $this->editCartItemId = $key;
+    $this->editCartItemProductId = (int) ($item['id'] ?? 0);
     $this->editCartItemQty = $item['qty'] ?? 1;
     $this->editCartItemNotes = $item['instructions'] ?? '';
-    $this->applyRegularDiscount = $item['apply_regular_discount'] ?? false;
-    $this->applySeniorDiscount = $item['apply_senior_discount'] ?? false;
 }
 
        #[Renderless]
-    public function saveEditItem(): void
+    public function saveEditItem(bool $applyRegularDiscount = false, bool $applySeniorDiscount = false): void
     {
         $key = $this->editCartItemId;
-        if (!isset($this->cart[$key])) return;
+        if (!$key || !$this->editCartItemProductId) return;
 
         // Guard against exceeding available stock without showing a duplicate toast
-        $productId = $this->cart[$key]['id'];
-        $product = Product::find($productId);
+        $product = Product::find($this->editCartItemProductId);
         if ($product && $this->branchId) {
             $maxQty = $product->getMaxAvailableQuantity((int)$this->branchId);
             if ($this->editCartItemQty > $maxQty) {
@@ -607,37 +620,41 @@ public function openEditItem(string $key, array $item): void
             }
         }
 
-        $this->cart[$key]['qty'] = $this->editCartItemQty;
-        $this->cart[$key]['instructions'] = $this->editCartItemNotes;
-        $this->cart[$key]['apply_regular_discount'] = $this->applyRegularDiscount;
-        $this->cart[$key]['apply_senior_discount'] = $this->applySeniorDiscount;
+        $shouldRemove = $this->editCartItemQty <= 0;
 
-        if ($this->editCartItemQty <= 0) {
-            unset($this->cart[$key]);
-        }
+        // Only the fields that changed in this modal are sent back — never
+        // the whole cart. The client merges these into its existing item
+        // (preserving name/price/image/options/modifiers) and leaves every
+        // other item in the cart untouched.
+        $this->dispatch('cart-item-updated',
+            key: $key,
+            remove: $shouldRemove,
+            item: $shouldRemove ? null : [
+                'qty' => $this->editCartItemQty,
+                'instructions' => $this->editCartItemNotes,
+                'apply_regular_discount' => $applyRegularDiscount,
+                'apply_senior_discount' => $applySeniorDiscount,
+            ]
+        );
 
-        $this->dispatch('cart-loaded', cart: $this->cart);
         $this->closeEditItemModal();
     }
 
     public function closeEditItemModal(): void
     {
         $this->editCartItemId = null;
+        $this->editCartItemProductId = null;
         $this->editCartItemQty = 1;
         $this->editCartItemNotes = '';
-        $this->applyRegularDiscount = false;
-        $this->applySeniorDiscount = false;
-
         $this->dispatch('close-modal', name: 'edit-cart-item');
     }
-
-    
 
     /**
      * @param bool $force Bypasses the verified-payment guard. Used internally
      *                     after an order has actually been placed/drafted,
      *                     where the cart legitimately needs to be emptied.
      */
+    #[Renderless]
     public function clearCart(bool $force = false): void
     {
         if (!$force && $this->paymentMethod === 'GCash' && $this->gcashVerified) {
@@ -699,6 +716,8 @@ public function openEditItem(string $key, array $item): void
                         'unit_price'            => $item['price'],
                         'subtotal'              => $item['price'] * $item['qty'],
                         'special_instructions'  => !empty($item['instructions']) ? $item['instructions'] : null,
+                        'apply_regular_discount' => (bool) ($item['apply_regular_discount'] ?? false),
+                        'apply_senior_discount'  => (bool) ($item['apply_senior_discount'] ?? false),
                     ]);
 
                     // Save Selected Options to DB
@@ -774,11 +793,15 @@ public function openEditItem(string $key, array $item): void
                 
                 $optionIds = $item->options->pluck('product_option_id')->sort()->toArray();
                 $modifierIds = $item->modifiers->pluck('modifier_id')->sort()->toArray();
+                // Create a unique key for the cart (consistent with confirmAdd).
+                // Prefixed with a letter so this key is never treated as a
+                // numeric array index by the client-side JS cart object.
 
-                // Create a unique key for the cart (consistent with confirmAdd)
                 $optKey = !empty($optionIds) ? '-' . implode(',', $optionIds) : '';
+
                 $modKey = !empty($modifierIds) ? '-' . implode(',', $modifierIds) : '';
-                $key = $product->id . $optKey . $modKey;
+
+                $key = 'p' . $product->id . $optKey . $modKey;
 
                 // Build options array for cart
                 $options = [];
@@ -810,9 +833,9 @@ public function openEditItem(string $key, array $item): void
                     'available' => true,
                     'options'   => $options,
                     'modifiers' => $modifiers,
-                    'instructions' => '',
-                    'apply_regular_discount' => false,
-                    'apply_senior_discount' => false,
+                    'instructions' => $item->special_instructions ?? '',
+                    'apply_regular_discount' => (bool) $item->apply_regular_discount,
+                    'apply_senior_discount' => (bool) $item->apply_senior_discount,
                 ];
             }
 
@@ -1249,6 +1272,8 @@ public function openEditItem(string $key, array $item): void
                     'unit_price'            => $item['price'],
                     'subtotal'              => $item['price'] * $item['qty'],
                     'special_instructions'  => !empty($item['instructions']) ? $item['instructions'] : null,
+                    'apply_regular_discount' => (bool) ($item['apply_regular_discount'] ?? false),
+                    'apply_senior_discount'  => (bool) ($item['apply_senior_discount'] ?? false),
                 ]);
 
                 // Save Selected Options to DB

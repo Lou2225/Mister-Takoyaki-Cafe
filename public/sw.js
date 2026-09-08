@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mister-takoyaki-static-v1';
+const CACHE_NAME = 'mister-takoyaki-static-v2';
 
 self.addEventListener('install', () => {
     self.skipWaiting();

@@ -1,14 +1,14 @@
-@props(['paginator', 'keyPrefix' => 'pag', 'perPageOptions' => [5, 10, 15, 30, 50, 100]])
+@props(['paginator', 'keyPrefix' => 'pag', 'perPageOptions' => [5, 10, 15, 30, 50, 100], 'perPageModel' => 'perPage', 'compact' => false])
 
 @if ($paginator->hasPages() || $paginator->total() > 0)
-    <div class="flex flex-col lg:flex-row items-center justify-between px-4 py-4 bg-white border-t border-gray-100 lg:px-6 gap-6">
+    <div class="flex flex-col lg:flex-row items-center justify-between {{ $compact ? 'px-2 py-2 gap-2' : 'px-4 py-4 lg:px-6 gap-6' }} bg-white border-t border-gray-100">
         <div class="flex flex-col sm:flex-row items-center justify-between w-full lg:w-auto gap-4 sm:gap-8">
             {{-- Rows per page & Info text --}}
             <div class="flex items-center justify-between sm:justify-start w-full sm:w-auto gap-4 sm:gap-6">
                 <div class="flex items-center gap-3">
                     <div class="flex flex-col sm:flex-row sm:items-center sm:gap-1.5 leading-[0.9] sm:leading-none">
-                        <span class="text-[11px] sm:text-[12px] text-gray-400 font-black uppercase tracking-tighter sm:tracking-widest">Row</span>
-                        <span class="text-[9px] sm:text-[12px] text-gray-400/70 font-black uppercase tracking-tighter sm:tracking-widest">per page</span>
+                        <span class="{{ $compact ? 'text-[9px]' : 'text-[11px] sm:text-[12px]' }} text-gray-400 font-black uppercase tracking-widest">{{ $compact ? 'Rows' : 'Row' }}</span>
+                        @unless($compact)<span class="text-[9px] sm:text-[12px] text-gray-400/70 font-black uppercase tracking-widest">per page</span>@endunless
                     </div>
                     <div wire:key="{{ $keyPrefix }}-per-page-{{ $paginator->getPageName() }}">
                         <x-dropdown align="top" width="20" containerClasses="block">
@@ -22,7 +22,7 @@
                             </x-slot>
                             <x-slot name="content">
                                @foreach ($perPageOptions as $option)
-    <x-dropdown-link href="#" x-on:click.prevent="$wire.set('perPage', {{ $option }}); dropdownOpen = false;">
+    <x-dropdown-link href="#" x-on:click.prevent="$wire.set('{{ $perPageModel }}', {{ $option }}); dropdownOpen = false;">
         {{ $option }}
     </x-dropdown-link>
 @endforeach
@@ -46,7 +46,7 @@
         {{-- Navigation buttons (Page Selection) --}}
         <div class="flex items-center gap-2 w-full lg:w-auto justify-center lg:justify-end border-t border-gray-50 pt-4 lg:border-0 lg:pt-0">
             {{-- First Page --}}
-            <x-secondary-button 
+            @unless($compact)<x-secondary-button 
                 wire:key="{{ $keyPrefix }}-{{ $paginator->getPageName() }}-first-{{ $paginator->onFirstPage() ? 'disabled' : 'active' }}"
                 wire:click="gotoPage(1, '{{ $paginator->getPageName() }}')" 
                 wire:loading.attr="disabled"
@@ -55,10 +55,10 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
                 </svg>
-            </x-secondary-button>
+            </x-secondary-button>@endunless
  
             {{-- Previous Page --}}
-            <x-secondary-button 
+            @unless($compact)<x-secondary-button 
                 wire:key="{{ $keyPrefix }}-{{ $paginator->getPageName() }}-prev-{{ $paginator->onFirstPage() ? 'disabled' : 'active' }}"
                 wire:click="previousPage('{{ $paginator->getPageName() }}')" 
                 wire:loading.attr="disabled"
@@ -67,7 +67,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                 </svg>
-            </x-secondary-button>
+            </x-secondary-button>@endunless
  
             {{-- Page Numbers --}}
             <div class="flex items-center gap-1.5 px-2">
@@ -75,7 +75,7 @@
                     @if($page == $paginator->currentPage())
                         <x-primary-button 
                             wire:key="{{ $keyPrefix }}-{{ $paginator->getPageName() }}-page-{{ $page }}-active"
-                            class="!p-0 w-9 h-9 items-center justify-center !rounded-xl bg-gray-900 text-[13px] font-black shadow-none ring-0">
+                                        class="!p-0 {{ $compact ? 'w-8 h-8' : 'w-9 h-9' }} items-center justify-center !rounded-xl bg-gray-900 text-[13px] font-black shadow-none ring-0">
                             {{ $page }}
                         </x-primary-button>
                     @else
@@ -83,7 +83,7 @@
                             wire:key="{{ $keyPrefix }}-{{ $paginator->getPageName() }}-page-{{ $page }}-inactive"
                             wire:click="gotoPage({{ $page }}, '{{ $paginator->getPageName() }}')" 
                             wire:loading.attr="disabled"
-                            class="!p-0 w-9 h-9 items-center justify-center !rounded-xl text-[13px] font-bold">
+                            class="!p-0 {{ $compact ? 'w-8 h-8' : 'w-9 h-9' }} items-center justify-center !rounded-xl text-[13px] font-bold">
                             {{ $page }}
                         </x-secondary-button>
                     @endif
@@ -95,7 +95,7 @@
                         wire:key="{{ $keyPrefix }}-{{ $paginator->getPageName() }}-page-last"
                         wire:click="gotoPage({{ $paginator->lastPage() }}, '{{ $paginator->getPageName() }}')" 
                         wire:loading.attr="disabled"
-                        class="!p-0 w-9 h-9 items-center justify-center !rounded-xl text-[13px] font-bold">
+                        class="!p-0 {{ $compact ? 'w-8 h-8' : 'w-9 h-9' }} items-center justify-center !rounded-xl text-[13px] font-bold">
                         {{ $paginator->lastPage() }}
                     </x-secondary-button>
                 @endif
@@ -107,14 +107,14 @@
                 wire:click="nextPage('{{ $paginator->getPageName() }}')" 
                 wire:loading.attr="disabled"
                 :disabled="!$paginator->hasMorePages()" 
-                class="!p-0 w-9 h-9 items-center justify-center !rounded-xl {{ !$paginator->hasMorePages() ? 'opacity-30' : '' }}">
+                class="!p-0 {{ $compact ? 'w-8 h-8' : 'w-9 h-9' }} items-center justify-center !rounded-xl {{ !$paginator->hasMorePages() ? 'opacity-30' : '' }}">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                 </svg>
             </x-secondary-button>
  
             {{-- Last Page --}}
-            <x-secondary-button 
+            @unless($compact)<x-secondary-button 
                 wire:key="{{ $keyPrefix }}-{{ $paginator->getPageName() }}-last-{{ !$paginator->hasMorePages() ? 'disabled' : 'active' }}"
                 wire:click="gotoPage({{ $paginator->lastPage() }}, '{{ $paginator->getPageName() }}')" 
                 wire:loading.attr="disabled"
@@ -123,7 +123,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
                 </svg>
-            </x-secondary-button>
+            </x-secondary-button>@endunless
         </div>
     </div>
 @endif

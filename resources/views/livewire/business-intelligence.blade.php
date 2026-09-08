@@ -14,7 +14,7 @@
         <div class="mb-4 flex items-center justify-between gap-3">
             <div class="min-w-0 shrink">
                 <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Business Reports</h2>
-                <p class="hidden sm:block text-[12px] text-gray-500 font-medium whitespace-nowrap overflow-hidden text-ellipsis">Consolidated analytics and <span class="{{ $primaryText }} font-bold">forecasting insights</span></p>
+                <p class="hidden sm:block text-[12px] text-gray-500 font-medium whitespace-nowrap overflow-hidden text-ellipsis">Four-layer business intelligence: what happened, why, what is next, and what to do</p>
             </div>
             <div class="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2 shrink-0">
                 <x-date-filter startModel="startDate" endModel="endDate" activeModel="activeFilter" refreshAction="applyQuickDateFilter" />
@@ -50,11 +50,10 @@
         <div class="mb-6 -mx-1 px-1 overflow-x-auto no-scrollbar scroll-smooth">
             <x-sliding-tabs model="activeTab" class="w-max" ref="tabList" wire:ignore>
                 @foreach([
-                    'performance' => ['Performance', 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'],
-                    'forecasting' => ['Forecasting', 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6'],
-                    'products' => ['Products', 'M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z'],
-                    'operations' => ['Operations', 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'],
-                    'sales' => ['Sales Report', 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
+                    'descriptive' => ['Sales Performance', 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'],
+                    'diagnostic' => ['Products & Operations', 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'],
+                    'predictive' => ['Forecasting', 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6'],
+                    'prescriptive' => ['Restock Actions', 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 12c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.031 9-11.622 0-1.042-.133-2.052-.382-3.016z'],
                 ] as $tab => $info)
                     <x-sliding-tab model="activeTab" value="{{ $tab }}">
                         <x-slot name="icon">
@@ -67,7 +66,7 @@
         </div>
     </div>
 
-    <div x-cloak x-show="activeTab === 'performance'" class="space-y-6">
+    <div x-cloak x-show="activeTab === 'descriptive'" class="space-y-6">
 
             {{-- Branch Comparison Cards --}}
                         @if($branchComparison->count() > 1)
@@ -263,7 +262,7 @@
         </div>
     </div>
 
-    <div x-cloak x-show="activeTab === 'forecasting'" class="space-y-6">
+    <div x-cloak x-show="activeTab === 'predictive'" class="space-y-6">
 
         {{-- Reference Guide --}}
         <div x-data="{ open: false }" class="mx-0">
@@ -291,14 +290,14 @@
                                 <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                                 <div>
                                     <p class="text-[11px] font-black text-emerald-700">High</p>
-                                    <p class="text-[10px] text-emerald-600/70">60+ days of data, RÂ² â‰¥ 0.70</p>
+                                    <p class="text-[10px] text-emerald-600/70">60+ days of data, R2 >= 0.70</p>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2 px-3 py-2 bg-amber-50 rounded-lg border border-amber-100">
                                 <span class="w-2 h-2 rounded-full bg-amber-500"></span>
                                 <div>
                                     <p class="text-[11px] font-black text-amber-700">Medium</p>
-                                    <p class="text-[10px] text-amber-600/70">30+ days of data, RÂ² â‰¥ 0.40</p>
+                                    <p class="text-[10px] text-amber-600/70">30+ days of data, R2 >= 0.40</p>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2 px-3 py-2 bg-rose-50 rounded-lg border border-rose-100">
@@ -316,17 +315,93 @@
                                 </div>
                             </div>
                         </div>
+                        <p class="mt-3 text-[10px] leading-relaxed text-slate-500">Confidence is assigned separately to the 7-day and 6-month forecasts. It combines the amount of usable history with how closely the weighted trend fits that history (R2). It does not mean the forecast is guaranteed.</p>
                     </div>
 
-                    {{-- RÂ² display if available --}}
+                    {{-- Acronym guide --}}
+                    <div class="pt-4 border-t border-slate-100">
+                        <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Acronym guide</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                            <div class="rounded-lg bg-indigo-50 px-3 py-2"><span class="font-black text-indigo-800">MAE</span><span class="text-slate-600"> - Mean Absolute Error</span></div>
+                            <div class="rounded-lg bg-indigo-50 px-3 py-2"><span class="font-black text-indigo-800">RMSE</span><span class="text-slate-600"> - Root Mean Squared Error</span></div>
+                            <div class="rounded-lg bg-indigo-50 px-3 py-2"><span class="font-black text-indigo-800">MAPE</span><span class="text-slate-600"> - Mean Absolute Percentage Error</span></div>
+                            <div class="rounded-lg bg-slate-50 px-3 py-2"><span class="font-black text-slate-800">R2</span><span class="text-slate-600"> - R-squared model fit score</span></div>
+                            <div class="rounded-lg bg-slate-50 px-3 py-2"><span class="font-black text-slate-800">WLR</span><span class="text-slate-600"> - Weighted Linear Regression</span></div>
+                            <div class="rounded-lg bg-slate-50 px-3 py-2"><span class="font-black text-slate-800">IQR</span><span class="text-slate-600"> - Interquartile Range for outlier filtering</span></div>
+                        </div>
+                    </div>
+
+                    {{-- Forecast method --}}
+                    <div class="pt-4 border-t border-slate-100">
+                        <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">How the forecast is calculated</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div class="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
+                                <p class="text-[11px] font-black text-indigo-800">7-Day Forecast</p>
+                                <p class="mt-1 text-[10px] leading-relaxed text-indigo-900/70">Uses up to 60 completed daily periods. Recent days have more weight, unusual values are filtered with the IQR method, and day-of-week patterns are applied when at least 14 days are available.</p>
+                            </div>
+                            <div class="rounded-xl border border-violet-100 bg-violet-50/60 p-4">
+                                <p class="text-[11px] font-black text-violet-800">6-Month Forecast</p>
+                                <p class="mt-1 text-[10px] leading-relaxed text-violet-900/70">Uses up to 12 completed monthly periods. The trend is damped over time, so a short recent spike does not grow indefinitely across six months.</p>
+                            </div>
+                        </div>
+                        <div class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                            <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Model flow</p>
+                            <p class="mt-2 text-[10px] leading-relaxed text-slate-600">Historical sales -> remove extreme outliers -> fit a recent-weighted trend -> apply seasonality -> damp the distant trend -> prevent unrealistic near-zero results.</p>
+                        </div>
+                    </div>
+
+                    {{-- Accuracy metrics --}}
+                    <div class="pt-4 border-t border-slate-100">
+                        <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Accuracy metrics explained</p>
+                        <div class="space-y-2">
+                            <div class="rounded-xl border border-slate-200 p-3">
+                                <div class="flex items-center justify-between gap-3">
+                                    <p class="text-[11px] font-black text-slate-800">MAE - Mean Absolute Error</p>
+                                    <span class="text-[10px] font-black text-indigo-600">Pesos</span>
+                                </div>
+                                <p class="mt-1 text-[10px] font-mono text-indigo-700">MAE = average(|actual - predicted|)</p>
+                                <p class="mt-1 text-[10px] leading-relaxed text-slate-500">The average absolute difference between predicted and actual daily revenue. Example: MAE of P500 means the forecast is off by about P500 per day on average.</p>
+                            </div>
+                            <div class="rounded-xl border border-slate-200 p-3">
+                                <div class="flex items-center justify-between gap-3">
+                                    <p class="text-[11px] font-black text-slate-800">RMSE - Root Mean Squared Error</p>
+                                    <span class="text-[10px] font-black text-indigo-600">Pesos</span>
+                                </div>
+                                <p class="mt-1 text-[10px] font-mono text-indigo-700">RMSE = sqrt(average((actual - predicted)^2))</p>
+                                <p class="mt-1 text-[10px] leading-relaxed text-slate-500">Similar to MAE, but large misses count more heavily. A much higher RMSE than MAE usually means a few days had unusually large errors.</p>
+                            </div>
+                            <div class="rounded-xl border border-slate-200 p-3">
+                                <div class="flex items-center justify-between gap-3">
+                                    <p class="text-[11px] font-black text-slate-800">MAPE - Mean Absolute Percentage Error</p>
+                                    <span class="text-[10px] font-black text-indigo-600">Percent</span>
+                                </div>
+                                <p class="mt-1 text-[10px] font-mono text-indigo-700">MAPE = average(|actual - predicted| / actual) x 100</p>
+                                <p class="mt-1 text-[10px] leading-relaxed text-slate-500">The average error relative to actual revenue. A MAPE of 12% means the forecast differs from actual sales by about 12% on average. Days with zero sales are excluded from this percentage.</p>
+                            </div>
+                        </div>
+                        <p class="mt-3 text-[10px] leading-relaxed text-slate-500">These metrics are calculated by hiding the most recent 7 complete days, forecasting them from earlier data, and comparing the predictions with what actually happened. Lower MAE, RMSE, and MAPE are better.</p>
+                    </div>
+
+                    {{-- Where metrics apply --}}
+                    <div class="pt-4 border-t border-slate-100">
+                        <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Where each signal is used</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px] leading-relaxed text-slate-600">
+                            <div class="rounded-lg bg-indigo-50 px-3 py-2"><span class="font-black text-indigo-800">Confidence:</span> shown on both forecast cards to indicate how much trust to place in the trend.</div>
+                            <div class="rounded-lg bg-slate-50 px-3 py-2"><span class="font-black text-slate-800">MAE / RMSE / MAPE:</span> shown in Benchmarking to evaluate forecast quality against the baseline.</div>
+                            <div class="rounded-lg bg-amber-50 px-3 py-2"><span class="font-black text-amber-800">RMSE range:</span> used around the 7-day chart as an approximate error range, not a guaranteed interval.</div>
+                            <div class="rounded-lg bg-emerald-50 px-3 py-2"><span class="font-black text-emerald-800">Restock actions:</span> use the 7-day forecast to estimate 14-day ingredient demand, then adjust for buffer, waste, and current stock.</div>
+                        </div>
+                    </div>
+
+                    {{-- R2 display if available --}}
                     @if(isset($forecasting['short_term']['r_squared']))
                     <div class="pt-4 border-t border-slate-100">
                         <div class="bg-indigo-50 rounded-xl p-4">
                             <div class="flex items-center justify-between mb-2">
-                                <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Model Quality (RÂ² Score)</p>
+                                <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Model Quality (R2 Score)</p>
                                 <p class="text-[18px] font-black text-indigo-900">{{ number_format($forecasting['short_term']['r_squared'] * 100, 1) }}%</p>
                             </div>
-                            <p class="text-[10px] text-slate-600 leading-relaxed">RÂ² measures how well the regression model fits your historical sales data on a scale of 0-100%. Higher scores indicate more reliable forecasts. Typically, 70%+ = Strong, 40-70% = Moderate, Below 40% = Weak.</p>
+                            <p class="text-[10px] text-slate-600 leading-relaxed">R2 measures how well the regression model fits your historical sales data on a scale of 0-100%. Higher scores indicate more reliable forecasts. Typically, 70%+ = Strong, 40-70% = Moderate, Below 40% = Weak.</p>
                         </div>
                     </div>
                     @endif
@@ -498,22 +573,25 @@
 
                         <div class="text-[10px] text-gray-500 space-y-1 bg-blue-50/50 border border-blue-100 rounded-lg p-3 mb-4">
                             <p><span class="font-bold text-gray-700">Trend:</span> Direction of daily sales change (60-day history analyzed)</p>
-                            <p><span class="font-bold text-gray-700">Baseline:</span> Average of last 7 days Ã— 7 (reference for comparison)</p>
+                            <p><span class="font-bold text-gray-700">Baseline:</span> Average of last 7 days x 7 (reference for comparison)</p>
                             <p><span class="font-bold text-gray-700">Method:</span> Weighted Linear Regression with exponential recent-data emphasis + day-of-week seasonal adjustment</p>
                         </div>
 
-                        @php
+                          @php
                             $short = $fc['short_term']['forecast'] ?? [];
                             $shortCategories = collect($short)->pluck('date')->all();
                             $shortPredicted = collect($short)->pluck('predicted')->map(fn($v) => round($v, 2))->all();
+                            $hasBandData = collect($short)->every(fn($p) => isset($p['lower'], $p['upper']));
+                            $shortLower = $hasBandData ? collect($short)->pluck('lower')->map(fn($v) => round($v, 2))->all() : [];
+                            $shortUpper = $hasBandData ? collect($short)->pluck('upper')->map(fn($v) => round($v, 2))->all() : [];
                         @endphp
 
                         {{-- Short-Term Chart --}}
                         @if(count($shortPredicted) > 0)
-                            <script type="application/json" id="bi-forecast-short-data">
-                                {!! json_encode(['categories' => $shortCategories, 'predicted' => $shortPredicted], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!}
+                            <script type="application/json" id="bi-forecast-short-data-card">
+                                {!! json_encode(['categories' => $shortCategories, 'predicted' => $shortPredicted, 'lower' => $shortLower, 'upper' => $shortUpper], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!}
                             </script>
-                            <div x-data="forecastingChart(JSON.parse(document.getElementById('bi-forecast-short-data').textContent), '#6366F1')"
+                            <div x-data="forecastingChart(JSON.parse(document.getElementById('bi-forecast-short-data-card').textContent), '#6366F1')"
                                  wire:ignore
                                  wire:key="bi-forecast-short-{{ $selectedBranchId }}-{{ $startDate }}-{{ $endDate }}-{{ str_replace(' ', '-', $activeFilter) }}"
                                  x-intersect.once="init()"
@@ -605,7 +683,7 @@
             </div>
         </div>
 
-        {{-- Restock Insight â€” sits to the right of the flip card, filling the space instead of leaving it empty --}}
+        {{-- Restock Insight - sits to the right of the flip card, filling the space instead of leaving it empty --}}
 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-col h-full overflow-hidden">
                 <div class="flex items-center justify-between gap-3 mb-4 shrink-0">
                     <div>
@@ -651,8 +729,234 @@
         </div>
         </div>
 
-    {{-- â”€â”€ Product Insights Tab â”€â”€ --}}
-    <div x-cloak x-show="activeTab === 'products'" class="space-y-6">
+    {{-- Prescriptive Analytics --}}
+    <div x-cloak x-show="activeTab === 'prescriptive'" class="space-y-6">        <div class="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-5 sm:p-6">
+            <div class="flex items-start justify-between gap-3">
+                <div class="flex items-start gap-3">
+                    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 12c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.031 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-700">Recommended actions</p>
+                        <h3 class="mt-1 text-[18px] font-black text-emerald-950">Turn the forecast into a decision</h3>
+                        <p class="mt-1 text-[12px] leading-relaxed text-emerald-800">Recommendations combine projected 14-day demand, a spoilage-adjusted safety buffer, and current usable stock. Select a branch before acting.</p>
+                    </div>
+                </div>
+                @if($selectedBranchId !== 'all')
+                    <button type="button" wire:click="exportPrescriptiveCsv" class="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-white border border-emerald-200 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-emerald-700 hover:bg-emerald-50 transition-colors">
+                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H8a2 2 0 01-2-2V5a2 2 0 012-2h6l6 6v11a2 2 0 01-2 2z"/></svg>
+                        Export list
+                    </button>
+                @endif
+            </div>
+        </div>
+
+        @if($selectedBranchId === 'all')
+            <div class="rounded-2xl border border-dashed border-gray-200 bg-white p-6">
+                <x-empty-state title="Select a branch for purchase recommendations" description="Current stock is branch-specific, so a network-wide forecast cannot produce a safe purchase quantity." />
+                @if(auth()->user()->role_id === 1)
+                    <div class="mt-4" wire:key="network-restock-panel-{{ $showNetworkRestockSummary ? 'expanded' : 'collapsed' }}">
+                        @if(!$showNetworkRestockSummary)
+                            <button type="button" wire:click="loadNetworkRestockSummary" class="inline-flex items-center gap-1.5 rounded-xl bg-gray-900 px-3.5 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-gray-700 transition-colors">
+                                View network-wide restock summary
+                            </button>
+                        @else
+                            <div class="rounded-xl border border-gray-100 bg-white p-4">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">Top 15 ingredients by combined demand, all branches</p>
+                                @forelse($networkRestockSummary as $item)
+                                    <div class="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                                        <div class="min-w-0">
+                                            <p class="text-[12px] font-bold text-gray-900 truncate">{{ $item['name'] }}</p>
+                                            <p class="text-[10px] text-gray-400">Needed in {{ $item['branch_count'] }} {{ Str::plural('branch', $item['branch_count']) }}</p>
+                                        </div>
+                                        <p class="text-[13px] font-black text-gray-900 shrink-0 ml-3">{{ number_format($item['amount'], 0) }} {{ $item['unit'] }}</p>
+                                    </div>
+                                @empty
+                                    <p class="text-[11px] text-gray-500">No network-wide demand data available.</p>
+                                @endforelse
+                            </div>
+                        @endif
+                    </div>
+                @endif
+            </div>
+        @else
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div class="max-h-[38rem] overflow-y-auto overflow-x-auto custom-scrollbar">
+                    <x-data-table>
+                        <x-slot name="header">
+                            <th class="py-3 px-4 border-r border-gray-100 text-[11px] font-medium text-gray-500 tracking-wide uppercase">Ingredient</th>
+                            <th class="py-3 px-4 border-r border-gray-100 text-[11px] font-medium text-gray-500 tracking-wide uppercase text-center">Priority</th>
+                            <th class="py-3 px-4 border-r border-gray-100 text-[11px] font-medium text-gray-500 tracking-wide uppercase text-right">On Hand</th>
+                            <th class="py-3 px-4 border-r border-gray-100 text-[11px] font-medium text-gray-500 tracking-wide uppercase text-right">14-Day Demand</th>
+                            <th class="py-3 px-4 border-r border-gray-100 text-[11px] font-medium text-gray-500 tracking-wide uppercase text-right">Safety Stock</th>
+                            <th class="py-3 px-4 border-r border-gray-100 text-[11px] font-medium text-gray-500 tracking-wide uppercase text-center">Coverage</th>
+                            <th class="py-3 px-4 border-r border-gray-100 text-[11px] font-medium text-gray-500 tracking-wide uppercase text-right">Recommended</th>
+                            <th class="py-3 px-4 text-[11px] font-medium text-gray-500 tracking-wide uppercase text-center">Action</th>
+                        </x-slot>
+                        @forelse($prescriptiveRecommendations as $recommendation)
+                            @php
+                                $priority = strtolower($recommendation['priority'] ?? 'medium');
+                                $priorityClass = match($priority) {
+                                    'critical' => 'bg-red-50 text-red-700 border-red-100',
+                                    'high' => 'bg-orange-50 text-orange-700 border-orange-100',
+                                    'medium' => 'bg-amber-50 text-amber-700 border-amber-100',
+                                    default => 'bg-slate-50 text-slate-600 border-slate-100',
+                                };
+                                $isActionable = ($recommendation['actionable'] ?? false) && isset($recommendation['recommended_quantity']);
+                            @endphp
+                            <tr wire:key="prescriptive-row-{{ $recommendation['ingredient_id'] ?? $loop->index }}" class="hover:bg-gray-50/50 transition-colors align-top">
+                                <td class="py-3 px-4 border-r border-gray-100">
+                                    <p class="text-[13px] font-bold text-gray-900">{{ $recommendation['title'] }}</p>
+                                    <p class="mt-1 text-[11px] leading-relaxed text-gray-500 max-w-sm">{{ $recommendation['reason'] }}</p>
+                                    <div class="mt-1.5 flex flex-wrap gap-1">
+                                        @if($recommendation['stockout_suppressed'] ?? false)
+                                            <span class="inline-flex items-center rounded-full bg-red-50 text-red-600 border border-red-100 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest">Out of stock now</span>
+                                        @endif
+                                        @if(($recommendation['waste_rate_pct'] ?? 0) > 10)
+                                            <span class="inline-flex items-center rounded-full bg-amber-50 text-amber-600 border border-amber-100 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-widest">{{ number_format($recommendation['waste_rate_pct'], 0) }}% waste rate</span>
+                                        @endif
+                                    </div>
+                                </td>
+                                <td class="py-3 px-4 border-r border-gray-100 text-center whitespace-nowrap">
+                                    <span class="rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest {{ $priorityClass }}">{{ $recommendation['priority'] ?? '—' }}</span>
+                                </td>
+                                @if($isActionable)
+                                    <td class="py-3 px-4 border-r border-gray-100 text-right text-[12px] font-bold text-gray-900 whitespace-nowrap">{{ number_format($recommendation['current_stock_display']['value'], 2) }} {{ $recommendation['current_stock_display']['unit'] }}</td>
+                                    <td class="py-3 px-4 border-r border-gray-100 text-right text-[12px] font-bold text-indigo-900 whitespace-nowrap">{{ number_format($recommendation['projected_demand_display']['value'], 2) }} {{ $recommendation['projected_demand_display']['unit'] }}</td>
+                                    <td class="py-3 px-4 border-r border-gray-100 text-right text-[12px] font-bold text-amber-900 whitespace-nowrap">{{ number_format($recommendation['safety_stock_display']['value'], 2) }} {{ $recommendation['safety_stock_display']['unit'] }}</td>
+                                    <td class="py-3 px-4 border-r border-gray-100 text-center text-[12px] font-bold text-emerald-900 whitespace-nowrap">{{ number_format($recommendation['coverage_days'], 1) }} days</td>
+                                    <td class="py-3 px-4 border-r border-gray-100 text-right whitespace-nowrap">
+                                        <span class="text-[14px] font-black text-gray-900">{{ number_format($recommendation['recommended_quantity_display']['value'], 2) }}</span>
+                                        <span class="text-[10px] font-bold text-gray-400 uppercase ml-1">{{ $recommendation['recommended_quantity_display']['unit'] }}</span>
+                                    </td>
+                                    <td class="py-3 px-4 text-center whitespace-nowrap">
+                                        <button type="button" wire:click="openStockReview({{ $recommendation['ingredient_id'] }})" wire:loading.attr="disabled" wire:loading.class="cursor-wait opacity-70" class="inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white transition hover:bg-gray-700 disabled:cursor-wait disabled:opacity-70">
+                                            Review
+                                            <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+                                        </button>
+                                    </td>
+                                @else
+                                    <td class="py-3 px-4 border-r border-gray-100 text-center text-[11px] text-gray-400" colspan="5">—</td>
+                                    <td class="py-3 px-4 text-center text-[11px] text-gray-400">—</td>
+                                @endif
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="8" class="py-0">
+                                    <x-empty-state title="No recommendations yet" description="More completed sales and stock data are needed to produce an actionable recommendation." />
+                                </td>
+                            </tr>
+                        @endforelse
+                    </x-data-table>
+                </div>
+                <div class="p-4 border-t border-gray-100">
+                    <x-pagination :paginator="$prescriptiveRecommendations" keyPrefix="bi-prescriptive" perPageModel="prescriptivePerPage" />
+                </div>
+            </div>
+        @endif
+
+        <x-modal name="prescriptive-stock-review" maxWidth="2xl" focusable>
+            <div>
+            @if(empty($stockReview))
+            <div>
+                <div class="animate-pulse p-6" aria-label="Loading inventory details">
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="w-full space-y-2">
+                            <div class="h-2.5 w-28 rounded bg-emerald-100"></div>
+                            <div class="h-5 w-44 rounded bg-gray-200"></div>
+                            <div class="h-3 w-56 rounded bg-gray-100"></div>
+                        </div>
+                        <div class="h-8 w-8 rounded-lg bg-gray-100"></div>
+                    </div>
+
+                    <div class="mt-6 space-y-2">
+                        <div class="h-3 w-28 rounded bg-gray-200"></div>
+                        <div class="rounded-xl border border-gray-100 p-4">
+                            <div class="grid grid-cols-3 gap-4">
+                                <div class="space-y-2"><div class="h-2 w-12 rounded bg-gray-100"></div><div class="h-3 w-28 rounded bg-gray-200"></div></div>
+                                <div class="space-y-2"><div class="h-2 w-16 rounded bg-gray-100"></div><div class="h-3 w-20 rounded bg-gray-200"></div></div>
+                                <div class="space-y-2"><div class="h-2 w-12 rounded bg-gray-100"></div><div class="h-3 w-24 rounded bg-gray-200"></div></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 space-y-2">
+                        <div class="h-3 w-40 rounded bg-gray-200"></div>
+                        <div class="overflow-hidden rounded-xl border border-gray-100">
+                            @for($skeletonRow = 0; $skeletonRow < 4; $skeletonRow++)
+                                <div class="flex items-center justify-between border-b border-gray-100 px-3 py-3 last:border-0">
+                                    <div class="space-y-2"><div class="h-3 w-16 rounded bg-gray-200"></div><div class="h-2 w-28 rounded bg-gray-100"></div></div>
+                                    <div class="h-3 w-16 rounded bg-gray-200"></div>
+                                </div>
+                            @endfor
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
+            <div>
+            @if(!empty($stockReview))
+                <div class="max-h-[calc(100vh-7rem)] overflow-y-auto custom-scrollbar p-6">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <p class="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-600">Inventory review</p>
+                            <h3 class="mt-1 text-[19px] font-black text-gray-900">{{ $stockReview['ingredient_name'] }}</h3>
+                            <p class="mt-1 text-[11px] text-gray-500">Current balance: <span class="font-black text-gray-900">{{ number_format($stockReview['current_stock_display']['value'], 2) }} {{ $stockReview['current_stock_display']['unit'] }}</span></p>
+                        </div>
+                        <button type="button" @click="$dispatch('close-modal', 'prescriptive-stock-review')" class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700" aria-label="Close stock details">
+                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+
+                    <div class="mt-5">
+                        <div class="mb-2 flex items-center justify-between">
+                            <h4 class="text-[12px] font-black uppercase tracking-widest text-gray-700">Active batches</h4>
+                            <span class="text-[10px] font-bold text-gray-400">FEFO order</span>
+                        </div>
+                        <div class="max-h-56 overflow-y-auto rounded-xl border border-gray-200">
+                            @forelse($stockReview['batches'] as $batch)
+                                @php
+                                    $state = $batch['expiry_state'];
+                                    $stateClass = $state === 'Expired' ? 'text-red-700 bg-red-50' : ($state === 'Expiring soon' ? 'text-amber-700 bg-amber-50' : 'text-emerald-700 bg-emerald-50');
+                                @endphp
+                                <div class="grid grid-cols-3 gap-3 border-b border-gray-100 px-3 py-3 last:border-0">
+                                    <div><p class="text-[9px] font-black uppercase tracking-widest text-gray-400">Batch</p><p class="mt-1 text-[12px] font-bold text-gray-900">{{ $batch['batch_number'] }}</p></div>
+                                    <div><p class="text-[9px] font-black uppercase tracking-widest text-gray-400">Quantity</p><p class="mt-1 text-[12px] font-bold text-gray-900">{{ number_format($batch['quantity_display']['value'], 2) }} {{ $batch['quantity_display']['unit'] }}</p></div>
+                                    <div><p class="text-[9px] font-black uppercase tracking-widest text-gray-400">Expiry</p><p class="mt-1 text-[11px] font-bold text-gray-700">{{ $batch['expiry_date'] ?: 'No expiry' }}</p><span class="mt-1 inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-black {{ $stateClass }}">{{ $state }}</span></div>
+                                </div>
+                            @empty
+                                <p class="px-3 py-4 text-[11px] text-gray-500">No active batches found for this ingredient and branch.</p>
+                            @endforelse
+                        </div>
+                    </div>
+
+                    <div class="mt-5">
+                        <h4 class="mb-2 text-[12px] font-black uppercase tracking-widest text-gray-700">Recent inventory activity</h4>
+                                <div class="h-48 max-h-48 overflow-y-auto overscroll-contain rounded-xl border border-gray-200">
+                            @forelse($this->stockReviewMovements as $movement)
+                                <div class="flex items-center justify-between gap-3 border-b border-gray-100 px-3 py-2.5 last:border-0">
+                                    <div><p class="text-[11px] font-bold text-gray-900">{{ $movement['type'] }}</p><p class="text-[10px] text-gray-400">{{ $movement['reference'] }} · {{ $movement['date'] }}</p></div>
+                                    <span class="text-[12px] font-black {{ $movement['quantity'] < 0 ? 'text-red-600' : 'text-emerald-600' }}">{{ $movement['quantity'] > 0 ? '+' : '' }}{{ number_format($movement['quantity_display']['value'], 2) }} {{ $movement['quantity_display']['unit'] }}</span>
+                                </div>
+                            @empty
+                                <p class="px-3 py-4 text-[11px] text-gray-500">No recent inventory movements found.</p>
+                            @endforelse
+                        </div>
+                        <x-pagination :paginator="$this->stockReviewMovements" keyPrefix="bi-stock-review" perPageModel="stockReviewPerPage" compact />
+                    </div>
+
+                    <div class="mt-6 flex justify-end gap-2">
+                        <x-secondary-button type="button" @click="$dispatch('close-modal', 'prescriptive-stock-review')">Close</x-secondary-button>
+                        <a href="{{ $stockReview['adjustment_url'] }}" wire:navigate @click="$dispatch('close-modal', 'prescriptive-stock-review')" class="inline-flex items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-[11px] font-black uppercase tracking-widest text-white hover:bg-gray-700">Open Adjustment</a>
+                    </div>
+            @endif
+            </div>
+            </div>
+        </x-modal>
+    </div>
+
+    {{-- Product Insights --}}
+    <div x-cloak x-show="activeTab === 'diagnostic'" class="space-y-6">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 px-1 items-stretch">
 {{-- Star Products --}}
 <div class="bg-white border border-gray-200 rounded-2xl shadow-sm flex flex-col overflow-hidden">
@@ -718,13 +1022,13 @@
             </div>
         </div>
 
-        {{-- Product Seasonality (Weekly / Monthly) â€” unified chart --}}
+        {{-- Product Seasonality (Weekly / Monthly) - unified chart --}}
         <div class="bg-white border border-gray-200 rounded-2xl shadow-sm mx-1 mt-6 overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/30">
                 <div>
                     <h4 class="text-[14px] font-bold text-gray-900 tracking-tight">Product Seasonality</h4>
                     <p class="text-[11px] text-gray-400 font-medium italic">
-                        {{ $seasonalityMode === 'weekly' ? 'Units sold per day of week â€” top 3 products' : 'Units sold per month â€” top 3 products' }}
+                        {{ $seasonalityMode === 'weekly' ? 'Units sold per day of week - top 3 products' : 'Units sold per month - top 3 products' }}
                     </p>
                 </div>
                 {{-- Weekly / Monthly Toggle --}}
@@ -850,7 +1154,7 @@
     </div>{{-- end products tab --}}
 
     {{-- â”€â”€ Operations Tab â”€â”€ --}}
-    <div x-cloak x-show="activeTab === 'operations'" class="space-y-6">
+    <div x-cloak x-show="activeTab === 'diagnostic'" class="space-y-6">
         {{-- Hours Intensity Chart (above Network Performance) --}}
         <div class="mx-1">
             <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
@@ -950,7 +1254,7 @@
 
 
     {{-- â”€â”€ Sales Report Tab â”€â”€ --}}
-    <div x-cloak x-show="activeTab === 'sales'" class="space-y-6">
+    <div x-cloak x-show="activeTab === 'descriptive'" class="space-y-6">
         <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <div>
@@ -1100,7 +1404,7 @@
                                     <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Formula:</span>
                                     <code class="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
                                         @if($selectedMetric === 'Gross Revenue')
-                                            Î£ (Sales Price Ã— Qty)
+                                            Sum (Sales Price x Qty)
                                         @elseif($selectedMetric === 'Net Sales')
                                             Gross Revenue - Deductions
                                         @elseif($selectedMetric === 'Gross Profit')
@@ -1229,7 +1533,7 @@
 
     <div id="bi-chart-data" style="display:none;" data-state='{{ $biChartDataState }}'></div>
 
-</div>{{-- â† THIS closes x-data="slidingTabs(...)" --}}
+</div>{{-- This closes x-data="slidingTabs(...)" --}}
 
 @push('scripts')
     <script>
@@ -1454,8 +1758,29 @@
                     if (typeof window.ApexCharts === 'undefined' || !this.$refs.forecastChart) return;
 
                     const self = this;
+                    const toFiniteArray = (arr) => Array.isArray(arr) ? arr.map(v => Number(v)) : [];
+                    const isAllFinite = (arr) => arr.length > 0 && arr.every(v => Number.isFinite(v));
+
+                    const predicted = toFiniteArray(self.chartData.predicted);
+                    const lower = toFiniteArray(self.chartData.lower);
+                    const upper = toFiniteArray(self.chartData.upper);
+
+                    const hasBand = isAllFinite(lower)
+                        && isAllFinite(upper)
+                        && lower.length === predicted.length
+                        && upper.length === predicted.length
+                        && !(lower.every((v, i) => v === upper[i])); // reject a zero-width band
+
+                    if (!isAllFinite(predicted)) return; // don't render a chart with non-numeric data
+
+                    const series = [{ name: 'Forecast', data: predicted }];
+                    if (hasBand) {
+                        series.push({ name: 'Upper bound', data: upper });
+                        series.push({ name: 'Lower bound', data: lower });
+                    }
+
                     const options = {
-                        series: [{ name: 'Forecast', data: self.chartData.predicted }],
+                        series,
                         chart: {
                             type: 'area',
                             height: 320,
@@ -1478,9 +1803,14 @@
                         dataLabels: { enabled: false },
                         stroke: {
                             curve: 'smooth',
-                            width: 3,
+                            width: hasBand ? [3, 1, 1] : 3,
+                            dashArray: hasBand ? [0, 4, 4] : 0,
                         },
-                        fill: {
+                        fill: hasBand ? {
+                            type: ['gradient', 'solid', 'solid'],
+                            gradient: { shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.02, stops: [0, 85, 100] },
+                            opacity: [1, 0, 0],
+                        } : {
                             type: 'gradient',
                             gradient: {
                                 shadeIntensity: 1,
@@ -1507,7 +1837,7 @@
                                 }
                             }
                         },
-                        colors: [self.chartColor],
+                        colors: hasBand ? [self.chartColor, '#94a3b8', '#94a3b8'] : [self.chartColor],
                         tooltip: {
                             theme: 'dark',
                             y: {
@@ -1519,13 +1849,13 @@
                             strokeDashArray: 4,
                             padding: { top: 0, right: 15, bottom: 10, left: 10 }
                         },
-                        legend: { show: false },
+                        legend: { show: hasBand },
                         markers: {
-                            size: 4,
+                            size: hasBand ? [4, 0, 0] : 4,
                             colors: [self.chartColor],
                             strokeColors: '#fff',
                             strokeWidth: 2,
-                            hover: { size: 6 }
+                            hover: { size: hasBand ? [6, 0, 0] : 6 }
                         }
                     };
 

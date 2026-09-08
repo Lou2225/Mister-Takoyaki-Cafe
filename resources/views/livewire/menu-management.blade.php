@@ -1,5 +1,5 @@
 <div 
-    x-data="window.menuManagement($wire)"
+    x-data="typeof window.menuManagement === 'function' ? window.menuManagement($wire) : { activeTab: $wire.entangle('activeTab').live, panel: $wire.entangle('panel').live, mode: $wire.entangle('mode').live }"
     x-on:switch-panel.window="panel = $event.detail.panel"
     class="relative min-h-full flex flex-col p-2 md:p-4"
     wire:ignore.self
@@ -861,7 +861,7 @@
                                 <td class="py-4 px-6 border-r border-slate-100/50 whitespace-nowrap">
                                     <div class="flex items-center gap-3">
                                         <div class="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 overflow-hidden shadow-sm transition-transform group-hover/row:scale-105">
-                                            @if($product->image)
+                                            @if($product->image && Storage::disk('public')->exists($product->image))
                                                 <img src="{{ Storage::url($product->image) }}" class="w-full h-full object-cover">
                                             @else
                                                 <img src="{{ asset('images/placeholder-product.png') }}" class="w-full h-full object-cover">
@@ -1009,7 +1009,7 @@
                     @forelse($products as $product)
                         <div wire:key="prod-card-{{ $product->id }}" x-show="isItemVisible({{ $product->id }})" x-cloak class="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm hover:shadow-md transition-all group/card relative {{ $this->isSuperAdmin() ? 'cursor-pointer' : '' }}" @if($this->isSuperAdmin()) wire:click="showEdit({{ $product->id }})" @endif>
                             <div class="aspect-[4/3] rounded-xl bg-slate-50 border border-slate-100 overflow-hidden mb-4 relative shadow-inner">
-                                @if($product->image)
+                                @if($product->image && Storage::disk('public')->exists($product->image))
                                     <img src="{{ Storage::url($product->image) }}" class="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-110">
                                 @else
                                     <img src="{{ asset('images/placeholder-product.png') }}" class="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-110">
@@ -1292,6 +1292,7 @@
         (function() {
             window.menuManagement = function($wire) {
                 return {
+                    activeTab: $wire.entangle('activeTab').live,
                     panel: $wire.entangle('panel').live,
                     tableView: $wire.entangle('view').live,
                     mode: $wire.entangle('mode').live,

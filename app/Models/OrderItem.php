@@ -17,6 +17,13 @@ class OrderItem extends Model
         'subtotal',
         'stock_batch_id',
         'special_instructions',
+        'apply_regular_discount',
+        'apply_senior_discount',
+    ];
+
+    protected $casts = [
+        'apply_regular_discount' => 'boolean',
+        'apply_senior_discount' => 'boolean',
     ];
 
     public function order()

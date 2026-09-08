@@ -99,6 +99,14 @@
                         document.body.classList.remove('overflow-y-hidden');
                     }
                 });
+                const closeForNavigation = () => {
+                    this.isModalOpen = false;
+                    document.body.classList.remove('overflow-y-hidden');
+                };
+                document.addEventListener('livewire:navigating', closeForNavigation);
+                this.$el.addEventListener('alpine:destroy', () => {
+                    document.removeEventListener('livewire:navigating', closeForNavigation);
+                }, { once: true });
             },
             open(detail) {
                 const target = typeof detail === 'string' ? detail : (detail?.name || detail?.[0]?.name || detail?.[0]);
