@@ -8,21 +8,23 @@ use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Livewire\Component;
 
 class ForgotPassword extends Component
 {
-    // ── Steps: 1 = email, 2 = otp, 3 = new password ───────────────
-    public int    $step     = 1;
-    public string $email    = '';
-    public string $otp      = '';
-    public string $password = '';
-    public string $passwordConfirmation = '';
+    // Steps: 1 = email, 2 = otp, 3 = new password
+    public int     $step         = 1;
+    public string  $email        = '';
+    public string  $otp          = '';
+    public string  $password     = '';
+    public string  $passwordConfirmation = '';
+    public ?string $challengeId  = null;
 
-    // ── Countdown (seconds remaining shown in UI) ──────────────────
+    // Countdown (seconds remaining shown in UI)
     public int $resendCooldown = 0;
 
-    // ── Step 1: Send OTP ──────────────────────────────────────────
+    // Step 1: Send OTP
     public function sendOtp(): void
     {
         $this->email = trim(strtolower($this->email));
@@ -35,24 +37,33 @@ class ForgotPassword extends Component
             'email.exists'   => 'We could not find an account registered with that email address.',
         ]);
 
-        // Always delete any existing OTP for this email
-        PasswordOtp::where('email', $this->email)->delete();
+        // Always delete any existing forgot password OTP for this email
+        PasswordOtp::where('email', $this->email)
+            ->where('purpose', PasswordOtp::PURPOSE_FORGOT_PASSWORD)
+            ->delete();
 
-        // Generate a cryptographically secure 6-digit code
-        $plainOtp = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        // Generate a cryptographically secure 6-digit code and unique challenge id
+        $plainOtp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $this->challengeId = (string) Str::uuid();
 
         PasswordOtp::create([
-            'email'      => $this->email,
-            'otp'        => Hash::make($plainOtp),
-            'attempts'   => 0,
-            'expires_at' => now()->addMinutes(10),
+            'email'        => $this->email,
+            'otp'          => Hash::make($plainOtp),
+            'purpose'      => PasswordOtp::PURPOSE_FORGOT_PASSWORD,
+            'challenge_id' => $this->challengeId,
+            'attempts'     => 0,
+            'expires_at'   => now()->addMinutes(PasswordOtp::OTP_EXPIRATION_MINUTES),
         ]);
 
         // Attempt to send the email — fail silently to prevent enumeration
         $user = User::where('email', $this->email)->first();
         if ($user) {
             try {
-                Mail::to($this->email)->send(new OtpMail($plainOtp, $user->first_name));
+                Mail::to($this->email)->send(new OtpMail(
+                    $plainOtp,
+                    $user->first_name ?: ($user->name ?: 'User'),
+                    PasswordOtp::PURPOSE_FORGOT_PASSWORD
+                ));
             } catch (\Exception $e) {
                 Log::error('OTP mail failed: ' . $e->getMessage());
             }
@@ -65,7 +76,7 @@ class ForgotPassword extends Component
         $this->dispatch('notify', ['type' => 'success', 'message' => 'Verification code sent to your email!']);
     }
 
-    // ── Step 2: Verify OTP ────────────────────────────────────────
+    // Step 2: Verify OTP
     public function verifyOtp(): void
     {
         $this->validate([
@@ -76,7 +87,20 @@ class ForgotPassword extends Component
             'otp.regex'    => 'The code must consist of numbers only.',
         ]);
 
-        $record = PasswordOtp::where('email', $this->email)->latest()->first();
+        $record = null;
+        if ($this->challengeId) {
+            $record = PasswordOtp::where('email', $this->email)
+                ->where('purpose', PasswordOtp::PURPOSE_FORGOT_PASSWORD)
+                ->where('challenge_id', $this->challengeId)
+                ->first();
+        }
+
+        if (! $record) {
+            $record = PasswordOtp::where('email', $this->email)
+                ->where('purpose', PasswordOtp::PURPOSE_FORGOT_PASSWORD)
+                ->latest()
+                ->first();
+        }
 
         if (! $record) {
             $this->addError('otp', 'No active code found. Please request a new one.');
@@ -107,12 +131,13 @@ class ForgotPassword extends Component
         // OTP is valid — store a server-side session token and advance
         session(['otp_verified_email' => $this->email, 'otp_verified_at' => now()->timestamp]);
         $record->delete(); // One-time use — delete immediately
+        $this->challengeId = null;
         $this->step = 3;
         $this->otp  = '';
         $this->dispatch('notify', ['type' => 'success', 'message' => 'Code verified! You may now set a new password.']);
     }
 
-    // ── Step 3: Reset Password ────────────────────────────────────
+    // Step 3: Reset Password
     public function resetPassword()
     {
         // Guard: ensure the session token is valid and recent (max 15 min)
@@ -164,11 +189,12 @@ class ForgotPassword extends Component
         return redirect()->route('login');
     }
 
-    // ── Resend OTP ────────────────────────────────────────────────
+    // Resend OTP
     public function resendOtp()
     {
         $this->step = 1;
         $this->otp  = '';
+        $this->challengeId = null;
         $this->sendOtp();
     }
 

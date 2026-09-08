@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class PasswordOtp extends Model
 {
@@ -19,6 +20,18 @@ class PasswordOtp extends Model
         'attempts',
         'expires_at',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (PasswordOtp $otp) {
+            if (empty($otp->challenge_id)) {
+                $otp->challenge_id = (string) Str::uuid();
+            }
+            if (empty($otp->purpose)) {
+                $otp->purpose = self::PURPOSE_FORGOT_PASSWORD;
+            }
+        });
+    }
 
     protected $casts = [
         'expires_at' => 'datetime',

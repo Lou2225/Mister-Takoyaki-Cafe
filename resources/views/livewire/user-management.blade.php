@@ -375,8 +375,8 @@
                     </div>
 
                     <div class="flex flex-col gap-2">
-                        <x-primary-button type="button" wire:click="validateBeforeSaveUser"
-                            class="w-full justify-center" x-text="mode === 'edit' ? 'Save Changes' : 'Register User'"></x-primary-button>
+                <x-primary-button type="button" wire:click="runPreSaveValidation"
+                    class="w-full justify-center" x-text="mode === 'edit' ? 'Save Changes' : 'Register User'"></x-primary-button>
                         <x-secondary-button @click="if(mode === 'edit') { mode = 'view'; $wire.showEdit($wire.get('editUserId'), 'view') } else { panel = 'list'; mode = 'list'; $wire.backToList() }" class="w-full justify-center">
                             <span>Cancel</span>
                         </x-secondary-button>
@@ -1060,7 +1060,7 @@
     {{-- ── Manager Conflict Warning Modal ── --}}
     <x-modal name="confirm-manager-replace" maxWidth="sm" focusable>
             <div class="h-1 w-full bg-gradient-to-r from-amber-400 to-orange-500 rounded-t-lg"></div>
-            <div class="p-6">
+            <div class="p-6" x-data="{ saving: false }" @open-modal.window="if ($event.detail === 'confirm-manager-replace') saving = false">
                 <div class="flex items-start gap-4 mb-4">
                     <div
                         class="flex-shrink-0 w-10 h-10 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center">
@@ -1081,14 +1081,14 @@
                     </div>
                 </div>
                 <div class="flex items-center justify-end gap-2">
-                    <x-secondary-button @click="$dispatch('close-modal', 'confirm-manager-replace')">Cancel</x-secondary-button>
-                    <x-primary-button 
-                        wire:click="replaceManager"
-                        wire:loading.attr="disabled"
-                        wire:target="replaceManager"
-                        class="bg-amber-600 hover:bg-amber-700 min-w-[140px] flex justify-center">
-                        <span wire:loading.remove wire:target="replaceManager">Replace & Save</span>
-                        <span wire:loading wire:target="replaceManager">
+                    <x-secondary-button @click="$dispatch('close-modal', 'confirm-manager-replace'); saving = false">Cancel</x-secondary-button>
+                <x-primary-button
+                    type="button"
+                    x-bind:disabled="saving"
+                    @click="saving = true; $wire.replaceManager().then(() => { saving = false })"
+                    class="bg-amber-600 hover:bg-amber-700 min-w-[140px] flex justify-center">
+                        <span x-show="!saving">Replace & Save</span>
+                        <span x-show="saving" x-cloak>
                             <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -1103,7 +1103,7 @@
     {{-- ── Save Confirmation Modal ── --}}
     <x-modal name="confirm-save-user" maxWidth="sm" focusable>
         <div class="h-1 w-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-t-lg"></div>
-        <div class="p-6">
+        <div class="p-6" x-data="{ saving: false }" @open-modal.window="if ($event.detail === 'confirm-save-user') saving = false">
             <div class="flex items-start gap-4 mb-4">
                 <div class="flex-shrink-0 w-10 h-10 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center">
                     <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1115,16 +1115,16 @@
                     <p class="mt-1 text-[13px] text-gray-500 leading-relaxed" x-text="mode === 'edit' ? 'Apply changes to this profile?' : 'Register this new user into the system?'"></p>
                 </div>
             </div>
-            
+
             <div class="flex items-center justify-end gap-2 mt-6">
-                <x-secondary-button @click="$dispatch('close-modal', 'confirm-save-user')" class="h-10">Cancel</x-secondary-button>
-                <x-primary-button 
-                    wire:click="{{ $editUserId ? 'updateUser' : 'saveUser' }}" 
-                    wire:loading.attr="disabled"
-                    wire:target="updateUser, saveUser"
+                <x-secondary-button @click="$dispatch('close-modal', 'confirm-save-user'); saving = false" class="h-10">Cancel</x-secondary-button>
+                <x-primary-button
+                    type="button"
+                    x-bind:disabled="saving"
+                    @click="saving = true; $wire.{{ $editUserId ? 'updateUser' : 'saveUser' }}().then(() => { saving = false })"
                     class="h-10 min-w-[150px] flex justify-center">
-                    <span wire:loading.remove wire:target="updateUser, saveUser">Confirm & Save</span>
-                    <span wire:loading wire:target="updateUser, saveUser">
+                    <span x-show="!saving">Confirm & Save</span>
+                    <span x-show="saving" x-cloak>
                         <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>

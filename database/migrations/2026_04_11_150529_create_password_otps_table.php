@@ -12,6 +12,8 @@ return new class extends Migration
             $table->id();
             $table->string('email')->index();
             $table->string('otp'); // stored as bcrypt hash
+            $table->string('purpose')->default('forgot_password');
+            $table->uuid('challenge_id')->unique();
             $table->unsignedTinyInteger('attempts')->default(0);
             $table->timestamp('expires_at');
             $table->timestamps();

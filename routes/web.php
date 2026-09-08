@@ -75,8 +75,7 @@ Route::middleware('auth')->group(function () {
     // Specific Restricted Routes
     Route::get('/management/categories', \App\Livewire\CategoryManagement::class)->name('categories.index')->middleware('role:super_admin');
     Route::get('/management/library', \App\Livewire\OptionLibraryManagement::class)->name('library.index')->middleware('role:super_admin|admin');
-    Route::get('/settings', \App\Livewire\SystemSettings::class)->name('settings.index')->middleware('role:super_admin');
-});
+    Route::get('/settings', \App\Livewire\SystemSettings::class)->name('settings.index')->middleware('role:super_admin|admin');});
 
 require __DIR__ . '/auth.php';
 

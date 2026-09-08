@@ -1,11 +1,11 @@
 # Mister Takoyaki Centralized Sales and Management System
-## User Manual — Version 1.3 (August 2026)
+## User Manual — Version 1.4 (September 2026)
 
 | Field | Value |
 |---|---|
 | Document | Mister Takoyaki User Manual |
 | System | Centralized Sales and Management System |
-| Version | 1.3 |
+| Version | 1.4 |
 | Status | Final |
 | Prepared By | Development Team |
 | Approved By | Management |
@@ -184,77 +184,199 @@ Admin accounts can view the product catalog and toggle per-branch availability. 
 
 ### 5.1 Overview
 
-The Dashboard is the operational command center. It combines real-time financial KPIs, multi-channel sales volume, predictive trends, inventory health, branch geographic mapping, and live terminal order activity in a single view.
+The Dashboard is the operational command center of the Mister Takoyaki system. It unifies real-time financial telemetry, multi-channel sales distribution, predictive linear trends, ingredient consumption velocity, multi-branch geographic mapping, stock deficiency alerts, and a live terminal order feed in a single interface.
 
-- **Target Audience:** Super Admin (global and per-branch), Administrator (branch-scoped), Cashier (branch-scoped)
-- **Refresh Interval:** Live background polling every 10 seconds. Recalculates dynamically upon order completion, refund, void, or stock adjustment.
+- **Target Audience:** Super Admin (Global Enterprise & branch-specific views), Administrator (Branch-scoped operational view), Cashier (Branch-scoped front-of-house view).
+- **Refresh & Reactive Architecture:** Live background polling updates metrics in real time. Dynamic recalculation triggers immediately upon order completion, void, refund, or stock adjustment. An in-memory request-level segment cache guarantees instant rendering without serving stale persistent cache data.
 
-### 5.2 Navigation Controls
+---
 
-- **Branch Selector:** Switch between All Locations (Global/Enterprise Overview) and specific branch views. For Branch Admins and Cashiers, the branch is fixed to their assigned store.
-- **Date Preset Range:** Scopes all dashboard cards, charts, and metrics simultaneously. Available presets are: Today, Yesterday, This Week, Last 7 Days, This Month, Last 30 Days, This Year, All Time, or Custom Date Range.
-- **Export Functionality:** Click the **Export** button in the top control bar to generate reports in PDF or CSV format.
+### 5.2 RBAC Welcome Banner
 
-### 5.3 Financial KPI Cards
+At the top of the dashboard, a responsive welcome banner provides immediate context and role-specific orientation.
 
-| KPI Card | Description |
-|---|---|
-| Gross Revenue | Total revenue before deductions, including discounts added back in. |
-| Gross Profit | Net sales minus COGS and wastage, displayed with a gross profit margin percentage. |
-| Net Sales | Revenue after excluding delivery fees. |
-| Average Order Value (AOV) | Average amount collected per completed transaction. |
-| Ingredient Costs (COGS) | Total cost of ingredients consumed, auto-calculated from product recipes. |
+- **Time-Aware Greeting:** Dynamically displays "Good morning" (before 12:00 PM), "Good afternoon" (12:00 PM – 6:00 PM), or "Good evening" (after 6:00 PM) alongside the logged-in user's first name.
+- **Centralized Role Theming:**
+  - **Super Admin:** Indigo gradient banner with `SUPER ADMIN` badge, shield icon, and the subtitle *"Enterprise command center and network-wide telemetry."*
+  - **Administrator:** Rose gradient banner with `BRANCH ADMIN` badge, store icon, and the subtitle *"Branch operational control, inventory oversight, and staff management."*
+  - **Cashier:** Emerald gradient banner with `CASHIER` badge, register icon, and the subtitle *"Front-of-house order terminal, kitchen dispatch, and payment processing."*
+- **Dismiss Control:** Users can click the close (`✕`) button on the right to dismiss the banner for the current session with an animated fade-out transition.
 
-Click any KPI card to open the **KPI Detail Slide-Over Breakdown**, which shows the calculation formula and a category-by-category breakdown. For Gross Profit, the panel shows a running deduction view: Total Revenue, minus Resource Consumption (COGS), minus Variance and Spoilage, resulting in the Net Earnings with margin percentage.
+---
 
-### 5.4 Operations Index
+### 5.3 Unified Control Panel
 
-Four quick-count status badges are displayed:
+Located directly below the welcome banner, the control panel provides global filtering and report generation tools.
 
-- **Menu Items:** Count of currently active products in the catalog.
-- **Tracked Ingredients:** Total tracked ingredients in the system.
-- **Inventory Alerts:** Combined count of low-stock and soon-to-expire items. Highlighted in red when greater than zero.
-- **Active Staff:** Ratio of active accounts to total registered accounts for the selected branch.
+#### 5.3.1 Branch Selector
+- **Super Admin:** An interactive dropdown selector allows toggling between **All Locations (Global / Enterprise Overview)** and any specific individual branch.
+- **Administrator & Cashier:** Fixed to a locked branch badge displaying their assigned branch name with a location pin icon, preventing unauthorized cross-branch data access.
 
-### 5.5 Spend and Revenue Activity Chart
+#### 5.3.2 Integrated 3-in-1 Date Filter (`x-date-filter`)
+The integrated date filter scopes all dashboard cards, charts, and metrics simultaneously. Clicking the filter trigger opens an interactive calendar panel:
+- **Responsive Calendar View:** Automatically renders a dual-month side-by-side calendar on desktop screens (screen width 1024px or higher) and a single-month view on mobile devices.
+- **Quick Range Presets:**
+  - **Today:** Current day (00:00 to 23:59).
+  - **Yesterday:** Previous calendar day.
+  - **This week:** Rolling 7-day window up to today.
+  - **Last week:** Monday through Sunday of the previous calendar week.
+  - **This month:** Rolling 30-day window up to today.
+  - **Last month:** 1st day to the final day of the previous calendar month.
+  - **This year:** January 1 of the current year up to today.
+  - **Last year:** January 1 to December 31 of the previous calendar year.
+  - **All time:** Clears date boundaries to evaluate all recorded historical data.
+- **Custom Range Picker:** Users can click any start date followed by an end date directly on the calendar.
+- **Date Validation Engine:** Prevents selecting future dates and prevents setting a start date later than the end date. If an invalid range is submitted, a red validation alert banner is displayed at the top of the dashboard (*"Start date cannot be in the future"* or *"Start date cannot be after end date"*).
 
-An interactive chart visualizes financial performance over time. Use the selector to switch between three metric views:
+#### 5.3.3 Executive Report Generation (`Generate Dashboard`)
+- The top control bar features a **Generate Dashboard** button (`x-report-dropdown`).
+- Clicking the button automatically compiles and streams a standardized executive PDF report (`Dashboard_Report_YYYY-MM-DD.pdf`).
+- **Report Contents:** Executive summary table of all financial KPIs, active staff ratios, top 5 selling products with volume and revenue, shortage inventory alerts, expiring batches within 7 days, and ingredient consumption velocity.
+- The underlying export engine also supports CSV and Excel-compatible exports.
 
-- **Gross Sales vs. Ingredient Costs:** Overlays Gross Sales against Ingredient Costs (COGS).
-- **Order Volume:** Displays total completed order counts alongside a predictive trend forecast line.
-- **Gross Profit vs. COGS:** Compares Gross Profit against COGS with a predictive forecast projection.
+---
 
-When the selected date range is a single day, the chart automatically switches to a 24-hour hourly breakdown.
+### 5.4 Financial Intelligence KPI Cards
 
-### 5.6 Branch Live Map (Super Admin and Multi-Branch Only)
+The financial section features five interactive cards with real-time calculations and embedded sparkline trend charts.
 
-An interactive map visualizes the geographic distribution and sales performance of all branch locations.
+| KPI Card | Description | Visual Features | Slide-Over Metric |
+|---|---|---|---|
+| **Gross Revenue** (Hero Card) | Total revenue before deductions, including discounts. | Live pulsing emerald indicator, total discounts applied counter (`₱... Discounts Applied`), and green gradient sparkline. | `Revenue` |
+| **Gross Profit** (Cashflow Card) | Net sales minus COGS and inventory wastage loss. | Displays Gross Profit Margin percentage (`%`), solid green **Revenue Collected** inflow bar, and 12-block pulsing rose **COGS & Spoilage** outflow bar. | `Profit` |
+| **Net Sales** | Revenue collected excluding delivery fees. | Displays exact delivery fee deduction notice (`Excl. ₱... delivery`) and bottom emerald sparkline. | `Revenue` |
+| **Average Order Value (AOV)** | Average monetary spend per completed transaction (`Net Sales ÷ Order Count`). | Displays average spend per transaction with bottom indigo sparkline. | `AOV` |
+| **Ingredient Costs (COGS)** | Total cost of raw materials consumed, derived from recipe deductions. | Displays period cost of goods sold with bottom rose sparkline. | `COGS` |
 
-- Toggle between Satellite, Street View, and Vector View using the dropdown selector.
-- Hover over any branch pin to view total sales and its percentage share of network-wide sales for the period. The top-performing branch is highlighted with a pulsing marker.
-- Click the expand icon to open a full-screen version of the map.
-- A leaderboard below the map ranks all branches by total revenue and percentage contribution.
+> [!TIP]
+> **Interactive Cards:** Clicking any KPI card or its *"View"* / *"View breakdown →"* link instantly opens the **Intelligence Report Slide-Over Panel** for deep-dive analysis.
 
-### 5.7 Revenue Channels and Payment Methods
+---
 
-- **Fulfillment Split:** Percentage split and order count per order type — Dine-in, Take-out, Delivery, and Pick-up.
-- **Payment Method Distribution:** Real-time breakdown of transactions processed via Cash or GCash (Static QR), showing transaction count and total monetary value.
+### 5.5 Intelligence Report Slide-Over Panel (`x-side-panel`)
 
-### 5.8 Inventory Health and Usage Velocity
+Clicking a KPI card opens an interactive slide-over drawer from the right side of the screen, providing granular mathematical and categorical breakdowns:
 
-- **Usage Velocity:** Ranks the fastest-moving ingredients by daily consumption velocity with visual progress bars.
-- **Efficiency Score:** A battery-style Efficiency Score (0 to 100%) comparing ingredient waste value against ingredient sales value.
-  - Green (80% or above): Healthy inventory turnover and minimal waste.
-  - Amber (50% to 80%): Moderate variance; monitor usage.
-  - Red (below 50%): Critical waste or variance detected.
+#### 5.5.1 Identity & Formula Header
+The header displays the metric initial avatar, active date filter pill, and the exact mathematical formula used by the system:
+- **Revenue:** `Σ (Sales Price × Qty)`
+- **COGS:** `Σ (Inventory Used × Unit Cost)`
+- **AOV:** `Total Revenue ÷ Order Count`
+- **Profit:** `Net Sales - COGS - Waste`
+- **Margin:** `(Net Profit ÷ Revenue) × 100`
 
-### 5.9 Top Products, Stock Alerts, and Live Order Feed
+#### 5.5.2 Profit Waterfall View
+When inspecting **Gross Profit**, the slide-over displays a step-by-step accounting waterfall:
+1. **Total Revenue Inflow:** Gross sales collected.
+2. **Resource Consumption (COGS):** Deducted raw material cost based on branch purchase costs and recipe deductions.
+3. **Variance & Spoilage:** Deducted monetary cost of recorded waste, spoiled stock, and physical discrepancy adjustments.
+4. **Gross Profit Result:** Final net profit card with highlighted margin percentage badge.
 
-- **Top 5 Products:** Displays the 5 best-selling products by units sold and generated revenue for the period.
-- **Stock Alerts:**
-  - **Shortage tab:** Lists ingredients below their configured minimum threshold with current stock levels.
-  - **Expiry tab:** Lists batches expiring within 7 days, or already expired (shown in red), with remaining days displayed.
-- **Live Order Feed:** A real-time feed showing the 10 most recent transactions, displaying order reference, elapsed time, status, and amount.
+#### 5.5.3 Categorical & Bucket Distributions
+For other metrics, the drawer displays categorized data nodes with volume badges and percentage contribution:
+- **Revenue & COGS:** Grouped by menu category (e.g., Classic Takoyaki, Premium Takoyaki, Beverages, Add-ons), including service charges, delivery deductions, and discount impacts.
+- **AOV Buckets:** Segmented into ticket brackets to evaluate customer spending habits:
+  - *Light Snack (Under ₱200)*
+  - *Standard Meal (₱200 – ₱500)*
+  - *Family Pack (₱501 – ₱1,000)*
+  - *Party / Bulk (Above ₱1,000)*
+
+---
+
+### 5.6 Operations Index
+
+Positioned beside the financial cards, the Operations Index provides four high-level operational counters:
+
+- **Menu Items:** Count of currently active products available in the catalog.
+- **Ingredients:** Total raw materials and packaging items actively tracked in inventory.
+- **Inventory Alerts:** Combined count of low-stock ingredients (below reorder threshold) and batches expiring within 7 days. Highlights in **bold red** when greater than zero to signal immediate attention.
+- **Staff:** Ratio of active accounts to total registered accounts for the selected branch (e.g., `3 / 6 Active Accounts`).
+
+---
+
+### 5.7 Spend and Revenue Activity Chart
+
+An interactive visualizer powered by ApexCharts that illustrates business trends and forecast projections over time.
+
+- **Metric View Switcher:**
+  - **Sales:** Overlays Gross Sales against Ingredient Costs (COGS) to track gross margin spread.
+  - **Vol (Volume):** Plots total completed order volume alongside a predictive trendline forecast.
+  - **Profit:** Compares Gross Profit against COGS with a predictive forecast projection.
+- **Adaptive Time-Resolution:**
+  - When the active date filter is set to a single day (e.g., *Today* or *Yesterday*), the chart automatically switches to a **24-hour hourly resolution**.
+  - When multi-day, monthly, or yearly ranges are selected, the chart groups data by day or week.
+- **Interactive Tooltips:** Hovering over data points reveals exact monetary values, timestamps, and trend indicators.
+
+---
+
+### 5.8 Branch Live Map & Expanded Modal (Super Admin / Multi-Branch)
+
+For enterprise accounts and multi-branch overviews, an interactive Leaflet map visualizes the geographical footprint and sales performance of all Laguna branch locations.
+
+- **Map Mode Switcher:**
+  - **Satellite:** High-resolution aerial satellite imagery (ESRI World Imagery).
+  - **Street View:** Standard road and topography map (OpenStreetMap).
+  - **Vector View:** Minimalist high-contrast vector cartography (CartoDB Positron).
+- **Interactive Branch Markers:**
+  - Hovering over a branch marker displays a tooltip with the branch name, period sales amount, and percentage share of total network sales.
+  - The top-performing branch is highlighted with a **pulsing emerald marker** and a star indicator (★).
+- **Expanded Map Modal (`branch-map-expanded`):**
+  - Clicking the expand button in the map header opens a full-screen modal with an expanded 520px high map canvas.
+  - Includes a 4-column summary grid showing all branches and their respective sales contributions.
+- **Branch Leaderboard:** A ranked performance list directly below the inline map displays each branch's sales amount and network percentage contribution.
+
+---
+
+### 5.9 Secondary Analytical Grid
+
+#### 5.9.1 Revenue Channels & Payment Methods
+- **Fulfillment Split:** Visual progress bars displaying order count and percentage distribution across all fulfillment types:
+  - **Dine-in** (Emerald)
+  - **Take-out** (Blue)
+  - **Delivery** (Amber)
+  - **Pick-up** (Indigo)
+- **Payment Methods Breakdown:** Real-time breakdown of transactions processed via **Cash** or **GCash (Static QR)**, displaying two-letter avatar badges, order count, and total monetary value collected in PHP (`₱`).
+
+#### 5.9.2 Ingredient Consumption (Usage Velocity)
+- Displays the fastest-moving raw materials ranked by daily consumption rate (`X / DAY`).
+- Includes visual progress bars dynamically styled according to the active user role's theme color (Indigo for Super Admin, Rose for Branch Admin, Emerald for Cashier).
+
+#### 5.9.3 Inventory Health & Efficiency Audit
+- **Segmented Battery Indicator:** A high-tech segmented battery graphic that dynamically reflects inventory efficiency (0% to 100%):
+  - **Emerald (>80%):** Healthy turnover with minimal waste loss.
+  - **Amber (50% – 80%):** Moderate variance; usage should be monitored.
+  - **Rose (<50%):** Critical waste or severe stock discrepancies detected.
+- **Efficiency Score & Waste Loss:** Displays overall efficiency score percentage, total monetary waste loss (`₱`), and waste variance as a percentage of consumed stock value.
+
+---
+
+### 5.10 Operational Workstation Grid
+
+The bottom row of the dashboard serves as a quick-action operational hub:
+
+#### 5.10.1 Top Products
+- Lists the top 5 best-selling menu items ranked by volume.
+- Displays product initial avatar, item name, category badge, total units sold, and total revenue generated.
+- Features a **Load Extended Catalog** shortcut button linking directly to Menu Management (`/menu`).
+
+#### 5.10.2 Stock Alerts Widget (Sliding Tabs)
+A dual-tab sliding widget that separates stock shortages from expiring batches:
+- **Shortage (Deficiency Tab):** Lists ingredients currently below their configured minimum threshold, indicating ingredient name, branch name, and current stock quantity.
+  - *Empty State:* Displays *"Stock Secured — All ingredients meet the threshold"* when inventory is healthy.
+- **Expiry (Expiration Tab):** Lists batches expiring within 7 days or already expired. An amber pulsing notification dot appears on the tab header when active expiration risks exist.
+  - Expired batches display an **`EXPIRED`** badge in red.
+  - Soon-to-expire batches display a countdown badge (e.g., **`3d`**) in amber.
+  - *Empty State:* Displays *"No Expirations — Materials life-cycle is healthy"* when all batches are fresh.
+- Features an **Expand Full Ledger** shortcut button linking directly to Stock Management (`/stock`).
+
+#### 5.10.3 Live Order Feed
+- A high-contrast dark console widget displaying the 10 most recent branch orders in real time with an active pulsing green status dot.
+- Displays order reference ID, elapsed time (e.g., *"2m ago"*), status label, and total amount.
+- Status borders are color-coded:
+  - **Amber Border:** Orders in `Preparing` state.
+  - **Emerald Border:** Orders in `Ready` or `New` state.
+  - **Gray Border:** Orders in `Completed` state.
+- Features a **POS Console** shortcut button linking directly to the POS terminal (`/pos`).
 
 ---
 
@@ -264,94 +386,124 @@ An interactive map visualizes the geographic distribution and sales performance 
 
 - **Target Roles:** Super Admin, Administrator, Cashier.
 - Navigate to **POS and Orders** (or `/pos`) from the sidebar.
-- The top bar contains Category Tabs, a Search Bar, a Held Orders button, and a Layout Sort toggle.
-- The main area displays an interactive Product Card Grid with instant live search and category filtering.
-- The right panel (desktop) or bottom drawer (mobile) shows the real-time Order Summary, line items, discounts, fulfillment method, table reference, and payment triggers.
+- The top bar contains Category Navigation Tabs, Live Search Bar, Held Orders indicator button, and the Layout Sort toggle button.
+- The main area displays an interactive Product Card Grid with instant live search, category filtering, and visual stock health indicators.
+- The right panel (desktop) or bottom drawer (mobile) displays the real-time Order Summary cart, line item modifiers, discount indicators, fulfillment method selector, table/reference input, and payment triggers.
 
 #### Stock Badges on Product Cards
 
-| Status | Description |
-|---|---|
-| In Stock | Ample stock available. The card shows the available quantity. |
-| Low Stock | 10 or fewer units remaining based on ingredient stock. |
-| Out of Stock | One or more required recipe ingredients are depleted. The card is grayed out and Add to Cart is disabled. |
+| Status | Visual Indicator | Operational Behavior |
+|---|---|---|
+| **In Stock** | Green badge showing available units | Item can be freely added to cart up to the available ingredient limit. |
+| **Low Stock** | Amber badge (10 or fewer units remaining) | Item is nearing depletion based on raw material availability. |
+| **Out of Stock** | Grayed out card with red "Out of Stock" badge | One or more mandatory recipe ingredients are depleted. Card is grayed out and clicking is disabled. |
+
+---
 
 ### 6.2 Adding Items to the Cart
 
 #### Standard (Non-Customizable) Items
-
 1. Tap the product card or click **Add to Cart**.
 2. The item is instantly added to the cart with a quantity of 1.
-3. Tapping again increases the quantity. When the cart quantity reaches the maximum physical stock limit, the button is disabled.
+3. Tapping again increments the quantity. When the cart quantity reaches the maximum physical stock limit (calculated from raw ingredient balances), further additions are prevented.
 
 #### Customizable Items with Options and Modifiers
+1. Tap the product card to open the **Product Customization Modal**.
+2. **Option Groups:** Select choices for required groups (e.g., Flavor, Size). Required groups must have a valid selection before the item can be added. Options with depleted ingredients are automatically disabled with an *"Out of Stock"* tag.
+3. **Modifiers & Add-ons:** Select optional toppings or add-ons with associated price increments.
+4. Tap **Add to Order** to confirm, or **Cancel** to discard.
+5. Adding the same product with identical options increments the existing line item's quantity rather than creating duplicate lines.
 
-1. Tap the product card to open the Customization Modal.
-2. For option groups, select the required choices. Required groups must have a valid in-stock selection before the item can be added.
-3. Out-of-stock options are disabled and cannot be selected. A configured default option is pre-selected if in stock.
-4. Select any optional add-ons or modifiers.
-5. Tap **Add to Order** to confirm, or **Cancel** to close without adding.
-6. Adding the same product with identical options increases the quantity of the existing cart line rather than creating a duplicate.
+---
 
-### 6.3 Managing Cart Items and Special Instructions
+### 6.3 Managing Cart Items: The Two-Column Edit Modal
 
-- Use the quantity stepper (+/-) to adjust line item quantities. Reducing to zero removes the item. You cannot exceed available stock.
-- Click the trash icon on any cart row to remove it. A confirmation prompt appears.
-- Click **Clear Cart** to remove all items from the cart. A confirmation prompt appears.
-- Tap the note icon on any cart line item to open the **Item Customization & Discount Modal**:
-  - Enter free-text kitchen notes for that item.
-  - Apply a per-item Regular Discount or Senior/PWD Discount.
-  - Tap **Apply** to save.
+Tapping the note/pencil icon on any cart row opens the **Two-Column Item Customization & Discount Modal** (`edit-cart-item`):
+
+#### Left Column: Options & Modifiers Reconfiguration
+- Displays all option groups and modifier selections for the product.
+- Cashiers can change flavors, sizes, or toppings directly without removing and re-adding the item to the cart.
+- Options depleted in branch inventory are disabled with out-of-stock badges.
+
+#### Right Column: Quantity, Notes & Discounts
+- **Quantity Stepper (+/-):** Adjust line quantity with live validation against branch ingredient inventory.
+- **Special Instructions:** Free-text textarea for kitchen notes (e.g., *"Extra crispy"*, *"Sauce on the side"*, *"No mayo"*). Notes print on kitchen tickets and customer receipts.
+- **Regular Discount Toggle:** Applies the system-configured regular discount percentage (e.g., 10%) directly to this specific line item.
+- **Senior / PWD Discount Toggle:** Applies the statutory 20% Senior Citizen / PWD discount rate and flags the line as VAT-exempt.
+
+> [!NOTE]
+> **Stock Safety Guard:** The modal's **Save Changes** button is dynamically disabled (`canSaveEditOrder()`) if a required option is unavailable or if the requested quantity exceeds physical branch stock. Changes update client-side immediately without full-page reloads.
+
+#### Cart Line Removal & Clearing
+- Use the (-) stepper to reduce quantity to zero, or click the red trash icon to delete a single item with confirmation.
+- Click **Clear Cart** in the order header to remove all items. A confirmation prompt prevents accidental clearing.
+
+---
 
 ### 6.4 Fulfillment Method and Table Reference
 
-- Use the **Order Type** dropdown to specify fulfillment type: Dine-in, Take-out, Delivery, or Pick-up.
-- A configured Service Charge is applied automatically only when the order method is Dine-in.
-- Enter a Table or Reference Number. When **Dine-in** is selected, entering a **Table Number** is mandatory to ensure orders reach the dining room accurately. For Take-out, Delivery, or Pick-up, customer reference information or phone number is entered.
+- **Order Type Selector:** Choose between **Dine-in**, **Take-out**, **Delivery**, or **Pick-up**.
+- **Service Charge:** Configured service charges are automatically applied only when the order method is set to **Dine-in**.
+- **Table / Customer Reference:**
+  - When **Dine-in** is selected, entering a **Table Number** is strictly required to ensure kitchen and floor staff deliver food to the correct table.
+  - When **Take-out**, **Delivery**, or **Pick-up** is selected, enter the customer's name, reference tag, or mobile contact number.
+
+---
 
 ### 6.5 Holding and Restoring Draft Orders
 
 #### Holding a Cart
-
-1. Click the hold icon in the Order Summary header.
-2. The system generates a unique reference code and saves the order items, customizations, table number, and order type without deducting ingredient stock.
-3. The cart is cleared for the next transaction.
+1. Click the **Hold Order** icon (pause symbol) in the Order Summary header.
+2. The system generates a unique reference code (e.g., `DFT-XXXXXX`) and saves all line items, customizations, special instructions, discount flags, order type, and table reference.
+3. Ingredient stock is not deducted while an order remains in draft status.
+4. The cart is cleared immediately so the cashier can serve the next customer.
 
 #### Restoring or Deleting Held Orders
+1. Click the **Held Orders** button in the top bar. The badge counter displays the number of active held drafts.
+2. The **Saved Drafts Panel** displays all branch drafts with table numbers, item counts, creation timestamps, and monetary totals.
+3. Click **Restore** on any draft to load all items, options, modifiers, discounts, and customer references back into the active POS cart. The draft is then removed from the draft list.
+4. Click the trash icon to permanently delete an abandoned draft.
 
-1. Click the Held Orders icon in the top bar. The badge shows the number of active held drafts.
-2. The Saved Drafts panel displays all branch drafts with table numbers, item counts, creation timestamps, and order values.
-3. Click **Restore** to restore the draft into the active POS cart and remove it from the draft ledger.
-4. Click the trash icon to delete an abandoned draft permanently.
+---
 
-### 6.6 Processing Payments
+### 6.6 Processing Payments & GCash Lock Safeguard
 
-1. Tap **Proceed to Payment** (or **Place Order**) to open the payment confirmation screen, which shows the itemized order breakdown on the left and payment method selection on the right.
-2. Select a payment method:
+1. Tap **Proceed to Payment** (or **Place Order**) to open the payment modal. The left side shows the itemized order breakdown; the right side provides payment method selection.
+2. Select the payment method:
 
-| Payment Method | Process |
+| Payment Method | Transaction Flow |
 |---|---|
-| Cash | Enter the amount tendered or tap a quick tender button (Exact, 100, 500, 1000). The system instantly computes and displays the change amount. The amount tendered cannot be less than the total due. The amount tendered and calculated change are permanently recorded in the order database and printed on customer receipts. |
-| GCash (Static QR) | The store's static GCash QR code, account name, and account number are displayed. The customer scans and pays. The cashier verifies receipt on the store phone and clicks **Mark as Verified**. A confirmed payment badge appears. |
+| **Cash** | Enter the amount tendered or tap a quick tender button (**Exact**, **100**, **500**, **1000**). The system instantly calculates and displays the change amount. The amount tendered cannot be less than the total due. Tendered and change amounts are permanently recorded and printed on customer receipts. |
+| **GCash (Static QR)** | The store's static GCash QR code, account name, and mobile number are displayed. The customer scans and transfers the exact amount. The cashier verifies the SMS/app payment notification on the store device, then clicks **Mark as Verified**. A green verified badge is displayed. |
 
-3. Tap **Place Order** to finalize the transaction.
+3. Tap **Place Order** to finalize the sale, trigger stock deductions, dispatch kitchen tickets to KDS, and generate the receipt.
 
 > [!WARNING]
-> **Verified Payment Protection:** Once a GCash payment is marked as verified, the payment modal cannot be cancelled and the cart cannot be cleared. This prevents unrecorded receipts. To cancel a verified transaction, complete the order first, then void it from Order Management (see Section 7.8).
+> **Verified Payment Protection Safeguard:**  
+> Once a GCash payment is marked as verified:
+> - The payment modal **cannot be dismissed or closed** (modal close and escape triggers are locked).
+> - The cart **cannot be cleared** (`clearCart` is blocked).
+> - Line items, quantities, discounts, and order details **cannot be modified**.
+> 
+> This safeguard ensures that money received via QR transfer cannot be accidentally lost or unrecorded. If an order must be cancelled after GCash verification, the cashier must finalize the order and then void it through Order Management (see Section 7.8).
+
+---
 
 ### 6.7 Thermal Receipt Printing
 
-- Placing an order automatically dispatches receipt generation to connected printers.
-- The system supports Web Bluetooth thermal printers (compatible ESC/POS devices) connectable directly from the browser without print dialogs.
-- When multiple slips are printed (for example, a customer receipt followed by kitchen or barista slips), a modal alerts the cashier to tear off the first slip before printing continues. A 15-second auto-continuation countdown is included.
+- Finalizing an order dispatches print commands directly to connected printers.
+- **Web Bluetooth ESC/POS Support:** Connects directly to Bluetooth thermal receipt printers from Chrome/Edge browsers without triggering default browser print dialogs.
+- **Multi-Slip Separation Alert:** When printing multiple slips (e.g., customer receipt followed by kitchen order slip or barista slip), an on-screen prompt alerts the cashier to tear off the first slip before printing continues, complete with a 15-second automatic progression timer.
+
+---
 
 ### 6.8 Menu and Category Layout Customization
 
 - **Authorized Roles:** Super Admin, Branch Administrator.
-1. Tap **Customize Layout** in the top bar to activate Layout Edit Mode.
-2. Drag and drop category tabs horizontally to reorder them. The "All" tab is permanently locked in the first position.
-3. Drag product cards using the drag handle icon to reorder them.
-4. Tap **Save Layout** to save the custom layout. The arrangement is saved per branch and does not affect other stores.
+1. Click **Customize Layout** in the top bar to toggle into Layout Edit Mode.
+2. **Category Tabs Reordering:** Drag and drop category tabs horizontally. The *"All"* category is locked in the first position.
+3. **Product Cards Reordering:** Drag product cards using the drag handle icon to set the preferred visual sequence.
+4. Click **Save Layout**. Changes are saved per branch to `branch_product.sort_order` and `BranchCategorySort.sort_order` and do not overwrite the layout of other stores.
 
 ---
 
@@ -359,90 +511,125 @@ An interactive map visualizes the geographic distribution and sales performance 
 
 ### 7.1 Overview
 
-Order Management is a centralized hub for managing online mobile delivery orders, in-store POS transactions, and historical order records. It provides fulfillment progression, rider assignment, refund and void processing, thermal receipt printing, and complete audit logging.
+Order Management is the centralized operations hub for managing online mobile delivery orders, in-store POS transactions, and historical sales ledgers. It provides end-to-end fulfillment progression, delivery rider dispatching, refund and void processing, thermal receipt printing, and comprehensive audit trails.
 
-- **Target Roles:** Super Admin, Branch Administrator, Cashier (restricted to their assigned branch).
-- The screen auto-refreshes in sync with mobile app order placements, KDS changes, and rider dispatch updates.
+- **Target Roles:** Super Admin (all branches), Branch Administrator (assigned branch), Cashier (assigned branch).
+- **Reactive Synchronization:** Real-time background synchronization reflects mobile app order placements, KDS preparation milestones, and rider dispatch updates without requiring manual page refreshes.
+
+---
 
 ### 7.2 Tab Navigation and the 1-Hour Transition Window
 
-The module is organized into three tabs:
+The module is structured into three dedicated operational views:
 
-- **Delivery Orders:** Displays incoming and active orders placed via the mobile delivery application with statuses: Pending, Preparing, Ready, Handed to Rider, and Out for Delivery.
-- **POS Orders:** Displays in-store POS transactions and saved drafts with statuses: Drafted, Pending, and recently completed in-store sales.
-- **Order History:** The permanent historical ledger for all completed, cancelled, voided, refunded, and partially refunded orders.
+- **Delivery Orders (App):** Displays incoming and active orders placed through the customer delivery mobile application with statuses: *Pending*, *Preparing*, *Ready*, *Handed to Rider*, and *Out for Delivery*.
+- **POS Orders (POS):** Displays in-store point-of-sale transactions and saved drafts with statuses: *Drafted*, *Pending*, and recently fulfilled walk-in orders.
+- **Order History:** The permanent audit ledger for all *Completed*, *Cancelled*, *Voided*, *Refunded*, and *Partially Refunded* orders across all sales channels.
 
 > [!NOTE]
-> **1-Hour Operational Transition Window:** When an order is completed, cancelled, voided, or refunded, it remains visible in its original operational tab for 1 hour. This allows staff to quickly reprint receipts, process refunds, or void erroneous entries. After 1 hour, the order automatically moves to Order History.
+> **1-Hour Operational Transition Window:**  
+> When an order is completed, cancelled, voided, or refunded, it remains visible in its original operational tab (*Delivery Orders* or *POS Orders*) for **1 hour**. This grace period allows staff to easily reprint receipts, process immediate refunds, or void erroneous entries without navigating away. After 1 hour, the transaction automatically transitions to the permanent *Order History* tab.
 
-### 7.3 Order Health Overview
+---
 
-Four live operational KPI cards are displayed above the order table:
+### 7.3 Tab-Scoped Order Health Overview
 
-| Card | Data Displayed |
+Four operational KPI cards are displayed above the order ledger:
+
+| Card | Data Displayed & Operational Behavior |
 |---|---|
-| Total Orders | Total order volume within the active tab scope. |
-| Active Orders | Unresolved orders currently in progress. A visual alert appears if any order has been sitting unresolved for 24 hours or more. |
-| Completed Today | Count of all orders successfully served and cleared today. |
-| Today's Revenue | Net income collected today (Gross Sales minus Refunds, excluding delivery fees and voided orders). |
+| **Total Orders** | Total transaction volume within the active tab and date filter scope. |
+| **Active Orders** | Dynamically scoped to the active tab via Alpine.js: <br>• In **Delivery Orders:** Counts pending and in-progress app orders. If any order has been sitting unresolved for 24 hours or more, an amber/red pulsing alert badge appears (`X unresolved 24h+`).<br>• In **POS Orders:** Counts unresolved in-store orders and active held drafts.<br>• In **Order History:** Displays zero by definition. |
+| **Completed Today** | Count of all orders successfully served, completed, or delivered during the current calendar day. |
+| **Today's Revenue** | Net income collected today (Gross Sales minus Refunds, excluding delivery fees and voided orders). |
 
-### 7.4 Search and Filtering
+---
 
-- **Search Filter:** Real-time search by Reference Number, Customer Name, or Customer Phone Number.
-- **Status Filter:** Shows only the status options valid for the active tab.
-- **Date Range Filter:** Quick presets (Today, Last 7 Days, Last 30 Days, All Time) or custom calendar start and end dates.
+### 7.4 Search and Filtering Controls
+
+- **Live Search Bar:** Instant filtering across Order Reference Number, Customer Name, or Customer Contact Phone Number.
+- **Status Filter:** Context-sensitive dropdown displaying only the status options applicable to the active tab.
+- **Date Range Presets:** Quick date filters (*Today*, *Last 7 Days*, *Last 30 Days*, *All Time*) or a custom calendar start and end date selector.
+
+---
 
 ### 7.5 Managing Delivery App Orders
 
-1. **Accepting an Order:** Open a Pending delivery order and click **Accept Order**. Status updates to Preparing and the ticket is pushed to KDS.
-   > [!IMPORTANT]
-   > **1-Hour Auto-Rejection Safeguard:** If an incoming mobile delivery order remains in Pending status for more than 1 hour without being accepted by a cashier or manager, the system's background scheduler automatically cancels and marks the order as Rejected with reason "Auto-cancelled: Order not accepted within 1 hour". This protects customers from indefinite waiting times.
-2. **Rejecting an Order:** Click **Reject Order**, enter an optional reason, and confirm. Orders can only be manually rejected within 24 hours of placement.
-3. **Dispatching to Rider:** When food is ready, click **Assign Rider**, select an active rider from the dropdown, and click **Assign**. Status advances to Handed to Rider and a notification is sent to the rider's app.
-4. **Completing an Order:** Once drop-off is verified, click **Complete Order** to finalize the order.
+#### 1. Accepting an Incoming Order
+- When a customer places an order via the mobile delivery application, it appears under the *Delivery Orders* tab with status **Pending**.
+- Click **Accept Order**. The order status advances to **Preparing**, the food ticket is instantly pushed to the Kitchen Display System (KDS), and the Web Bluetooth thermal receipt printer pre-warms its print connection to issue the kitchen slip.
+
+> [!IMPORTANT]
+> **1-Hour Auto-Rejection Safeguard:**  
+> If an incoming mobile delivery order remains in **Pending** status for more than **1 hour** without being accepted by a cashier or branch manager, the system's automated scheduler marks the order as **Rejected** with the reason *"Auto-cancelled: Order not accepted within 1 hour"*. This protects customers from indefinite waiting times during peak periods.
+
+#### 2. Rejecting an Order
+- If the store cannot fulfill the order (e.g., due to ingredient shortages or closing hours), click **Reject Order**.
+- The **Reject Order Modal** opens, allowing staff to enter an explanation reason (e.g., *"Out of takoyaki batter"*, *"Kitchen closed"*).
+- Confirming marks the order as **Cancelled / Rejected** and immediately notifies the customer via the mobile app.
+
+#### 3. Dispatching to Rider
+- Once food preparation is complete and the order is marked *Ready* on the KDS, click **Hand to Rider**.
+- The **Assign Rider Modal** opens, displaying all active branch-assigned riders with their contact numbers and current active deliveries.
+- Select an available rider and click **Assign**. Status advances to **Handed to Rider**, notifying the rider's mobile delivery application.
+
+#### 4. Completing an Order
+- Once the rider drops off the food and uploads the digital Proof of Delivery photo, click **Complete Order** to finalize the order ledger.
+
+---
 
 ### 7.6 Managing POS Draft Orders
 
-- **Resume Draft:** Open a Drafted order and click **Resume Order**. The items, options, order type, and table reference are loaded into the active POS session and the user is redirected to POS.
-- **Delete Draft:** Click **Delete Draft** to permanently remove an abandoned held cart.
+- **Resume Draft:** Select any held order in *Drafted* status and click **Resume Order**. The system transfers all items, selected options, special instructions, discount flags, order type, and table references directly into the active POS cart and redirects the user to the POS console (`/pos`).
+- **Delete Draft:** Click **Delete Draft** with confirmation to permanently remove an abandoned cart.
+
+---
 
 ### 7.7 Processing Refunds
 
-- **Authorized Roles:** Super Admin, Admin.
-- Available for completed orders within the refund window that have an eligible refundable balance.
+- **Authorized Roles:** Super Admin, Branch Administrator.
+- Available for completed orders that maintain an eligible refundable balance.
 
-1. Open the completed order and click **Refund**.
-2. Enter the Refund Amount (must not exceed the refundable balance) and a mandatory Refund Reason.
-3. Click **Submit Refund**. The refunded amount is logged, deducted from revenue totals, and recorded on the order ledger.
+1. Open the order row to open the order inspector and click **Refund**.
+2. Enter the **Refund Amount** (validated to never exceed the remaining refundable balance) and provide a mandatory **Refund Reason**.
+3. Click **Submit Refund**. The refunded amount is deducted from financial revenue totals, logged in the financial ledger, and permanently stamped onto the order timeline.
+
+---
 
 ### 7.8 Voiding an Order
 
-- **Authorized Roles:** Super Admin, Admin.
+- **Authorized Roles:** Super Admin, Branch Administrator.
 
-1. Open the order and click **Void Order**.
-2. Confirm the action.
-3. Voiding is permanent and irreversible. The order is excluded from all revenue calculations. Inventory deductions are reversed where applicable. This applies even to orders where a GCash payment was already verified and locked at the POS.
+1. Open the order in the inspector drawer and click **Void Order**.
+2. Review the confirmation alert and confirm.
+3. Voiding is permanent and irreversible:
+   - The transaction is completely zeroed out and excluded from financial revenue reports.
+   - Any raw material stock deducted during order creation is restored to branch inventory balances via automated reverse movements.
+   - This applies even to orders where a GCash payment was previously verified and locked at the POS terminal.
 
-### 7.9 Order Detail Panel
+---
 
-Click any order row to open the detailed slide-out inspector. It has two tabs:
+### 7.9 Order Detail Panel (Slide-Out Inspector)
+
+Clicking any order row opens a comprehensive slide-out inspector with two dedicated tabs:
 
 #### General Information Tab
-
-- Transaction source (App or POS), assigned branch, status, cashier or processor name, and creation timestamp.
-- Customer details for app orders: name, phone number, and delivery address.
-- Proof of Delivery section: rider photo captured upon delivery (click to view full-screen), rider name, capture timestamp, and a link to view the delivery location on a map.
-- Itemized breakdown: products, chosen options, modifiers, quantities, unit prices, and line totals.
-- Financial summary: subtotal, discount, delivery fee, grand total, and any refunded amounts.
+- **Metadata:** Transaction source (App or POS), assigned branch, current status, cashier or processor name, and exact placement timestamp.
+- **Customer Information:** Customer name, phone number, delivery address, and GPS coordinates for app orders.
+- **Proof of Delivery (POD):** For completed delivery orders, displays the physical delivery photo taken by the rider (click to expand full-screen), rider name, completion timestamp, and a map view link.
+- **Itemized Breakdown:** Detailed list of products, chosen options, modifiers, item-level special instructions, quantities, unit prices, and line subtotals.
+- **Financial Summary:** Subtotal, regular discounts, senior/PWD discounts, service charges, delivery fees, grand total, and any recorded refund amounts.
 
 #### Activity Timeline Tab
+- A chronological milestone log detailing every state transition (e.g., *Placed → Accepted → Preparing → Ready → Handed to Rider → Delivered/Completed*), complete with exact timestamps and the authenticated user who initiated each action.
 
-- A chronological activity timeline showing every status milestone with timestamps and the user who triggered each change.
+---
 
 ### 7.10 Viewing and Printing Receipts
 
-1. Click **Print Receipt** from the order inspector to open the thermal receipt preview, which includes the business name, logo, address, TIN, itemized product list, financial summary, footer message, and a customer review QR code.
-2. Click **Print** to send the job to the paired thermal printer.
+1. Click **Print Receipt** from the order inspector to open the thermal receipt preview.
+2. The preview displays the store header, business logo, TIN, address, order reference barcode, itemized product list with customizations, discount lines, VAT calculations, and the customer feedback QR code.
+3. Click **Print** to send the ESC/POS print job directly to the paired Web Bluetooth thermal printer.
 
 ---
 
@@ -756,27 +943,29 @@ Click any ingredient row to expand its Batch Detail View, which shows each batch
 
 ### 12.5 Expiry Tracking and Batch Disposal
 
-Switching to the Expiry Tracking tab displays all tracked physical stock batches.
+Switching to the **Expiry Tracking** tab displays all tracked physical stock batches across the branch.
 
-
-
-| Status | Condition |
+| Status | Condition & Visual Indicator |
 |---|---|
-| Expired | Batch expiry date is earlier than today. Displayed with a red warning badge. |
-| Expiring Soon | Batch expires within the configured alert window (7 days or fewer). |
-| Fresh | Batch expires beyond the alert window. |
-| Non-Perishable | No expiration date set. |
+| **Expired** | Batch expiry date is prior to today. Flagged with a prominent red badge. |
+| **Expiring Soon** | Batch expires within the configured alert window (7 days or fewer). Flagged with an amber badge. |
+| **Fresh** | Batch expires beyond the alert window. Flagged with a green badge. |
+| **Non-Perishable** | No expiration date specified (e.g., packaging supplies). |
 
+#### Batch Disposal Workflow
+1. Locate the expired or damaged batch in the Expiry Tracking table.
+2. Click the **Dispose Batch** button (trash can icon).
+3. Review the **Batch Disposal Confirmation Modal**, which details the batch ID, ingredient name, unit cost, and exact quantity to be discarded.
+4. Click **Confirm Disposal**. The batch quantity is immediately zeroed out, the branch stock balance is decremented, and a permanent **Waste Movement** is recorded in the ledger with the user's ID, branch ID, and timestamp.
 
-
-1. Locate the expired batch in the Expiry Tracking table.
-2. Click .
-3. Review the Batch Disposal confirmation showing the batch ID, ingredient name, and quantity to be discarded.
-4. Click . The batch quantity is immediately zeroed out, the branch stock balance is decremented, and a permanent waste movement is logged with the responsible user's ID and timestamp.
+---
 
 ### 12.6 Automated Daily Email Alerts
 
-The system features an automated notification service that executes once per day. Super Admins receive a consolidated report for all branches; Branch Admins receive a localized report for their branch. The alert contents include all low-stock items needing reorder, batches expiring in the next 7 days, and batches requiring immediate disposal. A concurrency lock prevents duplicate emails when multiple staff log in simultaneously.
+The system features an automated notification service that executes daily at 6:00 AM:
+- **Super Admins:** Receive a consolidated enterprise report summarizing low-stock deficits, soon-to-expire batches, and critical stockouts across all branches.
+- **Branch Administrators:** Receive a localized digest specific to their branch.
+- **Deduplication Lock:** A background concurrency mutex ensures the digest email is dispatched only once per day, preventing duplicate emails when multiple staff members log in concurrently.
 
 ---
 
@@ -784,77 +973,70 @@ The system features an automated notification service that executes once per day
 
 ### 13.1 Overview
 
-The Stock Adjustment and Inventory Logistics module records supplier procurement, kitchen waste, manual inventory adjustments, and physical stock reconciliations. It is the immutable audit and reconciliation engine.
+The Stock Adjustment and Inventory Logistics module manages supplier procurement, kitchen waste logging, manual inventory adjustments, and physical stocktaking reconciliations. It serves as the immutable audit engine for all raw material movements.
 
--  Super Admin and Branch Admin.
--  Cashier.
+- **Authorized Roles:** Super Admin and Branch Administrator.
+- **View-Only Access:** Cashiers have read-only access to view ledger balances.
+- **Central Commissary Rule:** Only the designated **Main Branch** is authorized to record supplier **Procurement (Stock In)**. Satellite branches receive inventory through **Branch Stock Transfers** (Section 14) and are limited to logging **Waste**, **Stock Out**, or physical count reconciliations.
+- **FEFO Guarantee (First-Expired, First-Out):** Any stock reduction (waste, stock out, or negative reconciliation deficit) automatically deducts inventory from the earliest-expiring batch first.
 
- Only the designated Main Branch can record supplier Procurement (Stock In). Satellite branches receive stock through Branch Stock Transfers (Section 14) and can only record Waste or Stock Out entries.
-
- Any stock reduction (waste, stock out, or negative reconciliation variance) is processed by automatically deducting from the earliest-expiring batch first.
+---
 
 ### 13.2 Audit Ledger and Period KPI Cards
 
-The top of the ledger displays live metrics based on the active date filter:
+The top of the adjustment console features four live operational counters based on the active date filter:
 
 | Metric | Description |
 |---|---|
-| Period Logs | Total number of inventory change movements recorded in the period. |
-| Waste Count | Total quantity of spoiled, damaged, or expired stock discarded. |
-| Restock Value | Total monetary acquisition cost of procurement receipts recorded. |
-| Out Count | Total count of items manually reduced or checked out. |
+| **Period Logs** | Total number of inventory change movements recorded within the filtered date range. |
+| **Waste Count** | Total volume of spoiled, contaminated, or expired ingredients logged as waste. |
+| **Restock Value** | Total monetary acquisition cost of procurement receipts recorded at the branch. |
+| **Out Count** | Total volume of raw materials manually checked out for non-sales purposes. |
 
+#### Filtering and Audit Export
+- Filter movements by Reference ID, ingredient name, movement type, or attendant.
+- Quick date presets (*Today*, *This Week*, *This Month*, *All Time*) or custom calendar date ranges.
+- Click **Export Ledger** to download an immutable audit spreadsheet (CSV or PDF) formatted with Date, Branch, Ingredient, Type, Quantity, Reference ID, and Responsible Attendant.
 
-- Search by Reference ID, ingredient name, or remarks.
-- Use the date filter presets (Today, This Week, This Month, All Time) or a custom date range.
-- Click  to download an immutable audit spreadsheet formatted with Date, Branch, Ingredient, Type, Quantity, Reference ID, and Attendant.
+---
 
 ### 13.3 Adjustment Queue Engine
 
-Instead of saving adjustments one by one, the system uses an Adjustment Queue to stage and review multiple movements before committing them to the database.
+To prevent incomplete transaction commits, the system uses an **Adjustment Queue** that stages multiple inventory entries for review before writing them atomically to the database.
 
-
-
-| Type | Description |
+| Movement Type | Operational Purpose |
 |---|---|
-| Procurement / Stock In | Used when receiving fresh deliveries from suppliers. Creates a new stock batch with reference, quantity, and expiry date. Main Branch only. |
-| Waste | Logs spoiled, contaminated, or expired ingredients. Deducts stock via FEFO and flags the movement as kitchen loss. |
-| Stock Out | Logs inventory consumed for non-sales purposes (for example, taste testing, promotions). Deducts stock via FEFO. |
-| Return to Supplier | Reverses defective stock deliveries and logs supplier return credits. |
+| **Procurement / Stock In** | Used when receiving fresh deliveries from suppliers. Creates a new stock batch with batch number, quantity, acquisition cost, and supplier expiration date. (*Main Branch only*). |
+| **Waste** | Logs spoiled, contaminated, dropped, or expired ingredients. Deducts stock via FEFO and flags the monetary value as kitchen loss. |
+| **Stock Out** | Logs inventory consumed for non-sales purposes (e.g., taste testing, staff training, marketing demonstrations). Deducts stock via FEFO. |
+| **Return to Supplier** | Reverses defective stock deliveries and logs supplier return credits. |
 
+#### Staging Adjustments Step by Step
+1. Navigate to **Stock Adjustment** from the sidebar.
+2. Click **New Adjustment** to open the adjustment staging drawer.
+3. Select an ingredient from the dropdown.
+4. Select the **Movement Type** (Procurement, Waste, Stock Out, or Return).
+5. Enter the quantity. For procurement, select the packaging unit (e.g., Box, Sack), enter the supplier purchase price, and set the expiration date.
+6. Click **Add to Queue**. The item is added to the staged list. Repeat for any additional ingredients.
+7. Enter optional operational remarks or supplier invoice reference numbers.
+8. Click **Commit Adjustments** and confirm. All queued entries are committed in a single atomic database transaction.
 
+> [!TIP]
+> **Automatic Unit Cost Re-indexing:** When procurement is logged in bulk packaging units (e.g., Box of 12 Bottles), the system automatically divides the invoice cost down to the base recipe unit (e.g., per ml) and updates the ingredient's active master cost. This ensures subsequent COGS calculations reflect current supplier pricing.
 
-1. Navigate to Stock Adjustment.
-2. Click .
-3. In the sidebar, choose an ingredient, enter a quantity, select the movement type, and click .
-4. Repeat for additional items.
-5. Enter optional notes.
-6. Click  and confirm. All movements are committed as a single atomic transaction.
-
-
-
-1. Ensure the active branch is set to the Main Branch.
-2. Click .
-3. Select an ingredient with bulk packaging defined.
-4. Select the packaging unit button (for example, Box) and enter the quantity received.
-5. Enter the purchase price per unit and the supplier expiry date.
-6. Click , review the queue, and click .
-
-When a bulk unit is selected and a purchase price is entered, the system converts the cost to a per-base-unit rate and updates the ingredient master cost so future profitability calculations reflect the new purchase price.
+---
 
 ### 13.4 Physical Count Reconciliation
 
-The Stock Reconcile mode streamlines end-of-day or end-of-month physical stocktaking.
+The **Stock Reconcile** mode streamlines daily, weekly, or monthly physical inventory audits:
 
-
-
-1. Click  from the main adjustment toolbar.
-2. The system loads every ingredient for the selected branch alongside its current ledger balance (System Quantity).
-3. Staff enter the physically counted inventory in the Actual Quantity column.
-4. The system calculates the variance: Actual Quantity minus System Quantity.
-   - Negative variance (deficit): The system runs a FEFO deduction to retire the missing stock and logs the movement.
-   - Positive variance (surplus): The system creates a new untracked batch and increments the ledger balance.
-5. Click  and confirm. Only rows with entered actual counts are updated; untouched rows remain unchanged.
+1. Click **Stock Reconcile** from the main adjustment toolbar.
+2. The reconciliation table displays every tracked ingredient for the active branch alongside its current ledger balance (**System Quantity**).
+3. Staff conduct a physical count and type the verified count into the **Actual Quantity** column.
+4. The system calculates the variance in real time: `Variance = Actual Quantity - System Quantity`.
+   - **Negative Variance (Deficit):** The system automatically executes a FEFO deduction to retire the missing stock and logs a reconciliation shortage movement.
+   - **Positive Variance (Surplus):** The system creates a new untracked adjustment batch to increment the branch balance to match reality.
+5. Click **Reconcile Inventory** and confirm. Only rows with entered actual counts are updated; untouched rows remain unchanged.
 
 ---
 
@@ -862,95 +1044,109 @@ The Stock Reconcile mode streamlines end-of-day or end-of-month physical stockta
 
 ### 14.1 Overview
 
-The Branch Stock Ordering and Transfer System manages internal supply chain replenishment between the central commissary (Main Branch) and satellite retail branches.
+The Branch Stock Ordering and Inter-Branch Transfer System manages internal supply chain replenishment between the central commissary (**Main Branch**) and satellite retail store locations.
 
-The system operates across two consoles:
+The system operates across two specialized consoles:
 
-1.  The satellite branch interface where branch managers audit deficits, assemble replenishment carts, submit orders, and confirm delivery receipts.
-2.  The central commissary console where Super Admins review pending requests, adjust approved quantities, approve or reject orders, and dispatch physical transfers.
+1. **Satellite Branch Console (`BranchStockOrder`):** Used by branch managers to audit inventory deficits, assemble replenishment carts, submit supply orders, track transit progress, and confirm delivery receipts.
+2. **HQ Commissary Console (`BranchStockOrderAdmin`):** Used by Super Admins and commissary managers to review pending store requests, adjust approved quantities, set logistics delivery fees, approve or reject orders, and dispatch physical stock transfers.
 
->  The central Main Branch acts exclusively as the internal supplier. It cannot initiate stock requests to itself. If the active branch context is set to the Main Branch, the ordering interface will display an access restriction.
+> [!NOTE]
+> **Central Commissary Exclusive Supplier Rule:**  
+> The designated central Main Branch acts exclusively as the upstream supplier and warehouse. It cannot initiate replenishment requests to itself. If a user's operating context is set to the Main Branch, the satellite ordering interface is automatically disabled.
+
+---
 
 ### 14.2 Satellite Branch Ordering Console
 
-Satellite branch managers manage replenishment through three panels:
+Satellite branch managers manage replenishment through three tabs:
 
-| Panel | Purpose |
+| Panel | Purpose & Capabilities |
 |---|---|
-| Active Requests | Track pending, approved, and in-transit orders. |
-| New Stock Request | Interactive cart with packaging selectors and low-stock helpers. |
-| Transfer History | Historical archive of all delivered and cancelled internal shipments. |
+| **Active Requests** | Monitor pending, approved, packing, and in-transit orders with live timeline updates. |
+| **New Stock Request** | Interactive ordering workbench with packaging unit selectors, deficit alerts, and cost calculations. |
+| **Transfer History** | Historical archive of all delivered, rejected, and cancelled internal shipments. |
 
+#### Low-Stock Deficit Assistant
+- The ordering console continuously monitors local ingredient balances against configured reorder thresholds.
+- Depleted or deficit items display an amber warning badge with an **Add to Cart** shortcut.
+- Clicking the shortcut automatically calculates the deficit quantity needed to restore optimal stock levels and stages it directly into the order cart.
 
-- The ordering interface monitors branch ingredient balances against configured minimum thresholds.
-- Deficit items display an amber warning with an Add to Cart shortcut.
-- Clicking the shortcut automatically calculates the replenishment quantity and stages it into the order cart.
+#### Real-Time Commissary Stock Verification
+- When entering a requested quantity, the system performs a real-time inventory check against live balances at the Main Branch.
+- If the requested quantity exceeds available commissary stock, an on-screen warning is displayed to prevent requesting unavailable supplies.
 
+#### Request Priority Levels
 
-- When entering a requested quantity, the system checks the live inventory balance at the Main Branch.
-- If the requested quantity exceeds available stock, an error is displayed and the order cannot be submitted.
-
-
-
-| Level | Description |
+| Level | Operational Urgency |
 |---|---|
-| Normal | Standard weekly or bi-weekly restocking cycle. |
-| Urgent | Rapid depletion; stock projected to run out within 24 to 48 hours. |
-| Critical | Zero stock or immediate risk of halting operations. High-visibility indicator shown on the HQ dashboard. |
+| **Normal** | Standard weekly or scheduled restocking cycle. |
+| **Urgent** | Rapid depletion; stock projected to run out within 24 to 48 hours. |
+| **Critical** | Zero stock or immediate risk of halting store operations. High-visibility red banner displayed on the HQ admin console. |
+
+---
 
 ### 14.3 Logistics and Delivery Fee Calculation
 
-Inter-branch shipments use an automated geographic distance calculation engine. The system calculates the straight-line distance in kilometers between the Main Branch and the requesting satellite branch using their stored GPS coordinates. The delivery fee is then computed as follows:
+Inter-branch shipments use an automated geodesic distance calculation engine based on stored GPS coordinates:
 
-- Base Fee + (Distance in km x Rate per km)
-- The result is clamped between a configured minimum and maximum fee.
-- If the order subtotal exceeds a configured free-delivery threshold, the fee is waived.
-- Super Admins can manually adjust or waive the suggested logistics fee during fulfillment review.
+$$\text{Logistics Fee} = \text{Base Fee} + (\text{Distance in km} \times \text{Rate per km})$$
 
-Default parameters: Base Fee 0.00, Rate 50.00 per km, Minimum Fee 0.00, Maximum Fee Cap 5,000.00, Free Delivery Threshold 10,000.00 or above.
+- **Clamping:** The calculated fee is clamped between a configured Minimum Fee and Maximum Fee Cap.
+- **Free Delivery Threshold:** If the order subtotal exceeds the configured threshold, the delivery fee is automatically waived (`₱0.00`).
+- **HQ Manual Override:** Super Admins can manually adjust or waive the suggested logistics fee during fulfillment review.
+
+---
 
 ### 14.4 The 5-Stage Order Fulfillment Lifecycle
 
- The satellite branch submits the order. The branch can cancel at any time prior to approval. Only one pending request is permitted per branch at a time.
+```
+[1. Pending] ──> [2. Approved] ──> [3. Preparing] ──> [4. In Transit] ──> [5. Delivered]
+      │               │
+      └──> Cancelled  └──> Rejected
+```
 
- The Super Admin reviews the request, adjusts approved quantities if needed, confirms the logistics fee, and clicks Approve Request.
+1. **Stage 1 — Pending:** The satellite store submits the stock request. Branch managers can modify or cancel the request at any time prior to approval. Only one active pending request is permitted per branch at a time.
+2. **Stage 2 — Approved:** The Super Admin reviews the request at HQ, adjusts approved quantities if needed, verifies stock, confirms or modifies the logistics fee, and clicks **Approve Request**.
+3. **Stage 3 — Preparing:** Commissary warehouse staff pull items from physical storage and pack the crates.
+4. **Stage 4 — In Transit (Dispatched):** The Super Admin clicks **Dispatch Order**. The system generates an official Stock Transfer document, deducts inventory from Main Branch batches using **FEFO**, and creates transit staging records. Paired audit logs are written for both branches.
+5. **Stage 5 — Delivered (Completed):** The physical shipment arrives at the satellite branch. The branch manager inspects the crates, verifies quantities, and clicks **Confirm Delivery**. The transferred batches are committed to the branch ledger (preserving original supplier expiry dates and acquisition unit costs), and the order is archived to Transfer History.
 
- Commissary staff pull items from the warehouse and prepare the shipment.
-
- The Super Admin clicks Dispatch Order. The system creates an official Stock Transfer document, deducts stock from Main Branch batches using FEFO, and clones those batches into the receiving branch's inventory ledger (preserving original expiry dates and unit costs). Paired audit logs are generated for both branches.
-
- The shipment arrives at the satellite store. The branch manager inspects the physical delivery, clicks , and the order is archived to Transfer History.
-
-Orders may also end in Rejected or Cancelled status.
+---
 
 ### 14.5 Submitting a Stock Request — Step by Step
 
-1. Navigate to Stock Ordering.
-2. Switch to the New Stock Request tab.
-3. Review low-stock alerts and click  for deficit items.
-4. To add custom items: select an ingredient, choose a packaging unit, enter the requested quantity, and click .
-5. Select a Priority Level.
-6. Enter optional notes for the HQ team.
-7. Review the estimated delivery fee and order total.
-8. Click  and confirm.
+1. Navigate to **Stock Ordering** (`/stock-orders`).
+2. Switch to the **New Stock Request** tab.
+3. Review low-stock deficit alerts and click **Add to Cart** for depleted ingredients.
+4. To add custom items: select an ingredient, choose a packaging unit (e.g., *Box*, *Sack*, *Bottle*), enter the requested quantity, and click **Add to Cart**.
+5. Select the **Priority Level** (*Normal*, *Urgent*, or *Critical*).
+6. Enter optional delivery instructions or remarks for HQ.
+7. Review the estimated delivery fee, subtotal, and total cost.
+8. Click **Submit Order** and confirm.
+
+---
 
 ### 14.6 Approving and Dispatching an Order — Step by Step (HQ Admin)
 
-1. Navigate to Stock Orders Admin.
-2. In the Inbox panel, locate the pending request and click .
-3. Verify stock availability at the Main Branch.
-4. Adjust approved quantities if needed.
-5. Review or adjust the calculated delivery fee.
-6. Enter optional admin remarks.
-7. Click .
-8. Once items are packed, click .
-9. When the shipment departs, click .
+1. Navigate to **Stock Orders Admin** (`/stock-orders-admin`).
+2. In the Inbox panel, locate the pending request and click **Review**.
+3. Verify ingredient availability against Main Branch inventory.
+4. Adjust the **Approved Quantity** per line item if stock is limited.
+5. Review the calculated distance and logistics fee; apply fee overrides if necessary.
+6. Enter optional administrative remarks.
+7. Click **Approve Request**.
+8. Once items are pulled from storage and packed, click **Mark as Preparing**.
+9. When the delivery vehicle departs, click **Dispatch Order**. Main Branch stock is deducted immediately via FEFO.
+
+---
 
 ### 14.7 Confirming Delivery Receipt — Step by Step
 
-1. In Stock Ordering, locate the order under Active Requests (status: In Transit).
-2. Inspect the physical items received against the order summary.
-3. Click . The shipment is archived to Transfer History and branch balances are permanently finalized.
+1. In the satellite store's **Stock Ordering** console, locate the order under **Active Requests** (status: *In Transit*).
+2. Physically inspect all delivered items against the digital dispatch manifest.
+3. Click **Confirm Delivery**.
+4. The system increments the local branch inventory, writes matching batch records, and archives the transfer to **Transfer History**.
 
 ---
 
@@ -958,53 +1154,63 @@ Orders may also end in Rejected or Cancelled status.
 
 ### 15.1 Overview
 
-The Branch Management module governs the multi-store operational network. It allows centralized provisioning of physical stores, geographic routing, manager assignments, and network performance auditing.
+The Branch Management module governs the multi-store physical network. It provides centralized provisioning of store locations, geographic mapping, manager assignments, and cross-branch operational auditing.
 
--  Super Admin only.
+- **Authorized Role:** Super Admin only. Branch Admins and Cashiers are restricted from this module.
+
+---
 
 ### 15.2 Key Capabilities
 
- When entering a new branch name, the system automatically generates a unique, standardized branch code prefixed with MTC- (for example, "SM City Novaliches" becomes "MTC-SMCN"). This can be accepted or customized.
+- **Automated Branch Code Generation:** When typing a new branch name, the system automatically generates a standardized code prefixed with `MTC-` (e.g., *"SM City Santa Rosa"* produces `MTC-SMSR`), which can be accepted or customized.
+- **PSGC Address Integration:** Structured Philippine Standard Geographic Code hierarchy: Region, Province, City or Municipality, Barangay, and Street address.
+- **Interactive Leaflet Geo-Mapping:** An interactive map allows administrators to drop or drag a pin to automatically capture exact latitude and longitude GPS coordinates.
+- **Geodesic Distance Matrix:** Uses captured coordinates to calculate road and transit distances from the Main Branch, driving automated logistics fee calculations.
+- **Accountable Manager Assignment:** Every active branch must have an assigned Branch Manager. A manager can only be assigned to one store at a time. Assigning a manager to a new branch automatically releases them from their previous store.
 
- Branch addresses are structured using the Philippine Standard Geographic Code: Region, Province, City or Municipality, Barangay, and Street. An interactive map allows administrators to drag a pin or click a location to capture exact GPS coordinates.
-
- Once GPS coordinates are saved, the system calculates the geodesic distance from the Main Branch. This distance automatically determines the logistics delivery fee for stock replenishment requests.
-
- A branch cannot be set to Active status without an assigned Branch Manager. Each manager can only be assigned to one branch at a time. Assigning a manager to a new branch automatically decouples them from their previous store.
+---
 
 ### 15.3 Adding and Editing a Branch
 
-1. Navigate to Branch Management.
-2. Click  or select an existing branch to edit.
-3. Fill in the required details.
+1. Navigate to **Branch Management** from the sidebar.
+2. Click **Add Branch** (or click **Edit** on an existing branch card).
+3. Complete the branch form:
 
 | Field | Description |
 |---|---|
-| Branch Name and Identifier | The public-facing branch name. The system auto-generates a branch code. |
-| Contact Information | Branch phone number and email address. |
-| PSGC Address | Full Philippine Standard Geographic Code address: Region, Province, City, Barangay, and Street. |
-| Geo-Coordinates | Latitude and longitude, captured via the interactive map pin. |
-| Operating Hours | When the branch is officially open for system operations. |
-| Branch Manager | Select an active, unassigned user to serve as the accountable manager. |
-| Status | Active or Inactive. |
+| **Branch Name & Identifier** | The public-facing store name and unique `MTC-` branch identifier code. |
+| **Contact Information** | Official branch phone number and email address. |
+| **PSGC Address** | Full Philippine address hierarchy: Region, Province, City, Barangay, and Street. |
+| **Geo-Coordinates** | Latitude and Longitude coordinates captured by clicking on the interactive map canvas. |
+| **Operating Hours** | Official opening and closing hours for system operations. |
+| **Branch Manager** | Select an active, registered user with Role 2 (Admin) to serve as the branch manager. |
+| **Status** | Active or Inactive. |
 
-4. Click  and confirm.
+4. Click **Save Branch** and confirm.
 
-### 15.4 Managing Branch Active Status
+---
 
--  The branch is fully operational. Its POS is live and it appears in the customer-facing delivery application.
--  All POS operations for that branch are suspended immediately. The branch is removed from the delivery app. All historical data is preserved.
+### 15.4 Managing Branch Operational Status
 
-### 15.5 Decommissioning a Branch
+- **Active:** The store is fully operational. Its POS terminals are unlocked, KDS is enabled, and the location is visible for order placement in the customer mobile delivery app.
+- **Inactive:** Suspends all POS operations for the branch immediately. The branch is hidden from the mobile delivery app. All historical financial, order, and stock records remain intact.
 
-Decommissioning a store is protected by strict safety locks:
+---
 
--  If the branch has registered staff members, deletion is blocked. The Super Admin must transfer staff to another branch in User Management first.
--  If a manager is assigned, the system prompts a confirmation dialog. Confirming safely sets the manager's branch assignment to null and decommissions the branch within a database transaction.
+### 15.5 Safe Branch Decommissioning
 
-### 15.6 Multi-Branch Insights
+Decommissioning a store is protected by database integrity checks:
+- **Staff Transfer Safeguard:** If a branch has registered staff members (Cashiers or Riders), deletion is blocked. The Super Admin must transfer or reassign all personnel in User Management first.
+- **Manager Decoupling:** If an active manager is assigned, confirming branch deletion safely resets the user's branch assignment to null within an atomic database transaction.
 
-Switching to the Insights panel allows Super Admins to select multiple branches and run comparative audits across custom date ranges, including comparative revenue, order volume, average ticket value, and active personnel per location.
+---
+
+### 15.6 Multi-Branch Comparative Insights
+
+Switching to the **Insights** panel allows Super Admins to select multiple stores and run comparative performance audits across custom date ranges, analyzing:
+- Comparative Net Revenue and Gross Sales.
+- Order volume distribution and ticket size averages.
+- Active personnel ratios and operational fulfillment efficiency.
 
 ---
 
@@ -1012,126 +1218,121 @@ Switching to the Insights panel allows Super Admins to select multiple branches 
 
 ### 16.1 Overview
 
-The User and Staff Management module provides role-based identity management, access control, and staff accountability across all store locations.
+The User and Staff Management module provides centralized role-based identity management, access provisioning, and staff accountability.
 
--  Can create, edit, deactivate, and delete any account across all branches.
--  Strictly scoped to their own branch. Can only provision Staff (Role 3) for their assigned store.
--  View-only access to their own profile. Cannot create users.
+- **Super Admin:** Enterprise-wide access. Can create, edit, deactivate, and delete accounts across all branches.
+- **Branch Administrator:** Scoped strictly to their assigned branch. Can provision and manage branch Staff (Cashiers and Riders).
+- **Cashier & Rider:** Restricted to viewing and editing their own user profile.
 
-Navigate to User Management. The main directory displays a filterable, searchable list of all staff accounts:
+#### Directory Filtering & Search
+- Filter by **Role** (*Admin*, *Cashier*, *Rider*).
+- Filter by **Branch** (*Super Admin only*).
+- Filter by **Status** (*Active* or *Inactive*).
+- Switch between **Table View** (dense list) and **Card View** (visual user cards).
+- Instant search by Name, Email, Phone Number, or Employee ID.
 
-- Filter by Role: Admin, Cashier, Rider.
-- Filter by Branch (Super Admin only).
-- Filter by Status: Active or Inactive.
-- Toggle View: Table view or Card view.
-- Search by name, email, phone number, or Employee ID.
+---
 
-### 16.2 Standardized Staff Positions
+### 16.2 Standardized Staff Roles & Positions
 
-| Position | Authorization |
+| Position | Operational Responsibilities |
 |---|---|
-| Cashier | Authorized for front-of-house POS order entry, manual discounts, Cash/GCash payments, and receipt printing. |
-| Delivery Rider | Authorized for mobile order acceptance, GIS customer navigation, in-transit updates, and digital Proof of Delivery photo capture. |
+| **Branch Administrator** | Branch operational oversight, staff scheduling, local inventory adjustments, branch stock ordering, and daily reporting. |
+| **Cashier** | Front-of-house register operations, POS order entry, discount toggling, Cash/GCash tender verification, and receipt printing. |
+| **Delivery Rider** | Mobile app order acceptance, GPS customer navigation, transit status updates, and digital Proof of Delivery photo capture. |
 
-### 16.3 Manager Conflict Resolution
+---
 
-When promoting a user to Branch Administrator and assigning them to a branch that already has an active manager, the system halts and displays the Manager Conflict Modal: "Branch [Name] is currently managed by [Current Manager]. Do you want to replace them?" Confirming the replacement safely unassigns the prior manager.
+### 16.3 Manager Conflict Resolution Modal
 
-### 16.4 Adding a New User
+When assigning a user as Branch Administrator to a store that already has an active manager, the system halts execution and displays the **Manager Conflict Modal**:
+> *"Branch [Store Name] is currently managed by [Current Manager]. Do you want to replace them?"*
 
-1. Click .
-2. Complete the user form.
+Confirming safely decouples the prior manager, unsets their branch assignment, and assigns the new administrator within a database transaction.
+
+---
+
+### 16.4 Provisioning a New User — Step by Step
+
+1. Navigate to **User Management** and click **Add User**.
+2. Complete the user profile:
 
 | Field | Description |
 |---|---|
-| First Name, Middle Name, Last Name | Employee's full legal name (auto-capitalized). |
-| Email Address | Used as the login credential. Must be unique system-wide. |
-| Phone Number | 10-digit local mobile number (stored with the +63 prefix). |
-| Password | At least 8 characters with one uppercase, one lowercase, and one number. |
-| Role | Admin, Cashier, or Rider. |
-| Position | Cashier or Delivery Rider. |
-| Employee ID | Optional internal identification code. |
-| Date Hired | Official employment start date. |
-| Branch | Assigned branch. Super Admins can assign any branch; Admins are locked to their own branch. |
-| Address | Full PSGC address and optional GPS coordinates for rider dispatch mapping. |
+| **Full Legal Name** | First Name, Middle Name, and Last Name (auto-formatted). |
+| **Email Address** | Used as the login credential. Must be unique system-wide. |
+| **Phone Number** | 10-digit Philippine mobile number (+63 format). |
+| **Password** | Minimum 8 characters; requires at least one uppercase letter, one lowercase letter, and one number. |
+| **Role & Position** | Select Role (Admin, Cashier, or Rider) and functional position. |
+| **Employee ID** | Optional corporate employee reference tag. |
+| **Date Hired** | Official employment start date. |
+| **Branch Assignment** | Assigned store (Super Admin can assign any branch; Branch Admins are locked to their own store). |
+| **Address** | Full PSGC address and optional GPS home coordinates. |
 
-3. Click .
+3. Click **Create User** and confirm.
 
-### 16.5 Editing a User Profile
+---
 
-1. Select any user from the directory and click .
-2. All fields are editable, including role, branch assignment, and status.
-3. To reset a user's password, enter a new password in the password fields. Leave both blank to keep the current password unchanged.
-4. Click  to save.
+### 16.5 Editing Profiles & Password Resets
 
-### 16.6 Viewing Staff Performance History
+1. Select any user from the directory and click **Edit**.
+2. Update role, branch assignment, contact information, or status.
+3. **Password Reset:** Type a new password into the password fields. Leave both fields blank to preserve the existing password.
+4. Click **Save Changes**.
 
-Clicking  on any user opens their operational performance dashboard with three tabs:
+---
 
+### 16.6 Staff Performance Dashboard
 
-- Total orders processed (as cashier or rider)
-- Total sales facilitated (monetary value)
-- Average order value
-- Order completion rate (%)
-- Recent activity (orders in the last 7 days)
+Clicking **View Performance** on any staff member opens their operational performance dossier:
 
+- **Performance Overview Tab:** Total orders processed, total revenue facilitated, average ticket value, completion rate percentage, and 7-day activity velocity.
+- **Order Audit Log Tab:** Paginated, filterable log of every transaction processed or delivered by the staff member, with quick date presets and direct slide-out inspection.
+- **Profile Details Tab:** Complete demographic, role, branch assignment, and contact records.
 
-- Paginated, filterable log of every order the staff member processed or delivered.
-- Quick-filter presets: Today, Last 7 Days, Last 30 Days, All Time.
-- Click any order row to open the full Order Detail without navigating away.
+---
 
+### 16.7 Account Deactivation vs. Deletion
 
-- Full profile, role, branch assignment, and address on record.
+- **Deactivation (Toggle):** Setting an account to *Inactive* invalidates all active login sessions immediately. The user cannot log in. All historical orders, KDS records, and inventory audit trails tied to that user remain fully intact. An account can be reactivated at any time.
+- **Deletion (Super Admin Only):** Available exclusively from the user profile's **Danger Zone** with mandatory confirmation. Deletes the user identity record while safely preserving all historical order foreign keys (referencing them as `"(Deleted User)"`).
 
-### 16.7 Deactivating a User Account
+---
 
-1. Locate the user in the directory.
-2. Toggle their Active/Inactive status via the status control.
-3. Deactivation takes effect immediately. All active sessions are invalidated and the user can no longer log in.
-4. All historical order data tied to that account is preserved for auditing. A deactivation log entry is created with a timestamp.
+### 16.8 Built-In Avatar Customization Picker
 
-Reactivation is done by toggling the status back to Active at any time.
-
-### 16.8 Deleting a User Account
-
--  Super Admin only.
-- Permanently deletes the user record, available only from the user's profile Danger Zone and requires confirmation.
-- Historical orders referencing the deleted user are preserved. The user field will display as "(Deleted User)".
-
-### 16.9 Avatar Customization
-
-Users can personalize their profile avatar using the built-in avatar picker modal. Two collections are available: Foods and Animals. Each avatar features custom gradient backgrounds. Selecting or changing an avatar immediately updates the navigation bar without reloading the page. Clicking  reverts to a default initial-based avatar.
+Users can personalize their profile avatar via the built-in modal picker:
+- **Two Curated Collections:** **Foods** (e.g., Takoyaki, Ramen, Bento) and **Animals** (e.g., Shiba Inu, Cat, Panda).
+- **Dynamic Gradient Tiles:** Each avatar is rendered over a sleek gradient tile.
+- Selecting an avatar updates the user interface and navigation bar instantly without page reloads.
+- Clicking **Reset Avatar** reverts the profile to default initial-based letter avatars.
 
 ---
 
 ## 17. Customer Feedback and Reviews
 
-### 17.1 Customer Review Form (Public-Facing)
+### 17.1 Public Customer Review Portal
 
-The review form is publicly accessible with no login required. Customers access it via:
+Customers can submit feedback without creating an account or logging in:
+- **Receipt QR Code:** A dynamic QR code printed at the footer of customer thermal receipts encodes the store's unique review URL.
+- **Direct Web URL:** Accessible via the path `/review/{branch_slug}`.
 
-- A QR code printed on their thermal receipt (generated automatically by the system and encoded with the branch-specific review URL).
-- A direct link shared via SMS or digital channels.
-- The direct URL pattern: `/review/{branch}`.
+#### Submitted Feedback Data
+- **Star Rating Questions (1 to 5 Stars):** Evaluates food taste, service speed, cleanliness, and order accuracy.
+- **Open-Ended Text Questions:** Collects qualitative suggestions and customer comments.
+- **Customer Identity (Optional):** Customer name and contact number for management follow-ups.
+- **Order Reference (Optional):** Associates the review directly with a specific POS transaction.
 
-The form allows customers to submit:
+---
 
-- Answers to configurable rating questions (1 to 5 stars per question, for example, "How would you rate our food quality?")
-- Answers to open-text questions (for example, "Any suggestions for improvement?")
-- Customer name and contact number (optional, for follow-up)
-- Reference order number (optional, links the feedback to a specific POS transaction)
+### 17.2 Review Management Console
 
-The review form title, subtitle, and all question text are fully configurable by Super Admins via System Settings (Reviews tab).
+- **Authorized Roles:** Super Admin (all branches), Branch Administrator (assigned branch).
 
-### 17.2 Review Management Portal
-
--  Super Admin (all branches), Admin (their own branch only).
-
-1. Navigate to Customer Reviews.
-2. The Stats Bar at the top shows: Total Reviews, Average Rating (computed across all rating-type questions), Branch Count, and Latest Review timestamp.
-3. Use filters to narrow results: Branch (Super Admin only), Date Range, and Search (by customer name, contact number, or branch name).
-4. The review list is paginated. Click any review row to open the Review Detail drawer, which shows the customer name, contact number, submission timestamp, branch, and each question with the customer's answer and star rating.
-5. Use this data to identify underperforming areas, recognize top-rated branches, or address specific product or service feedback.
+1. Navigate to **Customer Reviews** (`/reviews`) from the sidebar.
+2. **Review Metrics Bar:** Displays Total Reviews count, Network Average Rating (out of 5.0 stars), Branch Count, and Latest Review submission timestamp.
+3. **Filtering & Search:** Filter by Branch (Super Admin only), Date Range presets, or search by customer name, phone number, or branch.
+4. **Slide-Out Review Inspector:** Click any review row to view the full questionnaire submission, customer comments, submission timestamp, and associated order reference.
 
 ---
 
@@ -1139,93 +1340,121 @@ The review form title, subtitle, and all question text are fully configurable by
 
 ### 18.1 Overview
 
-The Business Intelligence module is the primary reporting and analytics hub. It is a Consolidated Financial Ledger where every figure is derived directly from the immutable transaction record.
+The Business Intelligence module is the primary reporting and financial analytics hub of the Mister Takoyaki system. It operates on an immutable Financial Ledger where all figures are derived directly from permanent transaction, recipe deduction, and inventory waste records.
 
--  Super Admin (all branches and global network), Admin (own branch only). Cashiers are blocked from this module entirely.
-- Navigate to Business Reports. Use the Branch Selector (Super Admin only) and the Date Filter to scope all data across all tabs simultaneously.
--  Click the Export button and choose PDF (formatted report for printing or sharing), CSV (raw data for spreadsheet software), or Excel (equivalent to CSV for spreadsheet use).
+- **Authorized Roles:** Super Admin (all branches and global network view), Branch Administrator (assigned branch only). Cashiers are restricted from this module entirely.
+- **Global Scoping & Filter Sync:** The Branch Selector and Date Filter scope all analytical calculations, predictive regression models, and ledgers across all tabs simultaneously.
+- **Executive Report Generation:** Click the **Generate Report** button to export data in **PDF** (executive printable layout), **CSV** (raw spreadsheet data), or **Excel** formats.
+
+---
 
 ### 18.2 Tab 1 — Performance (Financial Summary)
 
-The default tab displays core financial KPIs for the selected period.
+The default tab summarizes the business's core financial health and revenue generation for the selected period.
 
+#### Core Financial Formulas
 
-
-| Formula | Calculation |
+| Metric | Accounting Formula |
 |---|---|
-| Gross Revenue | Net Sales plus Total Discounts. |
-| Net Sales | Total Cash and GCash Collected minus Delivery Fees minus Total Refunds. |
-| Gross Profit | Net Sales minus Total COGS minus Waste Cost (Spoilage). |
+| **Gross Revenue** | $\text{Net Sales} + \text{Total Discounts}$ |
+| **Net Sales** | $\text{Total Cash and GCash Collected} - \text{Delivery Fees} - \text{Total Refunds}$ |
+| **Gross Profit** | $\text{Net Sales} - \text{Total COGS} - \text{Wastage Loss}$ |
+| **Gross Profit Margin (%)** | $(\text{Gross Profit} \div \text{Net Sales}) \times 100$ |
+| **Average Order Value (AOV)** | $\text{Net Sales} \div \text{Completed Order Count}$ |
 
- Total COGS is calculated for every product sold using a 3-tier fallback:
-1. Branch Standard Cost (fixed unit cost in the branch's active inventory profile).
-2. Latest Purchase Price (most recent procurement cost recorded in stock intake).
-3. Global Master Cost (fallback master unit cost from the global ingredient catalog).
+#### 3-Tier COGS Cost Resolution Hierarchy
+Total Cost of Goods Sold (COGS) is calculated for every product sold using an automated 3-tier fallback lookup:
+1. **Branch Standard Cost:** Specific unit cost configured in the branch's local ingredient inventory.
+2. **Latest Purchase Price:** Most recent procurement intake price recorded at the branch.
+3. **Global Master Cost:** Global fallback unit cost from the master ingredient catalog.
 
-| Metric | Description |
+#### Key Financial Metric Indicators
+
+| Metric Card | Description & Operational Value |
 |---|---|
-| Gross Revenue | Total revenue before deductions. |
-| Net Sales | Revenue after excluding delivery fees. |
-| Order Count | Number of completed transactions. |
-| Average Order Value | Net Sales divided by Order Count. |
-| Total Discounts | Sum of all regular and Senior/PWD discounts applied. |
-| Delivery Fees Collected | Total delivery charges added to orders. |
-| Refunds Issued | Total monetary value of all refunded orders. |
-| Ingredient Costs (COGS) | Auto-calculated from recipes using the 3-tier cost lookup. |
-| Waste Costs | Financial value of all ingredients logged as Wastage or Spoilage. |
-| Gross Profit | Net Sales minus COGS minus Waste Costs. |
+| **Gross Revenue** | Total gross intake before deductions, with discount impact shown. |
+| **Net Sales** | Total money collected from product sales, excluding delivery fees and refunds. |
+| **Order Count** | Total count of successfully completed transactions. |
+| **Average Order Value (AOV)** | Average monetary spend per completed order ticket. |
+| **Total Discounts** | Aggregate value of regular discounts and statutory Senior Citizen / PWD discounts applied. |
+| **Delivery Fees Collected** | Total delivery surcharge collected on mobile delivery orders. |
+| **Refunds Issued** | Total monetary value returned to customers through authorized refunds. |
+| **Ingredient Costs (COGS)** | Direct raw material costs consumed during food preparation, resolved via the 3-tier cost hierarchy. |
+| **Waste Costs** | Financial value of all raw materials logged as spoilage, contamination, or physical stocktake deficit. |
+| **Gross Profit** | Net operational margin after subtracting ingredient consumption and waste from net sales. |
 
-Click any metric name to open a Breakdown Panel showing the formula and a line-by-line contribution breakdown. The Revenue Trend Chart plots Gross Sales vs. Net Sales over the period, or by hour if a single day is selected. Payment Method Breakdown and Order Source Breakdown are also available.
+> [!TIP]
+> **Metric Slide-Over Analysis:** Click any financial card or metric name to open the **Metric Breakdown Panel**, displaying its calculation formula and a line-by-line category contribution breakdown.
 
-### 18.3 Tab 2 — Forecasting
+---
 
-Uses a Damped-Trend Weighted Linear Regression statistical model to predict future demand.
+### 18.3 Tab 2 — Forecasting & Prescriptive Restock Intelligence
 
+The Forecasting engine combines predictive machine learning with an actionable prescriptive procurement assistant.
 
+#### Predictive Modeling Engine (Weighted Linear Regression)
+- **Outlier Cleansing:** Automatically strips promotional anomalies and irregular sales spikes outside the $1.5 \times \text{IQR}$ (Interquartile Range) boundary before training.
+- **Exponential Recency Weighting:** More recent sales days are weighted exponentially higher than older days to capture emerging trends.
+- **Day-of-Week Seasonality:** Computes cyclical multipliers for each day of the week (Monday through Sunday) to account for weekend surges and weekday slowdowns.
+- **Damped-Trend Projection:** Damps trend slope extrapolation per future step (0.98 short-term factor; 0.85 long-term factor) to prevent runaway projections.
+- **Baseline Floor Guarantee:** Predictions are floored at a minimum of 30% of the recent rolling mean to prevent unrealistically zeroed predictions during brief operational dips.
 
--  Removes abnormal revenue spikes or promotional anomalies outside the 1.5 x IQR fences before training.
--  More recent sales days are weighted exponentially higher than older days.
--  Analyzes cyclical weekend surges and weekday slowdowns, computing specific multipliers for each day of the week.
--  Trend slope contribution decreases exponentially per future step to prevent unrealistic extrapolation (short-term damping factor: 0.98; long-term: 0.85).
--  Forecast predictions are floored at a minimum of 30% of the recent mean to prevent zeroed predictions during brief dips.
+| Model Horizon | Training Window | Prediction Horizon | Tracked Accuracy Metrics |
+|---|---|---|---|
+| **Short-Term (Daily)** | Last 60 days of daily sales | Next 7 days | MAE, RMSE, MAPE |
+| **Long-Term (Monthly)** | Last 12 months of monthly sales | Next 6 months | Direction (Growing / Stable / Declining) |
 
-| Forecast | Training Window | Prediction Horizon |
-|---|---|---|
-| Short-Term (Daily) | Last 60 days of daily sales | Next 7 days |
-| Long-Term (Monthly) | Last 12 months of monthly sales | Next 6 months |
+#### Prescriptive Restock Recommendations Engine (Actionable Procurement)
+The system translates the 7-day and 14-day sales projections directly into ingredient-level supply recommendations:
 
-Displayed data per forecast includes: predicted revenue, trend direction (Growing, Stable, or Declining), growth rate (%), and confidence level based on the number of clean data points.
+$$\text{Recommended Quantity} = \text{Projected 14-Day Demand} + \text{Safety Stock} - \text{Current Stock}$$
 
- The system continuously evaluates forecasting reliability by training on all history except the last 7 days, then comparing predictions against actual recorded sales. Metrics tracked include MAE (Mean Absolute Error), RMSE (Root Mean Square Error), and MAPE (Mean Absolute Percentage Error).
+1. **Stockout-Suppressed Demand Adjustment (+30%):** If an ingredient's current stock is zero, historical sales figures artificially understate true customer demand (you cannot sell what is not in stock). The engine automatically applies a **+30% upward correction** (`projectedDemand * 1.3`) to prevent continuous under-ordering.
+2. **Spoilage & Waste-Aware Safety Stock:** High-waste ingredients do not receive a flat safety buffer (which would only lead to further spoilage). The engine scales the safety stock buffer down from 15% to as low as 5% based on the ingredient's historical waste rate:
+   $$\text{Safety Stock \%} = \max(0.05, 0.15 - (\text{Waste Rate} \times 0.5))$$
+3. **Coverage Days:** Calculates how many days current inventory will last at projected consumption rates:
+   $$\text{Coverage Days} = \frac{\text{Current Stock}}{\text{Daily Projected Demand}}$$
+4. **Urgency Priority Classification:**
+   - **Critical (Red):** Current stock is zero (immediate stockout).
+   - **High (Amber):** Current stock covers 3 days or fewer.
+   - **Medium (Yellow):** Current stock covers 4 to 7 days.
+   - **Low (Green):** Stock comfortably covers the projected 14-day demand plus safety buffer.
+5. **Direct Workflow Integration:** Each recommendation card features a direct action button (**Open Stock Workflow** or **Review Stock**) that navigates directly to Stock Ordering (for satellite stores) or Stock Adjustment (for commissary managers).
+6. **Network-Wide Restock Summary (`loadNetworkRestockSummary`):** When viewing "All Locations (Global)", Super Admins can click **View Network Restock Summary** to aggregate demand forecasts across all network stores into a single procurement manifest for central commissary purchasing.
+7. **Prescriptive Restock CSV Export:** Click **Export Restock List (CSV)** to generate a standardized supplier reorder spreadsheet containing Ingredient Name, Unit, Current Stock, Projected Demand, Safety Stock, Recommended Order Quantity, Coverage Days, and Priority.
 
- Combines the 7-day sales forecast with product recipes to calculate how much of each ingredient will be consumed. Generates a ranked "Must Stock" list sorted by urgency. Clicking an item navigates directly to Branch Requests (satellite branches) or Stock Adjustment (main commissary).
-
->  The system requires at least 5 clean daily data points (or 3 monthly points) to produce a reliable trend line. Below that threshold, it forecasts from the recent rolling average and displays "Insufficient Data" for Trend and Confidence.
+---
 
 ### 18.4 Tab 3 — Products
 
-Provides a detailed performance breakdown of every product sold in the selected period.
+Provides granular sales performance analytics for the entire product catalog:
 
--  Ranked by units sold, with total revenue, average price, and contribution percentage of total net sales.
--  Revenue and order count grouped by product category.
--  Shows the top 3 best-selling products plotted across the days of the week or months of the year. Toggle between Weekly Mode (Monday to Sunday pattern) and Monthly Mode (January to December pattern) to identify peak selling periods.
+- **Volume & Revenue Ranking:** Best-selling products ranked by units sold, total revenue, average unit price, and percentage contribution to gross sales.
+- **Category Performance:** Revenue, volume, and order counts aggregated by product category.
+- **Seasonality Pattern Analysis:** Plots the top 3 best-selling products across time. Toggle between:
+  - **Weekly Mode:** Displays demand patterns across days of the week (Monday through Sunday).
+  - **Monthly Mode:** Displays annual demand patterns across months (January through December).
+
+---
 
 ### 18.5 Tab 4 — Operations
 
-Focuses on operational efficiency and multi-branch performance.
+Monitors operational efficiency, peak trading windows, and sales channels:
 
--  A 24-hour breakdown showing order count and revenue by hour (00:00 to 23:00), identifying peak and off-peak periods.
--  Ranks every branch by revenue and order count, showing each branch's percentage share of total network sales. Paginated and searchable.
--  Compares Walk-in POS orders against delivery app orders.
--  Proportions of Cash vs. GCash transactions.
+- **24-Hour Hourly Trading Heatmap:** Plots order count and revenue by hour (00:00 to 23:00) to identify rush hours and optimize staff shift scheduling.
+- **Branch Performance Leaderboard:** Ranks every branch by total revenue, order volume, and percentage share of network sales. Fully searchable and paginated.
+- **Fulfillment Channel Split:** Compares Walk-in POS transactions against online mobile delivery app orders.
+- **Payment Method Proportions:** Ratio of Cash transactions versus GCash (Static QR) digital payments.
+
+---
 
 ### 18.6 Tab 5 — Sales (Order Ledger)
 
-A raw, paginated Consolidated Ledger of all individual orders within the selected scope.
+A raw, paginated Consolidated Ledger of all individual orders within the selected branch and date scope:
 
-- Search by Reference Number.
-- Each row shows: reference number, branch, order type, payment method, status, cashier, and total amount.
-- Click any order row to open the full Order Detail with a complete itemized breakdown.
+- **Search & Filter:** Search by Order Reference Number, Customer Name, or Payment Method.
+- **Ledger Columns:** Reference Number, Branch, Order Type, Payment Method, Order Status, Attending Cashier, and Total Amount.
+- **Detail Slide-Over:** Click any order row to open the complete Order Detail view, displaying itemized customizations, discount breakdowns, and audit timelines.
 
 ---
 
@@ -1233,113 +1462,125 @@ A raw, paginated Consolidated Ledger of all individual orders within the selecte
 
 ### 19.1 Overview
 
-The System Settings module is the administrative control center for the business.
+The System Settings module provides centralized administrative control over business identity, POS behavior, receipt printing, inventory thresholds, and customer feedback.
 
--  Super Admin only.
--  Admin.
--  Access is completely prohibited.
+- **Super Admin:** Full access to all 8 configuration tabs.
+- **Branch Administrator:** Scoped access to operational tabs (*Inventory*, *POS Configuration*, *Reviews*, *Thermal Printer*).
+- **Cashier:** Access is restricted.
 
-Navigate to System Settings and use the tab navigation to access each configuration area.
+---
 
 ### 19.2 Tab 1 — General (Business Identity)
 
--  Super Admin only.
+- **Authorized Role:** Super Admin only.
 
 | Setting | Description |
 |---|---|
-| Business Name | The official trading name. |
-| Business Email | Primary contact email. |
-| Business Phone | 10-digit mobile contact number. |
-| Business TIN | Tax Identification Number (format: 000-000-000-000). |
-| Business Address | Full PSGC address with geo-coordinates. |
-| Business Logo | Upload a logo (JPG or PNG, maximum 1 MB). Displayed on receipts and the application header. |
+| **Business Name** | Official trading and brand name (appears on receipts, invoices, and app headers). |
+| **Business Email** | Primary administrative contact email. |
+| **Business Phone** | Official customer service contact number (+63 format). |
+| **Business TIN** | Official Tax Identification Number (format: `000-000-000-000`). |
+| **Business Address** | Full physical headquarters address with PSGC hierarchy and GPS coordinates. |
+| **Business Logo** | Upload official brand logo (PNG, JPG, or WEBP up to 1 MB). Appears on printed receipts. |
+
+---
 
 ### 19.3 Tab 2 — Receipts
 
--  Super Admin only.
+- **Authorized Role:** Super Admin only.
 
 | Setting | Description |
 |---|---|
-| Station Slips | Configurable title and subtitle for the Kitchen Slip and Barista Slip. |
-| Show Logo on Receipt | Toggle to include or exclude the business logo on printed receipts. |
-| Show VAT on Receipt | Toggle to include or exclude the VAT line on receipts. |
-| Footer Message | Custom text printed at the bottom of every receipt. |
-| Return Policy Text | Return or exchange policy printed on receipts. |
-| Number of Copies | How many receipt copies to print per transaction (1 to 3). |
-| Review QR Code | Toggle to include a customer feedback QR code on the receipt footer. A live preview is rendered on-screen. |
+| **Station Slips** | Configurable titles and subtitles for Kitchen Order Slips and Barista Drink Slips. |
+| **Show Logo on Receipt** | Toggle to print the uploaded brand logo at the top of customer receipts. |
+| **Show VAT on Receipt** | Toggle to include statutory 12% VAT calculations and VATable sales lines. |
+| **Footer Message** | Custom promotional or appreciation message printed at the bottom of customer receipts. |
+| **Return Policy Text** | Return, exchange, or refund policies printed on receipts. |
+| **Number of Copies** | Default number of receipt copies to print per transaction (1 to 3 copies). |
+| **Review QR Code** | Toggle to print an automated feedback survey QR code linked to the branch's review portal. Includes an on-screen live receipt preview. |
 
-### 19.4 Tab 3 — Inventory (Thresholds)
+---
 
--  Super Admin, Admin.
+### 19.4 Tab 3 — Inventory (Thresholds & Automated Alerts)
+
+- **Authorized Roles:** Super Admin, Branch Administrator.
 
 | Setting | Description |
 |---|---|
-| Low Stock Threshold | Stock level at which an ingredient triggers an amber warning and a low-stock notification. |
-| Critical Stock Threshold | Must be lower than the Low Stock Threshold. At this level, the ingredient triggers a red badge. The POS will block sales of products that depend on this ingredient when it reaches zero. |
-| Expiry Alert Days | Number of days before expiry that triggers an expiring-soon notification (1 to 365 days). |
-| Auto-Notifications | When enabled, automatically flags low-stock items and sends morning email alerts to branch managers. |
+| **Low Stock Threshold** | Stock balance that triggers an amber alert badge and warns staff to reorder. |
+| **Critical Stock Threshold** | Severe deficit level that triggers a red pulsing badge. POS blocks sales when ingredients hit zero. |
+| **Expiry Alert Days** | Number of days prior to expiration that triggers an *Expiring Soon* amber alert (1 to 365 days). |
+| **Auto-Notifications** | When enabled, dispatches the automated daily 6:00 AM stock deficit email to branch managers. |
+
+---
 
 ### 19.5 Tab 4 — POS Configuration
 
--  Super Admin, Admin.
+- **Authorized Roles:** Super Admin, Branch Administrator.
 
 | Setting | Description |
 |---|---|
-| Service Charge Rate | Applied as a percentage to Dine-in orders (for example, 0.10 for 10%). |
-| Regular Discount Rate | Applied when a cashier selects "Regular Discount" on a cart item. |
-| Senior/PWD Discount Rate | Applied when a cashier selects "Senior/PWD Discount" on a cart item. |
-| POS Terminal Name | The business name displayed on the POS terminal header. |
-| Enabled Order Types | Toggle which order types appear in the POS Order Method dropdown: Dine-in, Take-out, Delivery, Pick-up. |
-| Enabled Payment Methods | Toggle which payment methods appear in the POS: Cash, GCash. |
-| GCash Account Name | The merchant account name displayed on the Static QR payment screen. |
-| GCash Account Number | The 10-digit GCash mobile number. |
-| GCash Static QR Image | Upload the store's static GCash QR code image for the Static QR payment flow. |
+| **Service Charge Rate** | Percentage applied automatically to Dine-in orders (e.g., `0.10` for 10%). |
+| **Regular Discount Rate** | Default percentage applied when applying a regular discount in POS (e.g., `0.10` for 10%). |
+| **Senior/PWD Discount Rate** | Statutory discount rate for Senior Citizens and PWDs (e.g., `0.20` for 20% VAT-exempt). |
+| **POS Terminal Title** | Store header label displayed on the POS interface. |
+| **Enabled Order Types** | Toggle fulfillment types available at the terminal (*Dine-in*, *Take-out*, *Delivery*, *Pick-up*). |
+| **Enabled Payment Methods** | Toggle payment options accepted at the terminal (*Cash*, *GCash*). |
+| **GCash Merchant Name** | Official merchant account name displayed on the Static QR payment screen. |
+| **GCash Mobile Number** | Registered 10-digit GCash mobile number. |
+| **GCash Static QR Image** | Upload the store's static GCash QR code image scanned by customers at the register. |
 
-### 19.6 Tab 5 — Reviews (Customer Feedback Configuration)
+---
 
--  Super Admin, Admin.
+### 19.6 Tab 5 — Reviews (Customer Survey Configuration)
 
-| Setting | Description |
-|---|---|
-| Form Title | The headline displayed at the top of the customer review form. |
-| Form Subtitle | Subheading text displayed below the title. |
-| Review Questions | A fully configurable list of questions. Each question has a Type (Rating: 1 to 5 stars, or Text: open-ended) and a Required toggle. Add or remove questions freely. |
-
-Click  to append a new question. Click the delete icon on any existing question to remove it. A live mobile screen simulation displays the exact layout customers will see.
-
-### 19.7 Tab 6 — System (Super Admin Operating Context)
-
--  Super Admin only.
+- **Authorized Roles:** Super Admin, Branch Administrator.
 
 | Setting | Description |
 |---|---|
-| Operating Branch | Assigns the Super Admin to a specific branch context, making operational modules (POS, KDS, Inventory) show data for that branch. Selecting "General Headquarters (No Branch)" enables the next setting. |
-| Hide Operational Modules | When toggled on (or when no branch is selected), hides branch-operational modules (POS, KDS) from the Super Admin's sidebar, providing a cleaner analytics-only view. Each Super Admin's preference is saved independently. |
+| **Form Title** | Headline displayed on the public customer feedback page (`/review/{branch}`). |
+| **Form Subtitle** | Descriptive subheading text guiding customer responses. |
+| **Questionnaire Builder** | Create, reorder, or delete survey questions. Configure Question Type (**Rating: 1 to 5 Stars** or **Open Text**) and mark questions as Mandatory or Optional. |
+
+> [!NOTE]
+> **Live Interactive Simulator:** Changes to survey questions are rendered instantly in a side-by-side mobile device frame preview.
+
+---
+
+### 19.7 Tab 6 — System (Operating Context & Sidebar Toggling)
+
+- **Authorized Role:** Super Admin only.
+
+| Setting | Description |
+|---|---|
+| **Operating Branch Context** | Assigns the Super Admin to a specific branch environment, allowing direct operational use of POS, KDS, and stock ordering as a branch member. Selecting *"General Headquarters (No Branch)"* restores enterprise global overview. |
+| **Hide Operational Modules** | When enabled (or when operating from General Headquarters), hides branch-specific operational modules (POS, KDS) from the sidebar for a distraction-free executive view. |
+
+---
 
 ### 19.8 Tab 7 — Thermal Printer
 
--  Super Admin, Admin.
+- **Authorized Roles:** Super Admin, Branch Administrator.
 
 | Setting | Description |
 |---|---|
-| Printer Activation | Master toggle to enable or disable automatic printing upon transaction completion. |
-| Connection Type | Select Bluetooth (pairs via Web Bluetooth directly from the browser) or Wired/USB (scans and lists local Windows printers and serial ports). |
-| Auto-Cut Paper | Sends an ESC/POS cut command at the end of each print job. |
-| Test Connection | Prints a formatted test voucher to verify communication, alignment, and paper feed. |
+| **Printer Activation** | Master toggle to enable or disable automatic ESC/POS printing upon transaction completion. |
+| **Connection Protocol** | Select **Web Bluetooth** (direct pairing from Chrome/Edge) or **Wired/USB/Serial** (local Windows printer spooler). |
+| **Auto-Cut Paper** | Sends an ESC/POS paper cutter command at the end of each printed ticket. |
+| **Test Print Connection** | Prints a standardized alignment and hardware diagnostic voucher to verify connection. |
 
-### 19.9 Tab 8 — Logs (Audit Trail)
+---
 
--  Super Admin only.
+### 19.9 Tab 8 — Audit Logs
 
-A paginated, combined activity log sourced from three real event streams.
+- **Authorized Role:** Super Admin only.
 
-| Log Type | What It Records |
-|---|---|
-| Order Logs | Every order event: order status, reference number, and the staff member who processed it. |
-| Stock Logs | Every stock movement: ingredient name, quantity change, movement type, and the user responsible. |
-| User Logs | Account creation events: staff name and timestamp. |
+A consolidated, tamper-proof activity trail merging three critical operational streams:
+- **Order Audit Logs:** Placed orders, status transitions, voids, refunds, and attending cashier IDs.
+- **Stock Movement Logs:** Intake batches, wastage logs, reconciliation adjustments, and transfer dispatches.
+- **User Authentication Logs:** Account creations, role modifications, and login sessions.
 
-All log types are merged and sorted by timestamp (most recent first). Each entry shows the event type with a color-coded status indicator.
+All log entries are indexed chronologically with exact timestamps, user names, and IP addresses.
 
 ---
 
@@ -1347,52 +1588,49 @@ All log types are merged and sorted by timestamp (most recent first). Each entry
 
 ### 20.1 Overview
 
-Notifications provide real-time operational awareness across store operations, kitchen inventory, customer orders, and supply chain transfers.
+The Notification system delivers instant operational awareness across kitchen operations, raw material inventory thresholds, customer delivery requests, and inter-branch logistics.
 
--  Super Admin, Admin, Cashier.
+- **Authorized Roles:** Super Admin, Branch Administrator, Cashier.
 
-The system delivers notifications through two interfaces:
+#### Dual Delivery Interfaces
+1. **Header Navigation Notification Bell:**
+   - Polls background updates every 5 seconds.
+   - Displays a red badge counter of unread alerts.
+   - Clicking the bell opens a quick flyout drawer displaying the 5 most recent alerts with relative timestamps and mark-as-read buttons.
+2. **Dedicated Notification Center (`/notifications`):**
+   - Full-page management console for searching, filtering, and bulk managing historical alerts.
 
- Checks for updates every 5 seconds. Displays an unread badge count. Clicking the bell opens a flyout menu with the five most recent notifications and relative timestamps. Allows users to mark individual items or all alerts as read.
+---
 
- A full-page management screen for reviewing historical alerts with search, type-based filtering, and paginated records.
+### 20.2 Scope Isolation Rules
 
-### 20.2 Branch and User Scope Isolation
+All notifications enforce strict role and branch isolation:
+- **Cashiers & Kitchen Staff:** Receive alerts strictly for their assigned branch (e.g., new delivery orders, low ingredients).
+- **Branch Administrators:** Receive branch-specific operational, inventory, and transfer alerts.
+- **Super Admins:** Receive enterprise-wide alerts across all store locations, or filtered to a specific branch when one is selected.
 
-All notifications enforce dual scoping. Staff members only receive alerts relevant to their account or broadcast to all staff. Branch Admins, Cashiers, and Kitchen staff only receive alerts for their active branch. Super Admins receive alerts across the entire network (or filtered to a specific branch when one is selected).
+---
 
 ### 20.3 Notification Types
 
-| Type | Trigger |
+| Alert Type | System Trigger Event |
 |---|---|
-| Stock Alert | An ingredient drops below the Low Stock or Critical threshold. |
-| Expiry Alert | A stock batch is within the configured expiry alert window, or has already expired. |
-| Stock Transfer | A branch submits a supply request (Super Admin receives it), or a request status changes (branch Admin is notified). |
-| Order Alert | A new delivery app order arrives requiring action. |
-| Customer Feedback | A customer submits a review through the digital receipt QR survey. |
+| **Stock Alert** | An ingredient drops below the configured Low Stock or Critical threshold. |
+| **Expiry Alert** | A physical stock batch enters the 7-day expiration window, or passes its expiration date. |
+| **Stock Transfer** | A satellite store submits a supply request, or HQ approves and dispatches an order. |
+| **Order Alert** | A new online mobile delivery order is placed by a customer and awaits acceptance. |
+| **Customer Feedback** | A customer submits a review through the receipt QR code survey. |
 
-### 20.4 Notification Archive — Advanced Management
+---
 
-Navigate to the full Notification History for:
+### 20.4 Notification Archive Controls
 
--  Total notifications, Unread count, Critical unread alerts, and Recent activity (last 7 days).
--  All, Stock, Expiry, Order, or Review.
--  By notification title or message content.
--  Click a notification to mark it individually, or click  to clear all unread indicators.
--  Click the notification's action link to navigate directly to the relevant module (for example, an expiry alert navigates to the specific ingredient batch in Stock Management).
--  Remove a single notification permanently.
--  Permanently deletes all notifications for the current user and branch. A confirmation prompt is shown.
-
-### 20.5 Intelligent Deep-Link Tracing
-
-Clicking any notification automatically marks it as read and routes the user to the correct location in the system:
-
-- Stock transfer notifications route to the correct tab based on the order's current status (Pending, In Transit, or Delivered).
-- Expiry alert notifications redirect to Stock Management, switch to the Expiry Tracking panel, and pre-filter to the specific ingredient batch.
-
-### 20.6 Automated Data Retention
-
-The system includes an automated cleanup command (`php artisan notifications:cleanup`) that deletes notification logs older than 60 days. Active inventory records, sales ledgers, and order audit trails are not affected.
+- **Filter Tabs:** Filter across *All*, *Stock Alerts*, *Expiry Alerts*, *Order Updates*, or *Customer Reviews*.
+- **Live Search:** Search alerts by headline, ingredient name, or reference ID.
+- **Mark as Read:** Click individual alerts to mark them as read, or click **Mark All as Read** to clear badge counters.
+- **Intelligent Deep-Link Navigation:** Clicking any notification marks it as read and navigates directly to the relevant operational console (e.g., clicking an Expiry Alert opens Stock Management, switches to the Expiry Tracking tab, and filters to that specific batch).
+- **Bulk Cleanup:** Click **Clear All Notifications** with confirmation to permanently delete alerts for the active branch.
+- **Automated 60-Day Purge:** A scheduled command (`php artisan notifications:cleanup`) automatically purges notifications older than 60 days without affecting order or ledger histories.
 
 ---
 
@@ -1400,147 +1638,129 @@ The system includes an automated cleanup command (`php artisan notifications:cle
 
 ### 21.1 Overview
 
-Profile Settings allows every logged-in user to manage their own personal account details.
+The Profile Settings module allows every authenticated employee to manage their personal account identity, contact information, password security, and custom avatar.
 
--  Super Admin, Admin, Cashier, Rider.
-- Click the profile avatar in the top-right corner of the navigation bar and select .
+- **Target Roles:** Super Admin, Branch Administrator, Cashier, Delivery Rider.
+- **Access:** Click your profile avatar in the top-right corner of the navigation bar and select **Profile Settings** (or `/profile`).
 
-The Profile Settings page has two tabs: Personal Information, and Security and Password.
+---
 
-### 21.2 Profile Information
+### 21.2 Managing Profile Details
 
-Update your personal details:
+1. Navigate to the **Personal Information** section.
+2. Update the profile fields:
+   - **First Name, Middle Name, Last Name:** Auto-capitalized legal employee name.
+   - **Email Address:** Primary login email. Changing this requires password verification.
+   - **Phone Number:** 10-digit Philippine mobile contact number.
+3. Click **Save Changes** to commit updates.
 
-| Field | Description |
-|---|---|
-| First Name | Required. Auto-capitalized as you type. |
-| Middle Name | Optional. Auto-capitalized. |
-| Last Name | Required. Auto-capitalized as you type. |
-| Email Address | Your login email. Must be unique system-wide. Changing this resets the account verification timestamp. |
-| Phone Number | 10-digit mobile number (stored with the +63 prefix). |
+---
 
-All fields are validated in real time. Click  to save changes.
+### 21.3 Built-in Avatar Selection
 
-### 21.3 Avatar Selection
+Personalize your account identity across the system interface:
+- Click **Change Avatar** to open the modal picker.
+- Choose between two illustrated collections: **Foods** (Takoyaki, Ramen, Bento, Drinks) and **Animals** (Shiba Inu, Cat, Panda, Fox).
+- Each avatar features a modern gradient tile background.
+- Select any avatar to apply it immediately across all navigation headers.
+- Click **Reset Avatar** to revert to standard initial-based letter avatars.
 
-Personalize your account with a themed avatar displayed in the navigation bar and across the system.
+---
 
-- Choose from two collections: Foods (for example, Takoyaki, Ramen, Sushi, Bento) and Animals (for example, Fox, Panda, Cat, Penguin).
-- Each avatar has a unique gradient color style applied to its background.
-- Click any avatar to instantly save and apply it. The navigation bar updates immediately without a page reload.
-- Click  to revert to the default initial-based avatar.
+### 21.4 Changing Account Password
 
-### 21.4 Change Password
-
-To update your account password:
-
-1. Enter your current password (required to verify your identity).
-2. Enter a new password. Requirements:
-   - At least 8 characters, maximum 128.
-   - Must contain at least one uppercase letter, one lowercase letter, and one number.
-3. Confirm the new password.
-4. Click . On success, the password fields are cleared automatically.
-
-An interactive password strength meter evaluates complexity in real time, categorizing strength as Weak, Fair, or Strong. A show/hide toggle allows you to unmask the password fields before submitting.
+1. Navigate to the **Update Password** section.
+2. Enter your **Current Password** to verify account ownership.
+3. Enter your **New Password** (minimum 8 characters; requires uppercase, lowercase, and numeric characters).
+4. Re-enter the password in **Confirm New Password**.
+5. Observe the live **Password Strength Meter** (*Weak*, *Fair*, *Strong*). Use the show/hide eye icon to unmask text if needed.
+6. Click **Update Password**. On success, the password fields are cleared and security audit logs are updated.
 
 ---
 
 ## Appendix A — Mobile Ecosystem
 
-### A.1 Customer Mobile Application
+### A.1 Customer Delivery Mobile Application
 
-The system provides a REST API layer that supports a customer-facing mobile application for delivery ordering, operating as a parallel channel alongside the in-store POS.
+The system exposes a secured REST API supporting a dedicated customer mobile application:
+- **Account Registration & OTP:** Customers sign up with email and mobile number, verified via single-use 6-digit OTP codes.
+- **Branch Geolocation:** The app detects customer GPS coordinates and lists the nearest active branches.
+- **Menu Browsing & Customization:** Real-time catalog browsing respecting branch-specific active/hidden product toggles and ingredient availability.
+- **Order Placement:** Customers place orders for Delivery or Pick-up. Placed orders push instant notifications to the store's Order Management console.
+- **Live Order Tracking:** Customers receive live status notifications (*Accepted → Preparing → Handed to Rider → Delivered*).
 
+---
 
+### A.2 Rider Delivery Mobile Application
 
-- Registration and Login with name, email, and mobile number.
-- OTP Verification for account creation and password recovery (same mechanism as the staff Forgot Password flow).
-- Address Book for saving, managing, and setting a default delivery address.
-
-
-
-1. The customer selects a branch from the list of active branches.
-2. They browse the branch-specific product catalog.
-3. They build a cart, select options, and place a delivery order.
-4. The order appears immediately in the Order Management screen (Delivery Orders tab) for the cashier or manager to Accept or Reject.
-
-### A.2 Rider Mobile Application
-
-The system's Rider API supports a dedicated mobile application for delivery staff.
-
-
-
-1. When a KDS operator assigns a rider to a ready delivery order, the assignment is pushed to the rider's app in real time.
-2. The rider views the order details (customer name, address, items) and an integrated map route to the delivery address.
-3. The rider app can generate a geographic directions route to the customer's GPS coordinates.
-4. Upon delivery, the rider uploads a Proof of Delivery photo through the app.
-5. The uploaded photo appears immediately in the Order Detail panel of Order Management under the Proof of Delivery section, along with a map location pin.
-6. The order is automatically marked as Delivered, completing the order lifecycle.
+The Rider API powers a purpose-built logistics mobile app for store delivery personnel:
+- **Real-Time Dispatch:** When a KDS or Order Management operator assigns a rider, the delivery ticket is dispatched to the rider's mobile device with sound and haptic notifications.
+- **Customer Navigation:** Provides GPS routing and map directions directly to the customer's delivery coordinates.
+- **Digital Proof of Delivery (POD):** Upon arrival, the rider captures a photo of the handed-over food parcel through the app camera.
+- **Automatic Order Completion:** Uploading the POD photo automatically marks the order as *Delivered*, embeds the photo in the store's Order Management inspector, and completes the transaction ledger.
 
 ---
 
 ## Appendix B — Troubleshooting
 
-| Problem | Possible Cause | Solution |
+| Symptom | Probable Cause | Corrective Action |
 |---|---|---|
-| Cannot log in | Incorrect credentials or deactivated account | Verify email and password. Use Forgot Password (OTP flow). If still failing, contact your Admin — the account may have been deactivated. |
-| OTP code not received | Email delivery delay | Wait 1 minute, then use the Resend Code button. Check your Spam or Junk folder. |
-| GCash QR not displaying at checkout | GCash account details or QR image not uploaded | Ensure the GCash merchant account name, mobile number, and static QR image are uploaded in System Settings under the POS Platform tab. |
-| Product is unavailable or grayed out on POS | Insufficient ingredient stock | The product's recipe ingredients are at zero. Perform a Stock Adjustment or submit a Branch Request. |
-| Cannot assign rider in KDS | No active Rider accounts at the branch | Create a Rider user account in User Management and assign them to the correct branch. |
-| Receipt not printing | Browser print permissions or printer not configured | Ensure the thermal printer is set as the default printer in the browser's print settings, or pair the Bluetooth printer via System Settings. |
-| Importing an Options Library template does nothing | A group with the same name already exists on the product | Rename or remove the existing group from the product's Options tab first, then retry the import. |
-| Category cannot be deleted | Products or ingredients still assigned to it | Re-categorize or remove all assigned items first. The system shows the exact count blocking deletion. |
-| Gross Profit shows zero | Ingredients have no cost, or products have no recipe | Ensure every ingredient has a cost per unit set, and every product has a recipe attached. |
-| Business Intelligence shows "Insufficient Data" | Not enough historical sales data | The forecasting model requires at least 5 daily data points. Accumulate more sales history. |
-| Admin receives 403 on Category Management | Access is restricted to Super Admin | Category Management is Super Admin only. Admins should contact the Super Admin for category changes. |
+| **Cannot log in to the web console** | Incorrect credentials or account deactivated | Verify email and password. Use the 3-step Forgot Password OTP flow. If still failing, contact your Administrator to verify account active status. |
+| **Password reset OTP email not received** | Email delay or spam filter | Wait 60 seconds, then click **Resend Code**. Inspect Spam/Junk folders. Verify email server configuration. |
+| **Product is grayed out / disabled on POS** | Required recipe ingredient is depleted | The POS verifies ingredient stock in real time. Perform a Stock Adjustment or receive a Branch Stock Transfer to replenish inventory. |
+| **GCash payment modal cannot be closed** | GCash payment was marked as verified | By design, verified GCash transactions are locked to prevent unrecorded cashflow. Complete the order, then void it from Order Management if necessary. |
+| **Receipt not printing on thermal printer** | Bluetooth pairing lost or paper out | Verify the printer is powered on and paired in Chrome/Edge via Web Bluetooth. Use **Test Print Connection** in System Settings (Thermal Printer tab). |
+| **Cannot assign rider in KDS or Order Management** | No active riders provisioned at the branch | Provision a new user with the **Delivery Rider** position in User Management and assign them to the branch. |
+| **Options Library import is blocked** | An option group with the same name already exists on the product | Rename or remove the existing option group on the product before importing the library template. |
+| **Category cannot be deleted** | Products or ingredients are currently assigned | Re-assign all associated items to another category. The system displays the blocking item count. |
+| **Forecasting shows "Insufficient Data"** | Not enough historical data points | The regression model requires at least 5 clean daily sales points (or 3 monthly points). Accumulate transaction history. |
+| **Admin receives 403 Forbidden on Category Management** | Access restricted to Super Admin | Category taxonomies are restricted to Super Admins. Branch Admins should request changes through headquarters. |
 
 ---
 
 ## Appendix C — Frequently Asked Questions
 
+#### Can a Cashier perform stock adjustments or waste logging?
+No. Cashiers have front-of-house operational access (POS, KDS, Order Management) and view-only access to inventory alerts. Stock Adjustments, Waste Logging, and Branch Transfers require Administrator or Super Admin permissions.
 
-No. Cashiers can view inventory alerts on the Dashboard but cannot perform Stock Adjustments, Waste Logging, or submit Supply Requests. These require Admin or Super Admin access.
+#### Can a Branch Administrator change product selling prices?
+No. Product selling prices and recipe definitions are globally defined by the Super Admin. Branch Administrators can only toggle whether a product is Active or Hidden for their assigned store.
 
+#### What happens if a branch is marked as Inactive in Branch Management?
+POS operations for that branch are immediately suspended, and the store is hidden from the customer delivery mobile app. All historical order ledgers, staff records, and inventory logs are safely preserved.
 
-No. Prices are global. An Admin can only toggle a product's Active or Hidden availability for their own branch. Pricing changes require Super Admin access.
+#### What is the operational difference between a Refund and a Void?
+- **Refund:** Returns a specified monetary sum to the customer while preserving the original order ledger as *Refunded* or *Partially Refunded*.
+- **Void:** Completely nullifies a transaction that should never have existed (e.g., test orders, cashier mistakes). Voiding reverses all recipe stock deductions back into branch inventory balances.
 
+#### What is the difference between an Option Group and an Option Template?
+- **Option Group:** A customization group attached directly to one specific product.
+- **Option Template:** A reusable master template stored in the centralized Options Library that can be imported into and synchronized across multiple products.
 
-The branch's POS is suspended immediately and it is removed from the delivery app. All existing order history and data are preserved. Reactivating the branch restores full operations.
-
-
-A Refund returns a specified monetary amount to the customer while keeping the order record as Refunded or Partially Refunded. A Void nullifies the entire order — no revenue is recorded for it at all. Voids are appropriate for orders that should not have existed (for example, test orders or system errors). Both are excluded from revenue totals.
-
-
-An Option Group lives on one product and only affects that product. An Option Template lives in the shared Options Library and can be imported into any number of products. Changes to a library template do not automatically update existing products — you must use the Sync function to pull in updates.
-
-
-The system checks recipe ingredients in real time. If any Base ingredient linked to the product's recipe has zero stock, the product is automatically disabled and shown with a red indicator. Perform a Stock Adjustment or receive a supply delivery to re-enable it.
-
-
-Yes. Go to System Settings, open the System tab, and set an Operating Branch. This scopes the Super Admin into that branch's context, allowing use of the POS, KDS, and other operational modules as if they were branch staff.
+#### Can a Super Admin use the POS or KDS terminals?
+Yes. Super Admins can open System Settings, navigate to the **System** tab, and select an **Operating Branch**. This scopes their active session to that specific store, enabling all operational modules.
 
 ---
 
 ## Appendix D — Glossary
 
-| Term | Definition |
+| Term | Operational Definition |
 |---|---|
-| AOV | Average Order Value — total revenue divided by order count. |
-| COGS | Cost of Goods Sold — the total ingredient cost consumed, calculated automatically from product recipes. |
-| FEFO | First-Expiry-First-Out — the stock deduction method that always consumes the earliest-expiring batch first. |
-| Financial Ledger | An immutable record of every Sale, Void, and Refund event. Cannot be edited or deleted, ensuring full audit integrity. |
-| IQR | Interquartile Range — a statistical method used by the forecasting engine to remove outlier data points before running regression. |
-| KDS | Kitchen Display System — the real-time screen used by kitchen staff to view, manage, and complete order tickets. |
-| Modifier | A standalone add-on applied to a product (for example, "Extra Cheese") that may have its own ingredient deduction. |
-| Option Group | A set of customization choices attached directly to one specific product (for example, a product's own "Size" options). |
-| Option Template | A reusable option group stored in the Options Library that can be imported into and synced with multiple products. |
-| OTP | One-Time Password — a cryptographically secure, single-use, time-limited numeric code used for password recovery. |
-| POS | Point of Sale — the in-store transaction terminal used by cashiers. |
-| PSGC | Philippine Standard Geographic Code — the official hierarchical address classification system (Region, Province, City, Barangay) used throughout the system. |
-| RBAC | Role-Based Access Control — the permission model ensuring each user only sees and can operate their authorized modules. |
-| Stock Batch | A specific delivery of an ingredient, tracked independently with its own quantity, unit cost, and expiry date. |
-| Weighted Linear Regression | The statistical algorithm used by the Business Intelligence module — recent data points are assigned higher weight, producing more accurate near-term forecasts. |
+| **AOV (Average Order Value)** | Total net sales revenue divided by the total number of completed order transactions. |
+| **COGS (Cost of Goods Sold)** | The total acquisition cost of raw materials and ingredients consumed during order preparation, calculated via recipes. |
+| **FEFO (First-Expired, First-Out)** | The inventory deduction rule that automatically retires stock batches with the earliest expiration dates first. |
+| **Financial Ledger** | An immutable database record storing every Sale, Refund, and Void event to guarantee financial audit integrity. |
+| **IQR (Interquartile Range)** | A statistical distribution method used by the predictive analytics engine to cleanse anomalous sales spikes before running regression. |
+| **KDS (Kitchen Display System)** | Digital kitchen operations display used by cooks and kitchen staff to track ticket preparation times and mark orders ready. |
+| **Modifier** | An optional add-on or topping selected by a customer (e.g., *"Extra Bonito Flakes"*) that carries an additive price and ingredient deduction. |
+| **Option Group** | A set of choices attached to a product defining flavors, sizes, or preparations (e.g., *"Takoyaki Size: 4 pcs, 8 pcs, 12 pcs"*). |
+| **Option Template** | A standardized customization blueprint stored in the Options Library, complete with pre-mapped ingredient recipe deductions. |
+| **OTP (One-Time Password)** | A cryptographically secure, 6-digit numeric token sent via email for password recovery and identity verification. |
+| **POS (Point of Sale)** | The front-of-house checkout terminal used by cashiers to record orders, apply discounts, and process payments. |
+| **PSGC** | Philippine Standard Geographic Code — the official national geographic hierarchy (Region, Province, City, Barangay) used for address records. |
+| **RBAC** | Role-Based Access Control — the security framework governing user permissions across Super Admin, Administrator, Cashier, and Rider roles. |
+| **Stock Batch** | A physical intake of raw materials tracked with its own lot reference, acquisition cost, and supplier expiration date. |
+| **Weighted Linear Regression** | The mathematical algorithm used by Business Intelligence to forecast future demand by placing higher weight on recent sales days. |
 
 ---
 
@@ -1548,8 +1768,9 @@ Yes. Go to System Settings, open the System tab, and set an Operating Branch. Th
 
 | Field | Value |
 |---|---|
-| Version | 1.3 |
-| Date | August 2026 |
-| Status | Final |
-| Prepared By | Development Team |
-| Approved By | Management |
+| **Document** | Mister Takoyaki Centralized Sales and Management System User Manual |
+| **System** | Web Application & Mobile Ecosystem |
+| **Version** | 1.4 |
+| **Status** | Approved & Released |
+| **Prepared By** | Development & Architecture Team |
+| **Approved By** | Executive Management |

@@ -419,7 +419,7 @@ public function updatedLastName() {
         $this->updateGlobalHeader('list');
     }
 
-    public function validateBeforeSaveUser()
+    public function runPreSaveValidation()
     {
         $this->firstName  = ucwords($this->normalizeString($this->firstName));
         $this->middleName = ucwords($this->normalizeString($this->middleName));
