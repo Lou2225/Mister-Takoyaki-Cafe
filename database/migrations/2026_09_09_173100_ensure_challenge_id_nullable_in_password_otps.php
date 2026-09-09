@@ -12,6 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('password_otps', function (Blueprint $table) {
+            //
             // Ensure challenge_id is nullable — on some deployments the original
             // create migration created it as NOT NULL with no default, causing
             // insert failures when older code paths didn't supply the value.
