@@ -12,6 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('proof_of_deliveries', function (Blueprint $table) {
+            //
             // Drop existing FK before modifying the column
             $table->dropForeign(['rider_id']);
             // Make rider_id nullable so a deleted rider doesn't block the delete
@@ -27,6 +28,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('proof_of_deliveries', function (Blueprint $table) {
+            //
             $table->dropForeign(['rider_id']);
             $table->unsignedBigInteger('rider_id')->nullable(false)->change();
             $table->foreign('rider_id')->references('id')->on('users');
