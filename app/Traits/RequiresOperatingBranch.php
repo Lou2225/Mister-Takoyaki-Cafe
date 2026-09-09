@@ -8,39 +8,66 @@ use App\Services\BranchContext;
 trait RequiresOperatingBranch
 {
     /**
-     * Blocks a super admin from entering an operational module (POS, Order
-     * Management, Kitchen Display) when no operating branch is selected.
-     * Non-super-admins are unaffected — they're always scoped to their own
-     * assigned branch_id and never hit this condition.
+     * Checks if the user has an operating branch selected.
+     * Returns false if a Super Admin is currently at General Headquarters (no operating branch).
      */
-    protected function guardOperatingBranch(): void
+    protected function hasOperatingBranch(): bool
     {
-        if (auth()->user()->isSuperAdmin() && !BranchContext::getActiveBranchId()) {
-            abort(403, 'Select an operating branch in Settings before accessing this module.');
+        $user = auth()->user();
+        if (!$user) return false;
+
+        if ($user->isSuperAdmin()) {
+            return (bool) BranchContext::getActiveBranchId();
         }
+
+        return (bool) $user->branch_id;
     }
 
     /**
-     * Blocks access to the HQ "Branch Requests" inbox unless the current
-     * operating context is actually the Main Branch — matches the same
-     * is_main-aware rule the sidebar uses to decide whether to show that link.
+     * Checks if the user is operating within the Main Branch context.
      */
-    protected function guardMainBranchContext(): void
+    protected function isMainBranchContext(): bool
     {
         $user = auth()->user();
+        if (!$user) return false;
 
         if ($user->isSuperAdmin()) {
             $activeBranchId = BranchContext::getActiveBranchId();
             $activeBranch = $activeBranchId ? Branch::find($activeBranchId) : null;
+            return (bool) ($activeBranch && $activeBranch->is_main);
+        }
 
-            if (!$activeBranch || !$activeBranch->is_main) {
-                abort(403, 'Switch your operating branch to the Main Branch to access this module.');
+        return (bool) ($user->branch && $user->branch->is_main);
+    }
+
+    /**
+     * Quick-switches the active operating branch directly from the placeholder UI.
+     */
+    public function quickSwitchBranch(int $branchId): void
+    {
+        if (auth()->user()?->isSuperAdmin()) {
+            BranchContext::setActiveBranch($branchId);
+            $this->dispatch('branch-switched', branchId: $branchId);
+            $this->dispatch('notify', type: 'success', message: 'Operating branch switched successfully.');
+            if (method_exists($this, 'mount')) {
+                $this->redirect(request()->header('Referer') ?: url()->current());
             }
-            return;
         }
+    }
 
-        if (!$user->branch || !$user->branch->is_main) {
-            abort(403, 'This module is only available to Main Branch staff.');
-        }
+    /**
+     * Legacy guard retained for compatibility; checks if operating branch is available.
+     */
+    protected function guardOperatingBranch(): bool
+    {
+        return $this->hasOperatingBranch();
+    }
+
+    /**
+     * Legacy guard retained for compatibility; checks if main branch is active.
+     */
+    protected function guardMainBranchContext(): bool
+    {
+        return $this->isMainBranchContext();
     }
 }

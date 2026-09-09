@@ -466,6 +466,16 @@ foreach ($sourceBatches as $sourceBatch) {
 
     public function render()
     {
+        if (!$this->isMainBranchContext()) {
+            return view('components.operating-branch-required', [
+                'title' => 'Main Branch Context Required',
+                'message' => 'The Branch Requests inbox is exclusively operated by the Main Branch (Headquarters) to review, approve, and dispatch inventory orders requested by sub-branches. Please switch your operating context to the Main Branch.',
+                'actionText' => 'Configure in Settings',
+                'actionRoute' => route('settings.index'),
+                'icon' => 'switch',
+            ])->layout('layouts.app');
+        }
+
         $kpis = $this->getKpis();
 
         if ($this->lastPendingCount !== null && $kpis['pending'] > $this->lastPendingCount) {

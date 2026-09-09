@@ -316,6 +316,16 @@ public function refreshStats()
         public function render()
 {
     try {
+        if (!$this->hasOperatingBranch()) {
+            return view('components.operating-branch-required', [
+                'title' => 'Operating Branch Required for KDS',
+                'message' => 'The Kitchen Display System coordinates tickets and cooking queues for a specific branch kitchen. Please select your operating branch to launch the display.',
+                'actionText' => 'Configure in Settings',
+                'actionRoute' => route('settings.index'),
+                'icon' => 'branch',
+            ])->layout('layouts.app');
+        }
+
         return view('livewire.kitchen-display', [
             'activeOrders'          => $this->activeOrders,
             'readyOrders'           => $this->readyOrders,

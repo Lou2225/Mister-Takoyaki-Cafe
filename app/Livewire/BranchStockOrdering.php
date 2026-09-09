@@ -16,10 +16,11 @@ use Illuminate\Support\Facades\Mail;
 use App\Mail\StockOrderMail;
 use App\Services\BranchContext;
 use App\Traits\HandlesValidations;
+use App\Traits\RequiresOperatingBranch;
 
 class BranchStockOrdering extends Component
 {
-    use WithPagination, HandlesValidations;
+    use WithPagination, HandlesValidations, RequiresOperatingBranch;
 
     // ── Panel / View State ────────────────────────────────────────
     public $panel = 'requests';
@@ -87,31 +88,15 @@ class BranchStockOrdering extends Component
         $this->mainBranchId = $mainBranch?->id;
 
         if ($this->isSuperAdmin()) {
-            $this->selectedBranchId = BranchContext::getActiveBranchId();
-
-            if (!$this->selectedBranchId) {
-                abort(403, 'Select an operating branch in Settings before accessing Request Supplies.');
-            }
-
-            if ($this->selectedBranchId == $this->mainBranchId) {
-                abort(403, 'Main branch cannot request stock orders. Please use supplier ordering module.');
-            }
+            $this->selectedBranchId = (string) (BranchContext::getActiveBranchId() ?: '');
         } else {
-            $this->selectedBranchId = $user->branch_id;
+            $this->selectedBranchId = (string) ($user->branch_id ?: '');
         }
 
-        // Main branch cannot request stock orders (they supply, not request)
-        if ($this->selectedBranchId == $this->mainBranchId) {
-            abort(403, 'Main branch cannot request stock orders. Please use supplier ordering module.');
+        if ($this->selectedBranchId && $this->selectedBranchId != $this->mainBranchId) {
+            $this->calculateEstimatedFee();
+            $this->updateHeader();
         }
-
-        if (!$this->selectedBranchId) {
-            session()->flash('error', 'No active branch context found for ordering.');
-            $this->redirect(route('dashboard'));
-        }
-
-        $this->calculateEstimatedFee();
-        $this->updateHeader();
 
         // Check for ingredient query parameter from BI insights
         if (request()->has('ingredient')) {
@@ -547,6 +532,26 @@ class BranchStockOrdering extends Component
 
     public function render()
     {
+        if (!$this->hasOperatingBranch() || empty($this->selectedBranchId)) {
+            return view('components.operating-branch-required', [
+                'title' => 'Operating Branch Required for Supplies',
+                'message' => 'Request Supplies lets physical branches order stock replenishments from General Headquarters. Please select an operating sub-branch context to proceed.',
+                'actionText' => 'Configure in Settings',
+                'actionRoute' => route('settings.index'),
+                'icon' => 'branch',
+            ])->layout('layouts.app');
+        }
+
+        if ($this->selectedBranchId == $this->mainBranchId) {
+            return view('components.operating-branch-required', [
+                'title' => 'Main Branch Cannot Request Supplies',
+                'message' => 'The Main Branch functions as the primary distribution hub supplying other locations. To request external supplier inventory, please use the Supplier Ordering or Purchase Orders module, or switch to a sub-branch context.',
+                'actionText' => 'Open Branch Requests Inbox',
+                'actionRoute' => route('stock.orders.admin'),
+                'icon' => 'building',
+            ])->layout('layouts.app');
+        }
+
         $this->calculateEstimatedFee();
 
         $isNewPanel = $this->panel === 'new';

@@ -1410,6 +1410,16 @@ public function openEditItem(string $key, array $item): void
             ]];
         })->all();
 
+        if (!$this->hasOperatingBranch()) {
+            return view('components.operating-branch-required', [
+                'title' => 'Operating Branch Required for POS',
+                'message' => 'The POS Terminal operates within a specific physical branch to access live inventory, categories, and branch menu pricing. Please select your operating branch to launch the terminal.',
+                'actionText' => 'Configure in Settings',
+                'actionRoute' => route('settings.index'),
+                'icon' => 'branch',
+            ])->layout('layouts.app');
+        }
+
         return view('livewire.pos-terminal', [
             'products'            => $products,
             'productData'         => $productData,

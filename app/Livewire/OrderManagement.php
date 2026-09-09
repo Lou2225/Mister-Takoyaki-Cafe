@@ -718,6 +718,16 @@ class OrderManagement extends Component
             }
         }
 
+        if (!$this->hasOperatingBranch()) {
+            return view('components.operating-branch-required', [
+                'title' => 'Operating Branch Required for Orders',
+                'message' => 'Order Management tracks live branch tickets, kitchen dispatch, and deliveries for an active branch. Please select your operating branch to review orders.',
+                'actionText' => 'Configure in Settings',
+                'actionRoute' => route('settings.index'),
+                'icon' => 'branch',
+            ])->layout('layouts.app');
+        }
+
         return view('livewire.order-management', [
             'orders' => $this->orders,
             'appOrders' => $this->appOrders,
