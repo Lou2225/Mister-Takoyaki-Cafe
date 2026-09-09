@@ -173,6 +173,33 @@ class User extends Authenticatable
         return $this->hasMany(\App\Models\UserAddress::class);
     }
     
+    
+     /**
+     * Favorites records created by this user.
+     */
+    public function favorites()
+    {
+        return $this->hasMany(\App\Models\Favorite::class, 'user_id');
+    }
+    /**
+     * The actual favorite products for this user.
+     */
+    public function favoriteProducts()
+    {
+        return $this->belongsToMany(\App\Models\Product::class, 'favorites', 'user_id', 'product_id')
+                    ->withTimestamps();
+    }
+    
+    
+    /**
+     * Reviews created by this user.
+     */
+    public function reviews()
+    {
+        return $this->hasMany(\App\Models\Review::class, 'user_id');
+    }
+    
+    
     /**
      * Stock movements performed by this user (Admin/Manager).
      */

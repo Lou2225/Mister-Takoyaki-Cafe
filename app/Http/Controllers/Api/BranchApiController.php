@@ -91,8 +91,10 @@ class BranchApiController extends Controller
         $request->validate(['branch_id' => 'required|integer|exists:branches,id']);
         $branchId = (int) $request->branch_id;
 
-        // Global products (available everywhere)
+         // Global products (available everywhere) with aggregated reviews & ratings
         $globalProducts = Product::with(['category', 'optionGroups.options', 'modifiers'])
+            ->withCount('reviews')
+            ->withAvg('reviews', 'rating')
             ->where('is_active', 1)
             ->where('scope', 'global')
             ->get();
@@ -101,6 +103,8 @@ class BranchApiController extends Controller
         $branch = Branch::findOrFail($branchId);
         $branchProducts = $branch->products()
         ->with(['category', 'optionGroups.options', 'modifiers'])
+        ->withCount('reviews')
+        ->withAvg('reviews', 'rating')
         ->where('products.is_active', 1)
         ->get();
 
@@ -140,6 +144,10 @@ class BranchApiController extends Controller
             'is_available'       => $avail['is_available'],
             'availability_label' => $avail['availability_label'],
             'base_price'         => (float) $p->price,
+            'average_rating'     => $p->average_rating,
+            'review_count'       => $p->review_count,
+            'rating'             => $p->average_rating,
+            'reviews'            => $p->review_count,
             'option_groups'      => $p->optionGroups->map(fn($group) => [
                 'id'               => $group->id,
                 'name'             => $group->name,

@@ -13,7 +13,8 @@ use App\Http\Controllers\Api\DirectionsController;
 use App\Http\Controllers\Api\SyncController;
 use App\Http\Controllers\ThermalPrintController;
 use App\Http\Controllers\Api\OtpController;
-
+use App\Http\Controllers\Api\FavoriteController;
+use App\Http\Controllers\Api\ReviewController;
 
 /*
 |--------------------------------------------------------------------------
@@ -51,6 +52,9 @@ use App\Http\Controllers\Api\OtpController;
     Route::get('/products', [ProductApiController::class, 'index']);
     Route::get('/products/{id}', [ProductApiController::class, 'show']);
     Route::get('/products/{id}/customizations', [ProductApiController::class, 'customizations']);
+    
+    // ── Public Product Reviews Route (viewing reviews) ──────────────────────
+    Route::get('/products/{productId}/reviews', [ReviewController::class, 'index']);
 
 // Protected routes (require auth:sanctum)
     Route::middleware('auth:sanctum')->group(function () {
@@ -59,7 +63,20 @@ use App\Http\Controllers\Api\OtpController;
     Route::post('/auth/change-password', [AuthController::class, 'changePassword']);
     Route::post('/user/profile', [UserController::class, 'updateProfile']);
     Route::delete('/user/delete', [UserController::class, 'deleteAccount']);
+    
+    
+    // ── Favorites Routes ───────────────────────────────────────────────────
+    Route::get('/favorites', [FavoriteController::class, 'index']);
+    Route::get('/favorites/ids', [FavoriteController::class, 'getFavoriteIds']);
+    Route::post('/favorites', [FavoriteController::class, 'store']);
+    Route::delete('/favorites/{productId}', [FavoriteController::class, 'destroy']);
+    Route::post('/favorites/toggle', [FavoriteController::class, 'toggle']);
 
+    // ── Review Submission Routes ───────────────────────────────────────────
+    Route::post('/products/{productId}/reviews', [ReviewController::class, 'store']);
+    Route::get('/orders/{orderId}/reviews', [ReviewController::class, 'getOrderReviews']);
+    Route::post('/orders/{orderId}/reviews', [ReviewController::class, 'storeOrderReviews']);
+    
     // Orders
     Route::get('/orders', [OrderApiController::class, 'index']);
     Route::post('/orders', [OrderApiController::class, 'store']);

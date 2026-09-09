@@ -20,6 +20,13 @@ class Product extends Model
         'image',
         'scope', // 'global' or 'branch'
     ];
+    
+    // ⬇️ ADD THIS BLOCK:
+    protected $appends = [
+        'image_url',
+        'average_rating',
+        'review_count',
+    ];
 
     public function getImageUrlAttribute()
     {
@@ -64,6 +71,54 @@ class Product extends Model
                     ->withPivot('price', 'sort_order')
                     ->withTimestamps();
     }
+
+
+     /**
+     * Favorites records for this product.
+     */
+    public function favorites()
+    {
+        return $this->hasMany(Favorite::class, 'product_id');
+    }
+    /**
+     * Customers who favorited this product.
+     */
+    public function favoritedBy()
+    {
+        return $this->belongsToMany(User::class, 'favorites', 'product_id', 'user_id')
+                    ->withTimestamps();
+    }
+
+
+
+    /**
+    * Reviews submitted for this product.
+    */
+    public function reviews()
+    {
+        return $this->hasMany(Review::class, 'product_id');
+    }
+    /**
+     * Calculate or retrieve the average rating (1 decimal place).
+     */
+    public function getAverageRatingAttribute(): float
+    {
+        if (isset($this->attributes['reviews_avg_rating'])) {
+            return round((float) $this->attributes['reviews_avg_rating'], 1);
+        }
+        return round((float) ($this->reviews()->avg('rating') ?? 0), 1);
+    }
+    /**
+     * Calculate or retrieve the total review count.
+     */
+    public function getReviewCountAttribute(): int
+    {
+        if (isset($this->attributes['reviews_count'])) {
+            return (int) $this->attributes['reviews_count'];
+        }
+        return (int) $this->reviews()->count();
+    }
+
 
     /**
      * Get the price of the product at a specific branch.
