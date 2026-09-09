@@ -9,31 +9,23 @@ use Livewire\Attributes\On;
 
 class BranchContextLabel extends Component
 {
-    public string $iconColor;
+    public string $iconColor = 'text-indigo-500';
+    public string $label = '';
+    public string $value = '';
 
-    #[On('branch-switched')]
-    #[On('branchContextUpdated')]
-    #[On('settingsUpdated')]
-    #[On('context-updated')]
-    public function refreshLabel(): void
-    {
-        //
-    }
-
-    public function mount(string $iconColor)
+    public function mount(string $iconColor = 'text-indigo-500')
     {
         $this->iconColor = $iconColor;
+        $this->syncContext();
     }
 
-    public function getContextProperty(): array
+    public function syncContext(): void
     {
         $user = auth()->user();
         $branch = \App\Models\Branch::find(BranchContext::getActiveBranchId() ?: $user?->branch_id);
 
-        return [
-            'label' => $user?->isSuperAdmin() ? 'Global Context' : 'Assigned Branch',
-            'value' => $branch?->branch_name ?? ($user?->isSuperAdmin() ? 'General Headquarters' : 'No Branch Assigned'),
-        ];
+        $this->label = $user?->isSuperAdmin() ? 'Global Context' : 'Assigned Branch';
+        $this->value = $branch?->branch_name ?? ($user?->isSuperAdmin() ? 'General Headquarters' : 'No Branch Assigned');
     }
 
     public function render()

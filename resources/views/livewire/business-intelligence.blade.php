@@ -714,30 +714,124 @@
         </div>
 
         @if($selectedBranchId === 'all')
-            <div class="rounded-2xl border border-dashed border-gray-200 bg-white p-6">
-                <x-empty-state title="Select a branch for purchase recommendations" description="Current stock is branch-specific, so a network-wide forecast cannot produce a safe purchase quantity." />
-                @if(auth()->user()->role_id === 1)
-                    <div class="mt-4" wire:key="network-restock-panel-{{ $showNetworkRestockSummary ? 'expanded' : 'collapsed' }}">
-                        @if(!$showNetworkRestockSummary)
-                            <button type="button" wire:click="loadNetworkRestockSummary" class="inline-flex items-center gap-1.5 rounded-xl bg-gray-900 px-3.5 py-2 text-[10px] font-black uppercase tracking-widest text-white hover:bg-gray-700 transition-colors">
-                                View network-wide restock summary
-                            </button>
-                        @else
-                            <div class="rounded-xl border border-gray-100 bg-white p-4">
-                                <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">Top 15 ingredients by combined demand, all branches</p>
-                                @forelse($networkRestockSummary as $item)
-                                    <div class="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                                        <div class="min-w-0">
-                                            <p class="text-[12px] font-bold text-gray-900 truncate">{{ $item['name'] }}</p>
-                                            <p class="text-[10px] text-gray-400">Needed in {{ $item['branch_count'] }} {{ Str::plural('branch', $item['branch_count']) }}</p>
-                                        </div>
-                                        <p class="text-[13px] font-black text-gray-900 shrink-0 ml-3">{{ number_format($item['amount'], 0) }} {{ $item['unit'] }}</p>
-                                    </div>
-                                @empty
-                                    <p class="text-[11px] text-gray-500">No network-wide demand data available.</p>
-                                @endforelse
+            @php
+                $formatFriendlyUnit = function($amount, $unit) {
+                    $unitLower = strtolower(trim($unit ?? ''));
+                    if (in_array($unitLower, ['g', 'gram', 'grams'])) {
+                        if ($amount >= 1000) {
+                            return [
+                                'primary' => number_format($amount / 1000, 1) . ' kg',
+                                'secondary' => number_format($amount) . ' g'
+                            ];
+                        }
+                        return ['primary' => number_format($amount) . ' g', 'secondary' => null];
+                    }
+                    if (in_array($unitLower, ['ml', 'milliliter', 'milliliters'])) {
+                        if ($amount >= 1000) {
+                            return [
+                                'primary' => number_format($amount / 1000, 1) . ' L',
+                                'secondary' => number_format($amount) . ' ml'
+                            ];
+                        }
+                        return ['primary' => number_format($amount) . ' ml', 'secondary' => null];
+                    }
+                    return ['primary' => number_format($amount) . ' ' . $unit, 'secondary' => null];
+                };
+
+                $maxAmount = !empty($networkRestockSummary) ? max(array_column($networkRestockSummary, 'amount') ?: [1]) : 1;
+            @endphp
+
+            <div class="space-y-4">
+                {{-- The Top 15 Aggregated Network Summary Card --}}
+                @if(auth()->user()->role_id === 1 || auth()->user()->isSuperAdmin())
+                    <div class="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden animate-fadeIn" wire:key="network-restock-panel-expanded">
+                        {{-- Top Header with controls --}}
+                        <div class="px-5 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3 bg-gray-50/50">
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <span class="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                    <h4 class="text-[13px] font-black text-gray-900 tracking-tight">Top 15 Ingredients by Combined Network Demand</h4>
+                                </div>
+                                <p class="text-[11px] text-gray-500 mt-0.5">Estimated 14-day commissary consumption across all branches (15% rush buffer included)</p>
                             </div>
-                        @endif
+                            <div class="flex items-center gap-2">
+                                <button type="button" wire:click="loadNetworkRestockSummary" 
+                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-[11px] font-bold transition-all shadow-2xs">
+                                    <svg wire:loading.class="animate-spin" wire:target="loadNetworkRestockSummary" class="h-3.5 w-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                    </svg>
+                                    <span>Refresh</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {{-- Modern Responsive Grid Layout (2 cols on md, 3 cols on xl) --}}
+                        <div class="p-4 sm:p-6">
+                            @if(count($networkRestockSummary) > 0)
+                                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
+                                    @foreach($networkRestockSummary as $index => $item)
+                                        @php
+                                            $formatted = $formatFriendlyUnit($item['amount'], $item['unit']);
+                                            $percentage = $maxAmount > 0 ? min(100, round(($item['amount'] / $maxAmount) * 100)) : 0;
+                                            $rank = $index + 1;
+                                            $rankStyle = match($rank) {
+                                                1 => 'bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-sm shadow-amber-500/25 ring-2 ring-amber-200/70',
+                                                2 => 'bg-gradient-to-r from-slate-700 to-slate-800 text-white shadow-xs ring-1 ring-slate-200',
+                                                3 => 'bg-gradient-to-r from-amber-700 to-amber-800 text-white shadow-xs',
+                                                default => 'bg-gray-100 text-gray-700 border border-gray-200'
+                                            };
+                                        @endphp
+                                        <div class="rounded-2xl border border-gray-100 bg-white p-4 hover:border-gray-200 hover:shadow-md transition-all flex flex-col justify-between group">
+                                            <div>
+                                                <div class="flex items-start justify-between gap-2 mb-2">
+                                                    <div class="flex items-center gap-2 min-w-0">
+                                                        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[11px] font-black {{ $rankStyle }}">
+                                                            {{ $rank }}
+                                                        </span>
+                                                        <p class="text-[13px] font-bold text-gray-900 truncate group-hover:text-amber-700 transition-colors" title="{{ $item['name'] }}">
+                                                            {{ $item['name'] }}
+                                                        </p>
+                                                    </div>
+                                                    <span class="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-50 text-gray-600 border border-gray-100">
+                                                        <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5"/>
+                                                        </svg>
+                                                        <span>{{ $item['branch_count'] }} {{ Str::plural('branch', $item['branch_count']) }}</span>
+                                                    </span>
+                                                </div>
+
+                                                {{-- Human-friendly quantity display --}}
+                                                <div class="mt-3 flex items-baseline justify-between">
+                                                    <span class="text-[18px] font-black text-gray-900 tracking-tight">
+                                                        {{ $formatted['primary'] }}
+                                                    </span>
+                                                    @if($formatted['secondary'])
+                                                        <span class="text-[11px] font-semibold text-gray-600 tabular-nums">
+                                                            ({{ $formatted['secondary'] }})
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                            </div>
+
+                                            {{-- Relative Demand Progress Bar --}}
+                                            <div class="mt-3.5 pt-2.5 border-t border-gray-50">
+                                                <div class="flex items-center justify-between text-[10px] text-gray-500 font-semibold mb-1">
+                                                    <span>Relative volume</span>
+                                                    <span class="tabular-nums">{{ $percentage }}%</span>
+                                                </div>
+                                                <div class="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                                                    <div class="h-1.5 rounded-full {{ $rank === 1 ? 'bg-amber-500' : ($rank <= 3 ? 'bg-slate-700' : 'bg-emerald-500/80') }}" style="width: {{ $percentage }}%"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                <div class="text-center py-10">
+                                    <p class="text-[12px] font-medium text-gray-500">No completed orders found in this date range to project demand.</p>
+                                </div>
+                            @endif
+                        </div>
                     </div>
                 @endif
             </div>

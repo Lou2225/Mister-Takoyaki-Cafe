@@ -54,12 +54,36 @@
 
     {{-- ── Navigation ── --}}
     <nav @click="if(isMobile && $event.target.closest('a')) sidebarOpen = false"
+        x-data="{
+            hideOps: @js($this->effectiveHideOperationalModules),
+            isSubBranch: @js($this->isSubBranch),
+            showOrderInbox: @js($this->showOrderInbox),
+        }"
+        @accessibility-config-updated.window="
+            hideOps = $event.detail.hide_modules;
+            if ($event.detail.has_branch !== undefined) {
+                isSubBranch = !$event.detail.hide_modules && Boolean($event.detail.is_sub);
+                showOrderInbox = !$event.detail.hide_modules && Boolean($event.detail.is_main);
+            }
+        "
+        @branch-switched.window="
+            if ($event.detail.hasBranch !== undefined) {
+                isSubBranch = !hideOps && Boolean($event.detail.hasBranch) && !Boolean($event.detail.isMain);
+                showOrderInbox = !hideOps && Boolean($event.detail.hasBranch) && Boolean($event.detail.isMain);
+            }
+        "
+        @branchContextUpdated.window="
+            if ($event.detail.hasBranch !== undefined) {
+                isSubBranch = !hideOps && Boolean($event.detail.hasBranch) && !Boolean($event.detail.isMain);
+                showOrderInbox = !hideOps && Boolean($event.detail.hasBranch) && Boolean($event.detail.isMain);
+            }
+        "
         class="flex-1 overflow-y-auto overflow-x-hidden px-3 pb-4 pt-4 text-[13px] font-medium text-gray-600">
 
         @if($user && !$user->isRider())
 
             {{-- ── I. OVERVIEW (Daily Operations) ── --}}
-            <div class="mb-5" x-data="{ hideOps: @js($this->effectiveHideOperationalModules) }" @accessibility-config-updated.window="hideOps = $event.detail.hide_modules">
+            <div class="mb-5">
                 <h3 class="px-3 mb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider transition-opacity duration-300"
                     x-show="!hideOps"
                     :class="sidebarOpen ? 'opacity-100' : 'opacity-0 h-0 overflow-hidden hidden'">
@@ -163,12 +187,6 @@
                         $isAdjustmentPage = request()->routeIs('stock.adjustment');
                         $isOrderingPage   = request()->routeIs('stock.orders') || request()->routeIs('stock.orders.admin');
                         $stockActive      = $isStockPage || $isAdjustmentPage || $isOrderingPage;
-
-                        $activeBranchForOrdering = \App\Services\BranchContext::getActiveBranch();
-                        $isSubBranch = $activeBranchForOrdering && !$activeBranchForOrdering->is_main;
-$showOrderInbox = ($user->isSuperAdmin() || ($user->branch && $user->branch->is_main))
-    && $activeBranchForOrdering
-    && $activeBranchForOrdering->is_main;
                     @endphp
 
                     @if($user->role_id <= 2)
@@ -213,30 +231,32 @@ $showOrderInbox = ($user->isSuperAdmin() || ($user->branch && $user->branch->is_
                                 </a>
 
                                 {{-- 3. Request Supplies (sub-branch) or Branch Requests (HQ/main) --}}
-                                @if($isSubBranch)
-                                    <a href="{{ route('stock.orders') }}" wire:navigate
-                                        class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors
-                                            {{ request()->routeIs('stock.orders') ? 'bg-indigo-50 text-indigo-700' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800' }}">
-                                        <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                                        </svg>
-                                        <span class="whitespace-nowrap">Request Supplies</span>
-                                    </a>
-                                @elseif($showOrderInbox)
-                                    <a href="{{ route('stock.orders.admin') }}" wire:navigate
-                                        class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors
-                                            {{ request()->routeIs('stock.orders.admin') ? 'bg-amber-50 text-amber-700' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800' }}">
-                                        <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                                        </svg>
-                                        <span class="flex-1 whitespace-nowrap">Branch Requests</span>
-                                        @if($this->pending_orders_count > 0)
-                                            <span class="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-amber-500 text-[9px] font-black text-white shadow-lg shadow-amber-200/40 animate-pulse">
-                                                {{ $this->pending_orders_count }}
-                                            </span>
-                                        @endif
-                                    </a>
-                                @endif
+                                <a href="{{ route('stock.orders') }}" wire:navigate
+                                    x-show="!hideOps && isSubBranch"
+                                    x-cloak
+                                    class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors
+                                        {{ request()->routeIs('stock.orders') ? 'bg-indigo-50 text-indigo-700' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800' }}">
+                                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                    <span class="whitespace-nowrap">Request Supplies</span>
+                                </a>
+
+                                <a href="{{ route('stock.orders.admin') }}" wire:navigate
+                                    x-show="!hideOps && showOrderInbox"
+                                    x-cloak
+                                    class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors
+                                        {{ request()->routeIs('stock.orders.admin') ? 'bg-amber-50 text-amber-700' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800' }}">
+                                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                                    </svg>
+                                    <span class="flex-1 whitespace-nowrap">Branch Requests</span>
+                                    @if($this->pending_orders_count > 0)
+                                        <span class="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-amber-500 text-[9px] font-black text-white shadow-lg shadow-amber-200/40 animate-pulse">
+                                            {{ $this->pending_orders_count }}
+                                        </span>
+                                    @endif
+                                </a>
                             </div>
                         </div>
                     @else

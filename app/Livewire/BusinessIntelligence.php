@@ -45,9 +45,9 @@ class BusinessIntelligence extends Component
     public int $stockReviewPerPage = 5;
     public array $networkRestockSummary = [];
     public bool $showNetworkRestockSummary = false;
-    
-      protected ?array $analyticsCache = null;
+    protected ?array $analyticsCache = null;
     protected ?array $forecastingCache = null;
+    protected ?array $networkRestockCache = null;
 
     protected $queryString = [
         'activeTab' => ['except' => 'descriptive'],
@@ -132,6 +132,7 @@ class BusinessIntelligence extends Component
 
         $this->analyticsCache = null;
         $this->forecastingCache = null;
+        $this->networkRestockCache = null;
         $this->dateError = '';
         $this->resetPage();
         $this->resetPage('branchPage');
@@ -268,6 +269,8 @@ class BusinessIntelligence extends Component
         }
 
         $this->analyticsCache = null;
+        $this->forecastingCache = null;
+        $this->networkRestockCache = null;
         $this->showNetworkRestockSummary = false;
         $this->networkRestockSummary = [];
     }
@@ -285,6 +288,7 @@ class BusinessIntelligence extends Component
         if (!$this->dateError) {
             $this->analyticsCache = null;
             $this->forecastingCache = null;
+            $this->networkRestockCache = null;
             $this->resetPage();
             $this->resetPage('branchPage');
             $this->resetPage('prescriptivePage');
@@ -297,6 +301,7 @@ class BusinessIntelligence extends Component
         if (!$this->dateError) {
             $this->analyticsCache = null;
             $this->forecastingCache = null;
+            $this->networkRestockCache = null;
             $this->resetPage();
             $this->resetPage('branchPage');
             $this->resetPage('prescriptivePage');
@@ -355,6 +360,12 @@ class BusinessIntelligence extends Component
         $forecasting = $this->getForecastingData();
         $prescriptiveRecommendations = $this->getPrescriptiveRecommendations($forecasting);
 
+        $networkRestockSummary = [];
+        if ($this->selectedBranchId === 'all' && (auth()->user()->isSuperAdmin() || auth()->user()->role_id === 1)) {
+            $networkRestockSummary = $this->getNetworkRestockSummary();
+        }
+        $this->networkRestockSummary = $networkRestockSummary;
+
         $performance = [
             'gross_sales'     => $analytics['gross_sales'],
             'net_sales'       => $analytics['net_sales'],
@@ -378,6 +389,7 @@ class BusinessIntelligence extends Component
             'recentOrders'    => $this->getRecentOrders(),
             'salesData'       => $analytics,
             'isActionable'    => $isActionable,
+            'networkRestockSummary' => $networkRestockSummary,
         ])->layout('layouts.app');
     }
 
@@ -1186,22 +1198,24 @@ class BusinessIntelligence extends Component
 
     public function loadNetworkRestockSummary(): void
     {
-        if (auth()->user()->role_id !== 1 || $this->selectedBranchId !== 'all') {
+        if ((!auth()->user()->isSuperAdmin() && auth()->user()->role_id !== 1) || $this->selectedBranchId !== 'all') {
             return;
         }
 
+        $this->networkRestockCache = null;
         $this->networkRestockSummary = $this->getNetworkRestockSummary();
-        $this->showNetworkRestockSummary = true;
     }
 
     /**
      * Aggregates each branch's ingredient demand forecast into one network-wide
-     * total. Re-runs the regression once per branch — there's no cheaper way to
-     * get a per-branch demand signal without duplicating the pipeline — so this
-     * stays behind an explicit button rather than running on every render.
+     * total. Re-runs the regression once per branch to aggregate per-branch demand.
      */
     private function getNetworkRestockSummary(): array
     {
+        if ($this->networkRestockCache !== null) {
+            return $this->networkRestockCache;
+        }
+
         $branchIds = Branch::pluck('id');
         $totals = [];
         $originalBranch = $this->selectedBranchId;
@@ -1232,7 +1246,7 @@ class BusinessIntelligence extends Component
 
         $this->selectedBranchId = $originalBranch;
 
-        return collect($totals)
+        $this->networkRestockCache = collect($totals)
             ->sortByDesc('amount')
             ->take(15)
             ->map(function ($item) {
@@ -1241,6 +1255,8 @@ class BusinessIntelligence extends Component
             })
             ->values()
             ->all();
+
+        return $this->networkRestockCache;
     }
 
     private function getProductInsights(array $analytics): array

@@ -1094,8 +1094,8 @@
             @if($this->isSuperAdmin())
             <div x-show="tab === 'system'" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="space-y-6"
                 x-data="{
-                    opBranchId: @entangle('opBranchId').live,
-                    hideOperationalModules: @entangle('hideOperationalModules').live,
+                    opBranchId: @entangle('opBranchId'),
+                    hideOperationalModules: @entangle('hideOperationalModules'),
                     branches: @js($branches->map(fn($b) => ['id' => (int) $b->id, 'name' => $b->branch_name])->values())
                 }">                <div class="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
                         <h2 class="text-[13px] font-bold text-gray-900 uppercase tracking-widest mb-6 border-b border-gray-50 pb-2">Module Visibility</h2>
@@ -1103,7 +1103,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <label class="flex flex-col gap-2 p-4 bg-gray-50 border border-gray-100 rounded-xl cursor-pointer hover:bg-white transition-all shadow-sm">
                                 <div class="flex items-center gap-3">
-                                    <input type="checkbox" wire:model.live="hideOperationalModules" class="rounded border-gray-300 text-gray-900 shadow-sm focus:ring-gray-900 h-4 w-4">
+                                    <input type="checkbox" x-model="hideOperationalModules" class="rounded border-gray-300 text-gray-900 shadow-sm focus:ring-gray-900 h-4 w-4">
                                     <span class="text-[13px] font-bold text-gray-800">Hide Operational View</span>
                                 </div>
                                 <span class="text-[11px] text-gray-500 ml-7">Simplify your sidebar by hiding POS, orders, and kitchen displays. This only affects your view.</span>

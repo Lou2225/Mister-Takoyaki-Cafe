@@ -9,9 +9,6 @@ use App\Models\StockOrder;
 
 class NavigationSidebar extends Component
 {
-    #[On('branch-switched')]
-    #[On('branchContextUpdated')]
-    #[On('settingsUpdated')]
     #[On('refreshSidebar')]
     #[On('order-submitted')]
     #[On('order-processed')]
@@ -54,6 +51,36 @@ class NavigationSidebar extends Component
         }
 
         return (bool) $user->hide_modules;
+    }
+
+    public function getIsSubBranchProperty(): bool
+    {
+        $user = auth()->user();
+        if (!$user) return false;
+
+        $activeBranch = BranchContext::getActiveBranch();
+        return (bool) ($activeBranch && !$activeBranch->is_main);
+    }
+
+    public function getShowOrderInboxProperty(): bool
+    {
+        $user = auth()->user();
+        if (!$user) return false;
+
+        $activeBranch = BranchContext::getActiveBranch();
+        $isAuthorized = ($user->isSuperAdmin() || ($user->branch && $user->branch->is_main));
+
+        return (bool) ($isAuthorized && $activeBranch && $activeBranch->is_main);
+    }
+
+    public function getEffectiveShowRequestSuppliesProperty(): bool
+    {
+        return !$this->effectiveHideOperationalModules && $this->isSubBranch;
+    }
+
+    public function getEffectiveShowBranchRequestsProperty(): bool
+    {
+        return !$this->effectiveHideOperationalModules && $this->showOrderInbox;
     }
 
     public function render()

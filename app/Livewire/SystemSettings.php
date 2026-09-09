@@ -124,10 +124,15 @@ class SystemSettings extends Component
         'perPage' => ['except' => 5, 'as' => 'ss_pp'],
     ];
 
+    public bool $isSavingSystemState = false;
+
     #[On('branchContextUpdated')]
     #[On('branch-switched')]
     public function handleBranchSwitch()
     {
+        if ($this->isSavingSystemState) {
+            return;
+        }
         $this->opBranchId = \App\Services\BranchContext::getActiveBranchId() ?: auth()->user()->branch_id;
         $this->loadSettings();
     }
@@ -646,7 +651,7 @@ class SystemSettings extends Component
             $this->dispatch('inventorySettingsUpdated', ConfigurationService::getInventoryConfig());
             $this->dispatch('posSettingsUpdated', ConfigurationService::getPosConfig());
         }
-
+ 
         $this->dispatch('notify',
             type: 'success',
             message: ucwords(str_replace('_', ' ', $this->tab)) . ' settings saved successfully.'
@@ -764,13 +769,35 @@ class SystemSettings extends Component
             \App\Services\BranchContext::setActiveBranch($this->opBranchId);
         }
 
-        $this->dispatch('accessibility-config-updated', hide_modules: (bool) $this->hideOperationalModules);
+        $branch = $this->opBranchId ? \App\Models\Branch::find($this->opBranchId) : null;
+        $hasBranch = !empty($this->opBranchId);
+        $isMain = $branch ? (bool) $branch->is_main : false;
+        $isSub = $hasBranch && !$isMain;
+        $effectiveHide = (bool) $this->hideOperationalModules || ($user->role_id === 1 && !$hasBranch);
+        $branchName = $branch?->branch_name ?? ($user->role_id === 1 ? 'General Headquarters' : 'No Branch Assigned');
 
-        $branchName = $this->opBranchId
-            ? \App\Models\Branch::find($this->opBranchId)?->branch_name
-            : 'General Headquarters';
-        $this->dispatch('branchContextUpdated', branchName: $branchName);
-        $this->dispatch('branch-switched', branchName: $branchName);
+        $this->isSavingSystemState = true;
+        try {
+            $this->dispatch('accessibility-config-updated', 
+                hide_modules: $effectiveHide,
+                has_branch: $hasBranch,
+                is_main: $isMain,
+                is_sub: $isSub,
+                branch_id: $this->opBranchId ? (int) $this->opBranchId : null,
+                branch_name: $branchName,
+                branchName: $branchName
+            );
+
+            $this->dispatch('branchContextUpdated', 
+                branchName: $branchName,
+                branch_name: $branchName,
+                branchId: $this->opBranchId ? (int) $this->opBranchId : null,
+                isMain: $isMain,
+                hasBranch: $hasBranch
+            );
+        } finally {
+            $this->isSavingSystemState = false;
+        }
     }
 
     private function saveReviewsTab(): void
