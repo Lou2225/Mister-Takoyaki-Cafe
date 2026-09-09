@@ -9,7 +9,8 @@
 
 @php
     $user = auth()->user();
-    $availableBranches = $branches ?? ($user && $user->isSuperAdmin() ? \App\Models\Branch::orderBy('branch_name')->get() : collect());
+    $rawBranches = $branches ?? ($user && $user->isSuperAdmin() ? \App\Models\Branch::orderBy('branch_name')->get() : []);
+    $availableBranches = is_iterable($rawBranches) ? collect($rawBranches) : collect();
 @endphp
 
 <div class="w-full min-h-[550px] flex items-center justify-center p-4 sm:p-8 animate-fadeIn">
@@ -46,7 +47,7 @@
 
         {{-- Action Buttons / Quick Branch Switcher --}}
         <div class="space-y-3">
-            @if($user && $user->isSuperAdmin() && $availableBranches->count() > 0)
+            @if($user && $user->isSuperAdmin() && count($availableBranches) > 0)
                 <div x-data="{ open: false }" class="relative">
                     <button type="button" @click="open = !open" 
                         class="w-full inline-flex items-center justify-between gap-2 px-4 py-3 bg-gray-900 text-white rounded-2xl text-[13px] font-bold hover:bg-gray-800 transition-all shadow-md focus:outline-none">
@@ -64,15 +65,22 @@
                     <div x-show="open" @click.outside="open = false" x-transition x-cloak
                         class="absolute left-0 right-0 mt-2 bg-white border border-gray-100 rounded-2xl shadow-2xl p-1.5 z-50 max-h-56 overflow-y-auto">
                         @foreach($availableBranches as $b)
-                            <button type="button" 
-                                wire:click="quickSwitchBranch({{ $b->id }})" 
-                                @click="open = false"
-                                class="w-full text-left px-3.5 py-2.5 rounded-xl text-[12px] font-semibold text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors flex items-center justify-between">
-                                <span>{{ $b->branch_name }}</span>
-                                @if($b->is_main)
-                                    <span class="text-[10px] font-bold uppercase tracking-wider text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Main</span>
-                                @endif
-                            </button>
+                            @php
+                                $bId = is_array($b) ? ($b['id'] ?? null) : ($b->id ?? null);
+                                $bName = is_array($b) ? ($b['branch_name'] ?? ($b['name'] ?? '')) : ($b->branch_name ?? ($b->name ?? ''));
+                                $bIsMain = is_array($b) ? (!empty($b['is_main'])) : (!empty($b->is_main));
+                            @endphp
+                            @if($bId)
+                                <button type="button" 
+                                    wire:click="quickSwitchBranch({{ $bId }})" 
+                                    @click="open = false"
+                                    class="w-full text-left px-3.5 py-2.5 rounded-xl text-[12px] font-semibold text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors flex items-center justify-between">
+                                    <span>{{ $bName }}</span>
+                                    @if($bIsMain)
+                                        <span class="text-[10px] font-bold uppercase tracking-wider text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Main</span>
+                                    @endif
+                                </button>
+                            @endif
                         @endforeach
                     </div>
                 </div>
