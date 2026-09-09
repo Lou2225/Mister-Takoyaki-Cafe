@@ -794,6 +794,9 @@ public function updatedLastName() {
         \App\Models\Order::where('rider_id', $idToDelete)->update(['rider_id' => null]);
         \App\Models\Order::where('user_id', $idToDelete)->update(['user_id' => null]);
 
+        // Nullify proof_of_deliveries.rider_id — has a FK referencing users.id
+        \App\Models\ProofOfDelivery::where('rider_id', $idToDelete)->update(['rider_id' => null]);
+
         // If user was a branch manager, unlink them from the branch
         \App\Models\Branch::where('user_id', $idToDelete)->update(['user_id' => null]);
 
