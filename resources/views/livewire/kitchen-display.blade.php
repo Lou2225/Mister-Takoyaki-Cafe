@@ -50,7 +50,7 @@
         $el.addEventListener('alpine:destroy', () => clearInterval(_timerInterval));
     "
     wire:key="kds-master-container"
-    wire:poll.5s="refreshStats"
+    wire:poll.15s="refreshStats"
     class="relative bg-[#F9FAFB] p-2 md:p-4"
     x-cloak>
 

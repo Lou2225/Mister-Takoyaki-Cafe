@@ -1,4 +1,4 @@
-<div class="relative" x-data="{ notificationsOpen: false }" wire:ignore.self @close-notifications.window="notificationsOpen = false" wire:poll.10s.keep-alive>
+<div class="relative" x-data="{ notificationsOpen: false }" wire:ignore.self @close-notifications.window="notificationsOpen = false" wire:poll.30s.keep-alive>
     <button @click="notificationsOpen = !notificationsOpen" @click.outside="notificationsOpen = false" 
         class="p-3 text-gray-400 hover:text-gray-500 rounded-full hover:bg-gray-100 transition-colors focus:outline-none relative group">
         <span class="sr-only">View notifications</span>

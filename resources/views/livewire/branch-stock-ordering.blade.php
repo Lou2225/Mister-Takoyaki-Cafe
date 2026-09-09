@@ -1,4 +1,4 @@
-<div class="px-2 py-2 space-y-6" x-data="slidingTabs({ panel: @entangle('panel') }, ['panel'])" wire:ignore.self wire:init="loadRestockSuggestions" wire:poll.5s>
+<div class="px-2 py-2 space-y-6" x-data="slidingTabs({ panel: @entangle('panel') }, ['panel'])" wire:ignore.self wire:init="loadRestockSuggestions" wire:poll.30s>
     {{-- ════════════════ DYNAMIC HEADER ════════════════ --}}
     <div class="px-1 pt-2">
         <div class="mb-4 flex items-center justify-between">

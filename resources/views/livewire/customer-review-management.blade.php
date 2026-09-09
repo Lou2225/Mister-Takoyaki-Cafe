@@ -6,7 +6,7 @@
     $primaryBg = "bg-{$primaryColor}-600";
 @endphp
 
-<div class="relative overflow-hidden" wire:poll.5s>
+<div class="relative overflow-hidden" wire:poll.30s>
     <div class="relative min-h-[600px] px-1">
         
         {{-- Header Section --}}
