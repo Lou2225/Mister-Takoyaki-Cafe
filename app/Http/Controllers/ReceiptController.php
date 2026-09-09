@@ -26,9 +26,9 @@ class ReceiptController extends Controller
             $address = !empty($address['formatted']) ? $address['formatted'] : 'Main Branch, Manila';
         }
 
-        $posConfig = \App\Services\ConfigurationService::getPosConfig();
+        $posConfig = \App\Services\ConfigurationService::getPosConfig($order->branch_id);
         $businessConfig = \App\Services\ConfigurationService::getBusinessConfig();
-        $financialConfig = \App\Services\ConfigurationService::getFinancialConfig();
+        $financialConfig = \App\Services\ConfigurationService::getFinancialConfig($order->branch_id);
 
         $settings = [
             'business_name' => $businessConfig['name'] ?? 'Mister Takoyaki Cafe',
@@ -47,7 +47,7 @@ class ReceiptController extends Controller
             'customer_receipt_title' => $posConfig['customer_receipt_title'] ?? 'Customer Receipt & Invoice',
             'show_receipt_qr_code' => $posConfig['show_receipt_qr_code'] ?? true,
             'show_receipt_footer' => $posConfig['show_receipt_footer'] ?? true,
-            'receipt_copies' => (int) SystemSetting::get('receipt_copies', 1),
+            'receipt_copies' => (int) ($posConfig['copies'] ?? 1),
             'qr_code' => null
         ];
 
@@ -94,7 +94,6 @@ class ReceiptController extends Controller
         $settings['qr_url'] = $qrUrl;
 
         if ($qrUrl) {
-            $settings['qr_code'] = \App\Helpers\QrCodeHelper::generateDataUri($qrUrl, 100);
             $settings['qr_code'] = \App\Helpers\QrCodeHelper::generateDataUri($qrUrl, 120);
         }
 

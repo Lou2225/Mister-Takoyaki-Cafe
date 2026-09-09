@@ -120,22 +120,27 @@ public $filterCategoryId = '';
         try {
             $branchData = []; // [branch_id => ['name' => ..., 'low' => [], 'expiring' => [], 'expired' => []]]
             $today    = Carbon::today();
-            $config   = ConfigurationService::getInventoryConfig();
+            // Per-branch alert digest — evaluated once per branch below,
+            // not globally, now that thresholds are branch-scoped.
             
-            // Critical check: Only proceed if auto-notifications are enabled in settings
-            if (!($config['auto_reorder_enabled'] ?? false)) {
-                return;
-            }
-
-            $alertDays = (int)($config['expiry_alert_days'] ?? 7);
-            $nextWeek = Carbon::today()->addDays($alertDays);
-
-            // Gather low stocks
+            // Gather low stocks — evaluated per branch using that branch's
+            // own thresholds (falls back to the global default for any
+            // branch that hasn't set an override).
             $stocks = BranchIngredientStock::with(['branch', 'ingredient'])->get();
+            $branchConfigCache = [];
+            $getBranchConfig = function ($bid) use (&$branchConfigCache) {
+                return $branchConfigCache[$bid] ??= ConfigurationService::getInventoryConfig($bid);
+            };
+
             foreach ($stocks as $stock) {
+                $bid = $stock->branch_id;
+                $branchConfig = $getBranchConfig($bid);
+                if (!($branchConfig['auto_reorder_enabled'] ?? false)) {
+                    continue;
+                }
+
                 $min = (float) ($stock->ingredient->minimum_stock ?? 0);
                 if ($min > 0 && $stock->stock_quantity < $min) {
-                    $bid = $stock->branch_id;
                     if (!isset($branchData[$bid])) {
                         $branchData[$bid] = [
                             'name' => $stock->branch->branch_name ?? 'Unknown',
@@ -153,15 +158,24 @@ public $filterCategoryId = '';
                 }
             }
 
-            // Gather batch expiry data
+            // Gather batch expiry data — each branch's own expiry_alert_days
+            // window and auto_reorder_enabled flag apply.
             $batches = StockBatch::with(['branch', 'ingredient'])
                 ->whereNotNull('expiry_date')
                 ->where('current_quantity', '>', 0)
                 ->get();
 
             foreach ($batches as $batch) {
-                $expiry = Carbon::parse($batch->expiry_date)->startOfDay();
                 $bid = $batch->branch_id;
+                $branchConfig = $getBranchConfig($bid);
+                if (!($branchConfig['auto_reorder_enabled'] ?? false)) {
+                    continue;
+                }
+
+                $alertDays = (int) ($branchConfig['expiry_alert_days'] ?? 7);
+                $nextWeek = Carbon::today()->addDays($alertDays);
+                $expiry = Carbon::parse($batch->expiry_date)->startOfDay();
+
                 if (!isset($branchData[$bid])) {
                     $branchData[$bid] = [
                         'name' => $batch->branch->branch_name ?? 'Unknown',
@@ -218,7 +232,7 @@ public $filterCategoryId = '';
             }
         } catch (\Exception $e) {
             // Silently fail — don't interrupt the user's session over an email
-            \Log::error('StockAlertMail failed: ' . $e->getMessage());
+            Log::error('StockAlertMail failed: ' . $e->getMessage());
         }
     }
 
@@ -485,7 +499,7 @@ public $filterCategoryId = '';
         }
         // Log for debugging when selection is made from the UI
         try {
-            \Log::info('setConversionLink called', ['rowIndex' => $rowIndex, 'fromIndex' => $fromIndex]);
+            Log::info('setConversionLink called', ['rowIndex' => $rowIndex, 'fromIndex' => $fromIndex]);
         } catch (\Throwable $e) {
             // ignore logging errors
         }
@@ -828,7 +842,8 @@ public $filterCategoryId = '';
     // ── Render ────────────────────────────────────────────────────
     public function render()
     {
-        $inventoryConfig = ConfigurationService::getInventoryConfig();
+        $selectedBranchForConfig = $this->selectedBranchId ?: (\App\Services\BranchContext::getActiveBranchId() ?: (Branch::first()?->id ?? null));
+        $inventoryConfig = ConfigurationService::getInventoryConfig($selectedBranchForConfig);
         $today = Carbon::today();
         $alertDays = (int)($inventoryConfig['expiry_alert_days'] ?? 7);
 

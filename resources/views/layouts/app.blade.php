@@ -85,7 +85,7 @@
         sidebarOpen: localStorage.getItem('sidebarOpen') ? JSON.parse(localStorage.getItem('sidebarOpen')) : (window.innerWidth >= 1024),
         isMobile: window.innerWidth < 1024,
         userMenuOpen: false,
-        hideOperationalModules: {{ $user?->hide_modules ? 'true' : 'false' }},
+        hideOperationalModules: {{ ($user?->hide_modules || ($user?->isSuperAdmin() && !\App\Services\BranchContext::getActiveBranchId())) ? 'true' : 'false' }},
         isSuperAdmin: {{ $user?->isSuperAdmin() ? 'true' : 'false' }},
         init() {
             // Watch sidebarOpen and save to localStorage
@@ -133,21 +133,7 @@
             </svg>
         </button>
         
-        <div class="hidden md:flex items-center gap-2.5 px-3 py-1.5 bg-gray-50 border border-gray-100 rounded-xl transition-all shadow-sm ml-2"
-             x-data="{ 
-                contextLabel: @js($contextLabel),
-                contextValue: @js($contextValue)
-             }"
-             @branch-switched.window="if($event.detail.branchName) contextValue = $event.detail.branchName"
-             @context-updated.window="if($event.detail.branchName) contextValue = $event.detail.branchName"
-        >
-            <svg class="w-4 h-4 {{ $iconColor }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-            <span class="text-[12px] font-bold text-gray-500 uppercase tracking-tight truncate max-w-[200px] lg:max-w-none">
-                <span x-text="contextLabel"></span>: <span class="text-gray-900 font-black tracking-normal" x-text="contextValue"></span>
-            </span>
-        </div>
+        @livewire('branch-context-label', ['iconColor' => $iconColor])
         
         {{-- Page Title placeholder/brand (mobile only) --}}
         <div class="flex items-center md:hidden">

@@ -33,9 +33,9 @@ class PosReceiptController extends Controller
         ]);
 
         $business = ConfigurationService::getBusinessConfig();
-        $financial = ConfigurationService::getFinancialConfig();
+        $financial = ConfigurationService::getFinancialConfig($order->branch_id);
 
-        $posConfig = ConfigurationService::getPosConfig();
+        $posConfig = ConfigurationService::getPosConfig($order->branch_id);
         $businessLogo = $business['logo'] ?? null;
         $logoDataUri = null;
         $receiptLogoEnabled = (bool) ($posConfig['logo_enabled'] ?? true);
@@ -63,7 +63,7 @@ class PosReceiptController extends Controller
             }
         }
 
-        $qrUrl = \App\Models\SystemSetting::get('receipt_qr_url', '');
+        $qrUrl = $posConfig['qr_url'] ?? '';
         if (empty($qrUrl)) {
             $qrUrl = route('customer.review', ['branch' => $order->branch_id]);
         } else {
@@ -107,7 +107,7 @@ class PosReceiptController extends Controller
         if ($kitchenItems->isNotEmpty()) {
             $receipts[] = [
                 'type'  => 'kitchen',
-                'title' => 'KITCHEN SLIP',
+                'title' => $posConfig['kitchen_slip_title'] ?? 'KITCHEN SLIP',
                 'items' => $kitchenItems->map($normalizeItem)->values()->all(),
             ];
         }
@@ -115,7 +115,7 @@ class PosReceiptController extends Controller
         if ($baristaItems->isNotEmpty()) {
             $receipts[] = [
                 'type'  => 'barista',
-                'title' => 'BARISTA SLIP',
+                'title' => $posConfig['barista_slip_title'] ?? 'BARISTA SLIP',
                 'items' => $baristaItems->map($normalizeItem)->values()->all(),
             ];
         }
@@ -155,20 +155,20 @@ class PosReceiptController extends Controller
                 'currency_symbol'        => $financial['currency_symbol'] ?? '₱',
                 'receipt_logo_enabled'   => $receiptLogoEnabled,
                 'logo_data_uri'          => $logoDataUri,
-                'receipt_footer_message' => \App\Models\SystemSetting::get('receipt_footer_message', 'Thank you for your visit!'),
-                'receipt_return_policy'  => \App\Models\SystemSetting::get('receipt_return_policy', ''),
-                'receipt_copies'         => (int) \App\Models\SystemSetting::get('receipt_copies', 1),
+                'receipt_footer_message' => $posConfig['footer_message'],
+                'receipt_return_policy'  => $posConfig['return_policy'],
+                'receipt_copies'         => (int) $posConfig['copies'],
                 'qr_code'                => $qrCode,
                 'qr_url'                 => $qrUrl,
-                'kitchen_slip_title'     => \App\Models\SystemSetting::get('kitchen_slip_title', '🍳 KITCHEN SLIP'),
-                'kitchen_slip_subtitle'  => \App\Models\SystemSetting::get('kitchen_slip_subtitle', 'Food Preparation Order'),
-                'barista_slip_title'     => \App\Models\SystemSetting::get('barista_slip_title', '☕ BARISTA SLIP'),
-                'barista_slip_subtitle'  => \App\Models\SystemSetting::get('barista_slip_subtitle', 'Beverage Preparation Order'),
-                'customer_receipt_title' => \App\Models\SystemSetting::get('customer_receipt_title', 'Customer Receipt & Invoice'),
-                'show_receipt_qr_code'   => (bool) \App\Models\SystemSetting::get('show_receipt_qr_code', true),
-                'show_receipt_footer'    => (bool) \App\Models\SystemSetting::get('show_receipt_footer', true),
-                'show_receipt_tendered'  => (bool) \App\Models\SystemSetting::get('show_receipt_tendered', true),
-                'show_receipt_change'    => (bool) \App\Models\SystemSetting::get('show_receipt_change', true),
+                'kitchen_slip_title'     => $posConfig['kitchen_slip_title'],
+                'kitchen_slip_subtitle'  => $posConfig['kitchen_slip_subtitle'],
+                'barista_slip_title'     => $posConfig['barista_slip_title'],
+                'barista_slip_subtitle'  => $posConfig['barista_slip_subtitle'],
+                'customer_receipt_title' => $posConfig['customer_receipt_title'],
+                'show_receipt_qr_code'   => (bool) $posConfig['show_receipt_qr_code'],
+                'show_receipt_footer'    => (bool) $posConfig['show_receipt_footer'],
+                'show_receipt_tendered'  => (bool) $posConfig['show_receipt_tendered'],
+                'show_receipt_change'    => (bool) $posConfig['show_receipt_change'],
             ],
             'receipts' => $receipts,
         ]);

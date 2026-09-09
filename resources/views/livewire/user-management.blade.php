@@ -358,6 +358,11 @@
                                     <span
                                         class="text-[12px] font-bold text-gray-800">{{ auth()->user()->branch?->branch_name ?? '—' }}</span>
                                 </div>
+                                @if(!auth()->user()->branch_id)
+                                    <div class="mt-2 p-3 bg-red-50 border border-red-100 rounded-lg text-[11px] text-red-600 font-medium leading-relaxed">
+                                        Your account has no branch assigned, so new staff can't be registered. Contact a Super Admin to assign your account a branch.
+                                    </div>
+                                @endif
                             </div>
                         @endif
                     </div>
@@ -376,6 +381,7 @@
 
                     <div class="flex flex-col gap-2">
                 <x-primary-button type="button" wire:click="runPreSaveValidation"
+                    :disabled="auth()->user()->isAdmin() && !auth()->user()->branch_id"
                     class="w-full justify-center" x-text="mode === 'edit' ? 'Save Changes' : 'Register User'"></x-primary-button>
                         <x-secondary-button @click="if(mode === 'edit') { mode = 'view'; $wire.showEdit($wire.get('editUserId'), 'view') } else { panel = 'list'; mode = 'list'; $wire.backToList() }" class="w-full justify-center">
                             <span>Cancel</span>

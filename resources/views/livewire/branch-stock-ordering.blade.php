@@ -253,14 +253,7 @@
             <div class="flex flex-1 min-w-0 lg:flex-initial">
                 <x-search-bar wireModel="search" placeholder="Reference..." width="w-full lg:w-64" />
             </div>
-<<<<<<< HEAD
             <div class="flex flex-nowrap items-center justify-end gap-1.5 sm:gap-3 shrink-0">
-=======
-            <div class="flex flex-wrap items-center lg:justify-end gap-3">
-                <div x-show="panel === 'history'" class="transition-all duration-200" x-cloak>
-                    <x-date-filter startModel="startDate" endModel="endDate" activeModel="activeFilter" />
-                </div>
->>>>>>> 8ad7217b87e6ff71676d665e65e7079c934664b2
                 <x-dropdown align="right" width="48">
                     <x-slot name="trigger">
                         <x-secondary-button type="button" class="gap-0 sm:gap-1.5 h-10 !px-2.5 sm:!px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none text-[13px] font-black">

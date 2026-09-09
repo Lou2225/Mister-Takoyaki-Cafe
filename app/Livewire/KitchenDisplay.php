@@ -11,12 +11,13 @@ use Carbon\Carbon;
 use Livewire\Attributes\Locked;
 use Livewire\WithPagination;
 use Illuminate\Support\Facades\Log;
+use App\Traits\RequiresOperatingBranch;
 
 class KitchenDisplay extends Component
 {
-    use WithPagination;
+    use WithPagination, RequiresOperatingBranch;
 
-        public int $branchId = 0;
+    public ?int $branchId = null;
     public string $activeTab = 'active';
     public int $perPage = 5;
     public ?string $startDate = null;
@@ -30,12 +31,16 @@ class KitchenDisplay extends Component
     public array $availableRiders = [];
     public mixed $selectedRiderId = null;
 
-        public function mount()
+    public function mount()
 {
-    $this->branchId = auth()->user()->branch_id;
+    $this->guardOperatingBranch();
+
+    $this->branchId = auth()->user()->isSuperAdmin()
+        ? (\App\Services\BranchContext::getActiveBranchId() ?: null)
+        : auth()->user()->branch_id;
     $this->startDate = now()->startOfDay()->format('Y-m-d');
     $this->endDate   = now()->endOfDay()->format('Y-m-d');
-    $this->delayThresholdMinutes = (int) SystemSetting::get('kds_delay_threshold_minutes', 10);
+    $this->delayThresholdMinutes = (int) SystemSetting::get('kds_delay_threshold_minutes', 10, $this->branchId);
     $this->updateHeader();
 }
 
@@ -111,6 +116,10 @@ public function refreshStats()
 
     public function getKdsStatsProperty()
     {
+        if (!$this->branchId) {
+            return ['active' => 0, 'delayed' => 0, 'ready' => 0, 'completed' => 0];
+        }
+
         $base = Order::where('branch_id', $this->branchId);
 
         return [
@@ -137,6 +146,10 @@ public function refreshStats()
 
     public function getActiveOrdersProperty()
     {
+        if (!$this->branchId) {
+            return collect();
+        }
+
         return Order::with(['items.product', 'items.options.option', 'items.modifiers.modifier'])
             ->where('branch_id', $this->branchId)
             ->where('status', Order::STATUS_PREPARING)
@@ -146,6 +159,10 @@ public function refreshStats()
 
     public function getReadyOrdersProperty()
     {
+        if (!$this->branchId) {
+            return collect();
+        }
+
         return Order::with(['items.product', 'items.options.option', 'items.modifiers.modifier'])
             ->where('branch_id', $this->branchId)
             ->where('status', Order::STATUS_READY)
@@ -156,6 +173,10 @@ public function refreshStats()
 
     public function getHistoryOrdersProperty()
     {
+        if (!$this->branchId) {
+            return Order::whereRaw('1 = 0')->paginate($this->perPage);
+        }
+
         $query = Order::with(['items.product', 'items.options.option', 'items.modifiers.modifier'])
             ->where('branch_id', $this->branchId)
             ->whereIn('status', [

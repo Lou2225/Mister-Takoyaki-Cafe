@@ -59,6 +59,14 @@
         wire:key="kds-board-card"
         class="bg-white rounded-2xl shadow-sm border border-gray-200">
 
+        @if(!$branchId)
+            <div class="p-12">
+                <x-empty-state
+                    title="No Branch Selected"
+                    description="Switch into a branch's operating context (Settings → Access Control) to view its Kitchen Display." />
+            </div>
+        @else
+
         {{-- Section 1: Title --}}
         <div class="px-4 py-4 md:px-6 md:py-6 shrink-0">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -372,6 +380,7 @@
             </div>
 
         </div>{{-- end Operational Content Area --}}
+        @endif
     </div>{{-- end MAIN BOARD CARD (wire:ignore.self) --}}
 
 

@@ -9,10 +9,11 @@ use App\Events\OrderStatusUpdated;
 use Illuminate\Support\Facades\DB;
 use App\Traits\HandlesValidations;
 use App\Helpers\ValidationHelper;
+use App\Traits\RequiresOperatingBranch;
 
 class OrderManagement extends Component
 {
-    use WithPagination, HandlesValidations;
+    use WithPagination, HandlesValidations, RequiresOperatingBranch;
 
     // View Query & State
     public $search = '';
@@ -48,6 +49,8 @@ class OrderManagement extends Component
 
     public function mount()
     {
+        $this->guardOperatingBranch();
+
         $this->startDate = '';
         $this->endDate = '';
         

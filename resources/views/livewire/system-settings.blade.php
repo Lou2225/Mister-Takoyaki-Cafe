@@ -17,6 +17,14 @@
 
     <div class="flex flex-col lg:flex-row gap-6 lg:gap-10 min-h-[700px] w-full">
 
+        @if($missingBranchAssignment && $tab === '')
+            <div class="w-full flex items-center justify-center">
+                <x-empty-state
+                    title="No Branch Assigned"
+                    description="Your account isn't assigned to a branch yet, so there are no branch-specific settings to show. Contact a super admin to get assigned to a branch." />
+            </div>
+        @else
+
         {{-- Mobile / Tablet Nav: horizontal scrollable pills --}}
         <div class="lg:hidden -mx-1 px-1 overflow-x-auto no-scrollbar scroll-smooth">
             <div class="flex items-center gap-2 w-max pb-1">
@@ -45,12 +53,14 @@
                     Customer Feedback
                 </button>
 
-                @if($this->isSuperAdmin())
+                @if($this->isSuperAdmin() || $this->isAdmin())
                     <div class="w-px h-6 bg-gray-200 shrink-0"></div>
                     <button @click="tab = 'printer'; $wire.selectTab('printer')" :class="tab === 'printer' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-200'" class="flex items-center gap-2 px-3.5 h-10 rounded-xl text-[12px] font-bold border shadow-sm transition-colors shrink-0 whitespace-nowrap">
                         <svg :class="tab === 'printer' ? 'text-white' : 'text-gray-400'" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
                         Thermal Printer
                     </button>
+                @endif
+                @if($this->isSuperAdmin())
                     <button @click="tab = 'system'; $wire.selectTab('system')" :class="tab === 'system' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-200'" class="flex items-center gap-2 px-3.5 h-10 rounded-xl text-[12px] font-bold border shadow-sm transition-colors shrink-0 whitespace-nowrap">
                         <svg :class="tab === 'system' ? 'text-white' : 'text-gray-400'" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                         Access Control
@@ -106,7 +116,7 @@
                 </button>
             </div>
 
-            @if($this->isSuperAdmin())
+            @if($this->isSuperAdmin() || $this->isAdmin())
             <div class="space-y-0.5">
                 <h3 class="px-3 mb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Hardware</h3>
                 <button @click="tab = 'printer'; $wire.selectTab('printer')" :class="tab === 'printer' ? 'bg-[#F3F4F6] text-gray-900 font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'" class="flex items-center gap-3 w-full px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors group focus:outline-none">
@@ -116,7 +126,9 @@
                     <span>Thermal Printer</span>
                 </button>
             </div>
+            @endif
 
+            @if($this->isSuperAdmin())
             <div class="space-y-0.5">
                 <h3 class="px-3 mb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Security</h3>
                 <button @click="tab = 'system'; $wire.selectTab('system')" :class="tab === 'system' ? 'bg-[#F3F4F6] text-gray-900 font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'" class="flex items-center gap-3 w-full px-3 py-1.5 rounded-lg text-[13px] font-medium transition-colors group focus:outline-none">
@@ -361,8 +373,12 @@
             <div x-show="tab === 'receipts'" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="grid grid-cols-1 xl:grid-cols-3 gap-6">
                 <div class="xl:col-span-2 space-y-6">
                         <div class="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
-                            <h2 class="text-[13px] font-bold text-gray-900 uppercase tracking-widest mb-6 border-b border-gray-50 pb-2">Design Controls</h2>
-
+                            <div class="flex items-center justify-between mb-6 border-b border-gray-50 pb-2">
+                                <h2 class="text-[13px] font-bold text-gray-900 uppercase tracking-widest">Design Controls</h2>
+                                <span class="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full {{ $settingsBranchId ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-600' }}">
+                                    {{ $settingsBranchId ? 'Editing: ' . $settingsBranchName : 'Editing Global Default' }}
+                                </span>
+                            </div>
                             <div class="space-y-4">
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <label class="flex items-center gap-3 p-3 bg-gray-50 border border-gray-100 rounded-xl cursor-pointer hover:bg-white transition-all shadow-sm">
@@ -930,7 +946,7 @@
                 </div>
             </div>
             {{-- Thermal Printer Settings --}}
-            @if($this->isSuperAdmin())
+            @if($this->isSuperAdmin() || $this->isAdmin())
             <div x-show="tab === 'printer'" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="space-y-6">
                 <div class="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
                                         <h2 class="text-[13px] font-bold text-gray-900 uppercase tracking-widest mb-6 border-b border-gray-50 pb-2">Thermal Printer</h2>
@@ -1076,8 +1092,12 @@
             @endif
             {{-- Access Control --}}
             @if($this->isSuperAdmin())
-            <div x-show="tab === 'system'" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="space-y-6">
-                <div class="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+            <div x-show="tab === 'system'" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="space-y-6"
+                x-data="{
+                    opBranchId: @entangle('opBranchId').live,
+                    hideOperationalModules: @entangle('hideOperationalModules').live,
+                    branches: @js($branches->map(fn($b) => ['id' => (int) $b->id, 'name' => $b->branch_name])->values())
+                }">                <div class="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
                         <h2 class="text-[13px] font-bold text-gray-900 uppercase tracking-widest mb-6 border-b border-gray-50 pb-2">Module Visibility</h2>
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1097,21 +1117,26 @@
                                     <x-dropdown align="left" width="full" containerClasses="block w-full">
                                         <x-slot name="trigger">
                                             <button type="button" class="mt-1 flex items-center justify-between w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] text-gray-700 shadow-sm hover:border-gray-300 focus:outline-none transition-all h-10">
-                                                <span>{{ $opBranchId ? $branches->firstWhere('id', $opBranchId)?->branch_name : 'General Headquarters (No Branch)' }}</span>
+                                                <span x-text="opBranchId ? (branches.find(b => b.id == opBranchId)?.name ?? 'Unknown Branch') : 'General Headquarters (No Branch)'"></span>
                                                 <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                             </button>
                                         </x-slot>
                                         <x-slot name="content">
-                                            <x-dropdown-link href="#" wire:click.prevent="$set('opBranchId', '')">General Headquarters (No Branch)</x-dropdown-link>
+                                            <x-dropdown-link href="#" @click.prevent="opBranchId = ''; hideOperationalModules = true; dropdownOpen = false">General Headquarters (No Branch)</x-dropdown-link>
                                             <hr class="border-gray-100">
                                             @forelse($branches as $branch)
-                                                <x-dropdown-link href="#" wire:click.prevent="$set('opBranchId', {{ $branch->id }})">{{ $branch->branch_name }}</x-dropdown-link>
+                                                <x-dropdown-link href="#" @click.prevent="opBranchId = {{ $branch->id }}; hideOperationalModules = false; dropdownOpen = false">{{ $branch->branch_name }}</x-dropdown-link>
                                             @empty
                                                 <x-empty-state compact title="No branches" description="" />
                                             @endforelse
                                         </x-slot>
                                     </x-dropdown>
                                     <x-input-error :messages="$errors->get('opBranchId')" class="mt-1" />
+
+                                    <div x-show="!opBranchId" x-cloak class="mt-2 flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-100 rounded-lg">
+                                        <svg class="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                        <p class="text-[10px] text-amber-700 font-medium leading-snug">With no operating branch selected, POS, Order Management, Kitchen Display, and Branch Requests will be hidden from your sidebar and blocked if visited directly, since those modules need a specific branch to operate in.</p>
+                                    </div>
                                 </div>
                             @endif
                         </div>
@@ -1175,7 +1200,8 @@
                     </div>
                 </div>
             @endif
-        </div>
+         </div>
+        @endif
     </div>
 
     {{-- ── Save Confirmation Modal ── --}}

@@ -21,10 +21,11 @@ use Illuminate\Support\Facades\Mail;
 use App\Mail\StockOrderMail;
 use App\Traits\HandlesValidations;
 use App\Traits\HandlesExports;
+use App\Traits\RequiresOperatingBranch;
 
 class BranchStockOrderAdmin extends Component
 {
-    use WithPagination, HandlesValidations, HandlesExports;
+    use WithPagination, HandlesValidations, HandlesExports, RequiresOperatingBranch;
 
     // ── Panel / View State ────────────────────────────────────────
     public $panel = 'inbox';
@@ -93,6 +94,8 @@ class BranchStockOrderAdmin extends Component
 
     public function mount()
     {
+        $this->guardMainBranchContext();
+
         $this->baseFee       = \App\Models\SystemSetting::get('logistics_base_fee', 0);
         $this->globalRate    = \App\Models\SystemSetting::get('logistics_global_rate', 50);
         $this->minFee        = \App\Models\SystemSetting::get('logistics_min_fee', 0);

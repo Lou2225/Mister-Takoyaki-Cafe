@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use Livewire\Component;
 
+use Livewire\Attributes\On;
 use Livewire\WithPagination;
 use Livewire\WithFileUploads;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -91,6 +92,20 @@ class SystemSettings extends Component
     public $opBranchId;
     public $branches = [];
 
+    // Which branch's settings are currently loaded/edited. Super admins
+    // follow whichever branch is active in BranchContext (the same
+    // switcher used for stock ordering elsewhere); everyone else is
+    // locked to their own assigned branch. Null = editing the global
+    // default that branches fall back to when they have no override.
+    public $settingsBranchId = null;
+    public $settingsBranchName = 'All Branches (Global Default)';
+    public $missingBranchAssignment = false;
+
+    // Tabs whose settings are per-branch. A user with no branch_id and
+    // no super-admin privileges must not be able to view or save these —
+    // there is no "their branch" to scope the edit to.
+    private const BRANCH_SCOPED_TABS = ['receipts', 'inventory', 'pos', 'reviews', 'printer'];
+
     // Review Settings
     public $reviewFormTitle = 'How was your experience?';
     public $reviewFormSubtitle = 'Thank you for your feedback!';
@@ -109,16 +124,18 @@ class SystemSettings extends Component
         'perPage' => ['except' => 5, 'as' => 'ss_pp'],
     ];
 
-    protected $listeners = [
-        'branchContextUpdated' => 'handleBranchSwitch',
-        'branch-switched' => 'handleBranchSwitch',
-        'refresh' => '$refresh'
-    ];
-
+    #[On('branchContextUpdated')]
+    #[On('branch-switched')]
     public function handleBranchSwitch()
     {
         $this->opBranchId = \App\Services\BranchContext::getActiveBranchId() ?: auth()->user()->branch_id;
         $this->loadSettings();
+    }
+
+    #[On('refresh')]
+    public function refreshSettings(): void
+    {
+        //
     }
 
     public function mount()
@@ -128,14 +145,16 @@ class SystemSettings extends Component
             abort(403, 'Unauthorized access to system settings.');
         }
 
-        // Set default tab for non-super admins
-        if (!auth()->user()->isSuperAdmin()) {
-            $this->tab = 'inventory';
-        }
-
         $this->branches = Branch::all();
         $this->opBranchId = auth()->user()->branch_id;
         $this->loadSettings();
+
+        // Set default tab for non-super admins. If they have no branch
+        // assignment, every operational tab is branch-scoped and blocked,
+        // so there is nothing safe to default into.
+        if (!auth()->user()->isSuperAdmin()) {
+            $this->tab = $this->missingBranchAssignment ? '' : 'inventory';
+        }
         $this->updateHeader();
         // Generate a sample QR code for the receipt preview
         $this->sampleQrCode = QrCodeHelper::generateReviewQrCode('SAMPLE-' . uniqid());
@@ -160,12 +179,28 @@ class SystemSettings extends Component
         }
         return $digits;
     }
+    private function resolveSettingsBranchId(): ?int
+    {
+        if ($this->isSuperAdmin()) {
+            return \App\Services\BranchContext::getActiveBranchId() ?: null;
+        }
+
+        $branchId = auth()->user()->branch_id;
+        $this->missingBranchAssignment = empty($branchId);
+
+        return $branchId;
+    }
 
     private function loadSettings()
     {
+        $this->settingsBranchId = $this->resolveSettingsBranchId();
+        $this->settingsBranchName = $this->settingsBranchId
+            ? (Branch::find($this->settingsBranchId)?->branch_name ?? 'Unknown Branch')
+            : 'All Branches (Global Default)';
+
         $this->businessName    = SystemSetting::get('business_name', 'Mister Takoyaki Cafe');
         $this->businessEmail   = SystemSetting::get('business_email', 'contact@mistertakoyaki.com');
-                $this->businessPhone = $this->normalizeMobileDisplay(SystemSetting::get('business_phone', ''));
+        $this->businessPhone   = $this->normalizeMobileDisplay(SystemSetting::get('business_phone', ''));
 
         $this->businessTin     = SystemSetting::get('business_tin', '');
         $this->businessAddress = SystemSetting::get('business_address', '');
@@ -188,64 +223,64 @@ class SystemSettings extends Component
             $this->businessAddress = $addr['formatted'] ?? '';
         }
 
-        $this->serviceCharge  = SystemSetting::get('service_charge', 0.00);
+        $this->serviceCharge  = SystemSetting::get('service_charge', 0.00, $this->settingsBranchId);
         $this->currency       = SystemSetting::get('currency', 'PHP');
         $this->currencySymbol = SystemSetting::get('currency_symbol', '₱');
 
-        $this->receiptLogoEnabled   = SystemSetting::get('receipt_logo_enabled', true);
-        $this->receiptShowVat       = SystemSetting::get('receipt_show_vat', true);
-        $this->receiptFooterMessage = SystemSetting::get('receipt_footer_message', 'Thank you for your visit!');
-        $this->receiptReturnPolicy  = SystemSetting::get('receipt_return_policy', 'No return, no exchange.');
-        $this->receiptCopies        = SystemSetting::get('receipt_copies', 1);
-        $this->receiptQrUrl         = SystemSetting::get('receipt_qr_url', '');
+        $this->receiptLogoEnabled   = SystemSetting::get('receipt_logo_enabled', true, $this->settingsBranchId);
+        $this->receiptShowVat       = SystemSetting::get('receipt_show_vat', true, $this->settingsBranchId);
+        $this->receiptFooterMessage = SystemSetting::get('receipt_footer_message', 'Thank you for your visit!', $this->settingsBranchId);
+        $this->receiptReturnPolicy  = SystemSetting::get('receipt_return_policy', 'No return, no exchange.', $this->settingsBranchId);
+        $this->receiptCopies        = SystemSetting::get('receipt_copies', 1, $this->settingsBranchId);
+        $this->receiptQrUrl         = SystemSetting::get('receipt_qr_url', '', $this->settingsBranchId);
         
         // Thermal printer receipt customization
-        $this->kitchenSlipTitle     = SystemSetting::get('kitchen_slip_title', '🍳 KITCHEN SLIP');
-        $this->kitchenSlipSubtitle  = SystemSetting::get('kitchen_slip_subtitle', 'Food Preparation Order');
-        $this->baristaSlipTitle     = SystemSetting::get('barista_slip_title', '☕ BARISTA SLIP');
-        $this->baristaSlipSubtitle  = SystemSetting::get('barista_slip_subtitle', 'Beverage Preparation Order');
-        $this->customerReceiptTitle = SystemSetting::get('customer_receipt_title', 'Customer Receipt & Invoice');
-        $this->showReceiptQrCode    = SystemSetting::get('show_receipt_qr_code', true);
-        $this->showReceiptFooter    = SystemSetting::get('show_receipt_footer', true);
-        $this->showReceiptTendered = SystemSetting::get('show_receipt_tendered', true);
-        $this->showReceiptChange   = SystemSetting::get('show_receipt_change', true);
+        $this->kitchenSlipTitle     = SystemSetting::get('kitchen_slip_title', '🍳 KITCHEN SLIP', $this->settingsBranchId);
+        $this->kitchenSlipSubtitle  = SystemSetting::get('kitchen_slip_subtitle', 'Food Preparation Order', $this->settingsBranchId);
+        $this->baristaSlipTitle     = SystemSetting::get('barista_slip_title', '☕ BARISTA SLIP', $this->settingsBranchId);
+        $this->baristaSlipSubtitle  = SystemSetting::get('barista_slip_subtitle', 'Beverage Preparation Order', $this->settingsBranchId);
+        $this->customerReceiptTitle = SystemSetting::get('customer_receipt_title', 'Customer Receipt & Invoice', $this->settingsBranchId);
+        $this->showReceiptQrCode    = SystemSetting::get('show_receipt_qr_code', true, $this->settingsBranchId);
+        $this->showReceiptFooter    = SystemSetting::get('show_receipt_footer', true, $this->settingsBranchId);
+        $this->showReceiptTendered = SystemSetting::get('show_receipt_tendered', true, $this->settingsBranchId);
+        $this->showReceiptChange   = SystemSetting::get('show_receipt_change', true, $this->settingsBranchId);
 
-        $this->lowStockThreshold      = SystemSetting::get('low_stock_threshold', 10);
-        $this->criticalStockThreshold = SystemSetting::get('critical_stock_threshold', 5);
-        $this->expiryAlertDays        = SystemSetting::get('expiry_alert_days', 7);
-        $this->autoReorderEnabled     = SystemSetting::get('auto_reorder_enabled', false);
+        $this->lowStockThreshold      = SystemSetting::get('low_stock_threshold', 10, $this->settingsBranchId);
+        $this->criticalStockThreshold = SystemSetting::get('critical_stock_threshold', 5, $this->settingsBranchId);
+        $this->expiryAlertDays        = SystemSetting::get('expiry_alert_days', 7, $this->settingsBranchId);
+        $this->autoReorderEnabled     = SystemSetting::get('auto_reorder_enabled', false, $this->settingsBranchId);
 
-        $this->discountRate      = SystemSetting::get('discount_rate', 0.10);
-        $this->seniorDiscountRate = SystemSetting::get('senior_discount_rate', 0.20);
-        $this->posBusinessName   = SystemSetting::get('pos_business_name', 'Mister Takoyaki');
+        $this->discountRate      = SystemSetting::get('discount_rate', 0.10, $this->settingsBranchId);
+        $this->seniorDiscountRate = SystemSetting::get('senior_discount_rate', 0.20, $this->settingsBranchId);
+        $this->posBusinessName   = SystemSetting::get('pos_business_name', 'Mister Takoyaki', $this->settingsBranchId);
         $this->posOrderTypes = array_values(array_intersect(
-            SystemSetting::get('pos_order_types', ['Dine-in', 'Take-out']),
+            SystemSetting::get('pos_order_types', ['Dine-in', 'Take-out'], $this->settingsBranchId),
             self::ORDER_TYPE_OPTIONS
         ));
         $this->posPaymentMethods = array_values(array_intersect(
-            SystemSetting::get('pos_payment_methods', ['Cash', 'GCash']),
+            SystemSetting::get('pos_payment_methods', ['Cash', 'GCash'], $this->settingsBranchId),
             self::PAYMENT_METHOD_OPTIONS
         ));
-        $this->gcashAccountName   = SystemSetting::get('gcash_account_name', 'Mister Takoyaki Cafe');
-                $this->gcashAccountNumber = $this->normalizeMobileDisplay(SystemSetting::get('gcash_account_number', ''));
-        $this->existingGcashQrImage = SystemSetting::get('gcash_qr_image', '');
+        $this->gcashAccountName   = SystemSetting::get('gcash_account_name', 'Mister Takoyaki Cafe', $this->settingsBranchId);
+        $this->gcashAccountNumber = $this->normalizeMobileDisplay(SystemSetting::get('gcash_account_number', '', $this->settingsBranchId));
+        $this->existingGcashQrImage = SystemSetting::get('gcash_qr_image', '', $this->settingsBranchId);
 
         // Per-user preference for module visibility (isolates settings between super admins)
         $this->hideOperationalModules = auth()->user()->hide_modules;
 
-        $this->reviewFormTitle   = SystemSetting::get('review_form_title', 'How was your experience?');
-        $this->reviewFormSubtitle = SystemSetting::get('review_form_subtitle', 'Thank you for your feedback!');
+        $this->reviewFormTitle   = SystemSetting::get('review_form_title', 'How was your experience?', $this->settingsBranchId);
+        $this->reviewFormSubtitle = SystemSetting::get('review_form_subtitle', 'Thank you for your feedback!', $this->settingsBranchId);
         $defaultQuestions = [
             ['text' => 'How would you rate our food quality?', 'type' => 'rating', 'required' => true],
             ['text' => 'How would you rate our service?', 'type' => 'rating', 'required' => true],
             ['text' => 'Any suggestions for improvement?', 'type' => 'text', 'required' => false],
         ];
-        $reviewQuestionsJson = SystemSetting::get('review_questions', json_encode($defaultQuestions));
-        $this->reviewQuestions = is_string($reviewQuestionsJson) 
-            ? json_decode($reviewQuestionsJson, true) 
-            : $reviewQuestionsJson;
+        $reviewQuestionsRaw = SystemSetting::get('review_questions', json_encode($defaultQuestions), $this->settingsBranchId);
+        $this->reviewQuestions = is_string($reviewQuestionsRaw)
+            ? json_decode($reviewQuestionsRaw, true)
+            : ($reviewQuestionsRaw ?? $defaultQuestions);
             // Thermal Printer Settings
-        $printerConfig = SystemSetting::get('thermal_printer_config', []);
+        $printerConfig = SystemSetting::get('thermal_printer_config', [], $this->settingsBranchId);
         if (is_string($printerConfig)) {
             $printerConfig = json_decode($printerConfig, true) ?? [];
         }
@@ -350,8 +385,8 @@ class SystemSettings extends Component
 
     public function selectTab($tab)
     {
-        $superAdminTabs = ['general', 'receipts', 'inventory', 'pos', 'reviews', 'system', 'logs'];
-        $operationalTabs = ['inventory', 'pos', 'reviews'];
+        $superAdminTabs = ['general', 'receipts', 'inventory', 'pos', 'reviews', 'system', 'logs', 'printer'];
+        $operationalTabs = ['inventory', 'pos', 'reviews', 'printer'];
 
         // Validate tab is a known value
         if (!in_array($tab, $superAdminTabs)) {
@@ -360,6 +395,17 @@ class SystemSettings extends Component
 
         // Non-super admins can only access operational tabs
         if (!auth()->user()->isSuperAdmin() && !in_array($tab, $operationalTabs)) {
+            return;
+        }
+
+        // A non-super-admin with no assigned branch has no branch to scope
+        // branch-specific settings to — block the tab rather than silently
+        // falling back to editing the global default.
+        if ($this->missingBranchAssignment && in_array($tab, self::BRANCH_SCOPED_TABS)) {
+            $this->dispatch('notify',
+                type: 'error',
+                message: 'You are not assigned to a branch, so branch-specific settings are unavailable. Contact a super admin.'
+            );
             return;
         }
 
@@ -444,7 +490,11 @@ class SystemSettings extends Component
 
     private function authorizeTabAccess(): bool
     {
-        $isOperationsTab = in_array($this->tab, ['inventory', 'pos', 'reviews']);
+        if ($this->missingBranchAssignment && in_array($this->tab, self::BRANCH_SCOPED_TABS)) {
+            return false;
+        }
+
+        $isOperationsTab = in_array($this->tab, ['inventory', 'pos', 'reviews', 'printer']);
         return $this->isSuperAdmin() || $isOperationsTab;
     }
 
@@ -576,22 +626,26 @@ class SystemSettings extends Component
                 $this->savePrinterTab();
                 break;
         }
-
         // Invalidate all cached configurations so other modules get fresh data
         ConfigurationService::invalidateCache();
 
-        // Broadcast update events so other Livewire components can react
-        $this->dispatch('settingsUpdated',
-            type: 'all',
-            business: ConfigurationService::getBusinessConfig(),
-            financial: ConfigurationService::getFinancialConfig(),
-            inventory: ConfigurationService::getInventoryConfig(),
-            pos: ConfigurationService::getPosConfig(),
-        );
-        $this->dispatch('businessSettingsUpdated', ConfigurationService::getBusinessConfig());
-        $this->dispatch('financialSettingsUpdated', ConfigurationService::getFinancialConfig());
-        $this->dispatch('inventorySettingsUpdated', ConfigurationService::getInventoryConfig());
-        $this->dispatch('posSettingsUpdated', ConfigurationService::getPosConfig());
+        // Broadcast only what's relevant to the tab just saved — the System
+        // tab already dispatches its own accessibility/branch events inside
+        // saveSystemTab(), so it doesn't need business/financial/inventory/
+        // pos payloads rebuilt and pushed on every save.
+        if ($this->tab !== 'system') {
+            $this->dispatch('settingsUpdated',
+                type: 'all',
+                business: ConfigurationService::getBusinessConfig(),
+                financial: ConfigurationService::getFinancialConfig(),
+                inventory: ConfigurationService::getInventoryConfig(),
+                pos: ConfigurationService::getPosConfig(),
+            );
+            $this->dispatch('businessSettingsUpdated', ConfigurationService::getBusinessConfig());
+            $this->dispatch('financialSettingsUpdated', ConfigurationService::getFinancialConfig());
+            $this->dispatch('inventorySettingsUpdated', ConfigurationService::getInventoryConfig());
+            $this->dispatch('posSettingsUpdated', ConfigurationService::getPosConfig());
+        }
 
         $this->dispatch('notify',
             type: 'success',
@@ -649,32 +703,32 @@ class SystemSettings extends Component
 
     private function saveReceiptsTab(): void
     {
-        SystemSetting::set('receipt_logo_enabled', (bool) $this->receiptLogoEnabled);
-        SystemSetting::set('receipt_show_vat', (bool) $this->receiptShowVat);
-        SystemSetting::set('receipt_footer_message', $this->receiptFooterMessage);
-        SystemSetting::set('receipt_return_policy', $this->receiptReturnPolicy);
-        SystemSetting::set('receipt_copies', (int) $this->receiptCopies);
-        SystemSetting::set('receipt_qr_url', $this->receiptQrUrl);
+        SystemSetting::set('receipt_logo_enabled', (bool) $this->receiptLogoEnabled, $this->settingsBranchId);
+        SystemSetting::set('receipt_show_vat', (bool) $this->receiptShowVat, $this->settingsBranchId);
+        SystemSetting::set('receipt_footer_message', $this->receiptFooterMessage, $this->settingsBranchId);
+        SystemSetting::set('receipt_return_policy', $this->receiptReturnPolicy, $this->settingsBranchId);
+        SystemSetting::set('receipt_copies', (int) $this->receiptCopies, $this->settingsBranchId);
+        SystemSetting::set('receipt_qr_url', $this->receiptQrUrl, $this->settingsBranchId);
         
         // Thermal printer receipt customization
-        SystemSetting::set('kitchen_slip_title', $this->kitchenSlipTitle);
-        SystemSetting::set('kitchen_slip_subtitle', $this->kitchenSlipSubtitle);
-        SystemSetting::set('barista_slip_title', $this->baristaSlipTitle);
-        SystemSetting::set('barista_slip_subtitle', $this->baristaSlipSubtitle);
-        SystemSetting::set('customer_receipt_title', $this->customerReceiptTitle);
-        SystemSetting::set('show_receipt_qr_code', (bool) $this->showReceiptQrCode);
-        SystemSetting::set('show_receipt_footer', (bool) $this->showReceiptFooter);
-        SystemSetting::set('show_receipt_tendered', (bool) $this->showReceiptTendered);
-        SystemSetting::set('show_receipt_change', (bool) $this->showReceiptChange);
+        SystemSetting::set('kitchen_slip_title', $this->kitchenSlipTitle, $this->settingsBranchId);
+        SystemSetting::set('kitchen_slip_subtitle', $this->kitchenSlipSubtitle, $this->settingsBranchId);
+        SystemSetting::set('barista_slip_title', $this->baristaSlipTitle, $this->settingsBranchId);
+        SystemSetting::set('barista_slip_subtitle', $this->baristaSlipSubtitle, $this->settingsBranchId);
+        SystemSetting::set('customer_receipt_title', $this->customerReceiptTitle, $this->settingsBranchId);
+        SystemSetting::set('show_receipt_qr_code', (bool) $this->showReceiptQrCode, $this->settingsBranchId);
+        SystemSetting::set('show_receipt_footer', (bool) $this->showReceiptFooter, $this->settingsBranchId);
+        SystemSetting::set('show_receipt_tendered', (bool) $this->showReceiptTendered, $this->settingsBranchId);
+        SystemSetting::set('show_receipt_change', (bool) $this->showReceiptChange, $this->settingsBranchId);
         $this->regenerateQrCode();
     }
 
     private function saveInventoryTab(): void
     {
-        SystemSetting::set('low_stock_threshold', (int) $this->lowStockThreshold);
-        SystemSetting::set('critical_stock_threshold', (int) $this->criticalStockThreshold);
-        SystemSetting::set('expiry_alert_days', (int) $this->expiryAlertDays);
-        SystemSetting::set('auto_reorder_enabled', (bool) $this->autoReorderEnabled);
+        SystemSetting::set('low_stock_threshold', (int) $this->lowStockThreshold, $this->settingsBranchId);
+        SystemSetting::set('critical_stock_threshold', (int) $this->criticalStockThreshold, $this->settingsBranchId);
+        SystemSetting::set('expiry_alert_days', (int) $this->expiryAlertDays, $this->settingsBranchId);
+        SystemSetting::set('auto_reorder_enabled', (bool) $this->autoReorderEnabled, $this->settingsBranchId);
     }
 
     private function savePosTab(): void
@@ -687,15 +741,15 @@ class SystemSettings extends Component
             $this->gcashQrImage = null;
         }
 
-        SystemSetting::set('service_charge', (float) $this->serviceCharge);
-        SystemSetting::set('discount_rate', (float) $this->discountRate);
-        SystemSetting::set('senior_discount_rate', (float) $this->seniorDiscountRate);
-        SystemSetting::set('pos_business_name', $this->posBusinessName);
-        SystemSetting::set('pos_order_types', $this->posOrderTypes);
-        SystemSetting::set('pos_payment_methods', $this->posPaymentMethods);
-        SystemSetting::set('gcash_account_name', $this->gcashAccountName);
-        SystemSetting::set('gcash_account_number', $this->gcashAccountNumber ? '+63' . trim($this->gcashAccountNumber) : '');
-        SystemSetting::set('gcash_qr_image', $this->existingGcashQrImage);
+        SystemSetting::set('service_charge', (float) $this->serviceCharge, $this->settingsBranchId);
+        SystemSetting::set('discount_rate', (float) $this->discountRate, $this->settingsBranchId);
+        SystemSetting::set('senior_discount_rate', (float) $this->seniorDiscountRate, $this->settingsBranchId);
+        SystemSetting::set('pos_business_name', $this->posBusinessName, $this->settingsBranchId);
+        SystemSetting::set('pos_order_types', $this->posOrderTypes, $this->settingsBranchId);
+        SystemSetting::set('pos_payment_methods', $this->posPaymentMethods, $this->settingsBranchId);
+        SystemSetting::set('gcash_account_name', $this->gcashAccountName, $this->settingsBranchId);
+        SystemSetting::set('gcash_account_number', $this->gcashAccountNumber ? '+63' . trim($this->gcashAccountNumber) : '', $this->settingsBranchId);
+        SystemSetting::set('gcash_qr_image', $this->existingGcashQrImage, $this->settingsBranchId);
     }
 
     private function saveSystemTab(): void
@@ -721,9 +775,9 @@ class SystemSettings extends Component
 
     private function saveReviewsTab(): void
     {
-        SystemSetting::set('review_form_title', $this->reviewFormTitle);
-        SystemSetting::set('review_form_subtitle', $this->reviewFormSubtitle);
-        SystemSetting::set('review_questions', json_encode($this->reviewQuestions));
+        SystemSetting::set('review_form_title', $this->reviewFormTitle, $this->settingsBranchId);
+        SystemSetting::set('review_form_subtitle', $this->reviewFormSubtitle, $this->settingsBranchId);
+        SystemSetting::set('review_questions', json_encode($this->reviewQuestions), $this->settingsBranchId);
     }
 
         public function regenerateQrCode()
@@ -758,8 +812,19 @@ class SystemSettings extends Component
     public function render()
     {
         return view('livewire.system-settings', [
-            'logs' => $this->getRealLogs()
+            'logs' => $this->tab === 'logs' ? $this->getRealLogs() : $this->emptyLogsPaginator(),
         ])->layout('layouts.app');
+    }
+
+    private function emptyLogsPaginator(): LengthAwarePaginator
+    {
+        return new LengthAwarePaginator(
+            collect(),
+            0,
+            $this->perPage,
+            $this->getPage(),
+            ['path' => request()->url(), 'query' => request()->query()]
+        );
     }
 
     private function getRealLogs()
@@ -851,7 +916,7 @@ class SystemSettings extends Component
             'name' => $this->printerName,
             'auto_cut' => (bool) $this->printerAutoCut,
         ];
-        SystemSetting::set('thermal_printer_config', json_encode($printerConfig));
+        SystemSetting::set('thermal_printer_config', json_encode($printerConfig), $this->settingsBranchId);
     }
 
     public function refreshAvailablePrinters(): void

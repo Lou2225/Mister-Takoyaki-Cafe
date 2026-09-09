@@ -367,28 +367,12 @@ class BusinessIntelligence extends Component
             'gross_profit'    => $analytics['gross_profit'],
         ];
 
-        $branchComparison = Order::whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
-            ->when($this->selectedBranchId !== 'all', fn($q) => $q->where('branch_id', (int)$this->selectedBranchId))
-            ->when($this->startDate, fn($q) => $q->where('created_at', '>=', Carbon::parse($this->startDate)->startOfDay()))
-            ->when($this->endDate, fn($q) => $q->where('created_at', '<=', Carbon::parse($this->endDate)->endOfDay()))
-            ->selectRaw('branch_id, SUM(total_amount) as revenue, COUNT(*) as order_count, AVG(total_amount) as avg_ticket')
-            ->groupBy('branch_id')
-            ->with('branch')
-            ->get()
-            ->map(function ($branch) {
-                $branch->branch_name = $branch->branch?->branch_name ?? 'Unknown Branch';
-                return $branch;
-            })
-            ->sortByDesc('revenue')
-            ->values();
-
         return view('livewire.business-intelligence', [
             'branches'        => Branch::all(),
             'performance'     => $performance,
             'forecasting'     => $forecasting,
             'prescriptiveRecommendations' => $prescriptiveRecommendations,
             'executiveSummary'=> $this->getExecutiveSummary($analytics, $forecasting),
-            'branchComparison'=> $branchComparison,
             'productInsights' => $this->getProductInsights($analytics),
             'operations'      => $this->getOperationalData($analytics),
             'recentOrders'    => $this->getRecentOrders(),

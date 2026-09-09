@@ -88,9 +88,12 @@ class BranchStockOrdering extends Component
 
         if ($this->isSuperAdmin()) {
             $this->selectedBranchId = BranchContext::getActiveBranchId();
-            
-            // Main branch cannot request stock orders
-            if (!$this->selectedBranchId || $this->selectedBranchId == $this->mainBranchId) {
+
+            if (!$this->selectedBranchId) {
+                abort(403, 'Select an operating branch in Settings before accessing Request Supplies.');
+            }
+
+            if ($this->selectedBranchId == $this->mainBranchId) {
                 abort(403, 'Main branch cannot request stock orders. Please use supplier ordering module.');
             }
         } else {

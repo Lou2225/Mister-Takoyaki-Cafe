@@ -22,11 +22,12 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Renderless;
 use App\Traits\HandlesValidations;
 use App\Helpers\ValidationHelper;
+use App\Traits\RequiresOperatingBranch;
 
 
 class PosTerminal extends Component
 {
-    use HandlesValidations;
+    use HandlesValidations, RequiresOperatingBranch;
     
 
     // ─── Cart ──────────────────────────────────────────────────────────────
@@ -37,8 +38,8 @@ class PosTerminal extends Component
     public string $orderType = '';
     public string $tableNumber = '';
     public string $paymentMethod = '';
-public string $paymentReference = '';
-public $amountTendered = 0;
+    public string $paymentReference = '';
+    public $amountTendered = 0;
 
     // ─── Branch / Settings ─────────────────────────────────────────────────
     public ?int $branchId = null;
@@ -109,16 +110,16 @@ protected $listeners = [
  * fall back to the first available option and clear anything tied to
  * the old selection (e.g. an in-progress GCash verification).
  */
-public function handlePosSettingsUpdated($pos = null): void
-{
-    $this->orderTypes      = (array) SystemSetting::get('pos_order_types', ['Dine-in', 'Take-out']);
-    $this->paymentMethods   = (array) SystemSetting::get('pos_payment_methods', ['Cash', 'GCash']);
-    $this->serviceChargeRate = (float) SystemSetting::get('service_charge', 0);
-    $this->discountPercent   = (float) SystemSetting::get('discount_rate', 0);
-    $this->seniorDiscountRate = (float) SystemSetting::get('senior_discount_rate', 0.20);
-    $this->gcashAccountName   = (string) SystemSetting::get('gcash_account_name', 'Mister Takoyaki Cafe');
-    $this->gcashAccountNumber = (string) SystemSetting::get('gcash_account_number', '');
-    $this->gcashQrImage       = (string) SystemSetting::get('gcash_qr_image', '');
+    public function handlePosSettingsUpdated($pos = null): void
+    {
+        $this->orderTypes      = (array) SystemSetting::get('pos_order_types', ['Dine-in', 'Take-out'], $this->branchId);
+        $this->paymentMethods   = (array) SystemSetting::get('pos_payment_methods', ['Cash', 'GCash'], $this->branchId);
+        $this->serviceChargeRate = (float) SystemSetting::get('service_charge', 0, $this->branchId);
+        $this->discountPercent   = (float) SystemSetting::get('discount_rate', 0, $this->branchId);
+        $this->seniorDiscountRate = (float) SystemSetting::get('senior_discount_rate', 0.20, $this->branchId);
+        $this->gcashAccountName   = (string) SystemSetting::get('gcash_account_name', 'Mister Takoyaki Cafe', $this->branchId);
+        $this->gcashAccountNumber = (string) SystemSetting::get('gcash_account_number', '', $this->branchId);
+        $this->gcashQrImage       = (string) SystemSetting::get('gcash_qr_image', '', $this->branchId);
 
     if (!in_array($this->orderType, $this->orderTypes, true)) {
         $this->orderType = $this->orderTypes[0] ?? 'Dine-in';
@@ -216,27 +217,30 @@ public function openPaymentModal(): void
 }
 
 // ─── Mount ─────────────────────────────────────────────────────────────
+// ─── Mount ─────────────────────────────────────────────────────────────
     public function mount(): void
     {
+        $this->guardOperatingBranch();
+
         $user = auth()->user();
         $this->branchId = \App\Services\BranchContext::getActiveBranchId() ?: $user->branch_id;
 
         // Load settings from database
         $this->taxRate           = 0;
-        $this->serviceChargeRate = (float) SystemSetting::get('service_charge', 0);
-        $this->discountPercent   = (float) SystemSetting::get('discount_rate', 0);
-        $this->seniorDiscountRate = (float) SystemSetting::get('senior_discount_rate', 0.20);
+        $this->serviceChargeRate = (float) SystemSetting::get('service_charge', 0, $this->branchId);
+        $this->discountPercent   = (float) SystemSetting::get('discount_rate', 0, $this->branchId);
+        $this->seniorDiscountRate = (float) SystemSetting::get('senior_discount_rate', 0.20, $this->branchId);
         $this->currencySymbol    = (string) SystemSetting::get('currency_symbol', '₱');
         
-        $this->orderTypes      = (array) SystemSetting::get('pos_order_types', ['Dine-in', 'Take-out']);
-        $this->paymentMethods = (array) SystemSetting::get('pos_payment_methods', ['Cash', 'GCash']);
+        $this->orderTypes      = (array) SystemSetting::get('pos_order_types', ['Dine-in', 'Take-out'], $this->branchId);
+        $this->paymentMethods = (array) SystemSetting::get('pos_payment_methods', ['Cash', 'GCash'], $this->branchId);
 
         $userTheme = $user->getRoleTheme();
         $this->primaryColor = $userTheme['primary'] ?? 'indigo';
         
-        $this->gcashAccountName   = (string) SystemSetting::get('gcash_account_name', 'Mister Takoyaki Cafe');
-        $this->gcashAccountNumber = (string) SystemSetting::get('gcash_account_number', '');
-        $this->gcashQrImage = (string) SystemSetting::get('gcash_qr_image', '');
+        $this->gcashAccountName   = (string) SystemSetting::get('gcash_account_name', 'Mister Takoyaki Cafe', $this->branchId);
+        $this->gcashAccountNumber = (string) SystemSetting::get('gcash_account_number', '', $this->branchId);
+        $this->gcashQrImage = (string) SystemSetting::get('gcash_qr_image', '', $this->branchId);
 
         // Set defaults
         $this->orderType     = $this->orderTypes[0] ?? 'Dine-in';

@@ -59,8 +59,9 @@
         @if($user && !$user->isRider())
 
             {{-- ── I. OVERVIEW (Daily Operations) ── --}}
-            <div class="mb-5">
+            <div class="mb-5" x-data="{ hideOps: @js($this->effectiveHideOperationalModules) }" @accessibility-config-updated.window="hideOps = $event.detail.hide_modules">
                 <h3 class="px-3 mb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider transition-opacity duration-300"
+                    x-show="!hideOps"
                     :class="sidebarOpen ? 'opacity-100' : 'opacity-0 h-0 overflow-hidden hidden'">
                     Overview
                 </h3>
@@ -76,7 +77,7 @@
                         :class="sidebarOpen ? 'opacity-100' : 'opacity-0 hidden'">Dashboard</span>
                 </a>
 
-                <div x-show="!hideOperationalModules" x-transition.opacity x-cloak>
+                <div x-show="!hideOps" x-transition.opacity x-cloak>
                     <a href="{{ route('pos.index') }}" wire:navigate
                         class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
                             {{ request()->routeIs('pos.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
@@ -165,8 +166,9 @@
 
                         $activeBranchForOrdering = \App\Services\BranchContext::getActiveBranch();
                         $isSubBranch = $activeBranchForOrdering && !$activeBranchForOrdering->is_main;
-                        $showOrderInbox = ($user->isSuperAdmin() || ($user->branch && $user->branch->is_main))
-                            && (!$activeBranchForOrdering || $activeBranchForOrdering->is_main);
+$showOrderInbox = ($user->isSuperAdmin() || ($user->branch && $user->branch->is_main))
+    && $activeBranchForOrdering
+    && $activeBranchForOrdering->is_main;
                     @endphp
 
                     @if($user->role_id <= 2)
@@ -316,20 +318,18 @@
                             :class="sidebarOpen ? 'opacity-100' : 'opacity-0 hidden'">Business Reports</span>
                     </a>
 
-                    @if($user->isSuperAdmin())
-                        <a href="{{ route('settings.index') }}" wire:navigate
-                            class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
-                                {{ request()->routeIs('settings.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
-                            <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            <span class="transition-opacity duration-300 whitespace-nowrap"
-                                :class="sidebarOpen ? 'opacity-100' : 'opacity-0 hidden'">System Administration</span>
-                        </a>
-                    @endif
+                    <a href="{{ route('settings.index') }}" wire:navigate
+                        class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
+                            {{ request()->routeIs('settings.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
+                        <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span class="transition-opacity duration-300 whitespace-nowrap"
+                            :class="sidebarOpen ? 'opacity-100' : 'opacity-0 hidden'">System Administration</span>
+                    </a>
                 </div>
             @endif
 

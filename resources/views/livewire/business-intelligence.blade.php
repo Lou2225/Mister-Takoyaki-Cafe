@@ -68,44 +68,6 @@
 
     <div x-cloak x-show="activeTab === 'descriptive'" class="space-y-6">
 
-            {{-- Branch Comparison Cards --}}
-                        @if($branchComparison->count() > 1)
-                <div class="bg-white border border-gray-100 rounded-2xl shadow-sm p-5 sm:p-6">
-                    <div class="flex items-center justify-between gap-3 mb-4">
-                        <div>
-                            <p class="text-[10px] font-black uppercase tracking-[0.24em] text-gray-400">Branch comparison</p>
-                            <h3 class="mt-2 text-[18px] font-black text-gray-900">Revenue by branch</h3>
-                        </div>
-                        <span class="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">{{ $branchComparison->count() }} branches</span>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-                        @foreach($branchComparison as $branch)
-                            @php
-                                $topRevenue = $branchComparison->max('revenue') ?: 1;
-                                $share = ($branch->revenue / $topRevenue) * 100;
-                            @endphp
-                            <div class="rounded-2xl border border-gray-200 bg-gradient-to-br from-white to-slate-50 p-4">
-                                <div class="flex items-center justify-between gap-3">
-                                    <div>
-                                        <p class="text-[11px] font-black uppercase tracking-[0.18em] text-gray-400">{{ $branch->branch_name }}</p>
-                                        <p class="mt-2 text-[18px] font-black text-gray-900">&#8369;{{ number_format($branch->revenue, 2) }}</p>
-                                    </div>
-                                    <div class="rounded-full bg-indigo-50 px-2 py-1 text-[10px] font-black text-indigo-700">{{ number_format(($branch->revenue / max($performance['gross_sales'], 1)) * 100, 1) }}%</div>
-                                </div>
-                                <div class="mt-4 h-2 rounded-full bg-slate-100 overflow-hidden">
-                                    <div class="h-full rounded-full bg-indigo-500" style="width: {{ min(100, $share) }}%"></div>
-                                </div>
-                                <div class="mt-3 flex items-center justify-between text-[10px] font-bold text-gray-500 uppercase tracking-[0.14em]">
-                                    <span>{{ $branch->order_count }} orders</span>
-                                    <span>avg &#8369;{{ number_format($branch->avg_ticket, 2) }}</span>
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
-            @endif
-
             {{-- Primary Revenue Metrics --}}
 <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 px-1">
                     {{-- Gross Revenue --}}

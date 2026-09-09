@@ -9,18 +9,29 @@ class SystemSetting extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['key', 'value'];
+    protected $fillable = ['key', 'value', 'branch_id'];
 
     /**
-     * Get a setting by key.
+     * Get a setting by key. Pass $branchId to look up a branch-specific
+     * override first, falling back to the global (branch_id null) row.
+     * Omitting $branchId behaves exactly as before — a plain global lookup.
      */
-    public static function get($key, $default = null)
+    public static function get($key, $default = null, $branchId = null)
     {
-        $setting = self::where('key', $key)->first();
+        $setting = null;
+
+        if ($branchId) {
+            $setting = self::where('key', $key)->where('branch_id', $branchId)->first();
+        }
+
+        if (!$setting) {
+            $setting = self::where('key', $key)->whereNull('branch_id')->first();
+        }
+
         if (!$setting) return $default;
 
         $value = $setting->value;
-        
+
         // Auto-decode JSON if it looks like it
         if (str_starts_with($value, '[') || str_starts_with($value, '{')) {
             $decoded = json_decode($value, true);
@@ -36,9 +47,10 @@ class SystemSetting extends Model
     }
 
     /**
-     * Set a setting by key.
+     * Set a setting by key. Pass $branchId to write a branch-specific
+     * override; omit it (or pass null) to write the global default.
      */
-    public static function set($key, $value)
+    public static function set($key, $value, $branchId = null)
     {
         if (is_array($value) || is_object($value)) {
             $value = json_encode($value);
@@ -46,6 +58,6 @@ class SystemSetting extends Model
             $value = $value ? 'true' : 'false';
         }
 
-        return self::updateOrCreate(['key' => $key], ['value' => $value]);
+        return self::updateOrCreate(['key' => $key, 'branch_id' => $branchId], ['value' => $value]);
     }
 }

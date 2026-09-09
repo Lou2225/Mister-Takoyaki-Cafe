@@ -3,19 +3,22 @@
 namespace App\Livewire;
 
 use Livewire\Component;
+use Livewire\Attributes\On;
 use App\Services\BranchContext;
 use App\Models\StockOrder;
 
 class NavigationSidebar extends Component
 {
-    protected $listeners = [
-        'branch-switched' => '$refresh',
-        'branchContextUpdated' => '$refresh',
-        'settingsUpdated' => '$refresh',
-        'refreshSidebar' => '$refresh',
-        'order-submitted' => '$refresh',
-        'order-processed' => '$refresh',
-    ];
+    #[On('branch-switched')]
+    #[On('branchContextUpdated')]
+    #[On('settingsUpdated')]
+    #[On('refreshSidebar')]
+    #[On('order-submitted')]
+    #[On('order-processed')]
+    public function refreshSidebarState(): void
+    {
+        //
+    }
 
     public function getPendingOrdersCountProperty()
     {
@@ -31,8 +34,41 @@ class NavigationSidebar extends Component
         return StockOrder::where('status', 'pending')->count();
     }
 
+    /**
+     * The sidebar's own source of truth for whether POS/Orders/KDS should
+     * be hidden — always recomputed fresh, never a stale stored flag.
+     *
+     * hide_modules on the user record is a personal preference ("I don't
+     * want to see these"). For a super admin, we additionally hide the
+     * moment there's no operating branch selected in BranchContext,
+     * because those modules are branch-scoped and would 403 anyway if
+     * clicked — showing the link at that point is a broken promise.
+     */
+    public function getEffectiveHideOperationalModulesProperty(): bool
+    {
+        $user = auth()->user();
+        if (!$user) return true;
+
+        if ($user->isSuperAdmin()) {
+            return (bool) $user->hide_modules || !BranchContext::getActiveBranchId();
+        }
+
+        return (bool) $user->hide_modules;
+    }
+
     public function render()
     {
         return view('livewire.navigation-sidebar');
+    }
+
+    public function getContextLabelProperty(): array
+    {
+        $user = auth()->user();
+        $branch = \App\Models\Branch::find(BranchContext::getActiveBranchId() ?: $user?->branch_id);
+
+        return [
+            'label' => $user?->isSuperAdmin() ? 'Global Context' : 'Assigned Branch',
+            'value' => $branch?->branch_name ?? ($user?->isSuperAdmin() ? 'General Headquarters' : 'No Branch Assigned'),
+        ];
     }
 }
