@@ -473,7 +473,7 @@
                 name: product.name,
                 price: finalPrice,
                 qty: qty,
-                image: product.image,
+                image: product.image_url || product.image,
                 options: selectedOptions.map(o => ({ id: o.id, name: o.name, price: parseFloat(o.price) })),
                 modifiers: selectedModifiers.map(m => ({ id: m.id, name: m.name, price: parseFloat(m.price) })),
                 instructions: this.editingItem?.instructions || '',
@@ -576,7 +576,7 @@
                     name: product.name,
                     price: finalPrice,
                     qty: 1,
-                    image: product.image,
+                    image: product.image_url || product.image,
                     options: selectedOptions.map(o => ({ id: o.id, name: o.name, price: parseFloat(o.price) })),
                     modifiers: selectedModifiers.map(m => ({ id: m.id, name: m.name, price: parseFloat(m.price) })),
                     instructions: '',
@@ -1140,7 +1140,7 @@
                             <div class="flex items-start gap-2.5 py-3">
                                 {{-- Thumbnail --}}
                                 <div class="w-11 h-11 rounded-lg overflow-hidden bg-gray-100 shrink-0 border border-gray-100">
-                                    <img :src="item.image ? (item.image.startsWith('http') ? item.image : '{{ asset('storage') }}/' + item.image.replace(/^\/?storage\//, '')) : '{{ asset('images/placeholder-product.png') }}'" class="w-full h-full object-cover" :alt="item.name">
+                                    <img :src="item.image ? (item.image.startsWith('http') ? item.image : '{{ asset('storage') }}/' + item.image.replace(/^\/?storage\//, '')) : '{{ asset('images/placeholder-product.png') }}'" @error="$event.target.src='{{ asset('images/placeholder-product.png') }}'" onerror="this.onerror=null;this.src='{{ asset('images/placeholder-product.png') }}';" class="w-full h-full object-cover" :alt="item.name">
                                 </div>
 
                                 {{-- Details --}}

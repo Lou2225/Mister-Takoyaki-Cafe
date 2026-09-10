@@ -743,8 +743,8 @@
                         <div class="w-full aspect-square rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 flex items-center justify-center relative overflow-hidden transition-all group-hover:border-indigo-300 group-hover:bg-indigo-50/30">
                             @if($image)
                                 <img src="{{ $image->temporaryUrl() }}" class="w-full h-full object-cover animate-in fade-in zoom-in duration-300">
-                            @elseif($existingImage)
-                                <img src="{{ Storage::url($existingImage) }}" class="w-full h-full object-cover">
+                            @elseif($existingImage && Storage::disk('public')->exists($existingImage))
+                                <img src="{{ Storage::url($existingImage) }}" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='{{ asset('images/placeholder-product.png') }}';">
                             @else
                                 <img src="{{ asset('images/placeholder-product.png') }}" class="w-full h-full object-cover opacity-80 group-hover:opacity-40 transition-opacity">
                                 <div class="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
@@ -1069,7 +1069,7 @@
                                     <div class="flex items-center gap-3">
                                         <div class="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center shrink-0 overflow-hidden shadow-sm transition-transform group-hover/row:scale-105">
                                             @if($product->image && Storage::disk('public')->exists($product->image))
-                                                <img src="{{ Storage::url($product->image) }}" class="w-full h-full object-cover">
+                                                <img src="{{ Storage::url($product->image) }}" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='{{ asset('images/placeholder-product.png') }}';">
                                             @else
                                                 <img src="{{ asset('images/placeholder-product.png') }}" class="w-full h-full object-cover">
                                             @endif
@@ -1217,7 +1217,7 @@
                         <div wire:key="prod-card-{{ $product->id }}" x-show="isItemVisible({{ $product->id }})" x-cloak class="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm hover:shadow-md transition-all group/card relative {{ $this->isSuperAdmin() ? 'cursor-pointer' : '' }}" @if($this->isSuperAdmin()) wire:click="showEdit({{ $product->id }})" @endif>
                             <div class="aspect-[4/3] rounded-xl bg-slate-50 border border-slate-100 overflow-hidden mb-4 relative shadow-inner">
                                 @if($product->image && Storage::disk('public')->exists($product->image))
-                                    <img src="{{ Storage::url($product->image) }}" class="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-110">
+                                    <img src="{{ Storage::url($product->image) }}" class="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-110" onerror="this.onerror=null;this.src='{{ asset('images/placeholder-product.png') }}';">
                                 @else
                                     <img src="{{ asset('images/placeholder-product.png') }}" class="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-110">
                                 @endif
