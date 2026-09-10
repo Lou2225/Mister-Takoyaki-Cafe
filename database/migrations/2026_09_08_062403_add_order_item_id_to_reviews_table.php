@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasColumn('reviews', 'order_item_id')) {
+            return;
+        }
+
         Schema::table('reviews', function (Blueprint $table) {
             $table->foreignId('order_item_id')
                 ->nullable()
