@@ -6,6 +6,8 @@ use Livewire\Component;
 use Livewire\WithPagination;
 use App\Models\OptionTemplate;
 use App\Models\OptionTemplateItem;
+use App\Models\Ingredient;
+use App\Helpers\StockHelper;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -109,32 +111,44 @@ class OptionLibraryManagement extends Component
     public function showCreate()
     {
         $this->resetForm();
+        $this->templateItems = [
+            [
+                'id' => null,
+                'name' => '',
+                'price' => '',
+                'is_default' => false,
+                'new_ingredient_id' => '',
+                'new_ingredient_qty' => '',
+                'ingredients' => [],
+            ]
+        ];
         $this->panel = 'form';
         $this->mode = 'create';
     }
 
     public function showEdit($id)
     {
-        $template = OptionTemplate::with('items.ingredients.ingredient')->findOrFail($id);
+        $template = OptionTemplate::with(['items.ingredients.ingredient'])->findOrFail($id);
         $this->editTemplateId = $template->id;
         $this->name = $template->name;
         $this->priceMode = $template->price_mode;
-                $this->isRequired = (bool)$template->is_required;
+        $this->isRequired = (bool)$template->is_required;
         $this->noRecipeRequired = (bool)$template->no_recipe_required;
         
         $this->templateItems = collect($template->items)->map(fn($item) => [
-            'id'         => $item instanceof OptionTemplateItem ? $item->id : ($item['id'] ?? null),
-            'name'       => $item instanceof OptionTemplateItem ? $item->name : ($item['name'] ?? ''),
-            'price'      => $item instanceof OptionTemplateItem ? ($item->price == 0 ? '' : $item->price) : ($item['price'] == 0 ? '' : $item['price']),
-            'is_default' => (bool)($item instanceof OptionTemplateItem ? $item->is_default : ($item['is_default'] ?? false)),
+            'id'         => $item->id,
+            'name'       => $item->name,
+            'price'      => (float)$item->price == 0 ? '' : (float)$item->price,
+            'is_default' => (bool)$item->is_default,
             'new_ingredient_id' => '',
             'new_ingredient_qty' => '',
-            'ingredients' => $item instanceof OptionTemplateItem
-                ? $item->ingredients->map(fn($ri) => [
-                    'id' => $ri->ingredient_id, 'name' => $ri->ingredient->name,
-                    'unit' => $ri->ingredient->unit, 'quantity' => (float)$ri->quantity, 'cost' => $ri->ingredient->cost,
-                  ])->toArray()
-                : [],
+            'ingredients' => $item->ingredients->map(fn($ri) => [
+                'id'       => (int)$ri->ingredient_id,
+                'name'     => $ri->ingredient ? (string)$ri->ingredient->name : 'Unknown',
+                'unit'     => $ri->ingredient ? (string)StockHelper::getAbbreviation($ri->ingredient->unit) : '',
+                'quantity' => (float)$ri->quantity,
+                'cost'     => (float)($ri->ingredient?->cost ?? 0),
+            ])->values()->toArray(),
         ])->values()->toArray();
 
         $this->panel = 'form';
@@ -155,7 +169,7 @@ class OptionLibraryManagement extends Component
             'id' => null,
             'name' => '',
             'price' => '',
-            'is_default' => false,
+            'is_default' => count($this->templateItems) === 0,
             'new_ingredient_id' => '',
             'new_ingredient_qty' => '',
             'ingredients' => [],
@@ -183,11 +197,25 @@ class OptionLibraryManagement extends Component
 
     public function saveTemplate()
     {
+        foreach ($this->templateItems as $i => $it) {
+            if (isset($it['price']) && $it['price'] === '') {
+                $this->templateItems[$i]['price'] = 0;
+            }
+        }
+
         $this->validate([
             'name' => 'required|string|max:255',
             'priceMode' => 'required|in:fixed,additive',
+            'templateItems' => 'required|array|min:1',
             'templateItems.*.name' => 'required|string|max:100',
             'templateItems.*.price' => 'nullable|numeric|min:0',
+        ], [
+            'name.required' => 'Template name is required.',
+            'templateItems.required' => 'At least one variation option is required.',
+            'templateItems.min' => 'At least one variation option is required.',
+            'templateItems.*.name.required' => 'Every option must have a name.',
+            'templateItems.*.price.numeric' => 'Option price must be a valid number.',
+            'templateItems.*.price.min' => 'Option price cannot be negative.',
         ]);
 
         // Duplicate check
@@ -206,7 +234,7 @@ class OptionLibraryManagement extends Component
                     ? OptionTemplate::findOrFail($this->editTemplateId)
                     : new OptionTemplate();
 
-                                $template->name = $this->name;
+                $template->name = $this->name;
                 $template->price_mode = $this->priceMode;
                 $template->is_required = $this->isRequired;
                 $template->no_recipe_required = $this->noRecipeRequired;
@@ -224,7 +252,7 @@ class OptionLibraryManagement extends Component
                     $item = $item ? tap($item, fn($i) => $i->update($payload)) : $template->items()->create($payload);
                     $keepIds[] = $item->id;
 
-                                        // Rebuild this item's ingredient recipe from scratch —
+                    // Rebuild this item's ingredient recipe from scratch —
                     // same pattern as Recipe rebuild in MenuManagement.
                     $item->ingredients()->delete();
                     if (!$this->noRecipeRequired) {
@@ -275,7 +303,7 @@ class OptionLibraryManagement extends Component
         $this->editTemplateId = null;
         $this->name = '';
         $this->priceMode = 'additive';
-                $this->isRequired = false;
+        $this->isRequired = false;
         $this->noRecipeRequired = false;
         $this->templateItems = [];
         $this->resetValidation();
@@ -284,12 +312,20 @@ class OptionLibraryManagement extends Component
     public function render()
     {
         $allTemplates = OptionTemplate::query()
-            ->with('items')
+            ->with(['items.ingredients.ingredient'])
             ->orderBy('name', 'asc')
             ->get();
 
+        $allIngredients = Ingredient::orderBy('name', 'asc')->get()->map(fn($i) => [
+            'id'   => (int) $i->id,
+            'name' => (string) $i->name,
+            'unit' => (string) StockHelper::getAbbreviation($i->unit),
+            'cost' => (float) ($i->cost ?? 0),
+        ])->values()->toArray();
+
         return view('livewire.option-library-management', [
-            'allTemplates' => $allTemplates
+            'allTemplates' => $allTemplates,
+            'allIngredients' => $allIngredients,
         ])->layout('layouts.app');
     }
 }

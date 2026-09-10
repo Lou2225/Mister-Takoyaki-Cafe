@@ -6,13 +6,33 @@
 @endphp
 
 <div 
-    x-data="window.optionLibraryManagement($wire)"
+    x-data="window.optionLibraryManagement($wire, @js($allIngredients))"
     class="relative"
     wire:ignore.self
     wire:key="option-library-main-container">
 
     {{-- Hidden reactive sync helper under wire:ignore --}}
-    <div x-effect="updateTemplatesList(@js($allTemplates->map(fn($t) => ['id' => $t->id, 'name' => $t->name, 'price_mode' => $t->price_mode, 'is_required' => (bool)$t->is_required, 'items_count' => $t->items->count(), 'items' => $t->items->map(fn($i) => ['name' => $i->name, 'price' => (float)$i->price, 'is_default' => (bool)$i->is_default])])))" class="hidden" wire:key="templates-sync-helper"></div>
+    <div x-effect="updateTemplatesList(@js($allTemplates->map(fn($t) => [
+        'id' => (int)$t->id,
+        'name' => (string)$t->name,
+        'price_mode' => (string)$t->price_mode,
+        'is_required' => (bool)$t->is_required,
+        'no_recipe_required' => (bool)$t->no_recipe_required,
+        'items_count' => (int)$t->items->count(),
+        'items' => $t->items->map(fn($i) => [
+            'id' => (int)$i->id,
+            'name' => (string)$i->name,
+            'price' => (float)$i->price == 0 ? '' : (float)$i->price,
+            'is_default' => (bool)$i->is_default,
+            'ingredients' => $i->ingredients->map(fn($ri) => [
+                'id' => (int)$ri->ingredient_id,
+                'name' => $ri->ingredient ? (string)$ri->ingredient->name : 'Unknown',
+                'unit' => $ri->ingredient ? (string)\App\Helpers\StockHelper::getAbbreviation($ri->ingredient->unit) : '',
+                'quantity' => (float)$ri->quantity,
+                'cost' => (float)($ri->ingredient?->cost ?? 0),
+            ])->values(),
+        ])->values(),
+    ])))" class="hidden" wire:key="templates-sync-helper"></div>
 
     {{-- ════════════════ PANEL 1 — LIST ════════════════ --}}
     <div x-show="panel === 'list'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="px-1">
@@ -22,7 +42,7 @@
                 <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Options Library</h2>
                 <p class="text-[12px] text-gray-500 font-medium">Reusable configurations: <span class="text-indigo-600 font-bold" x-text="templatesList.length + ' templates available'"></span></p>
             </div>
-            <x-primary-button wire:click="showCreate" class="h-10">
+            <x-primary-button type="button" @click="createTemplate()" class="h-10">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
@@ -132,7 +152,7 @@
                 </x-slot>
 
                 @forelse($allTemplates as $tmpl)
-                    <tr x-show="isItemVisible({{ $tmpl->id }})" x-cloak class="hover:bg-slate-50/50 transition-colors group cursor-pointer" wire:click="showEdit({{ $tmpl->id }})">
+                    <tr x-show="isItemVisible({{ $tmpl->id }})" x-cloak class="hover:bg-slate-50/50 transition-colors group cursor-pointer" @click="editTemplate({{ $tmpl->id }})">
                         <td class="py-4 px-4 whitespace-nowrap">
                             <div class="flex items-center gap-3">
                                 <div class="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors shadow-sm">
@@ -157,7 +177,7 @@
                         </td>
                         <td class="py-4 px-4 text-right whitespace-nowrap" @click.stop>
                             <div class="flex items-center justify-end">
-                                <x-secondary-button wire:click="showEdit({{ $tmpl->id }})" class="h-8 px-3 inline-flex items-center gap-1.5 text-xs shadow-none border-slate-200">
+                                <x-secondary-button @click.stop="editTemplate({{ $tmpl->id }})" class="h-8 px-3 inline-flex items-center gap-1.5 text-xs shadow-none border-slate-200">
                                     <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                     Edit Template
                                 </x-secondary-button>
@@ -186,17 +206,17 @@
         <div x-show="tableView === 'board'" class="animate-fadeIn">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 @forelse($allTemplates as $tmpl)
-                    <div x-show="isItemVisible({{ $tmpl->id }})" x-cloak class="group relative bg-white border border-slate-100 rounded-[24px] p-6 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 hover:border-indigo-100 transition-all duration-300 cursor-pointer" wire:click="showEdit({{ $tmpl->id }})">
+                    <div x-show="isItemVisible({{ $tmpl->id }})" x-cloak class="group relative bg-white border border-slate-100 rounded-[24px] p-6 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 hover:border-indigo-100 transition-all duration-300 cursor-pointer" @click="editTemplate({{ $tmpl->id }})">
                         <div class="flex items-start justify-between mb-4">
                             <div class="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-all duration-300 shadow-sm border border-slate-100">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18 18.247 18.477 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
                             </div>
                             <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity" @click.stop>
-                                <x-secondary-button wire:click="showEdit({{ $tmpl->id }})" class="h-8 px-3 inline-flex items-center gap-1.5 text-xs shadow-none border-slate-200 bg-white">
+                                <x-secondary-button @click.stop="editTemplate({{ $tmpl->id }})" class="h-8 px-3 inline-flex items-center gap-1.5 text-xs shadow-none border-slate-200 bg-white">
                                     <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                     Edit
                                 </x-secondary-button>
-                                <x-danger-button type="button" wire:click.stop="confirmDeleteTemplate({{ $tmpl->id }})" class="h-8 px-3 inline-flex items-center gap-1.5 text-xs shadow-none border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100">
+                                <x-danger-button type="button" @click.stop="confirmDelete({{ $tmpl->id }}, '{{ addslashes($tmpl->name) }}')" class="h-8 px-3 inline-flex items-center gap-1.5 text-xs shadow-none border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100">
                                     <svg class="w-3.5 h-3.5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                                     Delete
                                 </x-danger-button>
@@ -340,7 +360,7 @@
                 <h2 class="text-[17px] font-bold text-gray-900 tracking-tight" x-text="mode === 'create' ? 'Create New Template' : 'Refine Template'"></h2>
                 <p class="text-[12px] text-gray-500 font-medium" x-text="mode === 'create' ? 'Establish a new reusable configuration group' : 'Modify variation items and pricing logic'"></p>
             </div>
-            <x-secondary-button wire:click="backToList" class="h-10">
+            <x-secondary-button type="button" @click="backToList()" class="h-10">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
@@ -351,29 +371,116 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {{-- Main Content: Variation Items --}}
             <div class="lg:col-span-2 space-y-6">
-                                    <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] h-[560px] flex flex-col">
+                <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] min-h-[560px] flex flex-col">
                     <div class="flex items-center justify-between mb-6 pb-4 border-b border-slate-50">
                         <div>
                             <h3 class="text-[13px] font-semibold text-gray-700 uppercase tracking-wider">Variation Options</h3>
                             <p class="text-[11px] text-gray-400 font-medium mt-0.5">Define the specific choices for this template.</p>
                         </div>
-                        <button wire:click="addItem" class="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-[11px] font-bold hover:bg-indigo-600 hover:text-white transition-all">
+                        <button type="button" @click="addOption()" class="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-[11px] font-bold hover:bg-indigo-600 hover:text-white transition-all">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4"/></svg>
                             Add Option
                         </button>
                     </div>
 
-                    {{-- Height-limited + scrollable again. Because this is an
-                         overflow-y-auto ancestor, the Ingredient dropdown below
-                         is teleported to <body> instead of using <x-dropdown>,
-                         so it can't be clipped by this box. --}}
-                    <div class="space-y-4 overflow-y-auto flex-1 min-h-0 max-h-[400px] pr-2 custom-scrollbar">
-                        @foreach($templateItems as $idx => $item)
-                            <div class="p-4 rounded-xl bg-slate-50/50 border border-slate-100 hover:bg-white hover:border-indigo-100 hover:shadow-sm transition-all group animate-fadeIn" x-data="{ showRecipe: {{ !empty($item['ingredients']) ? 'true' : 'false' }} }">
+                    {{-- Dynamic Alpine-driven Option Cards List --}}
+                    <div class="space-y-4 flex-1">
+                        <template x-for="(item, idx) in templateItems" :key="idx">
+                            <div class="p-4 rounded-xl bg-slate-50/50 border border-slate-100 hover:bg-white hover:border-indigo-100 hover:shadow-sm transition-all group animate-fadeIn mb-4"
+                                x-data="{
+                                    showRecipe: (item.ingredients && item.ingredients.length > 0),
+                                    open: false,
+                                    dropUp: false,
+                                    search: '',
+                                    selectedId: 0,
+                                    qty: '',
+                                    errorMessage: '',
+                                    get allIngredients() {
+                                        return (typeof ingredientsList !== 'undefined' && ingredientsList) ? ingredientsList : [];
+                                    },
+                                    get selectedItem() {
+                                        if (!this.selectedId) return null;
+                                        return this.allIngredients.find(i => Number(i.id) === Number(this.selectedId)) || null;
+                                    },
+                                    get selectedUnit() {
+                                        return this.selectedItem ? this.selectedItem.unit : '';
+                                    },
+                                    get filteredItems() {
+                                        if (!this.search.trim()) return this.allIngredients;
+                                        const q = this.search.toLowerCase().trim();
+                                        return this.allIngredients.filter(i => (i.name || '').toLowerCase().includes(q));
+                                    },
+                                    openDropdown() {
+                                        this.checkFlip();
+                                        this.open = true;
+                                        this.search = '';
+                                    },
+                                    closeDropdown() {
+                                        this.open = false;
+                                        this.search = '';
+                                    },
+                                    checkFlip() {
+                                        if (!this.$refs.comboboxContainer) return;
+                                        const rect = this.$refs.comboboxContainer.getBoundingClientRect();
+                                        const spaceBelow = window.innerHeight - rect.bottom;
+                                        this.dropUp = spaceBelow < 250 && rect.top > 250;
+                                    },
+                                    select(id) {
+                                        this.selectedId = Number(id);
+                                        this.search = '';
+                                        this.open = false;
+                                        this.errorMessage = '';
+                                    },
+                                    clear() {
+                                        this.selectedId = 0;
+                                        this.search = '';
+                                        this.open = false;
+                                        this.errorMessage = '';
+                                    },
+                                    addIngredient() {
+                                        if (!this.selectedId) {
+                                            this.errorMessage = 'Please select an ingredient.';
+                                            return;
+                                        }
+                                        const qtyNum = parseFloat(this.qty);
+                                        if (!qtyNum || qtyNum <= 0) {
+                                            this.errorMessage = 'Quantity must be at least 0.01.';
+                                            return;
+                                        }
+                                        const ing = this.selectedItem;
+                                        if (!ing) return;
+
+                                        if (!item.ingredients) {
+                                            item.ingredients = [];
+                                        }
+
+                                        const exists = item.ingredients.some(ri => Number(ri.id) === Number(this.selectedId));
+                                        if (exists) {
+                                            this.errorMessage = 'Ingredient already added to this option.';
+                                            return;
+                                        }
+
+                                        this.errorMessage = '';
+                                        item.ingredients.push({
+                                            id: ing.id,
+                                            name: ing.name,
+                                            unit: ing.unit,
+                                            quantity: qtyNum,
+                                            cost: Number(ing.cost || 0)
+                                        });
+
+                                        this.clear();
+                                        this.qty = '';
+                                    },
+                                    removeIngredient(ingIdx) {
+                                        item.ingredients.splice(ingIdx, 1);
+                                    }
+                                }">
+
                                 <div class="flex items-center gap-4">
                                     <div class="flex-1">
                                         <x-input-label value="Option Name" class="text-[10px] mb-1 ml-1" />
-                                        <x-text-input type="text" wire:model.live="templateItems.{{ $idx }}.name" 
+                                        <x-text-input type="text" x-model="item.name" 
                                             class="w-full h-10 text-[13px] font-bold text-slate-800 placeholder-slate-300" 
                                             placeholder="e.g. Regular Size" />
                                     </div>
@@ -383,171 +490,150 @@
                                             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                                 <span class="text-[12px] font-black text-slate-400">₱</span>
                                             </div>
-                                            <x-text-input type="text" wire:model.live="templateItems.{{ $idx }}.price" 
+                                            <x-text-input type="text" x-model="item.price" 
                                                 class="w-full h-10 pl-7 text-[13px] font-black text-slate-800 text-right" 
-                                                placeholder="0.00" />
+                                                placeholder="0.00" inputFilter="price" />
                                         </div>
                                     </div>
-                                                                        <div class="flex items-center gap-2 pt-5">
-                                        @if(!$noRecipeRequired)
-                                        <button type="button" @click="showRecipe = !showRecipe"
-                                            class="w-9 h-9 flex items-center justify-center rounded-lg border-2 transition-all"
+                                    <div class="flex items-center gap-2 pt-5">
+                                        <button type="button" x-show="!noRecipeRequired" @click="showRecipe = !showRecipe"
+                                            class="w-9 h-9 flex items-center justify-center rounded-lg border-2 transition-all relative"
                                             :class="showRecipe ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-100' : 'bg-white border-slate-100 text-slate-300 hover:text-amber-500 hover:border-amber-100'"
-                                            title="Toggle recipe ingredients">
+                                            :title="item.ingredients && item.ingredients.length > 0 ? (item.ingredients.length + ' ingredients mapped') : 'Toggle recipe ingredients'">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18 18.247 18.477 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                                            <span x-show="item.ingredients && item.ingredients.length > 0" class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 rounded-full border-2 border-white"></span>
                                         </button>
-                                        @endif
-                                        <button wire:click="toggleItemDefault({{ $idx }})"
-                                            class="w-9 h-9 flex items-center justify-center rounded-lg border-2 transition-all {{ $item['is_default'] ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-white border-slate-100 text-slate-300 hover:text-emerald-500 hover:border-emerald-100' }}" 
+                                        <button type="button" @click="toggleDefault(idx)"
+                                            class="w-9 h-9 flex items-center justify-center rounded-lg border-2 transition-all"
+                                            :class="item.is_default ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-white border-slate-100 text-slate-300 hover:text-emerald-500 hover:border-emerald-100'" 
                                             title="Toggle system default">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
                                         </button>
-                                        <button wire:click="removeItem({{ $idx }})" 
-                                            class="w-9 h-9 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-300 hover:text-rose-500 hover:border-rose-100 hover:bg-rose-50 transition-all">
+                                        <button type="button" @click="removeOption(idx)" 
+                                            class="w-9 h-9 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-slate-300 hover:text-rose-500 hover:border-rose-100 hover:bg-rose-50 transition-all"
+                                            title="Remove option">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
                                         </button>
                                     </div>
                                 </div>
 
-                                                                {{-- Per-item recipe: ingredients attached here travel with the
-                                     template on import, so a product doesn't need them re-typed. --}}
-                                @if(!$noRecipeRequired)
-                                <div x-show="showRecipe" x-collapse class="mt-4 pt-4 border-t border-slate-100/80" wire:key="item-recipe-{{ $idx }}">
+                                {{-- Per-item recipe: ingredients attached here travel with the template on import --}}
+                                <div x-show="!noRecipeRequired && showRecipe" x-collapse class="mt-4 pt-4 border-t border-slate-100/80">
                                     <div class="flex items-end gap-2 mb-3">
-                                                                                    <div class="flex-1">
-                                            <x-input-label value="Ingredient" class="text-[10px] mb-1 ml-1" />
-                                            <div class="relative"
-                                                x-data="{
-                                                    open: false,
-                                                    openUpward: false,
-                                                    query: '',
-                                                    ingredients: @js(\App\Models\Ingredient::orderBy('name')->get(['id', 'name', 'unit'])),
-                                                    get filteredIngredients() {
-                                                        const q = this.query.toLowerCase().trim();
-                                                        if (!q) return this.ingredients;
-                                                        return this.ingredients.filter(i => i.name.toLowerCase().includes(q));
-                                                    },
-                                                    // Decides flip direction only — no fixed top/left, since
-                                                    // this panel stays a normal DOM child of the trigger's
-                                                    // wrapper (position: relative) instead of being
-                                                    // teleported. It opens as `top-full` (below) or
-                                                    // `bottom-full` (above) via Tailwind classes.
-                                                    checkDirection() {
-                                                        const trigger = this.$refs.ingredientTrigger;
-                                                        const panel = this.$refs.ingredientPanel;
-                                                        if (!trigger || !panel) return;
-
-                                                        const r = trigger.getBoundingClientRect();
-                                                        const gap = 6;
-                                                        const panelHeight = panel.offsetHeight;
-                                                        const spaceBelow = window.innerHeight - r.bottom;
-                                                        const spaceAbove = r.top;
-
-                                                        this.openUpward = spaceBelow < (panelHeight + gap) && spaceAbove > spaceBelow;
-                                                    },
-                                                    async openDropdown() {
-                                                        this.open = true;
-                                                        this.query = '';
-                                                        // Render first (off-screen via x-cloak) so the panel
-                                                        // has a real height to measure, then decide up/down.
-                                                        await this.$nextTick();
-                                                        this.checkDirection();
-                                                        this.$refs.ingredientSearchInput?.focus();
-                                                    },
-                                                    closeDropdown() {
-                                                        this.open = false;
-                                                    }
-                                                }"
+                                        <div class="flex-1">
+                                            <x-input-label value="Select Ingredient" class="text-[10px] mb-1 ml-1" />
+                                            <div class="relative" x-ref="comboboxContainer"
                                                 @click.outside="closeDropdown()"
                                                 @keydown.escape.window="closeDropdown()">
 
-                                                <button type="button" x-ref="ingredientTrigger"
-                                                    @click="open ? closeDropdown() : openDropdown()"
-                                                    class="flex items-center justify-between w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[12px] text-slate-700 shadow-sm h-9">
-                                                    <span class="font-medium truncate">{{ !empty($item['new_ingredient_id']) ? (\App\Models\Ingredient::find($item['new_ingredient_id'])?->name ?? 'Choose...') : 'Choose ingredient...' }}</span>
-                                                    <svg class="w-3.5 h-3.5 text-slate-400 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
-                                                </button>
+                                                {{-- Search / Select Input Box --}}
+                                                <div class="relative flex items-center">
+                                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                                        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                                        </svg>
+                                                    </div>
 
-                                                {{-- Stays inline (no teleport). Positioned absolutely
-                                                     relative to the wrapper above; flips to open upward
-                                                     via :class when there isn't room below. Note: because
-                                                     this still lives inside the Variation Options list's
-                                                     overflow-y-auto/max-h-[400px] box, it remains subject
-                                                     to that container's clipping if the trigger sits near
-                                                     the container's own visible edge. --}}
-                                                <div x-show="open" x-cloak x-ref="ingredientPanel"
+                                                    <input 
+                                                        type="text"
+                                                        :value="open ? search : (selectedItem ? selectedItem.name : '')"
+                                                        @input="search = $event.target.value; open = true"
+                                                        @focus="openDropdown()"
+                                                        @click="openDropdown()"
+                                                        :placeholder="selectedItem ? selectedItem.name : 'Search or select ingredient...'"
+                                                        class="w-full pl-9 pr-9 py-2 bg-white border border-slate-200 rounded-lg text-[12px] text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all h-9"
+                                                        :class="selectedItem && !open ? 'font-bold text-indigo-700 bg-indigo-50/20 border-indigo-200' : 'text-slate-800'"
+                                                        autocomplete="off"
+                                                    />
+
+                                                    {{-- Clear button only (NO up/down arrow!) --}}
+                                                    <div class="absolute inset-y-0 right-0 pr-2.5 flex items-center">
+                                                        <button type="button" 
+                                                            x-show="selectedId > 0 || search.length > 0"
+                                                            x-cloak
+                                                            @click.stop="clear()"
+                                                            title="Clear selection"
+                                                            class="p-0.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
+                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {{-- Dropdown Results Menu with auto-flip --}}
+                                                <div x-show="open" x-cloak
                                                     x-transition:enter="transition ease-out duration-100"
-                                                    x-transition:enter-start="opacity-0"
-                                                    x-transition:enter-end="opacity-100"
+                                                    x-transition:enter-start="opacity-0 scale-95"
+                                                    x-transition:enter-end="opacity-100 scale-100"
                                                     x-transition:leave="transition ease-in duration-75"
-                                                    x-transition:leave-start="opacity-100"
-                                                    x-transition:leave-end="opacity-0"
-                                                    :class="openUpward ? 'bottom-full mb-1.5' : 'top-full mt-1.5'"
-                                                    class="absolute left-0 w-full z-50 bg-white rounded-xl shadow-lg ring-1 ring-black ring-opacity-5 p-2">
-                                                    <div class="px-2 pb-2 mb-2 border-b border-slate-50">
-                                                        <div class="relative">
-                                                            <svg class="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                                                            <input x-ref="ingredientSearchInput" x-model="query" type="text" placeholder="Search ingredients..."
-                                                                class="w-full pl-9 pr-4 py-2 bg-slate-50 border-none rounded-lg text-[12px] font-medium focus:ring-1 focus:ring-indigo-500 placeholder-slate-400">
+                                                    x-transition:leave-start="opacity-100 scale-100"
+                                                    x-transition:leave-end="opacity-0 scale-95"
+                                                    :class="dropUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'"
+                                                    class="absolute left-0 right-0 z-50 bg-white rounded-xl shadow-xl border border-slate-100 p-1.5 max-h-56 overflow-y-auto custom-scrollbar">
+                                                    <template x-for="ing in filteredItems" :key="ing.id">
+                                                        <button type="button" 
+                                                            @click="select(ing.id)"
+                                                            class="w-full text-left px-3 py-2 rounded-lg hover:bg-indigo-50/70 hover:text-indigo-900 transition-colors flex items-center justify-between group"
+                                                            :class="selectedId === ing.id ? 'bg-indigo-50 text-indigo-900 font-bold' : 'text-slate-700'">
+                                                            <span class="text-[12px] font-medium group-hover:font-semibold truncate" x-text="ing.name"></span>
+                                                            <span class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 group-hover:bg-indigo-100 group-hover:text-indigo-600 shrink-0 ml-2" x-text="ing.unit"></span>
+                                                        </button>
+                                                    </template>
+                                                    <template x-if="filteredItems.length === 0">
+                                                        <div class="px-4 py-3 text-[12px] text-slate-400 italic text-center">
+                                                            No ingredients found
                                                         </div>
-                                                    </div>
-                                                    {{-- Panel's own height limit + own scroll --}}
-                                                    <div class="max-h-48 overflow-y-auto custom-scrollbar">
-                                                        <template x-for="ing in filteredIngredients" :key="ing.id">
-                                                            <a href="#"
-                                                                @click.prevent="$wire.set('templateItems.{{ $idx }}.new_ingredient_id', ing.id); closeDropdown()"
-                                                                class="flex items-center justify-between px-4 py-2 text-[12px] rounded-lg hover:bg-slate-50 transition-colors">
-                                                                <span class="font-medium text-slate-700" x-text="ing.name"></span>
-                                                                <span class="text-slate-300 text-[10px]" x-text="'(' + ing.unit + ')'"></span>
-                                                            </a>
-                                                        </template>
-                                                        <div x-show="filteredIngredients.length === 0" class="px-4 py-2 text-[12px] text-slate-400 italic">No ingredients found</div>
-                                                    </div>
+                                                    </template>
                                                 </div>
                                             </div>
                                         </div>
                                         <div class="w-28">
                                             <x-input-label value="Qty" class="text-[10px] mb-1 ml-1" />
                                             <div class="relative">
-                                                <x-text-input wire:model.live="templateItems.{{ $idx }}.new_ingredient_qty" class="w-full h-9 pr-12 text-[12px] font-bold" placeholder="0.00" inputFilter="price" />
-                                                <span class="absolute inset-y-0 right-2 flex items-center text-[9px] font-black text-slate-400 uppercase">{{ !empty($item['new_ingredient_id']) ? (\App\Helpers\StockHelper::getAbbreviation(\App\Models\Ingredient::find($item['new_ingredient_id'])?->unit ?? '') ?: '—') : '—' }}</span>
+                                                <x-text-input x-model="qty" @keydown.enter.prevent="addIngredient()" class="w-full h-9 pr-12 text-[12px] font-bold" placeholder="0.00" inputFilter="price" />
+                                                <span class="absolute inset-y-0 right-2 flex items-center text-[9px] font-black text-slate-400 uppercase pointer-events-none" x-text="selectedUnit || '—'">—</span>
                                             </div>
                                         </div>
-                                        <x-secondary-button type="button" wire:click="addItemIngredient({{ $idx }})" class="h-9 px-3 text-[10px] font-black uppercase">Add</x-secondary-button>
+                                        <x-secondary-button type="button" @click="addIngredient()" class="h-9 px-3 text-[10px] font-black uppercase tracking-wider">Add</x-secondary-button>
                                     </div>
 
-                                    @if(!empty($item['ingredients']))
-                                        <div class="space-y-1.5">
-                                            @foreach($item['ingredients'] as $ingIdx => $ri)
-                                                <div class="flex items-center justify-between px-3 py-1.5 bg-white border border-slate-100 rounded-lg" wire:key="item-{{ $idx }}-ing-{{ $ingIdx }}">
-                                                    <span class="text-[11px] font-bold text-slate-700">{{ $ri['name'] }}</span>
-                                                    <div class="flex items-center gap-2">
-                                                        <span class="text-[10px] font-bold text-slate-400 uppercase">{{ $ri['quantity'] }} {{ $ri['unit'] }}</span>
-                                                        <button type="button" wire:click="removeItemIngredient({{ $idx }}, {{ $ingIdx }})" class="text-slate-300 hover:text-rose-500 transition-colors">
-                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                                                       @else
-                                        <p class="text-[11px] text-slate-400 italic">No ingredients mapped yet for this option.</p>
-                                    @endif
-                                </div>
-                                @endif
-                            </div>
-                        @endforeach
+                                    {{-- Local validation error --}}
+                                    <div x-show="errorMessage" x-cloak class="mb-3 p-2 bg-rose-50 border border-rose-100 rounded-lg text-[11px] font-bold text-rose-600 flex items-center gap-1.5">
+                                        <svg class="w-3.5 h-3.5 shrink-0 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        <span x-text="errorMessage"></span>
+                                    </div>
 
-                        @if(count($templateItems) === 0)
-                            <div class="py-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-100 rounded-2xl bg-slate-50/30">
-                                <div class="w-16 h-16 bg-white border border-slate-100 rounded-2xl flex items-center justify-center text-slate-300 mb-4 shadow-sm">
-                                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                                    {{-- Ingredients List --}}
+                                    <div x-show="item.ingredients && item.ingredients.length > 0" class="space-y-1.5">
+                                        <template x-for="(ri, ingIdx) in (item.ingredients || [])" :key="ri.id || ingIdx">
+                                            <div class="flex items-center justify-between px-3 py-1.5 bg-white border border-slate-100 rounded-lg shadow-xs hover:border-slate-200 transition-colors">
+                                                <span class="text-[11px] font-bold text-slate-700" x-text="ri.name"></span>
+                                                <div class="flex items-center gap-2">
+                                                    <span class="text-[10px] font-bold text-slate-400 uppercase" x-text="ri.quantity + ' ' + (ri.unit || '')"></span>
+                                                    <button type="button" @click="removeIngredient(ingIdx)" class="text-slate-300 hover:text-rose-500 p-0.5 rounded transition-colors" title="Remove ingredient">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                    <div x-show="!item.ingredients || item.ingredients.length === 0" class="text-[11px] text-slate-400 italic py-1">
+                                        No ingredients mapped yet for this option.
+                                    </div>
                                 </div>
-                                <h4 class="text-[14px] font-bold text-slate-900 tracking-tight">Empty Configuration</h4>
-                                <p class="text-[12px] font-medium text-slate-400 mt-1 mb-6">Begin by adding your first variation option.</p>
-                                <button wire:click="addItem" class="px-6 py-2 bg-slate-900 text-white text-[11px] font-black uppercase tracking-widest rounded-xl hover:bg-indigo-600 transition-all">Add First Option</button>
                             </div>
-                        @endif
+                        </template>
+
+                        {{-- Empty Configuration state --}}
+                        <div x-show="!templateItems || templateItems.length === 0" class="py-20 flex flex-col items-center justify-center border-2 border-dashed border-slate-100 rounded-2xl bg-slate-50/30">
+                            <div class="w-16 h-16 bg-white border border-slate-100 rounded-2xl flex items-center justify-center text-slate-300 mb-4 shadow-sm">
+                                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                            </div>
+                            <h4 class="text-[14px] font-bold text-slate-900 tracking-tight">Empty Configuration</h4>
+                            <p class="text-[12px] font-medium text-slate-400 mt-1 mb-6">Begin by adding your first variation option.</p>
+                            <button type="button" @click="addOption()" class="px-6 py-2 bg-slate-900 text-white text-[11px] font-black uppercase tracking-widest rounded-xl hover:bg-indigo-600 transition-all">Add First Option</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -560,27 +646,29 @@
                     <div class="space-y-6">
                         <div>
                             <x-input-label value="Template Identity *" />
-                            <x-text-input wire:model.live="name" class="w-full mt-1.5 h-10 font-bold text-slate-800" placeholder="e.g. Premium Flavors" />
+                            <x-text-input x-model="name" class="w-full mt-1.5 h-10 font-bold text-slate-800" placeholder="e.g. Premium Flavors" />
                             <x-input-error :messages="$errors->get('name')" class="mt-1" />
                         </div>
 
                         <div>
                             <x-input-label value="Pricing Logic" />
                             <div class="grid grid-cols-2 gap-2 mt-1.5">
-                                <button wire:click="$set('priceMode', 'additive')" 
-                                    class="h-10 rounded-lg border-2 text-[11px] font-black uppercase tracking-wider transition-all {{ $priceMode === 'additive' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200' }}">
+                                <button type="button" @click="priceMode = 'additive'" 
+                                    class="h-10 rounded-lg border-2 text-[11px] font-black uppercase tracking-wider transition-all"
+                                    :class="priceMode === 'additive' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'">
                                     Additive
                                 </button>
-                                <button wire:click="$set('priceMode', 'fixed')" 
-                                    class="h-10 rounded-lg border-2 text-[11px] font-black uppercase tracking-wider transition-all {{ $priceMode === 'fixed' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200' }}">
+                                <button type="button" @click="priceMode = 'fixed'" 
+                                    class="h-10 rounded-lg border-2 text-[11px] font-black uppercase tracking-wider transition-all"
+                                    :class="priceMode === 'fixed' ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'">
                                     Fixed
                                 </button>
                             </div>
                         </div>
 
-                                                <div class="pt-5 border-t border-slate-50 space-y-4">
+                        <div class="pt-5 border-t border-slate-50 space-y-4">
                             <label class="flex items-center gap-3 cursor-pointer group">
-                                <input type="checkbox" wire:model.live="noRecipeRequired" class="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+                                <input type="checkbox" x-model="noRecipeRequired" @change="if(noRecipeRequired) templateItems.forEach(it => it.ingredients = [])" class="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500">
                                 <div>
                                     <span class="text-[13px] font-bold text-slate-800 group-hover:text-amber-600 transition-colors">No Recipe Required</span>
                                     <p class="text-[11px] text-slate-400 font-medium leading-none mt-1">Options skip ingredient tracking and are always available</p>
@@ -588,7 +676,7 @@
                             </label>
 
                             <label class="flex items-center gap-3 cursor-pointer group">
-                                <input type="checkbox" wire:model.live="isRequired" class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                                <input type="checkbox" x-model="isRequired" class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
                                 <div>
                                     <span class="text-[13px] font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">Mandatory Field</span>
                                     <p class="text-[11px] text-slate-400 font-medium leading-none mt-1">Require customer selection</p>
@@ -600,20 +688,18 @@
 
                 <div class="flex flex-col gap-2">
                     <x-primary-button type="button" @click="$dispatch('open-modal', 'confirm-save-template')" class="w-full justify-center" x-text="mode === 'create' ? 'Register Template' : 'Save Changes'"></x-primary-button>
-                    <x-secondary-button wire:click="backToList" class="w-full justify-center">
+                    <x-secondary-button type="button" @click="backToList()" class="w-full justify-center">
                         <span>Cancel</span>
                     </x-secondary-button>
                 </div>
 
-                @if($editTemplateId)
-                    <div class="bg-red-50 border border-red-100 rounded-2xl p-6 shadow-sm mt-4">
-                        <h2 class="text-[13px] font-bold text-red-600 uppercase tracking-wider mb-2">Danger Zone</h2>
-                        <p class="text-[12px] text-gray-500 mb-4 leading-relaxed">Permanently remove this template from the library. This cannot be undone.</p>
-                        <x-danger-button type="button" wire:click="confirmDeleteTemplate({{ $editTemplateId }})" class="w-full justify-center h-11">
-                            Delete Template
-                        </x-danger-button>
-                    </div>
-                @endif
+                <div x-show="mode === 'edit' && editTemplateId" class="bg-red-50 border border-red-100 rounded-2xl p-6 shadow-sm mt-4">
+                    <h2 class="text-[13px] font-bold text-red-600 uppercase tracking-wider mb-2">Danger Zone</h2>
+                    <p class="text-[12px] text-gray-500 mb-4 leading-relaxed">Permanently remove this template from the library. This cannot be undone.</p>
+                    <x-danger-button type="button" @click="confirmDelete(editTemplateId, name)" class="w-full justify-center h-11">
+                        Delete Template
+                    </x-danger-button>
+                </div>
             </div>
         </div>
     </div>
@@ -637,7 +723,7 @@
             </div>
             
             <div class="px-3 py-2 bg-white border border-gray-100 rounded-lg text-[13px] text-gray-600 mb-5">
-                <span class="font-semibold text-gray-800">{{ $deleteTargetName }}</span>
+                <span class="font-semibold text-gray-800" x-text="deleteTargetName"></span>
             </div>
 
             <div class="flex items-center justify-end gap-2">
@@ -647,6 +733,7 @@
         </div>
     </x-modal>
 
+    {{-- ── Confirm Save Template Modal ── --}}
     <x-modal name="confirm-save-template" maxWidth="sm" focusable>
         <div class="h-1 w-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-t-lg"></div>
         <div class="p-6">
@@ -676,16 +763,25 @@
 
     <script>
         (function() {
-            window.optionLibraryManagement = function($wire) {
+            window.optionLibraryManagement = function($wire, allIngredients) {
                 return {
                     panel: $wire.entangle('panel').live,
                     mode: $wire.entangle('mode').live,
                     tableView: $wire.entangle('view').live,
+                    editTemplateId: $wire.entangle('editTemplateId'),
+                    name: $wire.entangle('name'),
+                    priceMode: $wire.entangle('priceMode'),
+                    isRequired: $wire.entangle('isRequired'),
+                    noRecipeRequired: $wire.entangle('noRecipeRequired'),
+                    templateItems: $wire.entangle('templateItems'),
+                    deleteTargetId: $wire.entangle('deleteTargetId'),
+                    deleteTargetName: $wire.entangle('deleteTargetName'),
                     priceModeFilter: '',
                     searchQuery: '',
                     currentPage: 1,
                     perPage: 5,
                     templatesList: [],
+                    ingredientsList: allIngredients || [],
 
                     get filteredTemplateIds() {
                         const query = this.searchQuery.toLowerCase().trim();
@@ -693,8 +789,8 @@
                         return this.templatesList
                             .filter(t => {
                                 const matchesSearch = !query || 
-                                    t.name.toLowerCase().includes(query) || 
-                                    t.items.some(item => item.name.toLowerCase().includes(query));
+                                    (t.name || '').toLowerCase().includes(query) || 
+                                    (t.items && t.items.some(item => (item.name || '').toLowerCase().includes(query)));
                                 
                                 const matchesMode = !filter || t.price_mode === filter;
                                 
@@ -720,12 +816,70 @@
                         return this.paginatedTemplateIds.includes(id);
                     },
                     updateTemplatesList(newList) {
-                        const oldSig = this.templatesList.map(t => `${t.id}-${t.name}-${t.price_mode}-${t.is_required}-${t.items_count}`).join(',');
-                        const newSig = newList.map(t => `${t.id}-${t.name}-${t.price_mode}-${t.is_required}-${t.items_count}`).join(',');
-                        if (oldSig !== newSig) {
-                            this.templatesList = newList;
-                            this.currentPage = 1;
+                        this.templatesList = newList || [];
+                    },
+
+                    // ── Instant 0ms Actions ──
+                    createTemplate() {
+                        this.editTemplateId = null;
+                        this.name = '';
+                        this.priceMode = 'additive';
+                        this.isRequired = false;
+                        this.noRecipeRequired = false;
+                        this.templateItems = [
+                            { id: null, name: '', price: '', is_default: false, ingredients: [] }
+                        ];
+                        this.panel = 'form';
+                        this.mode = 'create';
+                        this.$wire.showCreate();
+                    },
+                    editTemplate(id) {
+                        const tmpl = this.templatesList.find(t => Number(t.id) === Number(id));
+                        if (tmpl) {
+                            this.editTemplateId = tmpl.id;
+                            this.name = tmpl.name;
+                            this.priceMode = tmpl.price_mode;
+                            this.isRequired = tmpl.is_required;
+                            this.noRecipeRequired = tmpl.no_recipe_required;
+                            this.templateItems = JSON.parse(JSON.stringify(tmpl.items || []));
+                            this.panel = 'form';
+                            this.mode = 'edit';
                         }
+                        this.$wire.showEdit(id);
+                    },
+                    backToList() {
+                        this.panel = 'list';
+                        this.mode = 'list';
+                        this.$wire.backToList();
+                    },
+                    confirmDelete(id, name) {
+                        this.deleteTargetId = id;
+                        this.deleteTargetName = name;
+                        this.$wire.deleteTargetId = id;
+                        this.$wire.deleteTargetName = name;
+                        this.$dispatch('open-modal', 'delete-template');
+                    },
+                    addOption() {
+                        if (!this.templateItems) this.templateItems = [];
+                        this.templateItems.push({
+                            id: null,
+                            name: '',
+                            price: '',
+                            is_default: this.templateItems.length === 0,
+                            ingredients: []
+                        });
+                    },
+                    removeOption(idx) {
+                        if (this.templateItems) {
+                            this.templateItems.splice(idx, 1);
+                        }
+                    },
+                    toggleDefault(idx) {
+                        if (!this.templateItems || !this.templateItems[idx]) return;
+                        const isCurrent = !!this.templateItems[idx].is_default;
+                        this.templateItems.forEach((item, i) => {
+                            item.is_default = (i === idx && !isCurrent);
+                        });
                     },
 
                     init() {
