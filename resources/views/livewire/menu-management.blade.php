@@ -1,11 +1,12 @@
 <div 
-    x-data="typeof window.menuManagement === 'function' ? window.menuManagement($wire) : { activeTab: $wire.entangle('activeTab').live, panel: $wire.entangle('panel').live, mode: $wire.entangle('mode').live }"
+    x-data="typeof window.menuManagement === 'function' ? window.menuManagement($wire, @js($templatesData), @js($allCategories)) : { activeTab: $wire.entangle('activeTab').live, panel: $wire.entangle('panel').live, mode: $wire.entangle('mode').live }"
     x-on:switch-panel.window="panel = $event.detail.panel"
     class="relative min-h-full flex flex-col p-2 md:p-4"
     wire:ignore.self
     wire:key="menu-management-main-container">
-    {{-- Hidden reactive updater to sync products list under wire:ignore --}}
+    {{-- Hidden reactive updaters to sync products list, templates, and categories under wire:ignore --}}
     <div x-effect="updateProductsList(@js($products->map(fn($p) => ['id' => $p->id, 'name' => $p->name])))" class="hidden" wire:key="products-sync-helper"></div>
+    <div x-effect="if (typeof templates !== 'undefined') templates = @js($templatesData); if (typeof allCategories !== 'undefined') allCategories = @js($allCategories)" class="hidden" wire:key="options-templates-sync-helper"></div>
     {{-- Panel: Form --}}
     <div x-show="panel === 'form'" 
          x-transition:enter="transition ease-out duration-200" 
@@ -68,41 +69,132 @@
                             <div>
                                 <x-input-label value="Category" />
                                 <div class="flex gap-2 mt-1.5">
-                                    <div class="flex-1">
-                                        <x-dropdown align="left" width="full" containerClasses="block w-full">
-                                            <x-slot name="trigger">
-                                                <button type="button" class="flex items-center justify-between w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-[13px] text-slate-700 shadow-sm hover:border-slate-300 focus:outline-none transition-all h-11">
-                                                    <span class="font-medium text-slate-600">{{ $selectedCategoryName }}</span>
-                                                    <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" /></svg>
+                                    <div class="flex-1 relative"
+                                        x-data="{
+                                            open: false,
+                                            dropUp: false,
+                                            search: '',
+                                            selectedId: $wire.entangle('categoryId'),
+                                            get categoriesList() {
+                                                return (typeof allCategories !== 'undefined' && allCategories) ? allCategories : @js($allCategories);
+                                            },
+                                            get selectedItem() {
+                                                if (!this.selectedId) return null;
+                                                return this.categoriesList.find(c => Number(c.id) === Number(this.selectedId)) || null;
+                                            },
+                                            get filteredItems() {
+                                                if (!this.search.trim()) return this.categoriesList;
+                                                const q = this.search.toLowerCase().trim();
+                                                return this.categoriesList.filter(c => (c.name || '').toLowerCase().includes(q));
+                                            },
+                                            openDropdown() {
+                                                this.checkFlip();
+                                                this.open = true;
+                                                this.search = '';
+                                            },
+                                            closeDropdown() {
+                                                this.open = false;
+                                                this.search = '';
+                                            },
+                                            checkFlip() {
+                                                if (!this.$refs.categoryCombobox) return;
+                                                const rect = this.$refs.categoryCombobox.getBoundingClientRect();
+                                                const spaceBelow = window.innerHeight - rect.bottom;
+                                                this.dropUp = spaceBelow < 250 && rect.top > 250;
+                                            },
+                                            select(id) {
+                                                this.selectedId = id ? Number(id) : '';
+                                                this.search = '';
+                                                this.open = false;
+                                            },
+                                            clear() {
+                                                this.selectedId = '';
+                                                this.search = '';
+                                                this.open = false;
+                                            }
+                                        }"
+                                        x-ref="categoryCombobox"
+                                        @click.outside="closeDropdown()"
+                                        @keydown.escape.window="closeDropdown()">
+
+                                        {{-- Search / Select Input Box --}}
+                                        <div class="relative flex items-center">
+                                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                                </svg>
+                                            </div>
+
+                                            <input 
+                                                type="text"
+                                                :value="open ? search : (selectedItem ? selectedItem.name : 'Uncategorized')"
+                                                @input="search = $event.target.value; open = true"
+                                                @focus="openDropdown()"
+                                                @click="openDropdown()"
+                                                placeholder="Search or select category..."
+                                                class="w-full pl-10 pr-10 py-2 bg-white border border-slate-200 rounded-xl text-[13px] text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all h-11"
+                                                :class="selectedId && !open ? 'font-medium text-indigo-700 bg-indigo-50/20 border-indigo-200' : 'text-slate-800 font-medium'"
+                                                autocomplete="off"
+                                            />
+
+                                            {{-- Clear button only (NO up/down arrow!) --}}
+                                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                                                <button type="button" 
+                                                    x-show="(selectedId !== '' && selectedId !== null && selectedId !== undefined) || (search && search.length > 0)"
+                                                    x-cloak
+                                                    @click.stop="clear()"
+                                                    title="Clear selection"
+                                                    class="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                    </svg>
                                                 </button>
-                                            </x-slot>
-                                            <x-slot name="content">
-                                                <div class="p-2">
-                                                    <div class="px-2 pb-2 mb-2 border-b border-slate-50">
-                                                        <div class="relative">
-                                                            <svg class="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                                                            <input wire:model.live.debounce.300ms="categorySearch" type="text" placeholder="Search categories..." 
-                                                                    class="w-full pl-9 pr-4 py-2 bg-slate-50 border-none rounded-lg text-[12px] font-medium focus:ring-1 focus:ring-indigo-500 placeholder-slate-400">
-                                                        </div>
-                                                    </div>
-                                                    <div class="max-h-60 overflow-y-auto custom-scrollbar">
-                                                        @if(empty($categorySearch))
-                                                            <x-dropdown-link href="#" wire:click.prevent="$set('categoryId', '')">Uncategorized</x-dropdown-link>
-                                                            <hr class="border-slate-50">
-                                                        @endif
-                                                        
-                                                        @forelse($categories as $cat)
-                                                            <x-dropdown-link href="#" wire:click.prevent="$set('categoryId', {{ $cat->id }})">{{ $cat->name }}</x-dropdown-link>
-                                                        @empty
-                                                            <div class="px-4 py-2 text-[12px] text-slate-400 italic">No categories found</div>
-                                                        @endforelse
-                                                    </div>
+                                            </div>
+                                        </div>
+
+                                        {{-- Dropdown Results Menu with auto-flip --}}
+                                        <div x-show="open" x-cloak
+                                            x-transition:enter="transition ease-out duration-100"
+                                            x-transition:enter-start="opacity-0 scale-95"
+                                            x-transition:enter-end="opacity-100 scale-100"
+                                            x-transition:leave="transition ease-in duration-75"
+                                            x-transition:leave-start="opacity-100 scale-100"
+                                            x-transition:leave-end="opacity-0 scale-95"
+                                            :class="dropUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'"
+                                            class="absolute left-0 right-0 z-50 bg-white rounded-xl shadow-xl border border-slate-100 p-1.5 max-h-60 overflow-y-auto custom-scrollbar">
+                                            
+                                            {{-- Uncategorized option (default) --}}
+                                            <template x-if="!search.trim() || 'uncategorized'.includes(search.toLowerCase().trim())">
+                                                <div>
+                                                    <button type="button" 
+                                                        @click="select('')"
+                                                        class="w-full text-left px-3.5 py-2.5 rounded-lg hover:bg-indigo-50/70 hover:text-indigo-900 transition-colors flex items-center justify-between group"
+                                                        :class="!selectedId ? 'bg-indigo-50 text-indigo-900 font-bold' : 'text-slate-700'">
+                                                        <span class="text-[13px] font-medium group-hover:font-semibold">Uncategorized</span>
+                                                        <span class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-slate-400 group-hover:bg-indigo-100 group-hover:text-indigo-600 shrink-0 ml-2">Default</span>
+                                                    </button>
+                                                    <div class="my-1 border-t border-slate-100"></div>
                                                 </div>
-                                            </x-slot>
-                                        </x-dropdown>
+                                            </template>
+
+                                            <template x-for="cat in filteredItems" :key="cat.id">
+                                                <button type="button" 
+                                                    @click="select(cat.id)"
+                                                    class="w-full text-left px-3.5 py-2.5 rounded-lg hover:bg-indigo-50/70 hover:text-indigo-900 transition-colors flex items-center justify-between group"
+                                                    :class="Number(selectedId) === Number(cat.id) ? 'bg-indigo-50 text-indigo-900 font-bold' : 'text-slate-700'">
+                                                    <span class="text-[13px] font-medium group-hover:font-semibold truncate" x-text="cat.name"></span>
+                                                </button>
+                                            </template>
+                                            
+                                            <template x-if="filteredItems.length === 0 && search.trim() && !'uncategorized'.includes(search.toLowerCase().trim())">
+                                                <div class="px-4 py-3 text-[12px] text-slate-400 italic text-center">
+                                                    No categories found
+                                                </div>
+                                            </template>
+                                        </div>
                                     </div>
                                     @if($this->isSuperAdmin())
-                                    <button type="button" @click="$dispatch('open-modal', 'quick-add-category')" class="h-11 w-11 flex items-center justify-center bg-slate-50 border border-slate-200 rounded-xl text-indigo-600 hover:bg-indigo-50 transition-all shadow-sm">
+                                    <button type="button" @click="$dispatch('open-modal', 'quick-add-category')" class="h-11 w-11 flex items-center justify-center bg-slate-50 border border-slate-200 rounded-xl text-indigo-600 hover:bg-indigo-50 transition-all shadow-sm shrink-0">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                                     </button>
                                     @endif
@@ -174,78 +266,72 @@
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18 18.247 18.477 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
                                     <span class="truncate">Import Template</span>
                                 </button>
-                                <button type="button" @click="$dispatch('open-modal', 'add-option-group')" class="h-10 px-3 bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-indigo-100 transition-all border border-indigo-100/50 flex items-center justify-center truncate">
+                                <button type="button" @click="openAddGroupModal()" class="h-10 px-3 bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-indigo-100 transition-all border border-indigo-100/50 flex items-center justify-center truncate">
                                     + Add Group
                                 </button>
                             </div>
                         </div>
 
-                        @if(count($optionGroups) === 0)
-                            <div class="py-16 border-2 border-dashed border-slate-100 rounded-2xl text-center">
-                                <p class="text-[13px] text-slate-400 font-medium">No option groups defined for this product.</p>
-                            </div>
-                        @else
-                            <div class="space-y-4">
-                                @foreach($optionGroups as $idx => $group)
-                                    <div class="border border-slate-100 rounded-2xl overflow-hidden shadow-sm" wire:key="opt-group-{{ $idx }}">
-                                        <div class="flex items-center justify-between p-4 bg-slate-50/50 border-b border-slate-100">
-                                                                                        <div class="flex items-center gap-3">
-                                                <span class="text-[13px] font-bold text-slate-900 uppercase tracking-tight">{{ $group['name'] }}</span>
-                                                <span class="px-2 py-0.5 bg-white border border-slate-200 rounded text-[9px] font-black text-slate-400 uppercase tracking-widest">{{ $group['price_mode'] }}</span>
-                                                @if($group['is_required'])
-                                                    <span class="text-[9px] font-black text-rose-500 uppercase tracking-widest animate-pulse">Required</span>
-                                                @endif
-                                                @if($group['no_recipe_required'] ?? false)
-                                                    <span class="text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded uppercase tracking-widest">No Recipe</span>
-                                                @endif
-                                            </div>
-                                            <div class="flex items-center gap-1.5">
-                                                <label class="flex items-center gap-1.5 cursor-pointer mr-2" title="Options in this group skip ingredient tracking and are always available">
-                                                    <input type="checkbox" wire:model.live="optionGroups.{{ $idx }}.no_recipe_required" class="w-3.5 h-3.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500">
-                                                    <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">No Recipe</span>
-                                                </label>
-                                                <button type="button" wire:click="syncGroupFromLibrary({{ $idx }})" class="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all" title="Sync ingredients from Library">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                                </button>
-                                                <button type="button" wire:click="saveGroupToLibrary({{ $idx }})" class="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="Save as Template">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
-                                                </button>
-                                                <button type="button" wire:click="removeOptionGroup({{ $idx }})" class="text-rose-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg transition-all">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                </button>
-                                            </div>
+                        <div x-show="!optionGroups || optionGroups.length === 0" class="py-16 border-2 border-dashed border-slate-100 rounded-2xl text-center">
+                            <p class="text-[13px] text-slate-400 font-medium">No option groups defined for this product.</p>
+                        </div>
+
+                        <div x-show="optionGroups && optionGroups.length > 0" class="space-y-4">
+                            <template x-for="(group, idx) in (optionGroups || [])" :key="idx">
+                                <div class="border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
+                                    <div class="flex items-center justify-between p-4 bg-slate-50/50 border-b border-slate-100">
+                                        <div class="flex items-center gap-3">
+                                            <span class="text-[13px] font-bold text-slate-900 uppercase tracking-tight" x-text="group.name"></span>
+                                            <span class="px-2 py-0.5 bg-white border border-slate-200 rounded text-[9px] font-black text-slate-400 uppercase tracking-widest" x-text="group.price_mode"></span>
+                                            <span x-show="group.is_required" class="text-[9px] font-black text-rose-500 uppercase tracking-widest animate-pulse">Required</span>
+                                            <span x-show="group.no_recipe_required" class="text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded uppercase tracking-widest">No Recipe</span>
                                         </div>
-                                        <div class="p-4 bg-white space-y-3">
-                                            @foreach($group['options'] as $oIdx => $option)
-                                                <div class="flex items-center gap-4" wire:key="opt-item-{{ $idx }}-{{ $oIdx }}">
-                                                    <div class="flex-1">
-                                                        <x-text-input wire:model.live="optionGroups.{{ $idx }}.options.{{ $oIdx }}.name" class="w-full h-10 text-[13px] font-bold" placeholder="Option name..." inputFilter="productName" />
-                                                    </div>
-                                                    <div class="w-28 relative">
-                                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                                                            <span class="text-[12px] font-bold">₱</span>
-                                                        </div>
-                                                        <x-text-input wire:model.live="optionGroups.{{ $idx }}.options.{{ $oIdx }}.price" class="w-full h-10 pl-7 text-[13px] font-black text-right" placeholder="0.00" inputFilter="price" />
-                                                    </div>
-                                                    <div class="flex items-center gap-3">
-                                                        <label class="flex items-center gap-2 cursor-pointer">
-                                                            <input type="radio" name="default_opt_{{ $idx }}" wire:click="setOptionAsDefault({{ $idx }}, {{ $oIdx }})" {{ $option['is_default'] ? 'checked' : '' }} class="w-3.5 h-3.5 text-indigo-600 border-slate-200">
-                                                            <span class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Default</span>
-                                                        </label>
-                                                        <button type="button" wire:click="removeOptionFromGroup({{ $idx }}, {{ $oIdx }})" class="text-slate-300 hover:text-rose-500 transition-colors p-1.5">
-                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            @endforeach
-                                            <button type="button" wire:click="addOptionToGroup({{ $idx }})" class="w-full flex justify-center items-center h-10 border border-dashed border-slate-200 rounded-xl text-[11px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50/30 transition-all mt-2">
-                                                + Add Option to "{{ $group['name'] }}"
+                                        <div class="flex items-center gap-1.5">
+                                            <label class="flex items-center gap-1.5 cursor-pointer mr-2" title="Options in this group skip ingredient tracking and are always available">
+                                                <input type="checkbox" x-model="group.no_recipe_required" class="w-3.5 h-3.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+                                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">No Recipe</span>
+                                            </label>
+                                            <button type="button" @click="promptSyncGroup(idx)" class="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all" title="Sync ingredients from Library">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                            </button>
+                                            <button type="button" @click="promptSaveGroup(idx)" class="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="Save as Template">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                                            </button>
+                                            <button type="button" @click="promptDeleteGroup(idx)" class="text-rose-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg transition-all" title="Delete Group">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                             </button>
                                         </div>
                                     </div>
-                                @endforeach
-                            </div>
-                        @endif
+                                    <div class="p-4 bg-white space-y-3">
+                                        <template x-for="(option, oIdx) in (group.options || [])" :key="oIdx">
+                                            <div class="flex items-center gap-4">
+                                                <div class="flex-1">
+                                                    <input type="text" x-model="option.name" class="w-full h-10 px-3 text-[13px] font-bold rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" placeholder="Option name..." />
+                                                </div>
+                                                <div class="w-28 relative">
+                                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                                        <span class="text-[12px] font-bold">₱</span>
+                                                    </div>
+                                                    <input type="text" x-model="option.price" class="w-full h-10 pl-7 pr-3 text-[13px] font-black text-right rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" placeholder="0.00" />
+                                                </div>
+                                                <div class="flex items-center gap-3">
+                                                    <label class="flex items-center gap-2 cursor-pointer">
+                                                        <input type="radio" :name="'default_opt_' + idx" :checked="!!option.is_default" @change="setDefaultOption(idx, oIdx)" class="w-3.5 h-3.5 text-indigo-600 border-slate-200">
+                                                        <span class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Default</span>
+                                                    </label>
+                                                    <button type="button" @click="promptDeleteOption(idx, oIdx)" class="text-slate-300 hover:text-rose-500 transition-colors p-1.5" title="Remove Option">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <button type="button" @click="addOption(idx)" class="w-full flex justify-center items-center h-10 border border-dashed border-slate-200 rounded-xl text-[11px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50/30 transition-all mt-2">
+                                            <span x-text="'+ Add Option to &quot;' + group.name + '&quot;'"></span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
                     </div>
 
                     {{-- Tab: Recipe --}}
@@ -272,7 +358,133 @@
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        @php
+                            $ingredientsList = $allIngredients->map(fn($i) => [
+                                'id' => (int)$i->id,
+                                'name' => (string)$i->name,
+                                'unit' => (string)\App\Helpers\StockHelper::getAbbreviation($i->unit),
+                                'cost' => (float)($i->cost ?? 0),
+                            ])->values();
+                        @endphp
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8"
+                            wire:ignore.self
+                            x-data="{
+                                open: false,
+                                search: '',
+                                selectedId: 0,
+                                qty: '',
+                                errorMessage: '',
+                                dropUp: false,
+                                appliedOpen: false,
+                                appliedDropUp: false,
+                                appliedOwner: 'base',
+                                appliedLabel: 'Base Product',
+                                items: {{ Js::from($ingredientsList) }},
+                                optionGroups: $wire.entangle('optionGroups'),
+                                recipeIngredients: $wire.entangle('recipeIngredients'),
+                                get selectedItem() {
+                                    return this.items.find(i => i.id === Number(this.selectedId)) || null;
+                                },
+                                get selectedUnit() {
+                                    return this.selectedItem ? this.selectedItem.unit : '';
+                                },
+                                get filteredItems() {
+                                    if (!this.search.trim()) return this.items;
+                                    const q = this.search.toLowerCase().trim();
+                                    return this.items.filter(i => i.name.toLowerCase().includes(q));
+                                },
+                                openDropdown() {
+                                    this.checkFlip();
+                                    this.open = true;
+                                    this.search = '';
+                                },
+                                closeDropdown() {
+                                    this.open = false;
+                                    this.search = '';
+                                },
+                                checkFlip() {
+                                    const rect = this.$refs.comboboxContainer.getBoundingClientRect();
+                                    const spaceBelow = window.innerHeight - rect.bottom;
+                                    this.dropUp = spaceBelow < 250 && rect.top > 250;
+                                },
+                                select(id) {
+                                    this.selectedId = Number(id);
+                                    this.search = '';
+                                    this.open = false;
+                                    this.errorMessage = '';
+                                },
+                                clear() {
+                                    this.selectedId = 0;
+                                    this.search = '';
+                                    this.open = false;
+                                    this.errorMessage = '';
+                                },
+                                toggleApplied() {
+                                    const rect = this.$refs.appliedContainer.getBoundingClientRect();
+                                    const spaceBelow = window.innerHeight - rect.bottom;
+                                    this.appliedDropUp = spaceBelow < 220 && rect.top > 220;
+                                    this.appliedOpen = !this.appliedOpen;
+                                },
+                                setApplied(key, label) {
+                                    this.appliedOwner = key;
+                                    this.appliedLabel = label;
+                                    this.appliedOpen = false;
+                                    this.errorMessage = '';
+                                },
+                                getOwnerName(owner) {
+                                    if (!owner || owner === 'base') return 'Base';
+                                    if (owner.startsWith('option:')) {
+                                        const parts = owner.replace('option:', '').split('_');
+                                        const gIdx = parseInt(parts[0]);
+                                        const oIdx = parseInt(parts[1]);
+                                        if (this.optionGroups && this.optionGroups[gIdx] && this.optionGroups[gIdx].options && this.optionGroups[gIdx].options[oIdx]) {
+                                            return this.optionGroups[gIdx].options[oIdx].name || 'Option';
+                                        }
+                                        return 'Option';
+                                    }
+                                    return owner;
+                                },
+                                addIngredient() {
+                                    if (!this.selectedId) {
+                                        this.errorMessage = 'Please select an ingredient.';
+                                        return;
+                                    }
+                                    const qtyNum = parseFloat(this.qty);
+                                    if (!qtyNum || qtyNum <= 0) {
+                                        this.errorMessage = 'Quantity must be at least 0.01.';
+                                        return;
+                                    }
+                                    const item = this.selectedItem;
+                                    if (!item) return;
+
+                                    const ownerKey = this.appliedOwner || 'base';
+
+                                    const exists = this.recipeIngredients.some(ri => Number(ri.id) === Number(this.selectedId) && ri.owner === ownerKey);
+                                    if (exists) {
+                                        this.errorMessage = 'Ingredient already added for this option.';
+                                        return;
+                                    }
+
+                                    this.errorMessage = '';
+
+                                    // Instant addition (0ms)!
+                                    this.recipeIngredients.push({
+                                        id: item.id,
+                                        name: item.name,
+                                        unit: item.unit,
+                                        quantity: qtyNum,
+                                        cost: Number(item.cost || 0),
+                                        owner: ownerKey
+                                    });
+
+                                    // Instant reset
+                                    this.clear();
+                                    this.qty = '';
+                                },
+                                removeIngredient(idx) {
+                                    this.recipeIngredients.splice(idx, 1);
+                                }
+                            }">
                             {{-- Add Ingredient Form --}}
                             <div class="space-y-4">
                                 <h4 class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
@@ -282,144 +494,134 @@
                                 <div class="p-5 bg-slate-50/50 border border-slate-100 rounded-2xl space-y-4">
                                     <div>
                                         <x-input-label value="Select Ingredient" />
-                                                                                <div class="relative mt-1.5"
-                                            x-data="{
-                                                open: false,
-                                                openUpward: false,
-                                                top: 0, left: 0, width: 0,
-                                                position() {
-                                                    const trigger = this.$refs.ingredientTrigger;
-                                                    const panel = this.$refs.ingredientPanel;
-                                                    if (!trigger || !panel) return;
+                                        <div class="relative mt-1.5" x-ref="comboboxContainer"
+                                            @click.outside="closeDropdown()"
+                                            @keydown.escape.window="closeDropdown()">
 
-                                                    const r = trigger.getBoundingClientRect();
-                                                    const gap = 6;
-                                                    const panelHeight = panel.offsetHeight;
-                                                    const spaceBelow = window.innerHeight - r.bottom;
-                                                    const spaceAbove = r.top;
-
-                                                    // Flip above the field only if there truly isn't room
-                                                    // below AND there's more room above than below.
-                                                    this.openUpward = spaceBelow < (panelHeight + gap) && spaceAbove > spaceBelow;
-
-                                                    this.top = this.openUpward
-                                                        ? (r.top + window.scrollY - panelHeight - gap)
-                                                        : (r.bottom + window.scrollY + gap);
-
-                                                    let left = r.left + window.scrollX;
-                                                    const maxLeft = window.scrollX + window.innerWidth - r.width - 8;
-                                                    this.left = Math.max(8, Math.min(left, maxLeft));
-                                                    this.width = r.width;
-                                                },
-                                                async openDropdown() {
-                                                    this.open = true;
-                                                    // Render first (off-position), measure the real panel
-                                                    // height, THEN place it — this is what lets us decide
-                                                    // up vs down correctly instead of guessing a height.
-                                                    await this.$nextTick();
-                                                    this.position();
-                                                    this.$refs.ingredientSearchInput?.focus();
-                                                }
-                                            }"
-                                            @click.outside="open = false"
-                                            @keydown.escape.window="open = false"
-                                            @scroll.capture.window="open && position()"
-                                            @resize.window="open && position()">
-
-                                            <button type="button" x-ref="ingredientTrigger" @click="open ? (open = false) : openDropdown()"
-                                                class="flex items-center justify-between w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-[13px] text-slate-700 shadow-sm hover:border-slate-300 focus:outline-none transition-all h-11">
-                                                <span class="font-bold truncate">{{ $selectedIngredientName }}</span>
-                                                <svg class="w-4 h-4 text-slate-400 transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
-                                            </button>
-
-                                            {{-- Teleported to <body>: this panel no longer lives inside any
-                                                 overflow-y-auto ancestor, so opening it can never add a
-                                                 scrollbar to the surrounding card/tab/modal, and it can
-                                                 never be clipped by one either. --}}
-                                            <template x-teleport="body">
-                                                <div x-show="open" x-cloak x-ref="ingredientPanel"
-                                                    x-transition:enter="transition ease-out duration-100"
-                                                    :x-transition:enter-start="openUpward ? 'opacity-0 translate-y-1' : 'opacity-0 -translate-y-1'"
-                                                    x-transition:enter-end="opacity-100 translate-y-0"
-                                                    x-transition:leave="transition ease-in duration-75"
-                                                    x-transition:leave-start="opacity-100"
-                                                    x-transition:leave-end="opacity-0"
-                                                    :style="`position:absolute; top:${top}px; left:${left}px; width:${width}px;`"
-                                                    class="z-[9999] bg-white rounded-xl shadow-lg ring-1 ring-black ring-opacity-5 p-2">
-                                                    <div class="px-2 pb-2 mb-2 border-b border-slate-50">
-                                                        <div class="relative">
-                                                            <svg class="absolute left-3 top-2.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                                                            <input x-ref="ingredientSearchInput" wire:model.live.debounce.300ms="ingredientSearch" type="text" placeholder="Search ingredients..."
-                                                                   class="w-full pl-9 pr-4 py-2 bg-slate-50 border-none rounded-lg text-[12px] font-medium focus:ring-1 focus:ring-indigo-500 placeholder-slate-400">
-                                                        </div>
-                                                    </div>
-                                                    {{-- Own max-height + own scroll — this scrolling is
-                                                         local to the panel and never bubbles to the page. --}}
-                                                    <div class="max-h-60 overflow-y-auto custom-scrollbar">
-                                                        @forelse($allIngredients as $ing)
-                                                            <x-dropdown-link href="#" wire:click.prevent="$set('newIngredientId', {{ $ing->id }})" @click="open = false">
-                                                                <div class="flex items-center justify-between">
-                                                                    <span class="font-medium text-slate-700">{{ $ing->name }}</span>
-                                                                    <span class="text-[10px] font-black text-slate-300 uppercase tracking-widest">{{ $ing->unit }}</span>
-                                                                </div>
-                                                            </x-dropdown-link>
-                                                        @empty
-                                                            <div class="px-4 py-2 text-[12px] text-slate-400 italic">No ingredients found</div>
-                                                        @endforelse
-                                                    </div>
+                                            {{-- Search / Select Input Box --}}
+                                            <div class="relative flex items-center">
+                                                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                                    <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                                    </svg>
                                                 </div>
-                                            </template>
+
+                                                <input 
+                                                    type="text"
+                                                    :value="open ? search : (selectedItem ? selectedItem.name : '')"
+                                                    @input="search = $event.target.value; open = true"
+                                                    @focus="openDropdown()"
+                                                    @click="openDropdown()"
+                                                    :placeholder="selectedItem ? selectedItem.name : 'Search or select ingredient...'"
+                                                    class="w-full pl-10 pr-10 py-2 bg-white border border-slate-200 rounded-xl text-[13px] text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all h-11"
+                                                    :class="selectedItem && !open ? 'font-bold text-indigo-700 bg-indigo-50/20 border-indigo-200' : 'text-slate-800'"
+                                                    autocomplete="off"
+                                                />
+
+                                                {{-- Clear button only (NO up/down arrow!) --}}
+                                                <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                                                    <button type="button" 
+                                                        x-show="selectedId > 0 || search.length > 0"
+                                                        x-cloak
+                                                        @click.stop="clear()"
+                                                        title="Clear selection"
+                                                        class="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {{-- Dropdown Results Menu with auto-flip --}}
+                                            <div x-show="open" x-cloak
+                                                x-transition:enter="transition ease-out duration-100"
+                                                x-transition:enter-start="opacity-0 scale-95"
+                                                x-transition:enter-end="opacity-100 scale-100"
+                                                x-transition:leave="transition ease-in duration-75"
+                                                x-transition:leave-start="opacity-100 scale-100"
+                                                x-transition:leave-end="opacity-0 scale-95"
+                                                :class="dropUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'"
+                                                class="absolute left-0 right-0 z-50 bg-white rounded-xl shadow-xl border border-slate-100 p-1.5 max-h-60 overflow-y-auto custom-scrollbar">
+                                                <template x-for="item in filteredItems" :key="item.id">
+                                                    <button type="button" 
+                                                        @click="select(item.id)"
+                                                        class="w-full text-left px-3.5 py-2.5 rounded-lg hover:bg-indigo-50/70 hover:text-indigo-900 transition-colors flex items-center justify-between group"
+                                                        :class="selectedId === item.id ? 'bg-indigo-50 text-indigo-900 font-bold' : 'text-slate-700'">
+                                                        <span class="text-[13px] font-medium group-hover:font-semibold truncate" x-text="item.name"></span>
+                                                        <span class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 group-hover:bg-indigo-100 group-hover:text-indigo-600 shrink-0 ml-2" x-text="item.unit"></span>
+                                                    </button>
+                                                </template>
+                                                <template x-if="filteredItems.length === 0">
+                                                    <div class="px-4 py-3 text-[12px] text-slate-400 italic text-center">
+                                                        No ingredients found
+                                                    </div>
+                                                </template>
+                                            </div>
                                         </div>
-                                        <x-input-error :messages="$errors->get('newIngredientId')" class="mt-1" />
                                     </div>
 
                                     <div class="grid grid-cols-2 gap-4">
                                         <div>
                                             <x-input-label value="Quantity" />
                                             <div class="relative mt-1.5">
-                                                <x-text-input wire:model.live="newIngredientQty" class="w-full h-11 pr-14 text-[13px] font-black" placeholder="0.00" inputFilter="price" />
-                                                <span class="absolute inset-y-0 right-4 flex items-center text-[10px] font-black text-slate-400 uppercase">{{ $newIngredientUnit ?: '—' }}</span>
+                                                <x-text-input x-model="qty" @keydown.enter.prevent="addIngredient()" class="w-full h-11 pr-14 text-[13px] font-black" placeholder="0.00" inputFilter="price" />
+                                                <span class="absolute inset-y-0 right-4 flex items-center text-[10px] font-black text-slate-400 uppercase pointer-events-none" x-text="selectedUnit || '—'">—</span>
                                             </div>
-                                            <x-input-error :messages="$errors->get('newIngredientQty')" class="mt-1" />
                                         </div>
                                         <div>
                                             <x-input-label value="Applied To" />
-                                            <div class="mt-1.5">
-                                                <x-dropdown align="left" width="full" containerClasses="block w-full">
-                                                    <x-slot name="trigger">
-                                                        <button type="button" class="flex items-center justify-between w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-[13px] text-slate-700 shadow-sm hover:border-slate-300 focus:outline-none transition-all h-11">
-                                                            <span class="font-bold truncate">
-                                                                @if($newIngredientOwner === 'base') Base Product
-                                                                @elseif(str_starts_with($newIngredientOwner, 'option:'))
-                                                                    @php
-                                                                        $ref = str_replace('option:', '', $newIngredientOwner);
-                                                                        $parts = explode('_', $ref);
-                                                                        $gIdx = $parts[0] ?? null;
-                                                                        $oIdx = $parts[1] ?? null;
-                                                                        $optName = isset($optionGroups[$gIdx]['options'][$oIdx]) ? $optionGroups[$gIdx]['options'][$oIdx]['name'] : 'Unknown Option';
-                                                                    @endphp
-                                                                    {{ $optName }}
-                                                                @else Context... @endif
-                                                            </span>
-                                                            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
-                                                        </button>
-                                                    </x-slot>
-                                                    <x-slot name="content" class="max-h-64 overflow-y-auto">
-                                                                                                        <x-dropdown-link href="#" wire:click.prevent="$set('newIngredientOwner', 'base')">Base Product</x-dropdown-link>
-                                                        @foreach($optionGroups as $gIdx => $group)
-                                                            @if(!($group['no_recipe_required'] ?? false))
-                                                                <div class="px-4 py-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-50/50">{{ $group['name'] }}</div>
-                                                                @foreach($group['options'] as $oIdx => $option)
-                                                                    <x-dropdown-link href="#" wire:click.prevent="$set('newIngredientOwner', 'option:{{ $gIdx }}_{{$oIdx}}')">{{ $option['name'] }}</x-dropdown-link>
-                                                                @endforeach
-                                                            @endif
-                                                        @endforeach
-                                                    </x-slot>
-                                                </x-dropdown>
+                                            <div class="relative mt-1.5" x-ref="appliedContainer"
+                                                @click.outside="appliedOpen = false"
+                                                @keydown.escape.window="appliedOpen = false">
+                                                <button type="button" 
+                                                    @click="toggleApplied()"
+                                                    class="flex items-center justify-between w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-[13px] text-slate-700 shadow-sm hover:border-slate-300 focus:outline-none transition-all h-11">
+                                                    <span class="font-bold truncate" x-text="appliedLabel"></span>
+                                                    <svg class="w-4 h-4 text-slate-400 transition-transform duration-200" :class="appliedOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                                                    </svg>
+                                                </button>
+                                                <div x-show="appliedOpen" x-cloak
+                                                    x-transition:enter="transition ease-out duration-100"
+                                                    x-transition:enter-start="opacity-0 scale-95"
+                                                    x-transition:enter-end="opacity-100 scale-100"
+                                                    x-transition:leave="transition ease-in duration-75"
+                                                    x-transition:leave-start="opacity-100 scale-100"
+                                                    x-transition:leave-end="opacity-0 scale-95"
+                                                    :class="appliedDropUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'"
+                                                    class="absolute left-0 right-0 z-50 bg-white rounded-xl shadow-xl border border-slate-100 p-1.5 max-h-60 overflow-y-auto custom-scrollbar">
+                                                    <button type="button" 
+                                                        @click="setApplied('base', 'Base Product')"
+                                                        class="w-full text-left px-3.5 py-2 rounded-lg hover:bg-indigo-50/70 hover:text-indigo-900 transition-colors text-[13px] font-medium"
+                                                        :class="appliedOwner === 'base' ? 'bg-indigo-50 text-indigo-900 font-bold' : 'text-slate-700'">
+                                                        Base Product
+                                                    </button>
+                                                    <template x-for="(group, gIdx) in (optionGroups || [])" :key="gIdx">
+                                                        <div x-show="!group.no_recipe_required">
+                                                            <div class="px-3.5 py-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-50/50 rounded mt-1" x-text="group.name"></div>
+                                                            <template x-for="(option, oIdx) in (group.options || [])" :key="oIdx">
+                                                                <button type="button" 
+                                                                    @click="setApplied('option:' + gIdx + '_' + oIdx, option.name || ('Option #' + (oIdx + 1)))"
+                                                                    class="w-full text-left px-3.5 py-2 rounded-lg hover:bg-indigo-50/70 hover:text-indigo-900 transition-colors text-[13px] font-medium"
+                                                                    :class="appliedOwner === ('option:' + gIdx + '_' + oIdx) ? 'bg-indigo-50 text-indigo-900 font-bold' : 'text-slate-700'"
+                                                                    x-text="option.name || ('Option #' + (oIdx + 1))">
+                                                                </button>
+                                                            </template>
+                                                        </div>
+                                                    </template>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                    <x-primary-button type="button" wire:click="addRecipeIngredient" class="w-full justify-center h-11 text-[12px] font-black uppercase tracking-widest">Add to Recipe</x-primary-button>
+
+                                    {{-- Local validation error --}}
+                                    <div x-show="errorMessage" x-cloak class="p-2.5 bg-rose-50 border border-rose-100 rounded-xl text-[12px] font-bold text-rose-600 flex items-center gap-2">
+                                        <svg class="w-4 h-4 shrink-0 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                        <span x-text="errorMessage"></span>
+                                    </div>
+
+                                    <x-primary-button type="button" @click="addIngredient()" class="w-full justify-center h-11 text-[12px] font-black uppercase tracking-widest shadow-md shadow-indigo-100">Add to Recipe</x-primary-button>
                                 </div>
                             </div>
 
@@ -429,37 +631,35 @@
                                     <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
                                     Recipe Overview
                                 </h4>
-                                @if(count($recipeIngredients) === 0)
-                                    <div class="py-20 bg-white border border-slate-100 rounded-2xl text-center">
-                                        <p class="text-[12px] text-slate-400 font-medium">No ingredients added yet.</p>
-                                    </div>
-                                @else
-                                    <div class="space-y-3 max-h-96 overflow-y-auto pr-2">
-                                        @foreach($recipeIngredients as $idx => $ri)
-                                            <div class="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl shadow-sm group">
-                                                <div class="flex items-center gap-4">
-                                                    <div class="w-10 h-10 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center text-[12px] font-black text-slate-400 shadow-sm">
-                                                        {{ strtoupper(substr($ri['name'] ?? '??', 0, 1)) }}
+                                <div x-show="recipeIngredients.length === 0" class="py-20 bg-white border border-slate-100 rounded-2xl text-center">
+                                    <p class="text-[12px] text-slate-400 font-medium">No ingredients added yet.</p>
+                                </div>
+                                <div x-show="recipeIngredients.length > 0" class="space-y-3 max-h-96 overflow-y-auto pr-2">
+                                    <template x-for="(ri, idx) in recipeIngredients" :key="ri.id + '-' + ri.owner">
+                                        <div class="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl shadow-sm group">
+                                            <div class="flex items-center gap-4">
+                                                <div class="w-10 h-10 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center text-[12px] font-black text-slate-400 shadow-sm" x-text="(ri.name || '??').charAt(0).toUpperCase()">
+                                                </div>
+                                                <div>
+                                                    <div class="flex items-center gap-2">
+                                                        <span class="text-[14px] font-bold text-slate-900 leading-none" x-text="ri.name"></span>
+                                                        <span class="text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest"
+                                                            :class="ri.owner === 'base' ? 'text-indigo-600 bg-indigo-50' : 'text-amber-600 bg-amber-50'"
+                                                            x-text="getOwnerName(ri.owner)"></span>
                                                     </div>
-                                                    <div>
-                                                        <div class="flex items-center gap-2">
-                                                            <span class="text-[14px] font-bold text-slate-900 leading-none">{{ $ri['name'] }}</span>
-                                                            <span class="text-[9px] font-black {{ $ri['owner'] === 'base' ? 'text-indigo-600 bg-indigo-50' : 'text-amber-600 bg-amber-50' }} px-2 py-0.5 rounded-full uppercase tracking-widest">{{ $this->getOwnerLabel($ri['owner']) }}</span>
-                                                        </div>
-                                                        <div class="flex items-center gap-3 mt-1.5">
-                                                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Cost: <span class="text-rose-500">₱{{ number_format(($ri['cost'] ?? 0) * ($ri['quantity'] ?? 0), 2) }}</span></span>
-                                                            <span class="w-1 h-1 rounded-full bg-slate-200"></span>
-                                                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Unit: <span class="text-slate-900">{{ $ri['quantity'] }} {{ strtoupper($ri['unit']) }}</span></span>
-                                                        </div>
+                                                    <div class="flex items-center gap-3 mt-1.5">
+                                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Cost: <span class="text-rose-500 font-mono" x-text="'₱' + ((ri.cost || 0) * (ri.quantity || 0)).toFixed(2)"></span></span>
+                                                        <span class="w-1 h-1 rounded-full bg-slate-200"></span>
+                                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Unit: <span class="text-slate-900 font-mono" x-text="ri.quantity + ' ' + (ri.unit || '').toUpperCase()"></span></span>
                                                     </div>
                                                 </div>
-                                                <button type="button" wire:click="removeRecipeIngredient({{ $idx }})" class="text-slate-300 hover:text-rose-500 transition-all p-2 hover:bg-rose-50 rounded-lg">
-                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                                                </button>
                                             </div>
-                                        @endforeach
-                                    </div>
-                                @endif
+                                            <button type="button" @click="removeIngredient(idx)" class="text-slate-300 hover:text-rose-500 transition-all p-2 hover:bg-rose-50 rounded-lg" title="Remove ingredient">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                            </button>
+                                        </div>
+                                    </template>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -476,20 +676,20 @@
                                 </div>
                             </div>
 
-                            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                                <div class="p-5 bg-slate-50/50 rounded-2xl border border-slate-100 transition-all hover:bg-white hover:shadow-md group space-y-2">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3.5 sm:gap-4">
+                                <div class="p-4 sm:p-5 bg-slate-50/50 rounded-2xl border border-slate-100 transition-all hover:bg-white hover:shadow-md group space-y-1.5 sm:space-y-2">
                                     <span class="text-[11px] font-black text-slate-400 uppercase tracking-widest block group-hover:text-slate-500 transition-colors">Base Recipe Cost</span>
-                                    <span class="text-[22px] font-black text-slate-900 italic font-mono block leading-none">₱{{ number_format($recipeCost, 2) }}</span>
+                                    <span class="text-[20px] sm:text-[22px] font-black text-slate-900 italic font-mono block leading-none truncate">₱{{ number_format($recipeCost, 2) }}</span>
                                 </div>
-                                <div class="p-5 bg-slate-50/50 rounded-2xl border border-slate-100 transition-all hover:bg-white hover:shadow-md group space-y-2">
+                                <div class="p-4 sm:p-5 bg-slate-50/50 rounded-2xl border border-slate-100 transition-all hover:bg-white hover:shadow-md group space-y-1.5 sm:space-y-2">
                                     <span class="text-[11px] font-black text-slate-400 uppercase tracking-widest block group-hover:text-slate-500 transition-colors">Listing Price</span>
-                                    <span class="text-[22px] font-black text-slate-900 italic font-mono block leading-none">₱{{ number_format($salePrice, 2) }}</span>
+                                    <span class="text-[20px] sm:text-[22px] font-black text-slate-900 italic font-mono block leading-none truncate">₱{{ number_format($salePrice, 2) }}</span>
                                 </div>
-                                <div class="p-5 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-100 flex flex-col justify-center transition-all hover:scale-[1.02] space-y-2">
+                                <div class="p-4 sm:p-5 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-100 flex flex-col justify-center transition-all hover:scale-[1.01] space-y-1.5 sm:space-y-2 sm:col-span-2 xl:col-span-1">
                                     <span class="text-[11px] font-black text-indigo-100 uppercase tracking-widest block">Net Profit</span>
-                                    <div class="flex items-baseline gap-2">
-                                        <span class="text-[24px] font-black text-white italic font-mono leading-none">₱{{ number_format($netProfit, 2) }}</span>
-                                        <span class="text-[11px] font-black text-indigo-200 tracking-widest">{{ $profitMargin }}% MARGIN</span>
+                                    <div class="flex flex-wrap items-baseline justify-between gap-2">
+                                        <span class="text-[22px] sm:text-[24px] font-black text-white italic font-mono leading-none truncate">₱{{ number_format($netProfit, 2) }}</span>
+                                        <span class="text-[10px] sm:text-[11px] font-black text-indigo-100 tracking-wider px-2 py-0.5 rounded-md bg-white/15 shrink-0">{{ $profitMargin }}% MARGIN</span>
                                     </div>
                                 </div>
                             </div>
@@ -617,16 +817,18 @@
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                @foreach($this->optionTemplates as $tmpl)
+                <template x-for="tmpl in (templates || [])" :key="tmpl.id">
                     <div class="group relative bg-slate-50/50 border border-slate-100 rounded-2xl p-5 hover:bg-white hover:border-indigo-200 hover:shadow-md transition-all cursor-pointer" 
-                         wire:click="importOptionTemplate({{ $tmpl->id }})"
-                         wire:key="tmpl-card-{{ $tmpl->id }}">
+                         @click="importTemplate(tmpl.id)">
                         <div class="flex items-start justify-between mb-3">
                             <div>
-                                <h4 class="text-[14px] font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{{ $tmpl->name }}</h4>
+                                <h4 class="text-[14px] font-bold text-slate-900 group-hover:text-indigo-600 transition-colors" x-text="tmpl.name"></h4>
                                 <div class="flex items-center gap-2 mt-1">
-                                    <span class="text-[9px] font-black {{ $tmpl->is_required ? 'text-rose-500 bg-rose-50' : 'text-slate-400 bg-slate-100' }} px-1.5 py-0.5 rounded uppercase tracking-widest">{{ $tmpl->is_required ? 'Required' : 'Optional' }}</span>
-                                    <span class="text-[9px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded uppercase tracking-widest">{{ $tmpl->price_mode }}</span>
+                                    <span class="text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest"
+                                        :class="tmpl.is_required ? 'text-rose-500 bg-rose-50' : 'text-slate-400 bg-slate-100'"
+                                        x-text="tmpl.is_required ? 'Required' : 'Optional'"></span>
+                                    <span class="text-[9px] font-black text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded uppercase tracking-widest" x-text="tmpl.price_mode"></span>
+                                    <span x-show="tmpl.no_recipe_required" class="text-[9px] font-black text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded uppercase tracking-widest">No Recipe</span>
                                 </div>
                             </div>
                             <div class="w-8 h-8 rounded-lg bg-white border border-slate-100 flex items-center justify-center text-slate-300 group-hover:text-indigo-600 group-hover:border-indigo-100 transition-all shadow-sm">
@@ -634,27 +836,32 @@
                             </div>
                         </div>
                         <div class="space-y-1.5 opacity-60">
-                            @foreach($tmpl->items->take(3) as $tItem)
+                            <template x-for="tItem in (tmpl.items || []).slice(0, 3)" :key="tItem.id">
                                 <div class="flex items-center justify-between text-[11px] font-medium text-slate-500">
                                     <span class="flex items-center gap-1.5">
-                                        {{ $tItem->name }}
-                                        @if($tItem->ingredients->count() > 0)
-                                            <span class="inline-flex items-center gap-0.5 text-[9px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full" title="{{ $tItem->ingredients->pluck('ingredient.name')->join(', ') }}">
-                                                🧪 {{ $tItem->ingredients->count() }}
+                                        <span x-text="tItem.name"></span>
+                                        <template x-if="tItem.ingredients && tItem.ingredients.length > 0">
+                                            <span class="inline-flex items-center gap-0.5 text-[9px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full"
+                                                x-text="'🧪 ' + tItem.ingredients.length">
                                             </span>
-                                        @endif
+                                        </template>
                                     </span>
-                                    @if($tItem->price > 0)
-                                        <span class="font-bold">+₱{{ number_format($tItem->price, 2) }}</span>
-                                    @endif
+                                    <template x-if="tItem.price > 0">
+                                        <span class="font-bold" x-text="'+₱' + Number(tItem.price).toFixed(2)"></span>
+                                    </template>
                                 </div>
-                            @endforeach
-                            @if($tmpl->items->count() > 3)
-                                <div class="text-[10px] font-bold text-slate-400 italic mt-1">+ {{ $tmpl->items->count() - 3 }} more...</div>
-                            @endif
+                            </template>
+                            <template x-if="(tmpl.items || []).length > 3">
+                                <div class="text-[10px] font-bold text-slate-400 italic mt-1" x-text="'+ ' + ((tmpl.items || []).length - 3) + ' more...'"></div>
+                            </template>
                         </div>
                     </div>
-                @endforeach
+                </template>
+                <template x-if="!templates || templates.length === 0">
+                    <div class="col-span-2 py-12 text-center text-slate-400 italic text-[13px]">
+                        No template available in the library yet.
+                    </div>
+                </template>
             </div>
 
             <div class="mt-8 pt-6 border-t border-slate-100 flex justify-end gap-3">
@@ -1209,7 +1416,7 @@
             
             <div class="mt-4">
                 <x-input-label value="Category Name" />
-                <x-text-input wire:model.live.debounce.400ms="newCategoryName" class="w-full mt-1.5 h-10" placeholder="e.g. Snacks, Beverages, Desserts" inputFilter="name" :hasError="$errors->has('newCategoryName')" />
+                <x-text-input wire:model.live.debounce.400ms="newCategoryName" class="w-full mt-1.5 h-10" placeholder="e.g. Snacks & Drinks, Platters / Combos" inputFilter="categoryName" :hasError="$errors->has('newCategoryName')" />
                 <x-input-error :messages="$errors->get('newCategoryName')" class="mt-1" />
             </div>
 
@@ -1252,52 +1459,407 @@
             <div class="mt-4 space-y-4">
                 <div>
                     <x-input-label value="Group Name" />
-                    <x-text-input wire:model.live="newGroupName" class="w-full mt-1.5 h-10" placeholder="e.g. Extras, Sizes, Flavors" inputFilter="productName" />
-                    <x-input-error :messages="$errors->get('newGroupName')" class="mt-1" />
+                    <input type="text" x-model="newGroupName" @keydown.enter.prevent="submitAddGroup()" class="w-full mt-1.5 h-10 px-3.5 rounded-xl border border-slate-200 text-[13px] font-medium focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" placeholder="e.g. Extras, Sizes, Flavors" />
+                    <p x-show="newGroupError" x-text="newGroupError" class="mt-1 text-[12px] text-rose-500 font-bold" x-cloak></p>
                 </div>
                 <div>
                     <x-input-label value="Price Calculation Mode" />
                     <div class="mt-1.5">
-                        <x-dropdown align="left" width="full" containerClasses="block w-full">
-                            <x-slot name="trigger">
-                                <button type="button" class="flex items-center justify-between w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-[13px] text-slate-700 shadow-sm hover:border-slate-300 focus:outline-none transition-all h-10">
-                                    <span class="font-medium">{{ $newGroupPriceMode === 'additive' ? 'Additive (Price + Base Price)' : 'Fixed (Overrides Base Price)' }}</span>
-                                    <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                                </button>
-                            </x-slot>
-                            <x-slot name="content">
-                                <x-dropdown-link href="#" wire:click.prevent="$set('newGroupPriceMode', 'additive')">Additive (Price + Base Price)</x-dropdown-link>
-                                <x-dropdown-link href="#" wire:click.prevent="$set('newGroupPriceMode', 'fixed')">Fixed (Overrides Base Price)</x-dropdown-link>
-                            </x-slot>
-                        </x-dropdown>
+                        <select x-model="newGroupPriceMode" class="w-full h-10 px-3.5 bg-white border border-slate-200 rounded-xl text-[13px] font-medium text-slate-700 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
+                            <option value="additive">Additive (Price + Base Price)</option>
+                            <option value="fixed">Fixed (Overrides Base Price)</option>
+                        </select>
                     </div>
                 </div>
-                                <div class="flex items-center gap-3 p-3 bg-amber-50/50 rounded-xl border border-amber-100 transition-all hover:bg-amber-50">
-                    <input type="checkbox" wire:model.live="newGroupNoRecipeRequired" id="no_recipe_group" class="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+                <div class="flex items-center gap-3 p-3 bg-amber-50/50 rounded-xl border border-amber-100 transition-all hover:bg-amber-50">
+                    <input type="checkbox" x-model="newGroupNoRecipeRequired" id="no_recipe_group" class="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500">
                     <label for="no_recipe_group" class="text-[12px] font-medium text-slate-700 cursor-pointer">No Recipe Required (options always available, skip ingredient tracking)</label>
                 </div>
                 <div class="flex items-center gap-3 p-3 bg-slate-50/50 rounded-xl border border-slate-100 transition-all hover:bg-indigo-50/30">
-                    <input type="checkbox" wire:model.live="newGroupIsRequired" id="is_req_group" class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                    <input type="checkbox" x-model="newGroupIsRequired" id="is_req_group" class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
                     <label for="is_req_group" class="text-[12px] font-medium text-slate-700 cursor-pointer">Mandatory Selection (Customer must choose)</label>
                 </div>
             </div>
             <div class="flex items-center justify-end gap-2 mt-6">
                 <x-secondary-button @click="$dispatch('close-modal', 'add-option-group')" class="h-10">Cancel</x-secondary-button>
-                <x-primary-button wire:click="addOptionGroup" class="h-10">Add Group</x-primary-button>
+                <x-primary-button type="button" @click="submitAddGroup()" class="h-10">Add Group</x-primary-button>
+            </div>
+        </div>
+    </x-modal>
+
+    {{-- Options Action Confirmation Modal (Sync, Save Template, Delete) --}}
+    <x-modal name="confirm-options-action" maxWidth="sm" focusable wire:key="modal-confirm-options-action">
+        <div class="h-1 w-full rounded-t-lg"
+            :class="confirmActionType === 'delete_group' || confirmActionType === 'delete_option' ? 'bg-gradient-to-r from-red-400 to-rose-500' : (confirmActionType === 'sync' ? 'bg-gradient-to-r from-emerald-400 to-teal-500' : 'bg-gradient-to-r from-indigo-400 to-sky-500')"></div>
+        <div class="p-6">
+            <div class="flex items-start gap-4 mb-4">
+                <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center"
+                    :class="confirmActionType === 'delete_group' || confirmActionType === 'delete_option' ? 'bg-red-50 border border-red-100 text-red-500' : (confirmActionType === 'sync' ? 'bg-emerald-50 border border-emerald-100 text-emerald-500' : 'bg-indigo-50 border border-indigo-100 text-indigo-500')">
+                    <template x-if="confirmActionType === 'delete_group' || confirmActionType === 'delete_option'">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </template>
+                    <template x-if="confirmActionType === 'sync'">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    </template>
+                    <template x-if="confirmActionType === 'save_template'">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+                    </template>
+                </div>
+                <div>
+                    <h3 class="text-[15px] font-bold text-gray-900 leading-tight" x-text="confirmActionTitle"></h3>
+                    <p class="mt-1 text-[13px] text-gray-500 leading-relaxed" x-text="confirmActionMessage"></p>
+                </div>
+            </div>
+
+            <template x-if="confirmActionTargetName">
+                <div class="px-3 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[13px] font-bold text-slate-800 mb-5 truncate" x-text="confirmActionTargetName"></div>
+            </template>
+
+            <div class="flex items-center justify-end gap-2 mt-4">
+                <x-secondary-button @click="$dispatch('close-modal', 'confirm-options-action')" class="h-10">Cancel</x-secondary-button>
+                <template x-if="confirmActionType === 'delete_group' || confirmActionType === 'delete_option'">
+                    <x-danger-button type="button" @click="executeConfirmedOptionAction()" class="h-10">Delete</x-danger-button>
+                </template>
+                <template x-if="confirmActionType === 'sync'">
+                    <x-primary-button type="button" @click="executeConfirmedOptionAction()" class="h-10 !bg-emerald-600 hover:!bg-emerald-700">Confirm Sync</x-primary-button>
+                </template>
+                <template x-if="confirmActionType === 'save_template'">
+                    <x-primary-button type="button" @click="executeConfirmedOptionAction()" class="h-10">Save Template</x-primary-button>
+                </template>
             </div>
         </div>
     </x-modal>
 
     <script>
         (function() {
-            window.menuManagement = function($wire) {
+            window.menuManagement = function($wire, initialTemplates = [], initialCategories = []) {
                 return {
                     activeTab: $wire.entangle('activeTab').live,
                     panel: $wire.entangle('panel').live,
                     tableView: $wire.entangle('view').live,
                     mode: $wire.entangle('mode').live,
                     ...window.slidingTabs($wire.entangle('activeTab').live, 'activeTab'),
-                    
+
+                    optionGroups: $wire.entangle('optionGroups'),
+                    recipeIngredients: $wire.entangle('recipeIngredients'),
+                    templates: initialTemplates || [],
+                    allCategories: initialCategories || [],
+
+                    // Add group modal state
+                    newGroupName: '',
+                    newGroupPriceMode: 'additive',
+                    newGroupIsRequired: false,
+                    newGroupNoRecipeRequired: false,
+                    newGroupError: '',
+
+                    // Options action confirmation modal state
+                    confirmActionType: '',
+                    confirmActionGroupIndex: null,
+                    confirmActionOptionIndex: null,
+                    confirmActionTitle: '',
+                    confirmActionTargetName: '',
+                    confirmActionMessage: '',
+
+                    openAddGroupModal() {
+                        this.newGroupName = '';
+                        this.newGroupPriceMode = 'additive';
+                        this.newGroupIsRequired = false;
+                        this.newGroupNoRecipeRequired = false;
+                        this.newGroupError = '';
+                        this.$dispatch('open-modal', 'add-option-group');
+                    },
+                    submitAddGroup() {
+                        const name = (this.newGroupName || '').trim();
+                        if (!name) {
+                            this.newGroupError = 'Group name is required.';
+                            return;
+                        }
+                        const exists = (this.optionGroups || []).some(g => (g.name || '').toLowerCase() === name.toLowerCase());
+                        if (exists) {
+                            this.newGroupError = "An option group named '" + name + "' already exists.";
+                            return;
+                        }
+                        if (!this.optionGroups) this.optionGroups = [];
+                        this.optionGroups.push({
+                            id: null,
+                            name: name,
+                            price_mode: this.newGroupPriceMode,
+                            is_required: !!this.newGroupIsRequired,
+                            no_recipe_required: !!this.newGroupNoRecipeRequired,
+                            options: []
+                        });
+                        this.newGroupName = '';
+                        this.newGroupError = '';
+                        this.$dispatch('close-modal', 'add-option-group');
+                        this.$dispatch('notify', { type: 'success', message: "Group '" + name + "' added." });
+                    },
+                    addOption(gIdx) {
+                        if (!this.optionGroups[gIdx]) return;
+                        if (!this.optionGroups[gIdx].options) this.optionGroups[gIdx].options = [];
+                        this.optionGroups[gIdx].options.push({
+                            id: null,
+                            name: '',
+                            price: '',
+                            is_default: this.optionGroups[gIdx].options.length === 0
+                        });
+                    },
+                    setDefaultOption(gIdx, oIdx) {
+                        if (!this.optionGroups[gIdx] || !this.optionGroups[gIdx].options) return;
+                        this.optionGroups[gIdx].options.forEach((opt, index) => {
+                            opt.is_default = (index === oIdx);
+                        });
+                    },
+                    promptDeleteOption(gIdx, oIdx) {
+                        const group = this.optionGroups[gIdx];
+                        if (!group) return;
+                        const option = group.options ? group.options[oIdx] : null;
+                        if (!option) return;
+                        this.confirmActionType = 'delete_option';
+                        this.confirmActionGroupIndex = gIdx;
+                        this.confirmActionOptionIndex = oIdx;
+                        this.confirmActionTitle = 'Remove Option';
+                        this.confirmActionTargetName = option.name || ('Option #' + (oIdx + 1));
+                        this.confirmActionMessage = "Are you sure you want to remove '" + this.confirmActionTargetName + "' from the '" + group.name + "' group?";
+                        this.$dispatch('open-modal', 'confirm-options-action');
+                    },
+                    promptDeleteGroup(gIdx) {
+                        const group = this.optionGroups[gIdx];
+                        if (!group) return;
+                        this.confirmActionType = 'delete_group';
+                        this.confirmActionGroupIndex = gIdx;
+                        this.confirmActionOptionIndex = null;
+                        this.confirmActionTitle = 'Delete Option Group';
+                        this.confirmActionTargetName = group.name;
+                        this.confirmActionMessage = "Are you sure you want to remove the '" + group.name + "' group? All options within this group and any linked recipe components will be permanently deleted.";
+                        this.$dispatch('open-modal', 'confirm-options-action');
+                    },
+                    promptSyncGroup(gIdx) {
+                        const group = this.optionGroups[gIdx];
+                        if (!group) return;
+                        this.confirmActionType = 'sync';
+                        this.confirmActionGroupIndex = gIdx;
+                        this.confirmActionOptionIndex = null;
+                        this.confirmActionTitle = 'Sync with Library Template';
+                        this.confirmActionTargetName = group.name;
+                        this.confirmActionMessage = "This will update '" + group.name + "' with the latest options and recipe ingredients from the library template. Any local edits may be overwritten.";
+                        this.$dispatch('open-modal', 'confirm-options-action');
+                    },
+                    promptSaveGroup(gIdx) {
+                        const group = this.optionGroups[gIdx];
+                        if (!group) return;
+                        this.confirmActionType = 'save_template';
+                        this.confirmActionGroupIndex = gIdx;
+                        this.confirmActionOptionIndex = null;
+                        this.confirmActionTitle = 'Save Group as Template';
+                        this.confirmActionTargetName = group.name;
+                        this.confirmActionMessage = "Save '" + group.name + "' and its configured recipe mappings to the Options Library? This template will become available for all products.";
+                        this.$dispatch('open-modal', 'confirm-options-action');
+                    },
+                    executeConfirmedOptionAction() {
+                        const gIdx = this.confirmActionGroupIndex;
+                        const oIdx = this.confirmActionOptionIndex;
+                        const type = this.confirmActionType;
+
+                        this.$dispatch('close-modal', 'confirm-options-action');
+
+                        if (type === 'delete_option') {
+                            if (gIdx !== null && oIdx !== null && this.optionGroups[gIdx] && this.optionGroups[gIdx].options) {
+                                const opt = this.optionGroups[gIdx].options[oIdx];
+                                const ownerKeyUnsaved = 'option:' + gIdx + '_' + oIdx;
+                                const ownerKeySaved = opt && opt.id ? ('option:' + opt.id) : null;
+                                if (this.recipeIngredients) {
+                                    this.recipeIngredients = this.recipeIngredients.filter(ri => ri.owner !== ownerKeyUnsaved && (!ownerKeySaved || ri.owner !== ownerKeySaved));
+                                    this.recipeIngredients.forEach(ri => {
+                                        if (ri.owner && ri.owner.startsWith('option:' + gIdx + '_')) {
+                                            const currOIdx = parseInt(ri.owner.replace('option:' + gIdx + '_', ''));
+                                            if (currOIdx > oIdx) {
+                                                ri.owner = 'option:' + gIdx + '_' + (currOIdx - 1);
+                                            }
+                                        }
+                                    });
+                                }
+                                this.optionGroups[gIdx].options.splice(oIdx, 1);
+                                this.$dispatch('notify', { type: 'info', message: 'Option removed.' });
+                            }
+                        } else if (type === 'delete_group') {
+                            if (gIdx !== null && this.optionGroups[gIdx]) {
+                                const grp = this.optionGroups[gIdx];
+                                const prefixUnsaved = 'option:' + gIdx + '_';
+                                const savedOptIds = (grp.options || []).map(o => o.id).filter(Boolean).map(id => 'option:' + id);
+                                if (this.recipeIngredients) {
+                                    this.recipeIngredients = this.recipeIngredients.filter(ri => {
+                                        if (ri.owner && ri.owner.startsWith(prefixUnsaved)) return false;
+                                        if (savedOptIds.includes(ri.owner)) return false;
+                                        return true;
+                                    });
+                                    this.recipeIngredients.forEach(ri => {
+                                        if (ri.owner && ri.owner.startsWith('option:')) {
+                                            const ref = ri.owner.replace('option:', '');
+                                            if (ref.includes('_')) {
+                                                const parts = ref.split('_');
+                                                const groupI = parseInt(parts[0]);
+                                                const optI = parseInt(parts[1]);
+                                                if (groupI > gIdx) {
+                                                    ri.owner = 'option:' + (groupI - 1) + '_' + optI;
+                                                }
+                                            }
+                                        }
+                                    });
+                                }
+                                this.optionGroups.splice(gIdx, 1);
+                                this.$dispatch('notify', { type: 'info', message: "Group '" + grp.name + "' removed." });
+                            }
+                        } else if (type === 'sync') {
+                            this.executeSync(gIdx);
+                        } else if (type === 'save_template') {
+                            $wire.set('optionGroups', this.optionGroups, false);
+                            $wire.saveGroupToLibrary(gIdx);
+                        }
+                    },
+                    executeSync(gIdx) {
+                        const group = this.optionGroups[gIdx];
+                        if (!group) return;
+                        const template = (this.templates || []).find(t => (t.name || '').toLowerCase() === (group.name || '').toLowerCase());
+                        if (!template) {
+                            this.$dispatch('notify', { type: 'error', message: "No Library template named '" + group.name + "' found to sync from." });
+                            return;
+                        }
+
+                        let addedOptionCount = 0;
+                        let addedIngredientCount = 0;
+                        const noRecipe = !!group.no_recipe_required;
+                        const matchedItemIds = [];
+                        if (!this.recipeIngredients) this.recipeIngredients = [];
+
+                        // 1) Sync ingredients into existing options
+                        (group.options || []).forEach((opt, optIndex) => {
+                            const templateItem = (template.items || []).find(ti => (ti.name || '').toLowerCase() === (opt.name || '').toLowerCase());
+                            if (!templateItem) return;
+                            matchedItemIds.push(templateItem.id);
+
+                            if (noRecipe) return;
+
+                            const ownerKey = 'option:' + gIdx + '_' + optIndex;
+                            const legacyOwner = opt.id ? ('option:' + opt.id) : null;
+
+                            (templateItem.ingredients || []).forEach(ri => {
+                                const ingId = Number(ri.ingredient_id);
+                                const exists = this.recipeIngredients.some(existing => Number(existing.id) === ingId && (existing.owner === ownerKey || (legacyOwner && existing.owner === legacyOwner)));
+                                if (exists) return;
+
+                                this.recipeIngredients.push({
+                                    id: ingId,
+                                    name: ri.ingredient ? ri.ingredient.name : '',
+                                    unit: ri.ingredient ? ri.ingredient.unit : '',
+                                    quantity: parseFloat(ri.quantity) || 0,
+                                    cost: parseFloat(ri.ingredient ? ri.ingredient.cost : 0) || 0,
+                                    owner: legacyOwner || ownerKey
+                                });
+                                addedIngredientCount++;
+                            });
+                        });
+
+                        // 2) Pull in template items that aren't options yet
+                        (template.items || []).forEach(templateItem => {
+                            if (matchedItemIds.includes(templateItem.id)) return;
+                            const alreadyExists = (group.options || []).some(o => (o.name || '').toLowerCase() === (templateItem.name || '').toLowerCase());
+                            if (alreadyExists) return;
+
+                            const newOptIndex = group.options.length;
+                            group.options.push({
+                                id: null,
+                                name: templateItem.name,
+                                price: Number(templateItem.price) === 0 ? '' : templateItem.price,
+                                is_default: !!templateItem.is_default
+                            });
+                            addedOptionCount++;
+
+                            if (!noRecipe) {
+                                const ownerKey = 'option:' + gIdx + '_' + newOptIndex;
+                                (templateItem.ingredients || []).forEach(ri => {
+                                    this.recipeIngredients.push({
+                                        id: Number(ri.ingredient_id),
+                                        name: ri.ingredient ? ri.ingredient.name : '',
+                                        unit: ri.ingredient ? ri.ingredient.unit : '',
+                                        quantity: parseFloat(ri.quantity) || 0,
+                                        cost: parseFloat(ri.ingredient ? ri.ingredient.cost : 0) || 0,
+                                        owner: ownerKey
+                                    });
+                                    addedIngredientCount++;
+                                });
+                            }
+                        });
+
+                        if (addedOptionCount > 0 || addedIngredientCount > 0) {
+                            const parts = [];
+                            if (addedOptionCount > 0) parts.push(addedOptionCount + ' option(s)');
+                            if (addedIngredientCount > 0) parts.push(addedIngredientCount + ' ingredient(s)');
+                            this.$dispatch('notify', { type: 'success', message: 'Synced ' + parts.join(' and ') + " from the '" + template.name + "' template." });
+                        } else {
+                            this.$dispatch('notify', { type: 'info', message: 'Already up to date — nothing new to sync.' });
+                        }
+                    },
+                    importTemplate(templateId) {
+                        const template = (this.templates || []).find(t => Number(t.id) === Number(templateId));
+                        if (!template) return;
+
+                        if (!this.optionGroups) this.optionGroups = [];
+                        const exists = this.optionGroups.some(g => (g.name || '').toLowerCase() === (template.name || '').toLowerCase());
+                        if (exists) {
+                            this.$dispatch('close-modal', 'import-template-library');
+                            this.$dispatch('notify', { type: 'error', message: "The '" + template.name + "' template is already added to this product." });
+                            return;
+                        }
+
+                        const options = (template.items || []).map((item, idx) => ({
+                            id: null,
+                            name: item.name,
+                            price: Number(item.price) === 0 ? '' : item.price,
+                            is_default: !!item.is_default,
+                            sort_order: idx
+                        }));
+
+                        const newGroupIndex = this.optionGroups.length;
+                        this.optionGroups.push({
+                            id: null,
+                            name: template.name,
+                            price_mode: template.price_mode,
+                            is_required: !!template.is_required,
+                            no_recipe_required: !!template.no_recipe_required,
+                            options: options
+                        });
+
+                        let addedIngredientCount = 0;
+                        if (!template.no_recipe_required) {
+                            if (!this.recipeIngredients) this.recipeIngredients = [];
+                            (template.items || []).forEach((item, optIdx) => {
+                                const owner = 'option:' + newGroupIndex + '_' + optIdx;
+                                (item.ingredients || []).forEach(ri => {
+                                    const ingId = Number(ri.ingredient_id);
+                                    const alreadyPresent = this.recipeIngredients.some(existing => Number(existing.id) === ingId && existing.owner === owner);
+                                    if (alreadyPresent) return;
+
+                                    this.recipeIngredients.push({
+                                        id: ingId,
+                                        name: ri.ingredient ? ri.ingredient.name : '',
+                                        unit: ri.ingredient ? ri.ingredient.unit : '',
+                                        quantity: parseFloat(ri.quantity) || 0,
+                                        cost: parseFloat(ri.ingredient ? ri.ingredient.cost : 0) || 0,
+                                        owner: owner
+                                    });
+                                    addedIngredientCount++;
+                                });
+                            });
+                        }
+
+                        this.$dispatch('close-modal', 'import-template-library');
+                        let msg = "Imported '" + template.name + "' template.";
+                        if (addedIngredientCount > 0) {
+                            msg += " " + addedIngredientCount + " recipe ingredient(s) auto-mapped — review under the Recipe tab.";
+                        }
+                        this.$dispatch('notify', { type: 'success', message: msg });
+                    },
+
                     // Client-side search and pagination
                     searchQuery: '',
                     currentPage: 1,

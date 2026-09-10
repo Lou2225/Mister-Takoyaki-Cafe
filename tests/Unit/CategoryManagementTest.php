@@ -40,4 +40,45 @@ class CategoryManagementTest extends TestCase
 
         $this->assertSame(0, $component->getSelectedCategoryAssociatedCountProperty());
     }
+
+    /** @test */
+    public function it_allows_special_characters_in_category_name()
+    {
+        $validNames = [
+            'Snacks & Drinks',
+            'Takoyaki / Meals',
+            'Combo #1',
+            'Meals + Extras',
+            'Beverages (Hot/Cold)',
+            "Chef's Specials!",
+            '100% Japanese Authentic',
+            'Limited: Exclusive Treats',
+            'Bites, Platters & Bowls',
+        ];
+
+        $rules = ['name' => \App\Helpers\ValidationHelper::rulesCategoryName()];
+
+        foreach ($validNames as $name) {
+            $validator = \Illuminate\Support\Facades\Validator::make(['name' => $name], $rules);
+            $this->assertTrue($validator->passes(), "Expected '$name' to be a valid category name.");
+        }
+    }
+
+    /** @test */
+    public function it_rejects_unsafe_characters_in_category_name()
+    {
+        $invalidNames = [
+            '<script>alert(1)</script>',
+            'Category <name>',
+            'a', // too short (< 2)
+            '   ', // whitespace only
+        ];
+
+        $rules = ['name' => \App\Helpers\ValidationHelper::rulesCategoryName()];
+
+        foreach ($invalidNames as $name) {
+            $validator = \Illuminate\Support\Facades\Validator::make(['name' => $name], $rules);
+            $this->assertFalse($validator->passes(), "Expected '$name' to be rejected as invalid.");
+        }
+    }
 }

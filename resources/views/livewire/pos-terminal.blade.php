@@ -83,6 +83,19 @@
         selectedOptions: {},
         selectedModifierIds: [],
         pendingDeleteKey: null,
+        removeItem(key) {
+            if (this.cartLocked) {
+                this.$dispatch('notify', { type: 'warning', message: 'Order is locked — payment already verified.' });
+                return;
+            }
+            const targetKey = key || this.pendingDeleteKey;
+            if (targetKey && this.cart[targetKey]) {
+                delete this.cart[targetKey];
+                this.cart = { ...this.cart };
+            }
+            this.pendingDeleteKey = null;
+            this.$dispatch('close-modal', 'confirm-delete-item');
+        },
         categorySortable: null,
         categorySortableTimeout: null,
         setupCategorySortable() {
@@ -1161,7 +1174,7 @@
                                     
                                     <div class="flex items-center justify-between mt-2.5">
                                         <div class="flex items-center gap-1">
-                                            <button @click="!cartLocked && (item.qty > 1 ? (item.qty--, cart = {...cart}) : (delete cart[key], cart = {...cart}))"
+                                            <button @click="!cartLocked && (item.qty > 1 ? (item.qty--, cart = {...cart}) : removeItem(key))"
                                                 class="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all active:scale-95 disabled:opacity-40" :disabled="cartLocked">
                                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4"/></svg>
                                             </button>
@@ -1979,6 +1992,7 @@
 
         </div>
     </div>
+    </template>
 </x-modal>
     {{-- ══════════════════════════════════════════════
          CONFIRM DELETE ITEM MODAL
@@ -2003,15 +2017,13 @@
             <div class="flex items-center justify-end gap-2 mt-6">
                 <x-secondary-button @click="pendingDeleteKey = null; $dispatch('close-modal', 'confirm-delete-item')" class="h-10">Cancel</x-secondary-button>
                 <button type="button"
-                    @click="delete cart[pendingDeleteKey]; cart = {...cart}; pendingDeleteKey = null; $dispatch('close-modal', 'confirm-delete-item')"
+                    @click="removeItem(pendingDeleteKey)"
                     class="h-10 px-4 inline-flex items-center justify-center rounded-lg bg-red-600 hover:bg-red-700 text-white text-[13px] font-bold transition-colors">
                     Remove Item
                 </button>
+            </div>
         </div>
-
-    </div>
-    </template>
-</x-modal>
+    </x-modal>
 
     {{-- ══════════════════════════════════════════════
          CONFIRM CLEAR ORDER MODAL

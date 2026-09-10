@@ -371,6 +371,14 @@ public function getOwnerLabel(string $owner): string
     public $newGroupNoRecipeRequired = false;
     public $activeGroupIndex = 0;
 
+    // ── Option Group Confirmation Modal ────────────────────────────
+    public ?int $confirmActionGroupIndex = null;
+    public ?int $confirmActionOptionIndex = null;
+    public string $confirmActionType = ''; // 'sync' | 'save_template' | 'delete_group' | 'delete_option'
+    public string $confirmActionTitle = '';
+    public string $confirmActionMessage = '';
+    public string $confirmActionTargetName = '';
+
     // ── Recipe ────────────────────────────────────────────────────
     public $newIngredientId = '';
     public $newIngredientQty = '';
@@ -441,7 +449,10 @@ public function getOwnerLabel(string $owner): string
 
     public function updatedNewCategoryName()
     {
-        $this->validateFieldLive('newCategoryName', ['required', 'string', 'max:255', 'unique:product_categories,name'], ValidationHelper::commonMessages());
+        $this->validateFieldLive('newCategoryName', array_merge(
+            ValidationHelper::rulesCategoryName(2, 255, true),
+            ['unique:product_categories,name']
+        ), ValidationHelper::commonMessages());
     }
 
     // ── Role Helpers ──────────────────────────────────────────────
@@ -602,7 +613,7 @@ public function getOwnerLabel(string $owner): string
 
     public function getOptionTemplatesProperty()
     {
-        return OptionTemplate::with('items.ingredients')->get();
+        return OptionTemplate::with('items.ingredients.ingredient')->get();
     }
 /**
      * The branch this session is currently acting on: the active filter
@@ -759,6 +770,83 @@ public function getOwnerLabel(string $owner): string
         }
     }
 
+    public function promptSyncGroup(int $groupIndex): void
+    {
+        $group = $this->optionGroups[$groupIndex] ?? null;
+        if (!$group) return;
+        $this->confirmActionGroupIndex = $groupIndex;
+        $this->confirmActionOptionIndex = null;
+        $this->confirmActionType = 'sync';
+        $this->confirmActionTitle = 'Sync with Library Template';
+        $this->confirmActionTargetName = $group['name'];
+        $this->confirmActionMessage = "This will update '{$group['name']}' with the latest options and recipe ingredients from the library template. Any local edits may be overwritten.";
+        $this->dispatch('open-modal', name: 'confirm-options-action');
+    }
+
+    public function promptSaveGroup(int $groupIndex): void
+    {
+        $group = $this->optionGroups[$groupIndex] ?? null;
+        if (!$group) return;
+        $this->confirmActionGroupIndex = $groupIndex;
+        $this->confirmActionOptionIndex = null;
+        $this->confirmActionType = 'save_template';
+        $this->confirmActionTitle = 'Save Group as Template';
+        $this->confirmActionTargetName = $group['name'];
+        $this->confirmActionMessage = "Save '{$group['name']}' and its configured recipe mappings to the Options Library? This template will become available for all products.";
+        $this->dispatch('open-modal', name: 'confirm-options-action');
+    }
+
+    public function promptRemoveGroup(int $groupIndex): void
+    {
+        $group = $this->optionGroups[$groupIndex] ?? null;
+        if (!$group) return;
+        $this->confirmActionGroupIndex = $groupIndex;
+        $this->confirmActionOptionIndex = null;
+        $this->confirmActionType = 'delete_group';
+        $this->confirmActionTitle = 'Delete Option Group';
+        $this->confirmActionTargetName = $group['name'];
+        $this->confirmActionMessage = "Are you sure you want to remove the '{$group['name']}' group? All options within this group and any linked recipe components will be permanently deleted.";
+        $this->dispatch('open-modal', name: 'confirm-options-action');
+    }
+
+    public function promptRemoveOption(int $groupIndex, int $optionIndex): void
+    {
+        $group = $this->optionGroups[$groupIndex] ?? null;
+        $option = $group['options'][$optionIndex] ?? null;
+        if (!$group || !$option) return;
+        $this->confirmActionGroupIndex = $groupIndex;
+        $this->confirmActionOptionIndex = $optionIndex;
+        $this->confirmActionType = 'delete_option';
+        $this->confirmActionTitle = 'Remove Option';
+        $this->confirmActionTargetName = $option['name'] ?: 'Option #' . ($optionIndex + 1);
+        $this->confirmActionMessage = "Are you sure you want to remove '{$this->confirmActionTargetName}' from the '{$group['name']}' group?";
+        $this->dispatch('open-modal', name: 'confirm-options-action');
+    }
+
+    public function executeConfirmedOptionAction(): void
+    {
+        if ($this->confirmActionGroupIndex === null) return;
+        $gIdx = $this->confirmActionGroupIndex;
+        $oIdx = $this->confirmActionOptionIndex;
+        $type = $this->confirmActionType;
+
+        $this->confirmActionGroupIndex = null;
+        $this->confirmActionOptionIndex = null;
+        $this->confirmActionType = '';
+
+        $this->dispatch('close-modal', name: 'confirm-options-action');
+
+        if ($type === 'sync') {
+            $this->syncGroupFromLibrary($gIdx);
+        } elseif ($type === 'save_template') {
+            $this->saveGroupToLibrary($gIdx);
+        } elseif ($type === 'delete_group') {
+            $this->removeOptionGroup($gIdx);
+        } elseif ($type === 'delete_option' && $oIdx !== null) {
+            $this->removeOptionFromGroup($gIdx, $oIdx);
+        }
+    }
+
     // ── Recipe Actions ────────────────────────────────────────────
     public function addRecipeIngredient()
     {
@@ -793,6 +881,8 @@ public function getOwnerLabel(string $owner): string
         ];
         $this->newIngredientId = '';
         $this->newIngredientQty = '';
+        $this->newIngredientUnit = '';
+        $this->ingredientSearch = '';
     }
 
     public function removeRecipeIngredient(int $index)
@@ -806,10 +896,19 @@ public function getOwnerLabel(string $owner): string
         return $this->newIngredientId ? Ingredient::find($this->newIngredientId) : null;
     }
 
-    public function clearSelectedIngredient()
+    public function selectIngredient(int|string $id): void
+    {
+        $id = (int) $id;
+        $this->newIngredientId = $id;
+        $this->ingredientSearch = '';
+        $this->updatedNewIngredientId($id);
+    }
+
+    public function clearSelectedIngredient(): void
     {
         $this->newIngredientId = '';
         $this->newIngredientUnit = '';
+        $this->ingredientSearch = '';
     }
 
     // ── Category Actions ──────────────────────────────────────────
@@ -817,7 +916,10 @@ public function getOwnerLabel(string $owner): string
     {
         if (!$this->isSuperAdmin() && !$this->isAdmin()) return;
         $this->validateSecure([
-            'newCategoryName' => ['required', 'string', 'max:255', 'regex:' . ValidationHelper::REGEX_NAME, 'unique:product_categories,name'],
+            'newCategoryName' => array_merge(
+                ValidationHelper::rulesCategoryName(2, 255, true),
+                ['unique:product_categories,name']
+            ),
             'newCategoryStation' => ['required', 'string', 'in:kitchen,barista'],
         ]);
         $cat = ProductCategory::create([
@@ -1114,6 +1216,7 @@ public function getOwnerLabel(string $owner): string
         $this->newIngredientId   = '';
         $this->newIngredientQty  = '';
         $this->newIngredientOwner = 'base';
+        $this->ingredientSearch  = '';
         $this->activeTab         = 'basic';
         $this->resetValidation();
     }
@@ -1172,11 +1275,7 @@ public function getOwnerLabel(string $owner): string
         }
         $filterCategories = $filterCategoriesQuery->get();
 
-        $allIngredientsQuery = Ingredient::orderBy('name', 'asc');
-        if ($this->ingredientSearch) {
-            $allIngredientsQuery->where('name', 'like', "%{$this->ingredientSearch}%");
-        }
-        $allIngredients = $allIngredientsQuery->get();
+        $allIngredients = Ingredient::orderBy('name', 'asc')->get();
 
         $branches = Branch::orderBy('branch_name', 'asc')->get();
 
@@ -1198,11 +1297,41 @@ public function getOwnerLabel(string $owner): string
         $netProfit    = round($salePrice - $recipeCost, 2);
         $profitMargin = $salePrice > 0 ? round(($netProfit / $salePrice) * 100, 2) : 0;
 
+        $allCategories = ProductCategory::orderBy('name', 'asc')->get(['id', 'name'])->map(fn($c) => [
+            'id' => (int)$c->id,
+            'name' => (string)$c->name,
+        ])->values();
+
+        $templatesData = $this->optionTemplates->map(fn($t) => [
+            'id' => (int)$t->id,
+            'name' => (string)$t->name,
+            'price_mode' => (string)$t->price_mode,
+            'is_required' => (bool)$t->is_required,
+            'no_recipe_required' => (bool)$t->no_recipe_required,
+            'items' => $t->items->map(fn($item) => [
+                'id' => (int)$item->id,
+                'name' => (string)$item->name,
+                'price' => (float)($item->price ?: 0),
+                'is_default' => (bool)$item->is_default,
+                'ingredients' => $item->ingredients->map(fn($ri) => [
+                    'ingredient_id' => (int)$ri->ingredient_id,
+                    'quantity' => (float)$ri->quantity,
+                    'ingredient' => $ri->ingredient ? [
+                        'id' => (int)$ri->ingredient->id,
+                        'name' => (string)$ri->ingredient->name,
+                        'unit' => (string)\App\Helpers\StockHelper::getAbbreviation($ri->ingredient->unit),
+                        'cost' => (float)($ri->ingredient->cost ?? 0),
+                    ] : null,
+                ])->values(),
+            ])->values(),
+        ])->values();
+
         return view('livewire.menu-management', compact(
             'products', 'categories', 'filterCategories', 'branches', 'allIngredients',
             'selectedCategoryName', 'selectedFilterCategoryName', 'selectedIngredientName',
             'totalProducts', 'totalCategories',
-            'recipeCost', 'salePrice', 'netProfit', 'profitMargin'
+            'recipeCost', 'salePrice', 'netProfit', 'profitMargin',
+            'allCategories', 'templatesData'
         ))->layout('layouts.app', ['noPadding' => true]);
     }
 }

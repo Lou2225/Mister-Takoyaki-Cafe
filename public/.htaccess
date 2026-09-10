@@ -5,10 +5,16 @@
 
     RewriteEngine On
 
+    # Disable QUIC / HTTP3 for LiteSpeed
+    RewriteRule .* - [E=no-quic:1]
+
     <IfModule mod_headers.c>
         <Files "sw.js">
             Header always set Cache-Control "no-cache, no-store, must-revalidate"
         </Files>
+        # Clear HTTP/3 / QUIC advertisement to force reliable HTTP/2 (prevents QUIC_TOO_MANY_RTOS)
+        Header always set Alt-Svc "clear"
+        Header set Alt-Svc "clear"
     </IfModule>
 
     # Handle Authorization Header

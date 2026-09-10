@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mister-takoyaki-static-v2';
+const CACHE_NAME = 'mister-takoyaki-static-v3';
 
 self.addEventListener('install', () => {
     self.skipWaiting();
@@ -21,7 +21,9 @@ self.addEventListener('fetch', (event) => {
     const url = new URL(request.url);
     const isStaticAsset = ['script', 'style', 'image', 'font'].includes(request.destination);
 
-    if (request.method !== 'GET' || url.origin !== self.location.origin || !isStaticAsset) {
+    // Bypass non-GET, external origins, non-static assets, and Vite hashed build bundles (/build/)
+    // Letting Vite build assets load natively prevents cross-world service worker preload mismatches
+    if (request.method !== 'GET' || url.origin !== self.location.origin || !isStaticAsset || url.pathname.startsWith('/build/')) {
         return;
     }
 

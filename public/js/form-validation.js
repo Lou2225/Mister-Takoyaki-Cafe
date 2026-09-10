@@ -29,6 +29,17 @@
                 return true;
             }
         },
+        categoryName: {
+            pattern: /^[\p{L}\p{N}\s\-.!?:;()'"/#+*=%&$@]+$/u,
+            allowedKeys: ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'Tab', 'Enter', 'Shift', 'Control', 'Alt', 'Meta', 'CapsLock'],
+            sanitizePaste: (text) => text.replace(/[^\p{L}\p{N}\s\-.!?:;()'"/#+*=%&$@]/gu, '').replace(/\s+/g, ' '),
+            extraValidate: (e, el) => {
+                const pos = el.selectionStart;
+                if (pos === 0 && (e.key === ' ' || e.key === '-' || e.key === '.')) { e.preventDefault(); return false; }
+                if ((e.key === ' ' && el.value[pos - 1] === ' ') || (e.key === '-' && el.value[pos - 1] === '-')) { e.preventDefault(); return false; }
+                return true;
+            }
+        },
         nameStrict: {
             pattern: /^[\p{L}\s\-\.']+$/u,
             allowedKeys: ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'Tab', 'Enter', 'Shift', 'Control', 'Alt', 'Meta', 'CapsLock'],
@@ -124,6 +135,8 @@
         namePaste: (e) => handlePaste(e, 'name'),
         productNameKeydown: (e) => handleKeydown(e, 'productName'),
         productNamePaste: (e) => handlePaste(e, 'productName'),
+        categoryNameKeydown: (e) => handleKeydown(e, 'categoryName'),
+        categoryNamePaste: (e) => handlePaste(e, 'categoryName'),
         nameStrictKeydown: (e) => handleKeydown(e, 'nameStrict'),
         nameStrictPaste: (e) => handlePaste(e, 'nameStrict'),
         numberKeydown: (e) => handleKeydown(e, 'number'),

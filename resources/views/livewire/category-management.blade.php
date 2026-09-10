@@ -407,7 +407,7 @@
                                     <div class="relative mt-1">
                                         <x-text-input type="text" wire:model.live.debounce.400ms="name" placeholder="e.g. Premium Seafood Platter"
                                             class="w-full pl-4 pr-10 text-[13px] {{ $errors->has('name') ? 'border-red-400 bg-red-50/30' : 'border-slate-200/60 bg-white' }} rounded-lg h-10 shadow-sm"
-                                            inputFilter="name" :hasError="$errors->has('name')"
+                                            inputFilter="categoryName" :hasError="$errors->has('name')"
                                         />
                                         <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                                             <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" /></svg>

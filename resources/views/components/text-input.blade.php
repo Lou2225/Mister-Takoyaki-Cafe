@@ -1,7 +1,7 @@
 @props([
     'disabled'    => false,
     'hasError'    => false,
-    'inputFilter' => null,  // 'name' | 'number' | 'price' | 'phone' | 'id' | null
+    'inputFilter' => null,  // 'name' | 'number' | 'price' | 'phone' | 'id' | 'productName' | 'categoryName' | null
 ])
 
 @php

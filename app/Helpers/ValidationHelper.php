@@ -30,6 +30,14 @@ class ValidationHelper
     const REGEX_PRODUCT_NAME = '~^[\pL\pN\s\-\.()/#&\']+$~u';
 
     /**
+     * Category Name Pattern: Allows letters, numbers, spaces, and special characters
+     * like hyphens, dots, commas, exclamation marks, question marks, colons, semicolons,
+     * parentheses, quotes, slashes, plus, asterisk, equals, percent, ampersands, dollar, at, hash.
+     * Examples: "Snacks & Drinks", "Takoyaki / Bento", "Meals + Extras", "Combo #1", "Chef's Specials!"
+     */
+    const REGEX_CATEGORY_NAME = '~^[\pL\pN\s\-\.\,\!\?\:\;\(\)\'\"/#\+\*\=\%\&\$\@]+$~u';
+
+    /**
      * Strict Phone Pattern: Optional leading +, then 7–20 digits.
      * Allows: +639123456789, 09123456789, 123456789
      */
@@ -103,6 +111,22 @@ class ValidationHelper
             'not_regex:~\s{2,}~'        // Prevents consecutive spaces
         ];
         return $rules;
+    }
+
+    /**
+     * Category name rules (allows letters, numbers, spaces, and special characters).
+     * Examples: "Snacks & Drinks", "Takoyaki / Bento", "Meals + Extras", "Combo #1", "Chef's Specials!"
+     */
+    public static function rulesCategoryName(int $min = 2, int $max = 255, bool $required = true): array
+    {
+        return [
+            $required ? 'required' : 'nullable',
+            'string',
+            "min:{$min}",
+            "max:{$max}",
+            'regex:' . self::REGEX_CATEGORY_NAME,
+            'not_regex:~\s{2,}~' // Prevents consecutive spaces
+        ];
     }
 
     /**

@@ -32,6 +32,7 @@ class CategoryManagement extends Component
     // Deletion targets
     public ?int $deleteTargetId = null;
     public string $deleteTargetName = '';
+    public $selectedCategory = null;
 
     protected $queryString = [
         'filterType' => ['except' => 'all', 'as' => 'type'],
@@ -55,7 +56,10 @@ class CategoryManagement extends Component
     public function updatedName()
     {
         $table = $this->editCategoryType === 'product' ? 'product_categories' : 'ingredient_categories';
-        $this->validateFieldLive('name', ['required', 'string', 'max:255', 'regex:' . ValidationHelper::REGEX_NAME, Rule::unique($table, 'name')->ignore($this->editCategoryId)], ValidationHelper::commonMessages());
+        $this->validateFieldLive('name', array_merge(
+            ValidationHelper::rulesCategoryName(2, 255, true),
+            [Rule::unique($table, 'name')->ignore($this->editCategoryId)]
+        ), ValidationHelper::commonMessages());
     }
 
     public function updatedDescription()
@@ -81,6 +85,7 @@ class CategoryManagement extends Component
         $this->description = '';
         $this->icon = 'tag';
         $this->production_station = 'kitchen';
+        $this->selectedCategory = null;
         $this->resetValidation();
     }
 
@@ -155,7 +160,10 @@ class CategoryManagement extends Component
         $table = $this->editCategoryType === 'product' ? 'product_categories' : 'ingredient_categories';
 
         $rules = [
-            'name' => ['required', 'string', 'max:255', 'regex:' . ValidationHelper::REGEX_NAME, Rule::unique($table, 'name')->ignore($this->editCategoryId)],
+            'name' => array_merge(
+                ValidationHelper::rulesCategoryName(2, 255, true),
+                [Rule::unique($table, 'name')->ignore($this->editCategoryId)]
+            ),
             'description' => ['nullable', 'string', 'max:500'],
             'icon' => ['nullable', 'string', 'max:50'],
             'production_station' => [$this->editCategoryType === 'product' ? 'required' : 'nullable', 'string', 'in:kitchen,barista'],
@@ -170,7 +178,10 @@ class CategoryManagement extends Component
         $table = $this->editCategoryType === 'product' ? 'product_categories' : 'ingredient_categories';
 
         $rules = [
-            'name' => ['required', 'string', 'max:255', 'regex:' . ValidationHelper::REGEX_NAME, Rule::unique($table, 'name')->ignore($this->editCategoryId)],
+            'name' => array_merge(
+                ValidationHelper::rulesCategoryName(2, 255, true),
+                [Rule::unique($table, 'name')->ignore($this->editCategoryId)]
+            ),
             'description' => ['nullable', 'string', 'max:500'],
             'icon' => ['nullable', 'string', 'max:50'],
         ];
