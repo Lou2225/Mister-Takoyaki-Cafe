@@ -1714,7 +1714,7 @@
 
                         <style>
                             .gcash-success-pop { animation: gcashPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
-                            @keyframes gcashPop { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
+                            @@keyframes gcashPop { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
                             .gcash-success-circle {
                                 stroke-dasharray: 151; stroke-dashoffset: 151;
                                 animation: gcashCircle 0.5s cubic-bezier(0.65, 0, 0.45, 1) 0.1s forwards;
@@ -1723,8 +1723,8 @@
                                 stroke-dasharray: 36; stroke-dashoffset: 36;
                                 animation: gcashCheck 0.35s ease-out 0.55s forwards;
                             }
-                            @keyframes gcashCircle { to { stroke-dashoffset: 0; } }
-                            @keyframes gcashCheck { to { stroke-dashoffset: 0; } }
+                            @@keyframes gcashCircle { to { stroke-dashoffset: 0; } }
+                            @@keyframes gcashCheck { to { stroke-dashoffset: 0; } }
                         </style>
                     </div>{{-- end GCash --}}
                 </div>{{-- end payment details scrollable --}}
