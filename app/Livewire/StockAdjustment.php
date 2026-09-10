@@ -63,7 +63,7 @@ class StockAdjustment extends Component
     // New Item Form (Sidebar)
     public $newItemId = '';
     public $newItemQty = '';
-    public $newItemType = 'waste';
+    public $newItemType = 'in';
     public $newItemCost = '';
     public $newItemExpiry = '';
     public $newItemUnit = '';          // base unit (g, ml, pcs) — for display
@@ -104,12 +104,8 @@ class StockAdjustment extends Component
         // Identify the Dynamic Main Branch
         $this->mainBranchId = Branch::where('is_main', true)->first()?->id ?? 1;
 
-        // Validation: If non-main branch selected, default type to 'waste'
-        if ((string)$this->selectedBranchId !== (string)$this->mainBranchId) {
-            $this->newItemType = 'waste';
-        } else {
-            $this->newItemType = 'in';
-        }
+        // Only main branch has Stock In ('in'), non-main branch defaults to 'waste'
+        $this->newItemType = ((string)$this->selectedBranchId === (string)$this->mainBranchId) ? 'in' : 'waste';
 
         $this->updateHeader();
 
@@ -176,12 +172,11 @@ class StockAdjustment extends Component
     {
         $this->resetPage();
 
-        // Validation: If non-main branch selected and type is 'in', reset to 'waste'
-        if ((string)$this->selectedBranchId !== (string)$this->mainBranchId && $this->newItemType === 'in') {
+        // Only main branch has Stock In ('in'), non-main branch defaults to 'waste'
+        if ((string)$this->selectedBranchId !== (string)$this->mainBranchId) {
             $this->newItemType = 'waste';
-        } elseif ((string)$this->selectedBranchId === (string)$this->mainBranchId && $this->newItemType !== 'in') {
-             // Optional: flip to 'in' if we switch TO main branch and we were on waste?
-             // Maybe better to just leave it if they already picked something.
+        } else {
+            $this->newItemType = 'in';
         }
 
         if ($this->panel === 'bulk') {
@@ -193,12 +188,15 @@ class StockAdjustment extends Component
 
     public function handleQuickAdjustment($ingredientId = null)
     {
-        $this->reset(['rows', 'globalReference', 'globalRemarks', 'newItemId', 'newItemQty', 'newItemType', 'newItemCost', 'newItemExpiry']);
+        $this->reset(['rows', 'globalReference', 'globalRemarks', 'newItemId', 'newItemQty', 'newItemCost', 'newItemExpiry', 'newItemUnit', 'newItemSelectedUnit']);
+        $this->newItemType = ((string)$this->selectedBranchId === (string)$this->mainBranchId) ? 'in' : 'waste';
 
         if ($ingredientId) {
             $this->newItemId = $ingredientId;
             $ing = Ingredient::find($ingredientId);
             $this->newItemUnit = $ing ? StockHelper::getDefaultInputUnit($ing->unit) : '';
+            $this->newItemSelectedUnit = $this->newItemUnit;
+            $this->newItemCost = $ing ? $ing->cost : '';
         }
 
         $this->panel = 'adjust';
@@ -244,6 +242,11 @@ class StockAdjustment extends Component
 
     public function addToQueue()
     {
+        if ((string)$this->selectedBranchId !== (string)$this->mainBranchId && $this->newItemType === 'in') {
+            $this->addError('newItemType', 'Stock In is only allowed for the main branch.');
+            return;
+        }
+
         $this->validate([
             'newItemId'     => 'required|exists:ingredients,id',
             'newItemQty'    => 'required|numeric|min:0.01',
@@ -297,7 +300,7 @@ class StockAdjustment extends Component
 
         // Reset form
         $this->reset(['newItemId', 'newItemQty', 'newItemCost', 'newItemExpiry', 'newItemUnit', 'newItemSelectedUnit']);
-        $this->newItemType = ((string)$this->selectedBranchId !== (string)$this->mainBranchId) ? 'waste' : 'in';
+        $this->newItemType = ((string)$this->selectedBranchId === (string)$this->mainBranchId) ? 'in' : 'waste';
     }
 
     public function removeRow($index)
@@ -309,7 +312,8 @@ class StockAdjustment extends Component
     public function backToList()
     {
         $this->panel = 'list';
-        $this->reset(['rows', 'globalReference', 'globalRemarks', 'newItemId', 'newItemQty']);
+        $this->reset(['rows', 'globalReference', 'globalRemarks', 'newItemId', 'newItemQty', 'newItemCost', 'newItemExpiry', 'newItemUnit', 'newItemSelectedUnit']);
+        $this->newItemType = ((string)$this->selectedBranchId === (string)$this->mainBranchId) ? 'in' : 'waste';
     }
 
     // ── Physical Count Reconciliation ──────────────────────────────
@@ -364,6 +368,7 @@ class StockAdjustment extends Component
     {
         if (empty($this->rows)) {
             $this->dispatch('notify', type: 'error', message: 'Add at least one item to the queue before saving.');
+            $this->addError('rows', 'Add at least one item to the queue before saving.');
             return;
         }
 
@@ -385,6 +390,7 @@ class StockAdjustment extends Component
     {
         if (empty($this->rows)) {
             $this->dispatch('notify', type: 'error', message: 'Add at least one item to the queue before saving.');
+            $this->addError('rows', 'Add at least one item to the queue before saving.');
             return;
         }
 
@@ -430,6 +436,7 @@ class StockAdjustment extends Component
         
         if (!$hasActual) {
             $this->dispatch('notify', type: 'error', message: 'Please enter at least one physical count.');
+            $this->addError('bulkAdjustments', 'Please enter at least one physical count.');
             return;
         }
 
@@ -673,6 +680,7 @@ class StockAdjustment extends Component
             'stats' => $stats,
             'branches' => Branch::orderBy('branch_name')->get(),
             'ingredients' => Ingredient::orderBy('name')->get(),
+            'ingredients' => Ingredient::with('unitConversions')->orderBy('name')->get(),
         ])->layout('layouts.app');
     }
 }

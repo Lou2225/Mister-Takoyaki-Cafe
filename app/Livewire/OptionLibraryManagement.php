@@ -195,11 +195,24 @@ class OptionLibraryManagement extends Component
         }
     }
 
-    public function saveTemplate()
+    public function validateBeforeSave(?array $payload = null)
     {
+        if (!empty($payload)) {
+            if (isset($payload['name'])) $this->name = trim($payload['name']);
+            if (isset($payload['priceMode'])) $this->priceMode = $payload['priceMode'];
+            if (isset($payload['isRequired'])) $this->isRequired = (bool) $payload['isRequired'];
+            if (isset($payload['noRecipeRequired'])) $this->noRecipeRequired = (bool) $payload['noRecipeRequired'];
+            if (isset($payload['templateItems'])) $this->templateItems = $payload['templateItems'];
+        }
+
         foreach ($this->templateItems as $i => $it) {
-            if (isset($it['price']) && $it['price'] === '') {
+            if (!isset($it['price']) || $it['price'] === '' || $it['price'] === null) {
                 $this->templateItems[$i]['price'] = 0;
+            } else {
+                $this->templateItems[$i]['price'] = (float) $it['price'];
+            }
+            if (!isset($it['ingredients']) || !is_array($it['ingredients'])) {
+                $this->templateItems[$i]['ingredients'] = [];
             }
         }
 
@@ -224,6 +237,58 @@ class OptionLibraryManagement extends Component
             ->exists();
 
         if ($exists) {
+            $this->addError('name', "A template named '{$this->name}' already exists in the library.");
+            $this->dispatch('notify', type: 'error', message: "A template named '{$this->name}' already exists in the library.");
+            return false;
+        }
+
+        $this->dispatch('open-modal', 'confirm-save-template');
+        return true;
+    }
+
+    public function saveTemplate(?array $payload = null)
+    {
+        if (!empty($payload)) {
+            if (isset($payload['name'])) $this->name = trim($payload['name']);
+            if (isset($payload['priceMode'])) $this->priceMode = $payload['priceMode'];
+            if (isset($payload['isRequired'])) $this->isRequired = (bool) $payload['isRequired'];
+            if (isset($payload['noRecipeRequired'])) $this->noRecipeRequired = (bool) $payload['noRecipeRequired'];
+            if (isset($payload['templateItems'])) $this->templateItems = $payload['templateItems'];
+        }
+
+        foreach ($this->templateItems as $i => $it) {
+            if (!isset($it['price']) || $it['price'] === '' || $it['price'] === null) {
+                $this->templateItems[$i]['price'] = 0;
+            } else {
+                $this->templateItems[$i]['price'] = (float) $it['price'];
+            }
+            if (!isset($it['ingredients']) || !is_array($it['ingredients'])) {
+                $this->templateItems[$i]['ingredients'] = [];
+            }
+        }
+
+        $this->validate([
+            'name' => 'required|string|max:255',
+            'priceMode' => 'required|in:fixed,additive',
+            'templateItems' => 'required|array|min:1',
+            'templateItems.*.name' => 'required|string|max:100',
+            'templateItems.*.price' => 'nullable|numeric|min:0',
+        ], [
+            'name.required' => 'Template name is required.',
+            'templateItems.required' => 'At least one variation option is required.',
+            'templateItems.min' => 'At least one variation option is required.',
+            'templateItems.*.name.required' => 'Every option must have a name.',
+            'templateItems.*.price.numeric' => 'Option price must be a valid number.',
+            'templateItems.*.price.min' => 'Option price cannot be negative.',
+        ]);
+
+        // Duplicate check
+        $exists = OptionTemplate::where('name', $this->name)
+            ->when($this->editTemplateId, fn($q) => $q->where('id', '!=', $this->editTemplateId))
+            ->exists();
+
+        if ($exists) {
+            $this->addError('name', "A template named '{$this->name}' already exists in the library.");
             $this->dispatch('notify', type: 'error', message: "A template named '{$this->name}' already exists in the library.");
             return;
         }
@@ -252,15 +317,16 @@ class OptionLibraryManagement extends Component
                     $item = $item ? tap($item, fn($i) => $i->update($payload)) : $template->items()->create($payload);
                     $keepIds[] = $item->id;
 
-                    // Rebuild this item's ingredient recipe from scratch —
-                    // same pattern as Recipe rebuild in MenuManagement.
+                    // Rebuild this item's ingredient recipe from scratch
                     $item->ingredients()->delete();
-                    if (!$this->noRecipeRequired) {
-                        foreach (($itemData['ingredients'] ?? []) as $ri) {
-                            $item->ingredients()->create([
-                                'ingredient_id' => $ri['id'],
-                                'quantity'      => $ri['quantity'],
-                            ]);
+                    if (!$this->noRecipeRequired && !empty($itemData['ingredients'])) {
+                        foreach ($itemData['ingredients'] as $ri) {
+                            if (!empty($ri['id']) && !empty($ri['quantity']) && (float)$ri['quantity'] > 0) {
+                                $item->ingredients()->create([
+                                    'ingredient_id' => $ri['id'],
+                                    'quantity'      => (float)$ri['quantity'],
+                                ]);
+                            }
                         }
                     }
                 }
@@ -271,7 +337,7 @@ class OptionLibraryManagement extends Component
             $this->backToList();
         } catch (\Exception $e) {
             Log::error('OptionLibraryManagement.saveTemplate failed: ' . $e->getMessage());
-            $this->dispatch('notify', type: 'error', message: 'Failed to save template.');
+            $this->dispatch('notify', type: 'error', message: 'Failed to save template: ' . $e->getMessage());
         }
     }
 

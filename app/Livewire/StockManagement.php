@@ -742,7 +742,7 @@ public $filterCategoryId = '';
         }
 
         $this->validateSecure([
-            'newCategoryName' => ['required', 'string', 'max:255', 'regex:' . ValidationHelper::REGEX_NAME, 'unique:ingredient_categories,name']
+            'newCategoryName' => ['required', 'string', 'max:255', 'regex:' . ValidationHelper::REGEX_CATEGORY_NAME, 'unique:ingredient_categories,name']
         ], [
             'newCategoryName.regex' => 'Category name has invalid characters.',
         ]);

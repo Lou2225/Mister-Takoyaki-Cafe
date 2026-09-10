@@ -18,11 +18,11 @@
                             <svg class="w-4 h-4 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                             <span class="hidden sm:inline">Export CSV</span>
                         </x-secondary-button>
-                        <x-secondary-button wire:click="startBulkAdjustment" class="h-10 !px-2.5 sm:!px-4">
+<x-secondary-button @click="panel = 'bulk'; $wire.startBulkAdjustment()" class="h-10 !px-2.5 sm:!px-4">
                             <svg class="w-4 h-4 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                             <span class="hidden sm:inline">Stock Reconcile</span>
                         </x-secondary-button>
-                        <x-primary-button wire:click="handleQuickAdjustment(null)" class="h-10 !px-2.5 sm:!px-4">
+<x-primary-button @click="panel = 'adjust'; $wire.handleQuickAdjustment(null)" class="h-10 !px-2.5 sm:!px-4">
                             <span class="text-lg leading-none sm:mr-2">+</span> <span class="hidden sm:inline">New Adjustment</span>
                         </x-primary-button>
                     @else
@@ -227,7 +227,7 @@
                     <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Stock Adjustment</h2>
                     <p class="text-[12px] text-gray-500 font-medium">Record manual stock corrections and movements</p>
                 </div>
-                <x-secondary-button wire:click="backToList" class="h-10">
+<x-secondary-button @click="panel = 'list'; $wire.backToList()" class="h-10">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
@@ -344,7 +344,64 @@
                 <div class="space-y-6">
                     
                     {{-- Add Movement Form (Matching Menu Items "Add Component") --}}
-                    <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] space-y-4">
+                    <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] space-y-4"
+                        x-data="{
+                            open: false,
+                            dropUp: false,
+                            search: '',
+                            selectedId: @entangle('newItemId').live,
+                            qty: @entangle('newItemQty').live,
+                            formErrors: {},
+                            ingredients: {{ Js::from($ingredients->map(fn($i) => ['id' => $i->id, 'name' => $i->name, 'unit' => $i->unit])) }},
+                            get selectedItem() {
+                                if (!this.selectedId) return null;
+                                return this.ingredients.find(i => Number(i.id) === Number(this.selectedId)) || null;
+                            },
+                            get filteredItems() {
+                                if (!this.search.trim()) return this.ingredients;
+                                const q = this.search.toLowerCase().trim();
+                                return this.ingredients.filter(i => (i.name || '').toLowerCase().includes(q));
+                            },
+                            openDropdown() {
+                                this.checkFlip();
+                                this.open = true;
+                                this.search = '';
+                            },
+                            closeDropdown() {
+                                this.open = false;
+                                this.search = '';
+                            },
+                            checkFlip() {
+                                if (!this.$refs.comboboxContainer) return;
+                                const rect = this.$refs.comboboxContainer.getBoundingClientRect();
+                                const spaceBelow = window.innerHeight - rect.bottom;
+                                this.dropUp = spaceBelow < 250 && rect.top > 250;
+                            },
+                            select(id) {
+                                this.selectedId = id;
+                                this.search = '';
+                                this.open = false;
+                                delete this.formErrors.newItemId;
+                            },
+                            clear() {
+                                this.selectedId = '';
+                                this.search = '';
+                                this.open = false;
+                                delete this.formErrors.newItemId;
+                            },
+                            validateAndAdd() {
+                                this.formErrors = {};
+                                if (!this.selectedId) {
+                                    this.formErrors.newItemId = 'Select an ingredient.';
+                                }
+                                if (!this.qty || parseFloat(this.qty) <= 0) {
+                                    this.formErrors.newItemQty = 'Quantity is required.';
+                                }
+                                if (Object.keys(this.formErrors).length === 0) {
+                                    $wire.addToQueue();
+                                }
+                            }
+                        }">
                         <h2 class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1 flex items-center gap-2">
                             <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
                             Add Movement
@@ -352,35 +409,85 @@
                         
                         <div>
                             <x-input-label value="Select Ingredient" />
-                            <div class="mt-1.5">
-                                <x-dropdown align="left" width="full" containerClasses="block w-full">
-                                    <x-slot name="trigger">
-                                        <button type="button" class="flex items-center justify-between w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-[13px] text-slate-700 shadow-sm hover:border-slate-300 focus:outline-none transition-all h-11">
-                                            <span class="font-bold truncate">{{ $newItemId ? $ingredients->firstWhere('id', $newItemId)?->name : 'Choose an item...' }}</span>
-                                            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+                            <div class="relative mt-1.5" x-ref="comboboxContainer"
+                                @click.outside="closeDropdown()"
+                                @keydown.escape.window="closeDropdown()">
+
+                                {{-- Search / Select Input Box --}}
+                                <div class="relative flex items-center">
+                                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                        </svg>
+                                    </div>
+
+                                    <input 
+                                        type="text"
+                                        :value="open ? search : (selectedItem ? selectedItem.name : '')"
+                                        @input="search = $event.target.value; open = true; delete formErrors.newItemId"
+                                        @focus="openDropdown()"
+                                        @click="openDropdown()"
+                                        :placeholder="selectedItem ? selectedItem.name : 'Search or select ingredient...'"
+                                        class="w-full pl-10 pr-10 py-2 bg-white border border-slate-200 rounded-xl text-[13px] text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all h-11"
+                                        :class="{
+                                            'font-bold text-indigo-700 bg-indigo-50/20 border-indigo-200': selectedItem && !open,
+                                            'text-slate-800': !selectedItem || open,
+                                            '!border-red-400 focus:!border-red-400 focus:!ring-red-300 !bg-red-50/30': (formErrors.newItemId || @js($errors->has('newItemId')))
+                                        }"
+                                        autocomplete="off"
+                                    />
+
+                                    {{-- Clear button only (NO up/down arrow!) --}}
+                                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                                        <button type="button" 
+                                            x-show="selectedId || search.length > 0"
+                                            x-cloak
+                                            @click.stop="clear()"
+                                            title="Clear selection"
+                                            class="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                            </svg>
                                         </button>
-                                    </x-slot>
-                                    <x-slot name="content">
-                                        <div x-data="{ ingSearch: '' }" class="p-2">
-                                            <div class="px-2 pb-2 mb-2 border-b border-slate-50">
-                                                <x-search-bar x-model="ingSearch" placeholder="Search ingredients..." width="w-full" class="bg-slate-50 border-none h-10" />
-                                            </div>
-                                            <div class="max-h-60 overflow-y-auto custom-scrollbar">
-                                                @foreach($ingredients as $ing)
-                                                    <div x-show="!ingSearch || @js($ing->name).toLowerCase().includes(ingSearch.toLowerCase())">
-                                                        <x-dropdown-link href="#" wire:click.prevent="$set('newItemId', {{ $ing->id }})">
-                                                            <div class="flex items-center justify-between">
-                                                                <span class="font-bold text-slate-700">{{ $ing->name }}</span>
-                                                                <span class="text-[10px] font-black text-slate-300 uppercase tracking-widest">{{ $ing->unit }}</span>
-                                                            </div>
-                                                        </x-dropdown-link>
-                                                    </div>
-                                                @endforeach
-                                            </div>
+                                    </div>
+                                </div>
+
+                                {{-- Dropdown Results Menu with auto-flip --}}
+                                <div x-show="open" x-cloak
+                                    x-transition:enter="transition ease-out duration-100"
+                                    x-transition:enter-start="opacity-0 scale-95"
+                                    x-transition:enter-end="opacity-100 scale-100"
+                                    x-transition:leave="transition ease-in duration-75"
+                                    x-transition:leave-start="opacity-100 scale-100"
+                                    x-transition:leave-end="opacity-0 scale-95"
+                                    :class="dropUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'"
+                                    class="absolute left-0 right-0 z-50 bg-white rounded-xl shadow-xl border border-slate-100 p-1.5 max-h-60 overflow-y-auto custom-scrollbar">
+                                    <template x-for="item in filteredItems" :key="item.id">
+                                        <button type="button" 
+                                            @click="select(item.id)"
+                                            class="w-full text-left px-3.5 py-2.5 rounded-lg hover:bg-indigo-50/70 hover:text-indigo-900 transition-colors flex items-center justify-between group"
+                                            :class="Number(selectedId) === Number(item.id) ? 'bg-indigo-50 text-indigo-900 font-bold' : 'text-slate-700'">
+                                            <span class="text-[13px] font-medium group-hover:font-semibold truncate" x-text="item.name"></span>
+                                            <span class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 group-hover:bg-indigo-100 group-hover:text-indigo-600 shrink-0 ml-2" x-text="item.unit"></span>
+                                        </button>
+                                    </template>
+                                    <template x-if="filteredItems.length === 0">
+                                        <div class="px-4 py-3 text-[12px] text-slate-400 italic text-center">
+                                            No ingredients found
                                         </div>
-                                    </x-slot>
-                                </x-dropdown>
+                                    </template>
+                                </div>
                             </div>
+                            <template x-if="formErrors.newItemId">
+                                <div class="text-[11px] font-medium text-red-500 mt-1.5 flex items-start gap-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                                    <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    <ul class="space-y-0.5">
+                                        <li x-text="formErrors.newItemId"></li>
+                                    </ul>
+                                </div>
+                            </template>
                             <x-input-error :messages="$errors->get('newItemId')" class="mt-1" />
                         </div>
 
@@ -388,9 +495,27 @@
                             <div>
                                 <x-input-label value="Quantity" />
                                 <div class="relative mt-1.5">
-                                    <x-text-input wire:model.live="newItemQty" class="w-full h-11 pr-14 text-[13px] font-black" placeholder="0.00" x-on:input="restrictInput($event, 'price')" />
+                                    @php $qtyErrClass = $errors->has('newItemQty') ? 'border-red-400 bg-red-50/30' : ''; @endphp
+                                    <input 
+                                        type="text"
+                                        wire:model.live="newItemQty"
+                                        x-bind:class="{ 'border-red-400 bg-red-50/30': formErrors.newItemQty }"
+                                        class="w-full h-11 pr-14 text-[13px] font-black border focus:ring-1 focus:ring-indigo-500/30 rounded-lg shadow-sm placeholder-gray-400 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:outline-none {{ $qtyErrClass }} {{ $qtyErrClass ? 'focus:border-red-400' : 'border-gray-200 focus:border-indigo-500' }}"
+                                        placeholder="0.00"
+                                        x-on:input="delete formErrors.newItemQty; restrictInput($event, 'price')"
+                                    />
                                     <span class="absolute inset-y-0 right-4 flex items-center text-[10px] font-black text-slate-400 uppercase pointer-events-none">{{ $newItemSelectedUnit ?: $newItemUnit ?: '—' }}</span>
                                 </div>
+                                <template x-if="formErrors.newItemQty">
+                                    <div class="text-[11px] font-medium text-red-500 mt-1.5 flex items-start gap-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                                        <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                        </svg>
+                                        <ul class="space-y-0.5">
+                                            <li x-text="formErrors.newItemQty"></li>
+                                        </ul>
+                                    </div>
+                                </template>
                                 <x-input-error :messages="$errors->get('newItemQty')" class="mt-1" />
                             </div>
                             <div>
@@ -399,7 +524,7 @@
                                     <x-dropdown align="left" width="full" containerClasses="block w-full">
                                         <x-slot name="trigger">
                                             <button type="button" class="flex items-center justify-between w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-[13px] text-slate-700 shadow-sm hover:border-slate-300 focus:outline-none transition-all h-11">
-                                                <span class="font-bold truncate uppercase">{{ str_replace('_', ' ', $newItemType) }}</span>
+                                                <span class="font-bold truncate uppercase">{{ $newItemType === 'in' ? 'Procurement (Stock In)' : ($newItemType === 'waste' ? 'Waste' : ($newItemType === 'out' ? 'Stock Out' : str_replace('_', ' ', $newItemType))) }}</span>
                                                 <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
                                             </button>
                                         </x-slot>
@@ -415,11 +540,11 @@
                             </div>
                         </div>
 
-                        {{-- Unit Selector: shown when type=in and ingredient has packaging tiers --}}
-                        @if($newItemType === 'in' && $newItemId)
+                        {{-- Unit Selector: shown when type=in and ingredient has packaging tiers (only for main branch) --}}
+                        @if($newItemType === 'in' && $newItemId && (string)$selectedBranchId === (string)$mainBranchId)
                             @php
                                 $adjIng = $ingredients->firstWhere('id', $newItemId);
-                                $adjConversions = $adjIng ? \App\Models\IngredientUnitConversion::where('ingredient_id', $adjIng->id)->orderBy('qty_in_base')->get() : collect();
+                                $adjConversions = $adjIng ? ($adjIng->unitConversions ?? collect()) : collect();
                             @endphp
                             @if($adjConversions->isNotEmpty())
                             <div class="animate-fadeIn">
@@ -476,7 +601,7 @@
                             </div>
                         @endif
 
-                        <x-primary-button type="button" wire:click="addToQueue" class="w-full justify-center h-11 text-[11px] font-black uppercase tracking-widest mt-2">
+                        <x-primary-button type="button" @click="validateAndAdd()" class="w-full justify-center h-11 text-[11px] font-black uppercase tracking-widest mt-2">
                             Add to Queue
                         </x-primary-button>
                     </div>
@@ -494,10 +619,13 @@
                         </div>
 
                         <div class="space-y-3">
-                            <x-primary-button wire:click="validateBeforeCommit" class="w-full justify-center h-12 text-[12px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">
-                                Save Adjustment
-                            </x-primary-button>
-                            <x-secondary-button wire:click="backToList" class="h-11 w-full justify-center text-[12px] font-black uppercase tracking-widest border-slate-200 text-slate-500">
+                            <div>
+                                <x-primary-button wire:click="validateBeforeCommit" class="w-full justify-center h-12 text-[12px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">
+                                    Save Adjustment
+                                </x-primary-button>
+                                <x-input-error :messages="$errors->get('rows')" class="mt-2 text-center" />
+                            </div>
+                            <x-secondary-button @click="panel = 'list'; $wire.backToList()" class="h-11 w-full justify-center text-[12px] font-black uppercase tracking-widest border-slate-200 text-slate-500">
                                 Discard Draft
                             </x-secondary-button>
                         </div>
@@ -549,7 +677,7 @@
                     <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Stock Reconcile</h2>
                     <p class="text-[12px] text-gray-500 font-medium">Reconcile physical counts for <span class="text-indigo-600 font-bold uppercase">{{ $branches->firstWhere('id', $selectedBranchId)->branch_name ?? 'N/A' }}</span></p>
                 </div>
-                <x-secondary-button wire:click="backToList" class="h-10">
+                <x-secondary-button @click="panel = 'list'; $wire.backToList()" class="h-10">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
@@ -646,14 +774,16 @@
                     </div>
 
                     <div class="flex flex-col gap-3">
-                        <x-primary-button wire:click="confirmReconcile" class="w-full justify-center h-12 text-[12px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">
-                            Apply Corrections
-                        </x-primary-button>
-                        <x-secondary-button wire:click="backToList" class="w-full justify-center h-11 text-[12px] font-black uppercase tracking-widest border-slate-200 text-slate-500">
+                        <div>
+                            <x-primary-button wire:click="confirmReconcile" class="w-full justify-center h-12 text-[12px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">
+                                Apply Corrections
+                            </x-primary-button>
+                            <x-input-error :messages="$errors->get('bulkAdjustments')" class="mt-2 text-center" />
+                        </div>
+                        <x-secondary-button @click="panel = 'list'; $wire.backToList()" class="w-full justify-center h-11 text-[12px] font-black uppercase tracking-widest border-slate-200 text-slate-500">
                             Discard Audit
                         </x-secondary-button>
                     </div>
-                </div>
             </div>
         </div>{{-- end panel 3 --}}
     </div>

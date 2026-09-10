@@ -6,7 +6,7 @@
 @endphp
 
 <div 
-    x-data="window.optionLibraryManagement($wire, @js($allIngredients))"
+    x-data="typeof window.optionLibraryManagement === 'function' ? window.optionLibraryManagement($wire, @js($allIngredients)) : { panel: 'list', mode: 'list', tableView: 'table', searchQuery: '', templatesList: [], filteredTemplateIds: [], currentPage: 1, perPage: 5, isItemVisible: () => true, formErrors: {}, formSubmitted: false, isSaving: false }"
     class="relative"
     wire:ignore.self
     wire:key="option-library-main-container">
@@ -383,6 +383,19 @@
                         </button>
                     </div>
 
+                    {{-- Options Level Validation Error Banner --}}
+                    <div x-show="typeof formErrors !== 'undefined' && formErrors && formErrors.templateItems" 
+                        class="text-[11px] font-medium text-red-500 mb-4 p-3 bg-red-50/50 border border-red-200/80 rounded-xl flex items-start gap-2 animate-in fade-in slide-in-from-top-1 duration-200" 
+                        x-cloak>
+                        <svg class="w-4 h-4 shrink-0 mt-0.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <span x-text="(typeof formErrors !== 'undefined' && formErrors && formErrors.templateItems) || ''"></span>
+                    </div>
+                    @error('templateItems')
+                        <p class="mb-3 text-xs text-rose-600 font-semibold">{{ $message }}</p>
+                    @enderror
+
                     {{-- Dynamic Alpine-driven Option Cards List --}}
                     <div class="space-y-4 flex-1">
                         <template x-for="(item, idx) in templateItems" :key="idx">
@@ -481,8 +494,20 @@
                                     <div class="flex-1">
                                         <x-input-label value="Option Name" class="text-[10px] mb-1 ml-1" />
                                         <x-text-input type="text" x-model="item.name" 
+                                            @input="if (typeof formErrors !== 'undefined' && formErrors) { delete formErrors.itemNames; delete formErrors.templateItems; }"
+                                            ::class="(typeof formSubmitted !== 'undefined' && formSubmitted && (!item.name || !item.name.trim())) ? '!border-red-400 focus:!border-red-400 focus:!ring-red-300 !bg-red-50/30' : ''"
                                             class="w-full h-10 text-[13px] font-bold text-slate-800 placeholder-slate-300" 
                                             placeholder="e.g. Regular Size" />
+                                        <div x-show="typeof formSubmitted !== 'undefined' && formSubmitted && (!item.name || !item.name.trim())" 
+                                            class="text-[11px] font-medium text-red-500 mt-1.5 flex items-start gap-1.5 animate-in fade-in slide-in-from-top-1 duration-200" 
+                                            x-cloak>
+                                            <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                            </svg>
+                                            <ul class="space-y-0.5">
+                                                <li>Option name is required.</li>
+                                            </ul>
+                                        </div>
                                     </div>
                                     <div class="w-40">
                                         <x-input-label value="Extra Price" class="text-[10px] mb-1 ml-1" />
@@ -646,8 +671,24 @@
                     <div class="space-y-6">
                         <div>
                             <x-input-label value="Template Identity *" />
-                            <x-text-input x-model="name" class="w-full mt-1.5 h-10 font-bold text-slate-800" placeholder="e.g. Premium Flavors" />
-                            <x-input-error :messages="$errors->get('name')" class="mt-1" />
+                            <x-text-input x-model="templateName" 
+                                @input="if (typeof formErrors !== 'undefined' && formErrors) delete formErrors.name" 
+                                class="w-full mt-1.5 h-10 font-bold text-slate-800" 
+                                ::class="(typeof formErrors !== 'undefined' && formErrors && formErrors.name) ? '!border-red-400 focus:!border-red-400 focus:!ring-red-300 !bg-red-50/30' : ''"
+                                placeholder="e.g. Premium Flavors" />
+                            <div x-show="typeof formErrors !== 'undefined' && formErrors && formErrors.name" 
+                                class="text-[11px] font-medium text-red-500 mt-1.5 flex items-start gap-1.5 animate-in fade-in slide-in-from-top-1 duration-200" 
+                                x-cloak>
+                                <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                <ul class="space-y-0.5">
+                                    <li x-text="(typeof formErrors !== 'undefined' && formErrors && formErrors.name) || ''"></li>
+                                </ul>
+                            </div>
+                            @error('name')
+                                <p class="mt-1 text-xs text-rose-600 font-semibold">{{ $message }}</p>
+                            @enderror
                         </div>
 
                         <div>
@@ -687,7 +728,7 @@
                 </div>
 
                 <div class="flex flex-col gap-2">
-                    <x-primary-button type="button" @click="$dispatch('open-modal', 'confirm-save-template')" class="w-full justify-center" x-text="mode === 'create' ? 'Register Template' : 'Save Changes'"></x-primary-button>
+                    <x-primary-button type="button" @click="validateAndPromptSave()" class="w-full justify-center" x-text="mode === 'create' ? 'Register Template' : 'Save Changes'"></x-primary-button>
                     <x-secondary-button type="button" @click="backToList()" class="w-full justify-center">
                         <span>Cancel</span>
                     </x-secondary-button>
@@ -696,7 +737,7 @@
                 <div x-show="mode === 'edit' && editTemplateId" class="bg-red-50 border border-red-100 rounded-2xl p-6 shadow-sm mt-4">
                     <h2 class="text-[13px] font-bold text-red-600 uppercase tracking-wider mb-2">Danger Zone</h2>
                     <p class="text-[12px] text-gray-500 mb-4 leading-relaxed">Permanently remove this template from the library. This cannot be undone.</p>
-                    <x-danger-button type="button" @click="confirmDelete(editTemplateId, name)" class="w-full justify-center h-11">
+                    <x-danger-button type="button" @click="confirmDelete(editTemplateId, templateName)" class="w-full justify-center h-11">
                         Delete Template
                     </x-danger-button>
                 </div>
@@ -750,12 +791,20 @@
             </div>
             
             <div class="flex items-center justify-end gap-2 mt-6">
-                <x-secondary-button @click="$dispatch('close-modal', 'confirm-save-template')" class="h-10">Cancel</x-secondary-button>
+                <x-secondary-button @click="$dispatch('close-modal', 'confirm-save-template')" ::disabled="isSaving" class="h-10">Cancel</x-secondary-button>
                 <x-primary-button 
-                    wire:click="saveTemplate" 
-                    @click="$dispatch('close-modal', 'confirm-save-template')" 
-                    class="h-10">
-                    Confirm & Save
+                    type="button"
+                    @click="confirmSave()" 
+                    class="h-10"
+                    ::disabled="isSaving">
+                    <span x-show="!isSaving">Confirm & Save</span>
+                    <span x-show="isSaving" x-cloak class="flex items-center gap-1.5">
+                        <svg class="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                        </svg>
+                        Saving...
+                    </span>
                 </x-primary-button>
             </div>
         </div>
@@ -763,134 +812,203 @@
 
     <script>
         (function() {
-            window.optionLibraryManagement = function($wire, allIngredients) {
-                return {
-                    panel: $wire.entangle('panel').live,
-                    mode: $wire.entangle('mode').live,
-                    tableView: $wire.entangle('view').live,
-                    editTemplateId: $wire.entangle('editTemplateId'),
-                    name: $wire.entangle('name'),
-                    priceMode: $wire.entangle('priceMode'),
-                    isRequired: $wire.entangle('isRequired'),
-                    noRecipeRequired: $wire.entangle('noRecipeRequired'),
-                    templateItems: $wire.entangle('templateItems'),
-                    deleteTargetId: $wire.entangle('deleteTargetId'),
-                    deleteTargetName: $wire.entangle('deleteTargetName'),
-                    priceModeFilter: '',
-                    searchQuery: '',
-                    currentPage: 1,
-                    perPage: 5,
-                    templatesList: [],
-                    ingredientsList: allIngredients || [],
+            const defineFn = function() {
+                window.optionLibraryManagement = function($wire, allIngredients) {
+                    return {
+                        panel: $wire.entangle('panel').live,
+                        mode: $wire.entangle('mode').live,
+                        tableView: $wire.entangle('view').live,
+                        editTemplateId: $wire.entangle('editTemplateId'),
+                        templateName: $wire.entangle('name'),
+                        priceMode: $wire.entangle('priceMode'),
+                        isRequired: $wire.entangle('isRequired'),
+                        noRecipeRequired: $wire.entangle('noRecipeRequired'),
+                        templateItems: $wire.entangle('templateItems'),
+                        deleteTargetId: $wire.entangle('deleteTargetId'),
+                        deleteTargetName: $wire.entangle('deleteTargetName'),
+                        priceModeFilter: '',
+                        searchQuery: '',
+                        currentPage: 1,
+                        perPage: 5,
+                        templatesList: [],
+                        ingredientsList: allIngredients || [],
+                        formErrors: {},
+                        formSubmitted: false,
+                        isSaving: false,
 
-                    get filteredTemplateIds() {
-                        const query = this.searchQuery.toLowerCase().trim();
-                        const filter = this.priceModeFilter;
-                        return this.templatesList
-                            .filter(t => {
-                                const matchesSearch = !query || 
-                                    (t.name || '').toLowerCase().includes(query) || 
-                                    (t.items && t.items.some(item => (item.name || '').toLowerCase().includes(query)));
-                                
-                                const matchesMode = !filter || t.price_mode === filter;
-                                
-                                return matchesSearch && matchesMode;
-                            })
-                            .map(t => t.id);
-                    },
-                    get paginatedTemplateIds() {
-                        const start = (this.currentPage - 1) * this.perPage;
-                        return this.filteredTemplateIds.slice(start, start + this.perPage);
-                    },
-                    get pageNumbers() {
-                        const totalPages = Math.ceil(this.filteredTemplateIds.length / this.perPage) || 1;
-                        const start = Math.max(1, this.currentPage - 1);
-                        const end = Math.min(totalPages, this.currentPage + 1);
-                        const pages = [];
-                        for (let i = start; i <= end; i++) {
-                            pages.push(i);
-                        }
-                        return pages;
-                    },
-                    isItemVisible(id) {
-                        return this.paginatedTemplateIds.includes(id);
-                    },
-                    updateTemplatesList(newList) {
-                        this.templatesList = newList || [];
-                    },
+                        get filteredTemplateIds() {
+                            const query = (this.searchQuery || '').toLowerCase().trim();
+                            const filter = this.priceModeFilter;
+                            return (this.templatesList || [])
+                                .filter(t => {
+                                    const matchesSearch = !query || 
+                                        (t.name || '').toLowerCase().includes(query) || 
+                                        (t.items && t.items.some(item => (item.name || '').toLowerCase().includes(query)));
+                                    
+                                    const matchesMode = !filter || t.price_mode === filter;
+                                    
+                                    return matchesSearch && matchesMode;
+                                })
+                                .map(t => t.id);
+                        },
+                        get paginatedTemplateIds() {
+                            const start = (this.currentPage - 1) * this.perPage;
+                            return this.filteredTemplateIds.slice(start, start + this.perPage);
+                        },
+                        get pageNumbers() {
+                            const totalPages = Math.ceil(this.filteredTemplateIds.length / this.perPage) || 1;
+                            const start = Math.max(1, this.currentPage - 1);
+                            const end = Math.min(totalPages, this.currentPage + 1);
+                            const pages = [];
+                            for (let i = start; i <= end; i++) {
+                                pages.push(i);
+                            }
+                            return pages;
+                        },
+                        isItemVisible(id) {
+                            return this.paginatedTemplateIds.includes(id);
+                        },
+                        updateTemplatesList(newList) {
+                            this.templatesList = newList || [];
+                        },
 
-                    // ── Instant 0ms Actions ──
-                    createTemplate() {
-                        this.editTemplateId = null;
-                        this.name = '';
-                        this.priceMode = 'additive';
-                        this.isRequired = false;
-                        this.noRecipeRequired = false;
-                        this.templateItems = [
-                            { id: null, name: '', price: '', is_default: false, ingredients: [] }
-                        ];
-                        this.panel = 'form';
-                        this.mode = 'create';
-                        this.$wire.showCreate();
-                    },
-                    editTemplate(id) {
-                        const tmpl = this.templatesList.find(t => Number(t.id) === Number(id));
-                        if (tmpl) {
-                            this.editTemplateId = tmpl.id;
-                            this.name = tmpl.name;
-                            this.priceMode = tmpl.price_mode;
-                            this.isRequired = tmpl.is_required;
-                            this.noRecipeRequired = tmpl.no_recipe_required;
-                            this.templateItems = JSON.parse(JSON.stringify(tmpl.items || []));
+                        // ── Instant 0ms Actions ──
+                        createTemplate() {
+                            this.editTemplateId = null;
+                            this.templateName = '';
+                            this.priceMode = 'additive';
+                            this.isRequired = false;
+                            this.noRecipeRequired = false;
+                            this.templateItems = [
+                                { id: null, name: '', price: '', is_default: true, ingredients: [] }
+                            ];
+                            this.formErrors = {};
+                            this.formSubmitted = false;
                             this.panel = 'form';
-                            this.mode = 'edit';
-                        }
-                        this.$wire.showEdit(id);
-                    },
-                    backToList() {
-                        this.panel = 'list';
-                        this.mode = 'list';
-                        this.$wire.backToList();
-                    },
-                    confirmDelete(id, name) {
-                        this.deleteTargetId = id;
-                        this.deleteTargetName = name;
-                        this.$wire.deleteTargetId = id;
-                        this.$wire.deleteTargetName = name;
-                        this.$dispatch('open-modal', 'delete-template');
-                    },
-                    addOption() {
-                        if (!this.templateItems) this.templateItems = [];
-                        this.templateItems.push({
-                            id: null,
-                            name: '',
-                            price: '',
-                            is_default: this.templateItems.length === 0,
-                            ingredients: []
-                        });
-                    },
-                    removeOption(idx) {
-                        if (this.templateItems) {
-                            this.templateItems.splice(idx, 1);
-                        }
-                    },
-                    toggleDefault(idx) {
-                        if (!this.templateItems || !this.templateItems[idx]) return;
-                        const isCurrent = !!this.templateItems[idx].is_default;
-                        this.templateItems.forEach((item, i) => {
-                            item.is_default = (i === idx && !isCurrent);
-                        });
-                    },
+                            this.mode = 'create';
+                            this.$wire.showCreate();
+                        },
+                        editTemplate(id) {
+                            const tmpl = (this.templatesList || []).find(t => Number(t.id) === Number(id));
+                            if (tmpl) {
+                                this.editTemplateId = tmpl.id;
+                                this.templateName = tmpl.name;
+                                this.priceMode = tmpl.price_mode;
+                                this.isRequired = tmpl.is_required;
+                                this.noRecipeRequired = tmpl.no_recipe_required;
+                                this.templateItems = JSON.parse(JSON.stringify(tmpl.items || []));
+                                this.formErrors = {};
+                                this.formSubmitted = false;
+                                this.panel = 'form';
+                                this.mode = 'edit';
+                            }
+                            this.$wire.showEdit(id);
+                        },
+                        backToList() {
+                            this.panel = 'list';
+                            this.mode = 'list';
+                            this.formErrors = {};
+                            this.formSubmitted = false;
+                            this.$wire.backToList();
+                        },
+                        confirmDelete(id, name) {
+                            this.deleteTargetId = id;
+                            this.deleteTargetName = name;
+                            this.$wire.deleteTargetId = id;
+                            this.$wire.deleteTargetName = name;
+                            this.$dispatch('open-modal', 'delete-template');
+                        },
+                        addOption() {
+                            if (!this.templateItems) this.templateItems = [];
+                            this.templateItems.push({
+                                id: null,
+                                name: '',
+                                price: '',
+                                is_default: this.templateItems.length === 0,
+                                ingredients: []
+                            });
+                            delete this.formErrors.templateItems;
+                        },
+                        removeOption(idx) {
+                            if (this.templateItems) {
+                                this.templateItems.splice(idx, 1);
+                            }
+                        },
+                        toggleDefault(idx) {
+                            if (!this.templateItems || !this.templateItems[idx]) return;
+                            const isCurrent = !!this.templateItems[idx].is_default;
+                            this.templateItems.forEach((item, i) => {
+                                item.is_default = (i === idx && !isCurrent);
+                            });
+                        },
 
-                    init() {
-                        this.$watch('searchQuery', () => { this.currentPage = 1; });
-                        this.$watch('priceModeFilter', () => { this.currentPage = 1; });
-                        this.$watch('perPage', () => { this.currentPage = 1; });
-                    }
+                        // ── Validation & Save Actions ──
+                        validateAndPromptSave() {
+                            this.formErrors = {};
+                            this.formSubmitted = true;
+                            const trimmedName = (this.templateName || '').trim();
+
+                            if (!trimmedName) {
+                                this.formErrors.name = 'Template name is required.';
+                            } else {
+                                const dup = (this.templatesList || []).find(t => 
+                                    (t.name || '').trim().toLowerCase() === trimmedName.toLowerCase() && 
+                                    Number(t.id) !== Number(this.editTemplateId)
+                                );
+                                if (dup) {
+                                    this.formErrors.name = `A template named "${trimmedName}" already exists in the library.`;
+                                }
+                            }
+
+                            if (!this.templateItems || this.templateItems.length === 0) {
+                                this.formErrors.templateItems = 'At least one variation option is required.';
+                            } else {
+                                const emptyItem = this.templateItems.some(item => !(item.name || '').trim());
+                                if (emptyItem) {
+                                    this.formErrors.itemNames = 'Every option must have a name.';
+                                }
+                            }
+
+                            if (Object.keys(this.formErrors).length > 0) {
+                                return; // DO NOT OPEN MODAL! Inline errors appear below fields
+                            }
+
+                            this.$dispatch('open-modal', 'confirm-save-template');
+                        },
+
+                        async confirmSave() {
+                            this.$dispatch('close-modal', 'confirm-save-template');
+                            this.isSaving = true;
+                            try {
+                                const payload = {
+                                    id: this.editTemplateId,
+                                    name: (this.templateName || '').trim(),
+                                    priceMode: this.priceMode || 'additive',
+                                    isRequired: !!this.isRequired,
+                                    noRecipeRequired: !!this.noRecipeRequired,
+                                    templateItems: JSON.parse(JSON.stringify(this.templateItems || []))
+                                };
+                                await this.$wire.saveTemplate(payload);
+                            } catch (err) {
+                                console.error('Error saving template:', err);
+                                this.$dispatch('notify', { type: 'error', message: 'Failed to save template.' });
+                            } finally {
+                                this.isSaving = false;
+                            }
+                        },
+
+                        init() {
+                            this.$watch('searchQuery', () => { this.currentPage = 1; });
+                            this.$watch('priceModeFilter', () => { this.currentPage = 1; });
+                            this.$watch('perPage', () => { this.currentPage = 1; });
+                        }
+                    };
                 };
             };
+            defineFn();
         })();
     </script>
 </div>
+
 
 
