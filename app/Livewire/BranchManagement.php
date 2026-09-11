@@ -757,6 +757,19 @@ class BranchManagement extends Component
         ];
     }
 
+    public function getAssignedManagerLabelProperty()
+    {
+        if (!$this->user_id) {
+            return 'Unassigned';
+        }
+
+        $manager = User::find($this->user_id);
+
+        return ($manager && $manager->is_active)
+            ? trim($manager->first_name . ' ' . $manager->last_name)
+            : 'Unassigned';
+    }
+
     public function render()
     {
         $filteredBranches = $this->getBranches();

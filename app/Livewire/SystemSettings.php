@@ -55,7 +55,6 @@ class SystemSettings extends Component
 
     // Receipt Settings
     public $receiptLogoEnabled;
-    public $receiptShowVat;
     public $receiptFooterMessage;
     public $receiptReturnPolicy;
     public $receiptCopies;
@@ -233,7 +232,6 @@ class SystemSettings extends Component
         $this->currencySymbol = SystemSetting::get('currency_symbol', '₱');
 
         $this->receiptLogoEnabled   = SystemSetting::get('receipt_logo_enabled', true, $this->settingsBranchId);
-        $this->receiptShowVat       = SystemSetting::get('receipt_show_vat', true, $this->settingsBranchId);
         $this->receiptFooterMessage = SystemSetting::get('receipt_footer_message', 'Thank you for your visit!', $this->settingsBranchId);
         $this->receiptReturnPolicy  = SystemSetting::get('receipt_return_policy', 'No return, no exchange.', $this->settingsBranchId);
         $this->receiptCopies        = SystemSetting::get('receipt_copies', 1, $this->settingsBranchId);
@@ -709,7 +707,6 @@ class SystemSettings extends Component
     private function saveReceiptsTab(): void
     {
         SystemSetting::set('receipt_logo_enabled', (bool) $this->receiptLogoEnabled, $this->settingsBranchId);
-        SystemSetting::set('receipt_show_vat', (bool) $this->receiptShowVat, $this->settingsBranchId);
         SystemSetting::set('receipt_footer_message', $this->receiptFooterMessage, $this->settingsBranchId);
         SystemSetting::set('receipt_return_policy', $this->receiptReturnPolicy, $this->settingsBranchId);
         SystemSetting::set('receipt_copies', (int) $this->receiptCopies, $this->settingsBranchId);

@@ -288,8 +288,14 @@
                                                 <span x-show="group.is_required" class="text-[9px] font-black text-rose-500 uppercase tracking-widest animate-pulse">Required</span>
                                                 <span x-show="group.no_recipe_required" class="text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded uppercase tracking-widest">No Recipe</span>
                                             </div>
-                                            <p x-show="fieldError('optionGroups.' + idx + '.name')" x-cloak x-text="fieldError('optionGroups.' + idx + '.name')" class="text-[11px] font-medium text-red-500"></p>
-                                        </div>
+                                            <div x-show="fieldError('optionGroups.' + idx + '.name')" x-cloak class="text-[11px] font-medium text-red-500 mt-1.5 flex items-start gap-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                                                <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                </svg>
+                                                <ul class="space-y-0.5">
+                                                    <li x-text="fieldError('optionGroups.' + idx + '.name')"></li>
+                                                </ul>
+                                            </div>                                        </div>
                                         <div class="flex items-center gap-1.5">
                                             <label class="flex items-center gap-1.5 cursor-pointer mr-2" title="Options in this group skip ingredient tracking and are always available">
                                                 <input type="checkbox" x-model="group.no_recipe_required" class="w-3.5 h-3.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500">
@@ -315,8 +321,14 @@
                                                         class="w-full h-10 px-3 text-[13px] font-bold rounded-xl border focus:ring-2 transition-all"
                                                         :class="fieldError('optionGroups.' + idx + '.options.' + oIdx + '.name') ? 'border-rose-400 focus:border-rose-400 focus:ring-rose-300 bg-rose-50/30' : 'border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20'"
                                                         placeholder="Option name..." />
-                                                    <p x-show="fieldError('optionGroups.' + idx + '.options.' + oIdx + '.name')" x-cloak x-text="fieldError('optionGroups.' + idx + '.options.' + oIdx + '.name')" class="text-[11px] font-medium text-red-500 mt-1"></p>
-                                                </div>
+                                                    <div x-show="fieldError('optionGroups.' + idx + '.options.' + oIdx + '.name')" x-cloak class="text-[11px] font-medium text-red-500 mt-1.5 flex items-start gap-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                                                        <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                        </svg>
+                                                        <ul class="space-y-0.5">
+                                                            <li x-text="fieldError('optionGroups.' + idx + '.options.' + oIdx + '.name')"></li>
+                                                        </ul>
+                                                    </div>                                                </div>
                                                 <div class="w-28">
                                                     <div class="relative">
                                                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -328,8 +340,14 @@
                                                             :class="fieldError('optionGroups.' + idx + '.options.' + oIdx + '.price') ? 'border-rose-400 focus:border-rose-400 focus:ring-rose-300 bg-rose-50/30' : 'border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20'"
                                                             placeholder="0.00" />
                                                     </div>
-                                                    <p x-show="fieldError('optionGroups.' + idx + '.options.' + oIdx + '.price')" x-cloak x-text="fieldError('optionGroups.' + idx + '.options.' + oIdx + '.price')" class="text-[11px] font-medium text-red-500 mt-1"></p>
-                                                </div>
+                                                    <div x-show="fieldError('optionGroups.' + idx + '.options.' + oIdx + '.price')" x-cloak class="text-[11px] font-medium text-red-500 mt-1.5 flex items-start gap-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                                                        <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                        </svg>
+                                                        <ul class="space-y-0.5">
+                                                            <li x-text="fieldError('optionGroups.' + idx + '.options.' + oIdx + '.price')"></li>
+                                                        </ul>
+                                                    </div>                                                </div>
                                                 <div class="flex items-center gap-3 h-10">
                                                     <label class="flex items-center gap-2 cursor-pointer">
                                                         <input type="radio" :name="'default_opt_' + idx" :checked="!!option.is_default" @change="setDefaultOption(idx, oIdx)" class="w-3.5 h-3.5 text-indigo-600 border-slate-200">
@@ -653,24 +671,29 @@
                                 <div x-show="recipeIngredients.length > 0" class="space-y-3 max-h-96 overflow-y-auto pr-2">
                                     <template x-for="(ri, idx) in recipeIngredients" :key="ri.id + '-' + ri.owner">
                                         <div class="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl shadow-sm group">
-                                            <div class="flex items-center gap-4">
-                                                <div class="w-10 h-10 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center text-[12px] font-black text-slate-400 shadow-sm" x-text="(ri.name || '??').charAt(0).toUpperCase()">
+                                            <div class="flex items-center gap-4 min-w-0">
+                                                <div class="w-10 h-10 bg-slate-50 border border-slate-100 rounded-xl flex items-center justify-center text-[12px] font-black text-slate-400 shadow-sm shrink-0" x-text="(ri.name || '??').charAt(0).toUpperCase()">
                                                 </div>
-                                                <div>
-                                                    <div class="flex items-center gap-2">
+                                                <div class="min-w-0">
+                                                    <div class="flex items-center gap-2 flex-wrap">
                                                         <span class="text-[14px] font-bold text-slate-900 leading-none" x-text="ri.name"></span>
                                                         <span class="text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest"
                                                             :class="ri.owner === 'base' ? 'text-indigo-600 bg-indigo-50' : 'text-amber-600 bg-amber-50'"
                                                             x-text="getOwnerName(ri.owner)"></span>
                                                     </div>
-                                                    <div class="flex items-center gap-3 mt-1.5">
-                                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Cost: <span class="text-rose-500 font-mono" x-text="'₱' + ((ri.cost || 0) * (ri.quantity || 0)).toFixed(2)"></span></span>
-                                                        <span class="w-1 h-1 rounded-full bg-slate-200"></span>
-                                                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Unit: <span class="text-slate-900 font-mono" x-text="ri.quantity + ' ' + (ri.unit || '').toUpperCase()"></span></span>
+                                                    <div class="flex items-center gap-2 mt-2">
+                                                        <span class="inline-flex items-center gap-1 px-2 py-1 bg-rose-50 border border-rose-100 rounded-lg text-[12px] font-bold text-rose-600">
+                                                            <span class="text-[10px] font-black text-rose-400 uppercase tracking-tighter">Cost</span>
+                                                            <span class="font-mono" x-text="'₱' + ((ri.cost || 0) * (ri.quantity || 0)).toFixed(2)"></span>
+                                                        </span>
+                                                        <span class="inline-flex items-center gap-1 px-2 py-1 bg-slate-50 border border-slate-100 rounded-lg text-[12px] font-bold text-slate-700">
+                                                            <span class="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Qty</span>
+                                                            <span class="font-mono" x-text="ri.quantity + ' ' + (ri.unit || '').toUpperCase()"></span>
+                                                        </span>
                                                     </div>
                                                 </div>
                                             </div>
-                                            <button type="button" @click="removeIngredient(idx)" class="text-slate-300 hover:text-rose-500 transition-all p-2 hover:bg-rose-50 rounded-lg" title="Remove ingredient">
+                                            <button type="button" @click="removeIngredient(idx)" class="text-slate-300 hover:text-rose-500 transition-all p-2 hover:bg-rose-50 rounded-lg shrink-0" title="Remove ingredient">
                                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                                             </button>
                                         </div>
@@ -1483,8 +1506,14 @@
                 <div>
                     <x-input-label value="Group Name" />
                     <input type="text" x-model="newGroupName" @keydown.enter.prevent="submitAddGroup()" class="w-full mt-1.5 h-10 px-3.5 rounded-xl border border-slate-200 text-[13px] font-medium focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" placeholder="e.g. Extras, Sizes, Flavors" />
-                    <p x-show="newGroupError" x-text="newGroupError" class="mt-1 text-[12px] text-rose-500 font-bold" x-cloak></p>
-                </div>
+                    <div x-show="newGroupError" x-cloak class="text-[11px] font-medium text-red-500 mt-1.5 flex items-start gap-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                        <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <ul class="space-y-0.5">
+                            <li x-text="newGroupError"></li>
+                        </ul>
+                    </div>                </div>
                 <div>
                     <x-input-label value="Price Calculation Mode" />
                     <div class="mt-1.5">

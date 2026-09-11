@@ -60,8 +60,16 @@
                 return sum + discount;
             }, 0);
         },
-                get total() {
+        get total() {
             return (this.subtotal - this.discountTotal) + this.serviceCharge;
+        },
+        get amountTenderedError() {
+            if (this.paymentMethod !== 'Cash') return '';
+            const amt = parseFloat(this.amountTendered);
+            if (isNaN(amt) || amt < this.total) {
+                return 'Amount tendered must be at least the total amount due.';
+            }
+            return '';
         },
         get cartLocked() {
             return this.paymentMethod === 'GCash' && this.gcashVerified;
@@ -1264,11 +1272,15 @@
                         </div>
 
                         {{-- Table input — dynamic, not hardcoded --}}
-                        <div class="flex items-center justify-between">
-                            <span class="text-[12px] text-gray-500">Table / Ref</span>
-                            <input type="text" wire:model.live.debounce.400ms="tableNumber" placeholder="Table #"
-                                inputFilter="name_basic"
-                                class="text-[12px] font-bold text-gray-800 bg-transparent border-0 p-0 focus:ring-0 text-right w-24 placeholder-gray-300 {{ $errors->has('tableNumber') ? 'text-red-500 placeholder-red-300' : '' }}">
+                        <div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-[12px] text-gray-500">Table / Ref</span>
+                                <input type="text" wire:model.live.debounce.400ms="tableNumber" placeholder="Table #"
+                                    inputFilter="number" maxlength="2" inputmode="numeric" pattern="[0-9]*"
+                                    @keydown="FormFilters.numberKeydown($event)" @paste="FormFilters.numberPaste($event)"
+                                    class="text-[12px] font-bold text-gray-800 bg-transparent border-0 p-0 focus:ring-0 text-right w-24 placeholder-gray-300 {{ $errors->has('tableNumber') ? 'text-red-500 placeholder-red-300' : '' }}">
+                            </div>
+                            <x-input-error :messages="$errors->get('tableNumber')" class="mt-1 text-right" />
                         </div>
 
                                           {{-- Confirm Payment --}}
@@ -1544,7 +1556,16 @@
                         <div>
                             <x-input-label for="pos_amount_tendered" class="text-[11px] font-semibold text-gray-600 uppercase tracking-wide mb-2 block">Amount Tendered</x-input-label>
                             <x-text-input id="pos_amount_tendered" x-model="amountTendered" type="number" min="0" step="0.01"
+                                x-bind:class="amountTenderedError ? 'border-red-400 bg-red-50/30 focus:border-red-400 focus:ring-red-300' : ''"
                                 class="block w-full text-[14px] py-2.5 px-3 font-mono font-bold" placeholder="0.00"/>
+                            <div x-show="amountTenderedError" x-cloak class="text-[11px] font-medium text-red-500 mt-1.5 flex items-start gap-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                                <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                                <ul class="space-y-0.5">
+                                    <li x-text="amountTenderedError"></li>
+                                </ul>
+                            </div>                            <x-input-error :messages="$errors->get('amountTendered')" class="mt-1" />
                         </div>
                         
                         {{-- Quick Tenders --}}
@@ -1565,8 +1586,7 @@
                     <div x-show="paymentMethod !== 'Cash' && paymentMethod !== 'GCash'" class="space-y-4">
                         <div>
                             <x-input-label for="pos_payment_reference" class="text-[11px] font-semibold text-gray-600 uppercase tracking-wide mb-2 block">Payment Reference / Confirmation No.</x-input-label>
-                            <x-text-input id="pos_payment_reference" wire:model.blur="paymentReference" type="text" class="block w-full text-[14px] py-2.5 px-3 font-mono font-bold" placeholder="e.g. Transaction ID" />
-                            <x-input-error :messages="$errors->get('paymentReference')" class="mt-1" />
+                            <x-text-input id="pos_payment_reference" wire:model.blur="paymentReference" type="text" class="block w-full text-[14px] py-2.5 px-3 font-mono font-bold" :hasError="$errors->has('paymentReference')" />                            <x-input-error :messages="$errors->get('paymentReference')" class="mt-1" />
                         </div>
                     </div>
 
@@ -1754,15 +1774,17 @@
     <span x-text="cartLocked ? 'Locked' : 'Cancel'"></span>
 </x-secondary-button>
             <x-primary-button type="button"
-@click.capture="if (!isSubmitting && !window.thermalBluetoothPrinter?.characteristic) window.prepareThermalReceiptWindow?.()"
+@click.capture="if (!isSubmitting && !amountTenderedError && !window.thermalBluetoothPrinter?.characteristic) window.prepareThermalReceiptWindow?.()"
 @click.prevent="
-    if (isSubmitting) return;
+    if (isSubmitting || amountTenderedError) return;
     isSubmitting = true;
     $wire.confirmPayment(JSON.parse(JSON.stringify(cart)))
         .finally(() => { isSubmitting = false; });
 "
-                x-bind:disabled="isSubmitting"
+                x-bind:disabled="isSubmitting || !!amountTenderedError"
+                x-bind:class="(isSubmitting || amountTenderedError) ? 'opacity-60 cursor-not-allowed' : ''"
                 wire:loading.attr="disabled"
+                wire:target="confirmPayment"
                 id="pos_submit_payment_btn"
                 class="flex-1 justify-center">
                 <span x-show="!isSubmitting">Place Order</span>
@@ -2059,7 +2081,6 @@
             <div class="flex items-center justify-between mb-8">
                 <div>
                     <h2 class="text-[22px] font-black text-gray-900 flex items-center gap-2">
-                        <span class="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-sm border border-indigo-100">📋</span>
                         Saved Drafts
                     </h2>
                     <p class="text-[13px] text-gray-500 mt-1">Review or reload previously saved orders for this branch.</p>

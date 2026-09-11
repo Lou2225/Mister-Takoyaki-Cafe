@@ -98,6 +98,11 @@ public function updatingAmountTendered($value)
     $this->amountTendered = is_numeric($value) ? (float) $value : 0;
 }
 
+public function updatedAmountTendered(): void
+{
+    $this->resetErrorBag('amountTendered');
+}
+
 protected $listeners = [
     'posSettingsUpdated' => 'handlePosSettingsUpdated',
 ];
@@ -194,6 +199,7 @@ public function resetGCashState(): void
 public function openPaymentModal(): void
 {
     $this->resetErrorBag('gcashCancel');
+    $this->resetErrorBag('amountTendered');
 
     if (empty($this->cart)) {
         $this->dispatch('close-modal', 'pos-payment');
@@ -274,7 +280,7 @@ public function openPaymentModal(): void
 
     public function updatedTableNumber()
     {
-        $this->validateFieldLive('tableNumber', ['nullable', 'string', 'max:20', 'regex:' . ValidationHelper::REGEX_NAME_BASIC], ValidationHelper::commonMessages());
+        $this->validateFieldLive('tableNumber', ['nullable', 'string', 'max:2', 'regex:/^[0-9]*$/'], ValidationHelper::commonMessages());
     }
 
     public function toggleEditMode(): void
@@ -1199,7 +1205,7 @@ public function openEditItem(string $key, array $item): void
         }
 
         if ($this->paymentMethod === 'Cash' && (float) $this->amountTendered < $this->total) {
-            $this->dispatch('notify', type: 'error', message: 'Amount tendered is less than total amount.');
+            $this->addError('amountTendered', 'Amount tendered is less than the total amount due.');
             return;
         }
 
@@ -1225,7 +1231,7 @@ public function openEditItem(string $key, array $item): void
         }
 
         $this->validate([
-            'tableNumber' => ['nullable', 'string', 'max:20', 'regex:' . ValidationHelper::REGEX_NAME_BASIC]
+            'tableNumber' => ['nullable', 'string', 'max:2', 'regex:/^[0-9]*$/']
         ], ValidationHelper::commonMessages());
 
         // ──── STOCK VALIDATION ────────────────────────────────────────────────

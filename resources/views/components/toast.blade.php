@@ -44,7 +44,7 @@
             add({ type: 'error', message: '{{ session('error') }}' });
         @endif
     "
-    class="fixed bottom-6 right-6 flex flex-col items-end gap-3 z-[100] pointer-events-none"
+    class="fixed bottom-6 right-6 flex flex-col items-end gap-3 z-[10000] pointer-events-none"
 >
     <template x-for="notification in notifications" :key="notification.id">
         <div
