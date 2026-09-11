@@ -574,15 +574,16 @@
                                 <div>
                                     <x-input-label value="Item Category" />
                                     <div class="flex gap-2 mt-1.5">
-                                        <div class="flex-1 relative"
-                                            x-data="{
-                                                open: false,
-                                                dropUp: false,
-                                                search: '',
-                                                selectedId: $wire.entangle('ingredientCategoryId'),
-                                                get categoriesList() {
-                                                    return @js($allIngredientCategories->map(fn($c) => ['id' => $c->id, 'name' => $c->name]));
-                                                },
+                                    <div class="flex-1 relative"
+                                        wire:key="category-combobox-{{ $allIngredientCategories->pluck('id')->implode('-') }}"
+                                        x-data="{
+                                            open: false,
+                                            dropUp: false,
+                                            search: '',
+                                            selectedId: $wire.entangle('ingredientCategoryId'),
+                                            get categoriesList() {
+                                                return @js($allIngredientCategories->map(fn($c) => ['id' => $c->id, 'name' => $c->name]));
+                                            },
                                                 get selectedItem() {
                                                     if (!this.selectedId) return null;
                                                     return this.categoriesList.find(c => Number(c.id) === Number(this.selectedId)) || null;
@@ -765,7 +766,7 @@
                                 </div>
                                 
                                 <div>
-                                    <x-input-label value="Low Stock Alert Threshold *" />
+                                    <x-input-label value="Low Stock Alert Threshold" />
                                     <div class="mt-1.5">
                                         <x-text-input wire:model.live="ingredientMinStock" 
                                             @input="if (typeof formErrors !== 'undefined' && formErrors) delete formErrors.minStock"
@@ -1823,11 +1824,13 @@
                             this.formErrors.name = 'Ingredient name is required.';
                             hasErrors = true;
                         }
-                        const minStock = parseFloat(this.ingredientMinStock);
-                        if (this.ingredientMinStock === '' || this.ingredientMinStock === null || isNaN(minStock) || minStock < 0) {
-                            this.formErrors.minStock = 'Minimum stock must be a non-negative number.';
-                            hasErrors = true;
-                        }
+                        if (this.ingredientMinStock !== '' && this.ingredientMinStock !== null) {
+                                                    const minStock = parseFloat(this.ingredientMinStock);
+                                                    if (isNaN(minStock) || minStock < 0) {
+                                                        this.formErrors.minStock = 'Minimum stock must be a non-negative number.';
+                                                        hasErrors = true;
+                                                    }
+                                                }
                         if (Array.isArray(this.conversionRows)) {
                             for (let i = 0; i < this.conversionRows.length; i++) {
                                 const r = this.conversionRows[i];

@@ -370,7 +370,7 @@ foreach ($sourceBatches as $sourceBatch) {
     $sourceBatch->current_quantity -= $deductFromThisBatch;
     $sourceBatch->save();
 
-        // unit_price is priced per order_unit (e.g. per box/sack), but this
+    // unit_price is priced per order_unit (e.g. per box/sack), but this
     // batch's quantity is stored in base units (g/ml/pc) — convert so
     // unit_cost matches the unit current_quantity is actually measured in.
     $baseUnitsPerOrderUnit = $item->ingredient
@@ -380,26 +380,15 @@ foreach ($sourceBatches as $sourceBatch) {
         ? (float) $item->unit_price / $baseUnitsPerOrderUnit
         : (float) $item->unit_price;
 
-    foreach ($sourceBatches as $sourceBatch) {
-        if ($remainingQty <= 0) break;
-
-        $deductFromThisBatch = min($remainingQty, $sourceBatch->current_quantity);
-
-        $sourceBatch->current_quantity -= $deductFromThisBatch;
-        $sourceBatch->save();
-
-        \App\Models\StockBatch::create([
-            'branch_id'        => $order->requesting_branch_id,
-            'ingredient_id'    => $item->ingredient_id,
-            'batch_number'     => $transferRef . '-' . $sourceBatch->id,
-            'initial_quantity' => $deductFromThisBatch,
-            'current_quantity' => $deductFromThisBatch,
-            'expiry_date'      => $sourceBatch->expiry_date,
-            'unit_cost'        => round($unitCostPerBase, 4),
-        ]);
-
-        $remainingQty -= $deductFromThisBatch;
-    }
+    \App\Models\StockBatch::create([
+        'branch_id'        => $order->requesting_branch_id,
+        'ingredient_id'    => $item->ingredient_id,
+        'batch_number'     => $transferRef . '-' . $sourceBatch->id,
+        'initial_quantity' => $deductFromThisBatch,
+        'current_quantity' => $deductFromThisBatch,
+        'expiry_date'      => $sourceBatch->expiry_date,
+        'unit_cost'        => round($unitCostPerBase, 4),
+    ]);
 
     $remainingQty -= $deductFromThisBatch;
 }

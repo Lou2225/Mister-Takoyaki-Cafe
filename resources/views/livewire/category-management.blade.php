@@ -566,7 +566,7 @@
                     <h3 class="text-[15px] font-bold text-gray-900 leading-tight">Delete Category</h3>
                     <p class="mt-1 text-[13px] text-gray-500 leading-relaxed">
                         Are you sure you want to permanently delete <span class="text-red-600 font-bold">"{{ $deleteTargetName }}"</span>? 
-                        This action cannot be undone.
+                        Any products or ingredients assigned to it will be moved to <span class="font-bold text-slate-700">Uncategorized</span>. This action cannot be undone.
                     </p>
                 </div>
             </div>

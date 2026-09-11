@@ -7,6 +7,7 @@
     {{-- Hidden reactive updaters to sync products list, templates, and categories under wire:ignore --}}
     <div x-effect="updateProductsList(@js($products->map(fn($p) => ['id' => $p->id, 'name' => $p->name])))" class="hidden" wire:key="products-sync-helper"></div>
     <div x-effect="if (typeof templates !== 'undefined') templates = @js($templatesData); if (typeof allCategories !== 'undefined') allCategories = @js($allCategories)" class="hidden" wire:key="options-templates-sync-helper"></div>
+    <div x-effect="updateServerErrors(@js($errors->getMessages()))" class="hidden" wire:key="server-errors-sync-helper"></div>
     {{-- Panel: Form --}}
     <div x-show="panel === 'form'" 
          x-transition:enter="transition ease-out duration-200" 
@@ -280,11 +281,14 @@
                             <template x-for="(group, idx) in (optionGroups || [])" :key="idx">
                                 <div class="border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
                                     <div class="flex items-center justify-between p-4 bg-slate-50/50 border-b border-slate-100">
-                                        <div class="flex items-center gap-3">
-                                            <span class="text-[13px] font-bold text-slate-900 uppercase tracking-tight" x-text="group.name"></span>
-                                            <span class="px-2 py-0.5 bg-white border border-slate-200 rounded text-[9px] font-black text-slate-400 uppercase tracking-widest" x-text="group.price_mode"></span>
-                                            <span x-show="group.is_required" class="text-[9px] font-black text-rose-500 uppercase tracking-widest animate-pulse">Required</span>
-                                            <span x-show="group.no_recipe_required" class="text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded uppercase tracking-widest">No Recipe</span>
+                                        <div class="flex flex-col gap-1">
+                                            <div class="flex items-center gap-3">
+                                                <span class="text-[13px] font-bold text-slate-900 uppercase tracking-tight" x-text="group.name"></span>
+                                                <span class="px-2 py-0.5 bg-white border border-slate-200 rounded text-[9px] font-black text-slate-400 uppercase tracking-widest" x-text="group.price_mode"></span>
+                                                <span x-show="group.is_required" class="text-[9px] font-black text-rose-500 uppercase tracking-widest animate-pulse">Required</span>
+                                                <span x-show="group.no_recipe_required" class="text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded uppercase tracking-widest">No Recipe</span>
+                                            </div>
+                                            <p x-show="fieldError('optionGroups.' + idx + '.name')" x-cloak x-text="fieldError('optionGroups.' + idx + '.name')" class="text-[11px] font-medium text-red-500"></p>
                                         </div>
                                         <div class="flex items-center gap-1.5">
                                             <label class="flex items-center gap-1.5 cursor-pointer mr-2" title="Options in this group skip ingredient tracking and are always available">
@@ -304,17 +308,29 @@
                                     </div>
                                     <div class="p-4 bg-white space-y-3">
                                         <template x-for="(option, oIdx) in (group.options || [])" :key="oIdx">
-                                            <div class="flex items-center gap-4">
+                                            <div class="flex items-start gap-4">
                                                 <div class="flex-1">
-                                                    <input type="text" x-model="option.name" class="w-full h-10 px-3 text-[13px] font-bold rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" placeholder="Option name..." />
+                                                    <input type="text" x-model="option.name"
+                                                        @input="clearOptionError(idx, oIdx, 'name')"
+                                                        class="w-full h-10 px-3 text-[13px] font-bold rounded-xl border focus:ring-2 transition-all"
+                                                        :class="fieldError('optionGroups.' + idx + '.options.' + oIdx + '.name') ? 'border-rose-400 focus:border-rose-400 focus:ring-rose-300 bg-rose-50/30' : 'border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20'"
+                                                        placeholder="Option name..." />
+                                                    <p x-show="fieldError('optionGroups.' + idx + '.options.' + oIdx + '.name')" x-cloak x-text="fieldError('optionGroups.' + idx + '.options.' + oIdx + '.name')" class="text-[11px] font-medium text-red-500 mt-1"></p>
                                                 </div>
-                                                <div class="w-28 relative">
-                                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                                                        <span class="text-[12px] font-bold">₱</span>
+                                                <div class="w-28">
+                                                    <div class="relative">
+                                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                                            <span class="text-[12px] font-bold">₱</span>
+                                                        </div>
+                                                        <input type="text" x-model="option.price"
+                                                            @input="clearOptionError(idx, oIdx, 'price')"
+                                                            class="w-full h-10 pl-7 pr-3 text-[13px] font-black text-right rounded-xl border focus:ring-2 transition-all"
+                                                            :class="fieldError('optionGroups.' + idx + '.options.' + oIdx + '.price') ? 'border-rose-400 focus:border-rose-400 focus:ring-rose-300 bg-rose-50/30' : 'border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20'"
+                                                            placeholder="0.00" />
                                                     </div>
-                                                    <input type="text" x-model="option.price" class="w-full h-10 pl-7 pr-3 text-[13px] font-black text-right rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" placeholder="0.00" />
+                                                    <p x-show="fieldError('optionGroups.' + idx + '.options.' + oIdx + '.price')" x-cloak x-text="fieldError('optionGroups.' + idx + '.options.' + oIdx + '.price')" class="text-[11px] font-medium text-red-500 mt-1"></p>
                                                 </div>
-                                                <div class="flex items-center gap-3">
+                                                <div class="flex items-center gap-3 h-10">
                                                     <label class="flex items-center gap-2 cursor-pointer">
                                                         <input type="radio" :name="'default_opt_' + idx" :checked="!!option.is_default" @change="setDefaultOption(idx, oIdx)" class="w-3.5 h-3.5 text-indigo-600 border-slate-200">
                                                         <span class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Default</span>
@@ -739,7 +755,7 @@
                 {{-- Product Image --}}
                 <div class="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
                     <h2 class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1">Product Media</h2>
-                    <div class="relative group">
+                                        <div class="relative group">
                         <div class="w-full aspect-square rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 flex items-center justify-center relative overflow-hidden transition-all group-hover:border-indigo-300 group-hover:bg-indigo-50/30">
                             @if($image)
                                 <img src="{{ $image->temporaryUrl() }}" class="w-full h-full object-cover animate-in fade-in zoom-in duration-300">
@@ -756,6 +772,13 @@
                             @endif
                             <input type="file" wire:model.live="image" class="absolute inset-0 opacity-0 cursor-pointer" accept="image/*">
                         </div>
+                        @if($image || ($existingImage && Storage::disk('public')->exists($existingImage)))
+                            <button type="button" wire:click="removeImage" wire:loading.attr="disabled" wire:target="removeImage"
+                                class="absolute top-2 right-2 z-20 w-8 h-8 flex items-center justify-center bg-white/95 backdrop-blur-sm border border-slate-200 rounded-lg text-slate-400 hover:text-rose-600 hover:border-rose-200 hover:bg-rose-50 transition-all shadow-sm"
+                                title="Remove Image">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                        @endif
                     </div>
                     <x-input-error :messages="$errors->get('image')" class="mt-3 text-center" />
                 </div>
@@ -1559,6 +1582,24 @@
                     confirmActionTitle: '',
                     confirmActionTargetName: '',
                     confirmActionMessage: '',
+
+                    // Server-side validation error sync (Livewire $errors)
+                    serverErrors: {},
+                    updateServerErrors(errors) {
+                        this.serverErrors = errors || {};
+                    },
+                    fieldError(key) {
+                        const arr = this.serverErrors[key];
+                        return (arr && arr.length) ? arr[0] : '';
+                    },
+                    clearOptionError(gIdx, oIdx, field) {
+                        const key = 'optionGroups.' + gIdx + '.options.' + oIdx + '.' + field;
+                        if (this.serverErrors && this.serverErrors[key]) {
+                            const copy = { ...this.serverErrors };
+                            delete copy[key];
+                            this.serverErrors = copy;
+                        }
+                    },
 
                     openAddGroupModal() {
                         this.newGroupName = '';

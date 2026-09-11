@@ -96,6 +96,7 @@ class BranchStockOrdering extends Component
         if ($this->selectedBranchId && $this->selectedBranchId != $this->mainBranchId) {
             $this->calculateEstimatedFee();
             $this->updateHeader();
+            $this->loadRestockSuggestions();
         }
 
         // Check for ingredient query parameter from BI insights
@@ -113,6 +114,7 @@ class BranchStockOrdering extends Component
     {
         $this->calculateEstimatedFee();
         $this->clearCart(); // Clear cart when branch context changes to prevent cross-branch leaks
+        $this->loadRestockSuggestions();
     }
 
     public function updatedPanel(string $value): void
@@ -375,9 +377,22 @@ class BranchStockOrdering extends Component
         $this->dispatch('open-modal', name: 'confirm-submit-order');
     }
 
-    public function submitOrder(): void
+    public function submitOrder(array $items = [], ?string $priority = null, ?string $notes = null): bool
     {
-        if (empty($this->cartItems)) return;
+        if (!empty($items)) {
+            $this->cartItems = $items;
+        }
+        if ($priority !== null) {
+            $this->orderPriority = $priority;
+        }
+        if ($notes !== null) {
+            $this->orderNotes = $notes;
+        }
+
+        if (empty($this->cartItems)) {
+            $this->notify('error', 'Your cart is empty.');
+            return false;
+        }
 
         $this->validate([
             'orderPriority' => 'required|in:normal,urgent,critical',
@@ -387,9 +402,20 @@ class BranchStockOrdering extends Component
             'orderPriority.in'       => 'Invalid priority selected.',
         ]);
 
+        $hasPending = StockOrder::where('requesting_branch_id', $this->selectedBranchId)
+            ->where('status', 'pending')
+            ->exists();
+
+        if ($hasPending) {
+            $this->notify('warning', 'Wait for your current pending request to be processed.');
+            return false;
+        }
+
         try {
             DB::transaction(function () {
-                $totalAmount = collect($this->cartItems)->sum('subtotal') + (float) $this->deliveryFee;
+                $this->calculateEstimatedFee();
+                $itemsSubtotal = collect($this->cartItems)->sum('subtotal');
+                $totalAmount = $itemsSubtotal + (float) $this->deliveryFee;
 
                 $order = StockOrder::create([
                     'reference_no'          => StockOrder::generateReference(),
@@ -409,7 +435,7 @@ class BranchStockOrdering extends Component
                         'ingredient_id'      => $item['ingredient_id'],
                         'requested_quantity' => $item['quantity'],
                         'unit'               => $item['unit'],
-                        'order_unit'         => $item['order_unit'],
+                        'order_unit'         => $item['order_unit'] ?? $item['unit'],
                         'unit_price'         => $item['unit_price'],
                         'subtotal'           => $item['subtotal'],
                         'notes'              => $item['notes'] ?: null,
@@ -430,9 +456,16 @@ class BranchStockOrdering extends Component
             $this->notify('success', 'Stock request submitted!');
             $this->dispatch('order-submitted');
             $this->updateHeader();
+            $this->loadRestockSuggestions();
+            $this->dispatch('update-stock-data', [
+                'restockSuggestions' => $this->restockSuggestions,
+            ]);
+
+            return true;
 
         } catch (\Exception $e) {
             $this->notify('error', 'Failed to submit order: ' . $e->getMessage());
+            return false;
         }
     }
 
@@ -554,15 +587,41 @@ class BranchStockOrdering extends Component
 
         $this->calculateEstimatedFee();
 
-        $isNewPanel = $this->panel === 'new';
+        $ingredients = Ingredient::with('unitConversions')
+            ->orderBy('name')
+            ->get()
+            ->map(fn($i) => [
+                'id' => (int)$i->id,
+                'name' => $i->name,
+                'unit' => $i->unit,
+                'cost' => (float)($i->cost ?? 0),
+                'minimum_stock' => (float)($i->minimum_stock ?? 0),
+                'unit_conversions' => $i->unitConversions->map(fn($c) => [
+                    'unit_name' => $c->unit_name,
+                    'qty_in_base' => (float)$c->qty_in_base,
+                ])->values()->all(),
+            ])
+            ->values()
+            ->all();
+        $branchStock = BranchIngredientStock::where('branch_id', $this->selectedBranchId)->pluck('stock_quantity', 'ingredient_id');
+        $mainStock = BranchIngredientStock::where('branch_id', $this->mainBranchId)->pluck('stock_quantity', 'ingredient_id');
 
         return view('livewire.branch-stock-ordering', [
-            'requestOrders' => $this->requestOrders,
-            'historyOrders' => $this->historyOrders,
-            'kpis'          => $this->getKpis(),
-            'ingredients'   => $isNewPanel ? Ingredient::with('unitConversions')->orderBy('name')->get() : collect(),
-            'branchStock'   => $isNewPanel ? BranchIngredientStock::where('branch_id', $this->selectedBranchId)->pluck('stock_quantity', 'ingredient_id') : collect(),
-            'mainStock'     => $isNewPanel ? BranchIngredientStock::where('branch_id', $this->mainBranchId)->pluck('stock_quantity', 'ingredient_id') : collect(),
+            'requestOrders'   => $this->requestOrders,
+            'historyOrders'   => $this->historyOrders,
+            'kpis'            => $this->getKpis(),
+            'ingredients'     => $ingredients,
+            'branchStock'     => $branchStock,
+            'mainStock'          => $mainStock,
+            'restockSuggestions' => $this->restockSuggestions,
+            'logisticsConfig'    => [
+                'baseFee'        => (float)\App\Models\SystemSetting::get('logistics_base_fee', 0),
+                'globalRate'     => (int)\App\Models\SystemSetting::get('logistics_global_rate', 50),
+                'minFee'         => (float)\App\Models\SystemSetting::get('logistics_min_fee', 0),
+                'maxFee'         => (float)\App\Models\SystemSetting::get('logistics_max_fee', 5000),
+                'freeThreshold'  => (float)\App\Models\SystemSetting::get('logistics_free_threshold', 0),
+                'branchDistance' => (float)$this->branchDistance,
+            ],
         ])->layout('layouts.app');
     }
 
@@ -635,6 +694,7 @@ class BranchStockOrdering extends Component
                 return [
                     'id'      => $ing->id,
                     'name'    => $ing->name,
+                    'unit'    => $ing->unit,
                     'deficit' => max(1, $ing->minimum_stock - $currentStock),
                 ];
             }

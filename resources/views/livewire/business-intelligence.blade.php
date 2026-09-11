@@ -227,8 +227,8 @@
     <div x-cloak x-show="activeTab === 'predictive'" class="space-y-6">
 
         {{-- Reference Guide --}}
-        <div x-data="{ open: false }" class="mx-0">
-            <button @click="open = !open"
+        <div x-data="{ guideOpen: false }" class="mx-0">
+            <button @click="guideOpen = !guideOpen"
                 class="w-full flex items-center justify-between px-5 py-3 bg-indigo-50 border border-indigo-100 rounded-2xl text-left hover:bg-indigo-100/60 transition-all group">
                 <div class="flex items-center gap-3">
                     <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-sm">
@@ -239,10 +239,10 @@
                         <p class="text-[11px] text-indigo-600/70 font-medium mt-0.5">Confidence levels and model quality metrics</p>
                     </div>
                 </div>
-                <svg class="w-4 h-4 text-indigo-400 transition-transform duration-300" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                <svg class="w-4 h-4 text-indigo-400 transition-transform duration-300" :class="guideOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </button>
 
-            <div x-show="open" x-collapse class="mt-2">
+            <div x-show="guideOpen" x-collapse class="mt-2">
                 <div class="bg-white border border-indigo-100 rounded-2xl p-6 space-y-5">
                     {{-- Confidence explainer --}}
                     <div>
@@ -555,7 +555,7 @@
                             </script>
                             <div x-data="forecastingChart(JSON.parse(document.getElementById('bi-forecast-short-data-card').textContent), '#6366F1')"
                                  wire:ignore
-                                 wire:key="bi-forecast-short-{{ $selectedBranchId }}-{{ $startDate }}-{{ $endDate }}-{{ str_replace(' ', '-', $activeFilter) }}"
+                                 wire:key="bi-forecast-short-card-{{ $selectedBranchId }}-{{ $startDate }}-{{ $endDate }}-{{ str_replace(' ', '-', $activeFilter) }}"
                                  x-intersect.once="init()"
                                  class="w-full">
                                 <div x-ref="forecastChart" class="w-full h-[300px]"></div>
@@ -692,7 +692,8 @@
         </div>
 
     {{-- Prescriptive Analytics --}}
-    <div x-cloak x-show="activeTab === 'prescriptive'" class="space-y-6">        <div class="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-5 sm:p-6">
+    <div x-cloak x-show="activeTab === 'prescriptive'" class="space-y-6">
+        <div class="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-5 sm:p-6">
             <div class="flex items-start justify-between gap-3">
                 <div class="flex items-start gap-3">
                     <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white">
@@ -912,9 +913,7 @@
         @endif
 
         <x-modal name="prescriptive-stock-review" maxWidth="2xl" focusable>
-            <div>
             @if(empty($stockReview))
-            <div>
                 <div class="animate-pulse p-6" aria-label="Loading inventory details">
                     <div class="flex items-start justify-between gap-4">
                         <div class="w-full space-y-2">
@@ -948,10 +947,7 @@
                         </div>
                     </div>
                 </div>
-            </div>
-            @endif
-            <div>
-            @if(!empty($stockReview))
+            @else
                 <div class="max-h-[calc(100vh-7rem)] overflow-y-auto custom-scrollbar p-6">
                     <div class="flex items-start justify-between gap-4">
                         <div>
@@ -1005,9 +1001,8 @@
                         <x-secondary-button type="button" @click="$dispatch('close-modal', 'prescriptive-stock-review')">Close</x-secondary-button>
                         <a href="{{ $stockReview['adjustment_url'] }}" wire:navigate @click="$dispatch('close-modal', 'prescriptive-stock-review')" class="inline-flex items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-[11px] font-black uppercase tracking-widest text-white hover:bg-gray-700">Open Adjustment</a>
                     </div>
+                </div>
             @endif
-            </div>
-            </div>
         </x-modal>
     </div>
 
@@ -1209,7 +1204,7 @@
         </div>
     </div>{{-- end products tab --}}
 
-    {{-- â”€â”€ Operations Tab â”€â”€ --}}
+    {{-- ── Operations Tab ── --}}
     <div x-cloak x-show="activeTab === 'diagnostic'" class="space-y-6">
         {{-- Hours Intensity Chart (above Network Performance) --}}
         <div class="mx-1">
@@ -1309,7 +1304,7 @@
 
 
 
-    {{-- â”€â”€ Sales Report Tab â”€â”€ --}}
+    {{-- ── Sales Report Tab ── --}}
     <div x-cloak x-show="activeTab === 'descriptive'" class="space-y-6">
         <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
@@ -1614,17 +1609,7 @@
                             toolbar: { show: false },
                             zoom: { enabled: false },
                             animations: {
-                                enabled: true,
-                                easing: 'easeout',
-                                speed: 900,
-                                animateGradually: {
-                                    enabled: true,
-                                    delay: 120,
-                                },
-                                dynamicAnimation: {
-                                    enabled: true,
-                                    speed: 500,
-                                }
+                                enabled: false
                             }
                         },
                         dataLabels: { enabled: false },
@@ -1725,9 +1710,66 @@
                 init() {
                     if (typeof window.ApexCharts === 'undefined') return;
 
+                    // Watch activeTab so chart renders cleanly once tab is visible
+                    if (this.$watch) {
+                        this.$watch('activeTab', (tab) => {
+                            if (tab === 'diagnostic') {
+                                this.$nextTick(() => {
+                                    setTimeout(() => this.render(), 60);
+                                });
+                            }
+                        });
+                    }
+
+                    // Render immediately if already on diagnostic tab
+                    if (this.activeTab === 'diagnostic') {
+                        this.$nextTick(() => {
+                            setTimeout(() => this.render(), 60);
+                        });
+                    }
+
+                    if (this.$cleanup) {
+                        this.$cleanup(() => this.destroy());
+                    }
+                },
+
+                destroy() {
+                    if (this.hoursChart) {
+                        try { this.hoursChart.destroy(); } catch (e) {}
+                        this.hoursChart = null;
+                    }
+                },
+
+                render(retryCount = 0) {
+                    if (typeof window.ApexCharts === 'undefined') return;
+
                     const el = this.$refs.hoursChartTop ?? this.$refs.hoursChart;
                     if (!el) return;
+                    if (el.offsetWidth === 0) {
+                        if (retryCount < 5) {
+                            setTimeout(() => this.render(retryCount + 1), 60);
+                        }
+                        return;
+                    }
 
+                    if (this.hoursChart) {
+                        try {
+                            this.hoursChart.updateOptions({
+                                xaxis: { categories: this.chartData.categories }
+                            }, false, false);
+                            this.hoursChart.updateSeries([{ name: 'Orders', data: this.chartData.counts }], false);
+                        } catch (e) {
+                            this.destroy();
+                            this.createChart(el);
+                        }
+                    } else {
+                        this.createChart(el);
+                    }
+
+                    this.renderHeatmapStrip();
+                },
+
+                createChart(el) {
                     const options = {
                         series: [{ name: 'Orders', data: this.chartData.counts }],
                         chart: {
@@ -1736,11 +1778,7 @@
                             toolbar: { show: false },
                             zoom: { enabled: false },
                             animations: {
-                                enabled: true,
-                                easing: 'easeinout',
-                                speed: 800,
-                                animateGradually: { enabled: true, delay: 100 },
-                                dynamicAnimation: { enabled: true, speed: 450 }
+                                enabled: false
                             }
                         },
                         dataLabels: { enabled: false },
@@ -1756,50 +1794,58 @@
                     this.hoursChart = new ApexCharts(el, options);
                     this.hoursChart.render();
 
-                    // small heatmap strip to show color intensity per hour
-                    try {
-                        const heatEl = this.$refs.hoursHeatmapTop;
-                        if (heatEl && Array.isArray(this.chartData.counts)) {
-                            const counts = this.chartData.counts.map(v => Number(v) || 0);
-                            const cats = this.chartData.categories || [];
-                            const max = counts.length ? Math.max(...counts) : 0;
+                    this.renderHeatmapStrip();
+                },
 
-                            const heatSeries = [{ name: 'Intensity', data: cats.map((c, i) => ({ x: c, y: counts[i] ?? 0 })) }];
+                renderHeatmapStrip() {
+                    const heatEl = this.$refs.hoursHeatmapTop;
+                    if (!heatEl || !Array.isArray(this.chartData.counts) || !this.chartData.counts.length) return;
 
-                            const ranges = [];
-                            if (max > 0) {
-                                const q1 = Math.ceil(max * 0.25);
-                                const q2 = Math.ceil(max * 0.5);
-                                const q3 = Math.ceil(max * 0.75);
-                                ranges.push({ from: 0, to: q1, color: '#d1fae5' });
-                                ranges.push({ from: q1+1, to: q2, color: '#86efac' });
-                                ranges.push({ from: q2+1, to: q3, color: '#16a34a' });
-                                ranges.push({ from: q3+1, to: max, color: '#065f46' });
-                            } else {
-                                ranges.push({ from: 0, to: 1, color: '#d1fae5' });
-                            }
+                    const counts = this.chartData.counts.map(v => Number(v) || 0);
+                    const cats = this.chartData.categories || [];
+                    const max = Math.max(...counts, 0);
 
-                            const heatOpts = {
-                                series: heatSeries,
-                                chart: { type: 'heatmap', height: 48, toolbar: { show: false } },
-                                plotOptions: { heatmap: { radius: 4, enableShades: false, useFillColorAsStroke: false } },
-                                dataLabels: { enabled: false },
-                                legend: { show: false },
-                                tooltip: { y: { formatter: val => `${val} orders` } },
-                                grid: { padding: { top: 0, bottom: 0, left: 0, right: 0 } },
-                                xaxis: { labels: { show: false }, axisTicks: { show: false }, axisBorder: { show: false } },
-                                yaxis: { show: false },
-                                fill: { opacity: 1 },
-                                states: { hover: { filter: { type: 'none' } } },
-                                colorScale: { ranges }
-                            };
+                    const getColor = (val) => {
+                        if (max <= 0 || val <= 0) return '#f1f5f9';
+                        const ratio = val / max;
+                        if (ratio <= 0.25) return '#d1fae5';
+                        if (ratio <= 0.5) return '#86efac';
+                        if (ratio <= 0.75) return '#22c55e';
+                        return '#065f46';
+                    };
 
-                            const heatChart = new ApexCharts(heatEl, heatOpts);
-                            heatChart.render();
-                        }
-                    } catch (e) {
-                        console.error('Heatmap render error', e);
-                    }
+                    let html = '<div class="flex items-center gap-1 w-full h-8 pt-1">';
+                    cats.forEach((cat, idx) => {
+                        const cnt = counts[idx] ?? 0;
+                        const bg = getColor(cnt);
+                        html += `
+                            <div class="group/bar relative flex-1 h-6 rounded-md transition-transform hover:scale-y-110 cursor-pointer"
+                                 style="background-color: ${bg};"
+                                 title="${cat}: ${cnt} order(s)">
+                                <div class="opacity-0 group-hover/bar:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-900 text-white text-[10px] font-bold rounded shadow-lg pointer-events-none whitespace-nowrap z-30 transition-opacity">
+                                    ${cat}: ${cnt} order${cnt === 1 ? '' : 's'}
+                                </div>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+
+                    html += `
+                        <div class="flex items-center justify-between text-[10px] font-bold text-gray-400 mt-1 px-0.5">
+                            <span>12 AM</span>
+                            <div class="flex items-center gap-1">
+                                <span class="text-[9px] uppercase tracking-wider text-gray-400 mr-1">Intensity:</span>
+                                <span class="w-2.5 h-2.5 rounded-sm bg-slate-100 border border-slate-200" title="0 orders"></span>
+                                <span class="w-2.5 h-2.5 rounded-sm bg-emerald-100" title="Low"></span>
+                                <span class="w-2.5 h-2.5 rounded-sm bg-emerald-300" title="Moderate"></span>
+                                <span class="w-2.5 h-2.5 rounded-sm bg-emerald-500" title="High"></span>
+                                <span class="w-2.5 h-2.5 rounded-sm bg-emerald-800" title="Peak"></span>
+                            </div>
+                            <span>11 PM</span>
+                        </div>
+                    `;
+
+                    heatEl.innerHTML = html;
                 }
             };
         }
@@ -1843,17 +1889,7 @@
                             toolbar: { show: false },
                             zoom: { enabled: false },
                             animations: {
-                                enabled: true,
-                                easing: 'easeinout',
-                                speed: 1200,
-                                animateGradually: {
-                                    enabled: true,
-                                    delay: 200,
-                                },
-                                dynamicAnimation: {
-                                    enabled: true,
-                                    speed: 600,
-                                }
+                                enabled: false
                             }
                         },
                         dataLabels: { enabled: false },

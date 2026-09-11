@@ -506,6 +506,16 @@ public function getOwnerLabel(string $owner): string
         $this->updateGlobalHeader('list');
     }
 
+    public function removeImage()
+    {
+        if ($this->existingImage) {
+            Storage::disk('public')->delete($this->existingImage);
+        }
+        $this->image = null;
+        $this->existingImage = null;
+        $this->resetValidation('image');
+    }
+
     public function showEdit(int $id)
     {
         $product = Product::with(['category', 'recipes.ingredient', 'branches', 'optionGroups.options'])->findOrFail($id);
@@ -959,6 +969,28 @@ public function getOwnerLabel(string $owner): string
         return $rules;
     }
 
+    /**
+     * Friendly display names for validator attributes, so wildcard-indexed
+     * fields (e.g. optionGroups.0.options.1.name) don't leak their raw
+     * dot-notation array path into user-facing error messages.
+     */
+    private function getProductValidationAttributes(): array
+    {
+        return [
+            'name'                              => 'product name',
+            'categoryId'                        => 'category',
+            'price'                              => 'sale price',
+            'description'                       => 'description',
+            'image'                              => 'image',
+            'optionGroups.*.name'               => 'group name',
+            'optionGroups.*.price_mode'         => 'price mode',
+            'optionGroups.*.options.*.name'     => 'option name',
+            'optionGroups.*.options.*.price'    => 'option price',
+            'recipeIngredients.*.id'            => 'ingredient',
+            'recipeIngredients.*.quantity'      => 'quantity',
+        ];
+    }
+
     private function prepareData()
     {
         $this->name        = $this->normalizeString($this->name);
@@ -997,7 +1029,8 @@ public function getOwnerLabel(string $owner): string
             $this->validateBeforeModal(
                 $this->getProductValidationRules(), 
                 ValidationHelper::commonMessages(), 
-                'confirm-save-product'
+                'confirm-save-product',
+                $this->getProductValidationAttributes()
             );
         } catch (\Illuminate\Validation\ValidationException $e) {
             $this->switchToFailedTab($e->validator->errors()->keys());
@@ -1011,8 +1044,8 @@ public function getOwnerLabel(string $owner): string
 
         $this->prepareData();
 
-        try {
-            $this->validateSecure($this->getProductValidationRules(), ValidationHelper::commonMessages());
+         try {
+            $this->validateSecure($this->getProductValidationRules(), ValidationHelper::commonMessages(), $this->getProductValidationAttributes());
         } catch (\Illuminate\Validation\ValidationException $e) {
             $this->switchToFailedTab($e->validator->errors()->keys());
             throw $e;

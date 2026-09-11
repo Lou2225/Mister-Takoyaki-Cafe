@@ -64,7 +64,7 @@
     <script src="{{ asset('js/form-validation.js') }}" defer data-navigate-once></script>
 
     {{-- Alpine Components --}}
-    <script src="{{ asset('js/alpine-components.js') }}" defer data-navigate-once></script>
+    <script src="{{ asset('js/alpine-components.js') }}" data-navigate-once></script>
     {{-- Leaflet Overrides --}}
     <style>
         .leaflet-pane,

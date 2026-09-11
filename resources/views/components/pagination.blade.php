@@ -58,16 +58,16 @@
             </x-secondary-button>@endunless
  
             {{-- Previous Page --}}
-            @unless($compact)<x-secondary-button 
+            <x-secondary-button 
                 wire:key="{{ $keyPrefix }}-{{ $paginator->getPageName() }}-prev-{{ $paginator->onFirstPage() ? 'disabled' : 'active' }}"
                 wire:click="previousPage('{{ $paginator->getPageName() }}')" 
                 wire:loading.attr="disabled"
                 :disabled="$paginator->onFirstPage()" 
-                class="!p-0 w-9 h-9 items-center justify-center !rounded-xl {{ $paginator->onFirstPage() ? 'opacity-30' : '' }}">
+                class="!p-0 {{ $compact ? 'w-8 h-8' : 'w-9 h-9' }} items-center justify-center !rounded-xl {{ $paginator->onFirstPage() ? 'opacity-30' : '' }}">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                 </svg>
-            </x-secondary-button>@endunless
+            </x-secondary-button>
  
             {{-- Page Numbers --}}
             <div class="flex items-center gap-1.5 px-2">

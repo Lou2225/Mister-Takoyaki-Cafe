@@ -1,4 +1,62 @@
-<div class="px-2 py-2 space-y-6" x-data="slidingTabs({ panel: @entangle('panel') }, ['panel'])" wire:ignore.self wire:init="loadRestockSuggestions" wire:poll.30s>
+<div class="px-2 py-2 space-y-6" 
+     x-data="typeof window.branchStockOrdering === 'function' ? window.branchStockOrdering($wire, {
+         ingredients: {{ Js::from($ingredients) }},
+         branchStock: {{ Js::from($branchStock) }},
+         mainStock: {{ Js::from($mainStock) }},
+         logistics: {{ Js::from($logisticsConfig) }},
+         restockSuggestions: {{ Js::from($restockSuggestions) }},
+         initialIngredientId: {{ $this->cartIngredientId ? (int)$this->cartIngredientId : 'null' }}
+     }) : {
+         panel: $wire.entangle('panel').live,
+         restockSuggestions: [],
+         comboboxOpen: false,
+         comboboxSearch: '',
+         comboboxDropUp: false,
+         selectedIngredientId: null,
+         selectedIngredient: null,
+         filteredIngredients: [],
+         cartQty: '',
+         cartUnit: '',
+         cartPrice: 0,
+         cartNotes: '',
+         qtyErrorMessage: '',
+         cartItems: [],
+         orderPriority: 'normal',
+         orderNotes: '',
+         isSubmitting: false,
+         itemToRemoveIndex: null,
+         itemToRemoveName: '',
+         currentBranchStock: 0,
+         currentHqStock: 0,
+         qtyInBase: 0,
+         isStockExceeded: false,
+         itemSubtotal: 0,
+         cartSubtotal: 0,
+         calculatedDeliveryFee: 0,
+         cartTotal: 0,
+         formatStockQty: (q, u) => (q || 0) + ' ' + (u || ''),
+         addToCart: () => {},
+         isInCart: () => false,
+         promptRemoveItem: () => {},
+         confirmRemoveItem: () => {},
+         removeFromCart: () => {},
+         promptClearCart: () => {},
+         confirmClearCart: () => {},
+         clearCart: () => {},
+         addSuggestionToCart: () => {},
+         promptSubmitOrder: () => {},
+         confirmSubmitOrder: () => {},
+         openCombobox: () => {},
+         closeCombobox: () => {},
+         checkComboboxFlip: () => {},
+         selectIngredient: () => {},
+         clearIngredient: () => {},
+         selectUnit: () => {},
+         validateQty: () => true
+     }" 
+     wire:ignore.self 
+     wire:init="loadRestockSuggestions" 
+     wire:poll.30s>
     {{-- ════════════════ DYNAMIC HEADER ════════════════ --}}
     <div class="px-1 pt-2">
         <div class="mb-4 flex items-center justify-between">
@@ -60,8 +118,6 @@
         
         {{-- PANEL: New Request --}}
         <div wire:key="panel-new" x-show="panel === 'new'" class="space-y-4 animate-fadeIn px-1">
-            
-
             {{-- Restock Suggestions (always visible, preloaded) --}}
             <div class="bg-slate-900 rounded-3xl p-4 text-white overflow-hidden">
                 <div class="flex items-center justify-between mb-3 px-2">
@@ -72,42 +128,39 @@
                     <span class="text-[9px] text-white/40 font-bold uppercase italic">Quick-add suggestions based on low stock</span>
                 </div>
 
-                {{-- Skeleton Loading --}}
-                @if(!$restockLoaded)
-                    <div wire:key="suggestions-skeleton" class="flex gap-3 overflow-x-auto pb-1">
-                        @for($i = 0; $i < 5; $i++)
-                            <div wire:key="suggestions-skeleton-item-{{ $i }}" class="flex-shrink-0 w-56 h-[62px] bg-white/10 rounded-2xl animate-pulse"></div>
-                        @endfor
-                    </div>
-
-                {{-- Data Loaded: has suggestions --}}
-                @elseif(count($restockSuggestions) > 0)
-                    <div wire:key="suggestions-loaded" class="flex gap-3 overflow-x-auto pb-1 custom-scrollbar-slate scroll-smooth">
-                        @foreach($restockSuggestions as $item)
-                            @php $inCart = collect($cartItems)->contains('ingredient_id', $item['id']); @endphp
-                            <div wire:key="suggestion-item-{{ $item['id'] }}-{{ $inCart ? 'in' : 'out' }}" class="flex-shrink-0 w-56 bg-white/5 hover:bg-white/10 border border-white/10 p-3 rounded-2xl flex items-center justify-between transition-all cursor-pointer group/item" wire:click="addLowStockToCart({{ $item['id'] }})">
-                                <div class="min-w-0 pr-2">
-                                    <p class="text-[12px] font-bold truncate">{{ $item['name'] }}</p>
-                                    <p class="text-[9px] text-white/40 font-black uppercase mt-0.5">Need: <span class="text-amber-400">{{ number_format($item['deficit'], 1) }}</span></p>
-                                </div>
-                                <div class="p-1.5 {{ $inCart ? 'bg-emerald-500' : 'bg-white/10 group-hover/item:bg-indigo-500' }} rounded-lg transition-all">
-                                    <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="{{ $inCart ? 'M5 13l4 4L19 7' : 'M12 4v16m8-8H4' }}"/></svg>
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-
-                {{-- Data Loaded: all stock healthy --}}
-                @else
-                    <div wire:key="suggestions-healthy" class="flex items-center justify-center gap-2 py-4 opacity-40">
+                {{-- Empty or Healthy --}}
+                <div x-show="!restockSuggestions || restockSuggestions.length === 0" class="flex gap-3 overflow-x-auto pb-1" x-cloak>
+                    <div class="flex items-center justify-center gap-2 py-4 opacity-40 w-full">
                         <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                         <span class="text-[10px] font-black uppercase">All stock levels are healthy</span>
                     </div>
-                @endif
+                </div>
+
+                {{-- Suggestions Loaded (0ms Instant Add) --}}
+                <div x-show="restockSuggestions && restockSuggestions.length > 0" class="flex gap-3 overflow-x-auto pb-1 custom-scrollbar-slate scroll-smooth">
+                    <template x-for="item in restockSuggestions" :key="item.id">
+                        <div class="flex-shrink-0 w-56 bg-white/5 hover:bg-white/10 border border-white/10 p-3 rounded-2xl flex items-center justify-between transition-all cursor-pointer group/item" 
+                             @click="addSuggestionToCart(item)">
+                            <div class="min-w-0 pr-2">
+                                <p class="text-[12px] font-bold truncate" x-text="item.name"></p>
+                                <p class="text-[9px] text-white/40 font-black uppercase mt-0.5">Need: <span class="text-amber-400" x-text="formatStockQty(item.deficit, item.unit)"></span></p>
+                            </div>
+                            <div class="p-1.5 rounded-lg transition-all"
+                                 :class="isInCart(item.id) ? 'bg-emerald-500' : 'bg-white/10 group-hover/item:bg-indigo-500'">
+                                <template x-if="isInCart(item.id)">
+                                    <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                                </template>
+                                <template x-if="!isInCart(item.id)">
+                                    <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4"/></svg>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {{-- Left Column: Compact Entry Form --}}
+                {{-- Left Column: Compact Entry Form with Modern Combobox --}}
                 <div class="lg:col-span-1">
                     <div class="bg-white rounded-[2rem] border border-slate-200/60 shadow-sm overflow-hidden flex flex-col h-full">
                         <div class="p-5 border-b border-slate-50 bg-slate-50/30">
@@ -120,129 +173,250 @@
                         <div class="p-5 space-y-5">
                             <div>
                                 <x-input-label value="Select Ingredient" class="text-[11px]" />
-                                <div class="mt-1.5">
-                                    <x-dropdown align="left" width="full" containerClasses="block w-full">
-                                        <x-slot name="trigger">
-                                            <button type="button" class="flex items-center justify-between w-full px-4 py-2 bg-white border border-slate-200 rounded-xl text-[13px] text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all h-10">
-                                                <span class="font-bold truncate">{{ $cartIngredientId ? $ingredients->firstWhere('id', $cartIngredientId)?->name : 'Choose item...' }}</span>
-                                                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+                                <div class="relative mt-1.5" x-ref="comboboxContainer"
+                                    @click.outside="closeCombobox()"
+                                    @keydown.escape.window="closeCombobox()">
+
+                                    {{-- Search / Select Input Box --}}
+                                    <div class="relative flex items-center">
+                                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                            <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                            </svg>
+                                        </div>
+
+                                        <input 
+                                            type="text"
+                                            :value="comboboxOpen ? comboboxSearch : (selectedIngredient ? selectedIngredient.name : '')"
+                                            @input="comboboxSearch = $event.target.value; comboboxOpen = true"
+                                            @focus="openCombobox()"
+                                            @click="openCombobox()"
+                                            :placeholder="selectedIngredient ? selectedIngredient.name : 'Search or select ingredient...'"
+                                            class="w-full pl-10 pr-10 py-2 bg-white border border-slate-200 rounded-xl text-[13px] shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all h-11"
+                                            :class="selectedIngredient && !comboboxOpen ? 'font-bold text-indigo-700 bg-indigo-50/20 border-indigo-200' : 'text-slate-800'"
+                                            autocomplete="off"
+                                        />
+
+                                        {{-- Clear button --}}
+                                        <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                                            <button type="button" 
+                                                x-show="selectedIngredientId || comboboxSearch.length > 0"
+                                                x-cloak
+                                                @click.stop="clearIngredient()"
+                                                title="Clear selection"
+                                                class="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                </svg>
                                             </button>
-                                        </x-slot>
-                                        <x-slot name="content">
-                                            <div x-data="{ ingSearch: '' }" class="p-2">
-                                                <input x-model="ingSearch" type="text" placeholder="Search..." class="w-full px-3 py-1.5 bg-slate-50 border-none rounded-lg text-[12px] font-medium focus:ring-1 focus:ring-indigo-500 placeholder-slate-400 mb-2">
-                                                <div class="max-h-52 overflow-y-auto custom-scrollbar-slate">
-                                                    @foreach($ingredients as $ing)
-                                                        <div x-show="!ingSearch || @js($ing->name).toLowerCase().includes(ingSearch.toLowerCase())">
-                                                            <x-dropdown-link href="#" wire:click.prevent="$set('cartIngredientId', {{ $ing->id }})">
-                                                                <div class="flex items-center justify-between text-[12px]"><span class="font-medium text-slate-700">{{ $ing->name }}</span><span class="text-[9px] font-black text-slate-300 uppercase">{{ $ing->unit }}</span></div>
-                                                            </x-dropdown-link>
-                                                        </div>
-                                                    @endforeach
+                                        </div>
+                                    </div>
+
+                                    {{-- Dropdown Results Menu with auto-flip --}}
+                                    <div x-show="comboboxOpen" x-cloak
+                                        x-transition:enter="transition ease-out duration-100"
+                                        x-transition:enter-start="opacity-0 scale-95"
+                                        x-transition:enter-end="opacity-100 scale-100"
+                                        x-transition:leave="transition ease-in duration-75"
+                                        x-transition:leave-start="opacity-100 scale-100"
+                                        x-transition:leave-end="opacity-0 scale-95"
+                                        :class="comboboxDropUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'"
+                                        class="absolute left-0 right-0 z-50 bg-white rounded-xl shadow-xl border border-slate-100 p-1.5 max-h-60 overflow-y-auto custom-scrollbar-slate">
+                                        
+                                        <template x-for="item in filteredIngredients" :key="item.id">
+                                            <button type="button" 
+                                                @click="selectIngredient(item.id)"
+                                                class="w-full text-left px-3.5 py-2.5 rounded-lg hover:bg-indigo-50/70 hover:text-indigo-900 transition-colors flex items-center justify-between group"
+                                                :class="selectedIngredientId === item.id ? 'bg-indigo-50 text-indigo-900 font-bold' : 'text-slate-700'">
+                                                <div class="min-w-0 pr-2">
+                                                    <span class="text-[13px] font-medium group-hover:font-semibold truncate block" x-text="item.name"></span>
+                                                    <span class="text-[9px] text-slate-400 font-bold" x-text="'HQ Stock: ' + formatStockQty(mainStock[item.id] || 0, item.unit)"></span>
                                                 </div>
+                                                <div class="flex items-center gap-1.5 shrink-0">
+                                                    <span class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 group-hover:bg-indigo-100 group-hover:text-indigo-600" x-text="item.unit"></span>
+                                                    <span class="w-2 h-2 rounded-full" :class="(parseFloat(mainStock[item.id] || 0) > 0) ? 'bg-emerald-500' : 'bg-red-400'"></span>
+                                                </div>
+                                            </button>
+                                        </template>
+                                        <template x-if="filteredIngredients.length === 0">
+                                            <div class="px-4 py-3 text-[12px] text-slate-400 italic text-center">
+                                                No ingredients found
                                             </div>
-                                        </x-slot>
-                                    </x-dropdown>
+                                        </template>
+                                    </div>
                                 </div>
                             </div>
 
-                            @if($cartIngredientId)
-                                <div class="grid grid-cols-2 gap-2 p-1 bg-slate-50 rounded-2xl border border-slate-100">
-                                    <div class="p-3 bg-white rounded-xl border border-slate-100 text-center">
-                                        <span class="text-[8px] font-black text-slate-400 uppercase block mb-0.5">In Branch</span>
-                                        <span class="text-[13px] font-black text-slate-900 tabular-nums">{{ number_format($branchStock[$cartIngredientId] ?? 0, 1) }}</span>
+                            <template x-if="selectedIngredient">
+                                <div class="space-y-4 animate-fadeIn">
+                                    {{-- Stock Info Badges --}}
+                                    <div class="grid grid-cols-2 gap-2 p-1 bg-slate-50 rounded-2xl border border-slate-100">
+                                        <div class="p-3 bg-white rounded-xl border border-slate-100 text-center">
+                                            <span class="text-[8px] font-black text-slate-400 uppercase block mb-0.5">In Branch</span>
+                                            <span class="text-[13px] font-black text-slate-900 tabular-nums" x-text="formatStockQty(currentBranchStock, selectedIngredient.unit)"></span>
+                                        </div>
+                                        <div class="p-3 bg-indigo-600 rounded-xl text-center">
+                                            <span class="text-[8px] font-black text-indigo-100 uppercase block mb-0.5">HQ Avail</span>
+                                            <span class="text-[13px] font-black text-white tabular-nums" x-text="formatStockQty(currentHqStock, selectedIngredient.unit)"></span>
+                                        </div>
                                     </div>
-                                    <div class="p-3 bg-indigo-600 rounded-xl text-center">
-                                        <span class="text-[8px] font-black text-indigo-100 uppercase block mb-0.5">HQ Avail</span>
-                                        <span class="text-[13px] font-black text-white tabular-nums">{{ number_format($mainStock[$cartIngredientId] ?? 0, 1) }}</span>
-                                    </div>
-                                </div>
 
-                                @php $ing = $ingredients->firstWhere('id', $cartIngredientId); @endphp
-                                @if($ing && $ing->unitConversions->count() > 0)
-                                    <div>
-                                        <x-input-label value="Packaging Tier" class="text-[11px]" />
-                                        <div class="mt-2 flex flex-wrap gap-2">
-                                            <button type="button" wire:click="selectCartUnit('{{ $ing->unit }}')" class="h-8 px-3 rounded-lg border text-[10px] font-black uppercase transition-all {{ $cartUnit === $ing->unit ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-white border-slate-200 text-slate-500' }}">{{ $ing->unit }}</button>
-                                            @foreach($ing->unitConversions as $conv)
-                                                <button type="button" wire:click="selectCartUnit('{{ $conv->unit_name }}')" class="h-8 px-3 rounded-lg border text-[10px] font-black uppercase transition-all {{ $cartUnit === $conv->unit_name ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-white border-slate-200 text-slate-500' }}">
-                                                    {{ $conv->unit_name }} <span class="opacity-50 font-medium">({{ number_format($conv->qty_in_base, 0) }})</span>
+                                    {{-- Packaging Tier --}}
+                                    <template x-if="selectedIngredient.unit_conversions && selectedIngredient.unit_conversions.length > 0">
+                                        <div>
+                                            <x-input-label value="Packaging Tier" class="text-[11px]" />
+                                            <div class="mt-2 flex flex-wrap gap-2">
+                                                <button type="button" 
+                                                    @click="selectUnit(selectedIngredient.unit)"
+                                                    class="h-8 px-3 rounded-lg border text-[10px] font-black uppercase transition-all"
+                                                    :class="cartUnit === selectedIngredient.unit ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'"
+                                                    x-text="selectedIngredient.unit">
                                                 </button>
-                                            @endforeach
+                                                <template x-for="conv in selectedIngredient.unit_conversions" :key="conv.id">
+                                                    <button type="button" 
+                                                        @click="selectUnit(conv.unit_name)"
+                                                        class="h-8 px-3 rounded-lg border text-[10px] font-black uppercase transition-all"
+                                                        :class="cartUnit === conv.unit_name ? 'bg-indigo-600 border-indigo-600 text-white shadow-md' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'">
+                                                        <span x-text="conv.unit_name"></span>
+                                                        <span class="opacity-50 font-medium ml-1" x-text="'(' + Number(conv.qty_in_base).toFixed(0) + ')'"></span>
+                                                    </button>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    {{-- Cost Banner --}}
+                                    <div class="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 flex items-center justify-between">
+                                        <div>
+                                            <span class="text-[9px] font-black text-indigo-400 uppercase tracking-wider" x-text="'Cost / ' + cartUnit"></span>
+                                            <p class="text-[16px] font-black text-indigo-700 tabular-nums leading-none mt-0.5">₱<span x-text="cartPrice.toFixed(2)"></span></p>
+                                        </div>
+                                        <div class="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-indigo-600 shadow-sm border border-slate-100">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                         </div>
                                     </div>
-                                @endif
 
-                                <div class="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 flex items-center justify-between">
-                                    <div><span class="text-[9px] font-black text-indigo-400 uppercase">Cost / {{ $cartUnit }}</span><p class="text-[16px] font-black text-indigo-700 tabular-nums leading-none">₱{{ number_format($cartPrice, 2) }}</p></div>
-                                    <div class="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-indigo-600 shadow-sm border border-slate-100"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
-                                </div>
-
-                                <div class="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <x-input-label value="Quantity" class="text-[11px]" />
-                                        <div class="mt-1.5 relative">
-                                            <x-text-input wire:model.live="cartQty" type="number" step="0.01" class="w-full h-10 pr-10 font-black text-[13px]" />
-                                            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-400 uppercase">{{ $cartUnit }}</span>
+                                    {{-- Quantity & Subtotal --}}
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <x-input-label value="Quantity" class="text-[11px]" />
+                                            <div class="mt-1.5 relative">
+                                                <input 
+                                                    x-model="cartQty" 
+                                                    type="number" 
+                                                    step="0.01" 
+                                                    min="0.01"
+                                                    placeholder="0.00"
+                                                    @keydown.enter.prevent="addToCart()"
+                                                    class="w-full h-10 pr-10 font-black text-[13px] bg-white border border-slate-200 rounded-xl focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" 
+                                                    :class="qtyErrorMessage ? 'border-red-500 ring-1 ring-red-500/20' : ''"
+                                                />
+                                                <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-400 uppercase pointer-events-none" x-text="cartUnit"></span>
+                                            </div>
+                                            <template x-if="qtyErrorMessage">
+                                                <p class="mt-1 text-[10px] font-bold text-red-600 leading-tight" x-text="qtyErrorMessage"></p>
+                                            </template>
                                         </div>
-                                        <x-input-error :messages="$errors->get('cartQty')" class="mt-1" />
+                                        <div>
+                                            <x-input-label value="Subtotal" class="text-[11px]" />
+                                            <div class="mt-1.5 h-10 bg-slate-50 border border-slate-200 rounded-xl px-3 flex items-center text-[13px] font-black text-slate-900 tabular-nums italic">
+                                                ₱<span x-text="itemSubtotal.toFixed(2)"></span>
+                                            </div>
+                                        </div>
                                     </div>
+
+                                    {{-- Remarks --}}
                                     <div>
-                                        <x-input-label value="Subtotal" class="text-[11px]" />
-                                        <div class="mt-1.5 h-10 bg-slate-50 border border-slate-200 rounded-xl px-3 flex items-center text-[13px] font-black text-slate-900 tabular-nums italic">₱{{ number_format((float)($cartQty ?: 0) * (float)($cartPrice ?: 0), 2) }}</div>
+                                        <x-input-label value="Remarks" class="text-[11px]" />
+                                        <textarea x-model="cartNotes" class="mt-1.5 w-full bg-white border border-slate-200 rounded-xl text-[12px] focus:ring-indigo-500 focus:border-indigo-500 transition-all placeholder-slate-300 h-20 resize-none" placeholder="Optional notes for HQ..."></textarea>
                                     </div>
-                                </div>
 
-                                <div>
-                                    <x-input-label value="Remarks" class="text-[11px]" />
-                                    <textarea wire:model.live="cartNotes" class="mt-1.5 w-full bg-white border-slate-200 rounded-xl text-[12px] focus:ring-indigo-500 transition-all placeholder-slate-300 h-20 resize-none" placeholder="Optional..."></textarea>
+                                    {{-- Add to Cart Button --}}
+                                    <x-primary-button type="button" @click="addToCart()" class="w-full justify-center h-10 text-[12px] font-black uppercase tracking-widest bg-rose-600 hover:bg-rose-700 shadow-lg shadow-rose-100 transition-all">
+                                        Add to Cart
+                                    </x-primary-button>
                                 </div>
-                            @endif
-                        </div>
-
-                        <div class="p-5 bg-slate-50/50 border-t border-slate-100">
-                            <x-primary-button wire:click="addToCart" class="w-full justify-center h-10 text-[12px] font-black uppercase tracking-widest bg-rose-600 hover:bg-rose-700 shadow-lg shadow-rose-100 transition-all">
-                                Add to Cart
-                            </x-primary-button>
+                            </template>
                         </div>
                     </div>
                 </div>
 
                 {{-- Right Column: Compact Cart --}}
                 <div class="lg:col-span-2 flex flex-col h-full min-h-[500px]">
-                    <div class="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 flex flex-col h-full">
+                    <div class="bg-white rounded-[2rem] shadow-sm border border-slate-200/80 overflow-hidden flex flex-col h-full">
                         <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                             <div><h2 class="text-[14px] font-black text-slate-900">Submission Cart</h2></div>
-                            @if(!empty($cartItems)) <x-secondary-button wire:click="clearCart" class="text-red-600 border-red-100 hover:bg-red-50 h-8 text-[10px]">Clear</x-secondary-button> @endif
+                            <x-secondary-button type="button" x-show="cartItems.length > 0" x-cloak @click="promptClearCart()" class="text-red-600 border-red-100 hover:bg-red-50 h-8 text-[10px]">Clear</x-secondary-button>
                         </div>
                         <div class="flex-1 p-6 space-y-3 overflow-y-auto custom-scrollbar-slate">
-                            @forelse($cartItems as $index => $item)
-                                <div wire:key="cart-item-{{ $item['ingredient_id'] }}-{{ $index }}" class="flex items-center gap-3 p-3.5 bg-white border border-slate-100 rounded-2xl shadow-sm hover:border-indigo-200 transition-all group">
-                                    <div class="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center font-black text-[13px] group-hover:bg-indigo-600 group-hover:text-white transition-all">{{ $index + 1 }}</div>
+                            <template x-for="(item, index) in cartItems" :key="item.ingredient_id + '_' + index">
+                                <div class="flex items-center gap-3 p-3.5 bg-white border border-slate-100 rounded-2xl shadow-sm hover:border-indigo-200 transition-all group">
+                                    <div class="w-10 h-10 bg-slate-50 text-slate-400 rounded-xl flex items-center justify-center font-black text-[13px] group-hover:bg-indigo-600 group-hover:text-white transition-all" x-text="index + 1"></div>
                                     <div class="flex-1 min-w-0">
-                                        <div class="flex items-center gap-2"><h4 class="text-[13px] font-black text-slate-900 uppercase truncate">{{ $item['ingredient_name'] }}</h4></div>
-                                        <div class="flex items-center gap-3 mt-0.5"><span class="text-[11px] font-bold text-slate-700">Qty: <span class="text-indigo-600">{{ number_format($item['quantity'], 2) }} {{ $item['unit'] }}</span></span><div class="w-0.5 h-0.5 rounded-full bg-slate-200"></div><span class="text-[10px] font-black text-slate-900 italic">₱{{ number_format($item['subtotal'], 2) }}</span></div>
-                                    </div>
-                                    <button wire:click="removeFromCart({{ $index }})" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>
-                                </div>
-                            @empty <div class="flex flex-col items-center justify-center h-full py-10 opacity-30"><svg class="w-10 h-10 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg><p class="text-[11px] font-black uppercase">Cart is Empty</p></div> @endforelse
-                        </div>
-                        @if(!empty($cartItems))
-                            <div class="p-6 bg-slate-50 border-t border-slate-100 rounded-b-[2.5rem]">
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                                    <div><x-input-label value="Priority" class="text-[10px]" /><div class="mt-1 flex items-center gap-1.5">@foreach(['normal' => 'slate', 'urgent' => 'amber', 'critical' => 'red'] as $v => $c) <button wire:click="$set('orderPriority', '{{ $v }}')" class="flex-1 h-10 rounded-xl border text-[9px] font-black uppercase {{ $orderPriority === $v ? "bg-{$c}-600 border-{$c}-600 text-white shadow-md" : "bg-white border-slate-200 text-slate-500" }}">{{ $v }}</button> @endforeach</div></div>
-                                    <div class="bg-white rounded-xl border border-slate-200 p-3 flex flex-col justify-center">
-                                        <div class="flex justify-between text-[10px] font-black text-slate-400 uppercase mb-0.5"><span>Subtotal</span><span>₱{{ number_format($this->cartSubtotal, 2) }}</span></div>
-                                        <div class="flex justify-between text-[10px] font-black text-slate-400 uppercase mb-0.5">
-                                            <span class="flex items-center gap-1.5">Delivery (Est.) <span class="text-[8px] px-1.5 py-0.5 bg-slate-100 rounded text-slate-500">{{ number_format($branchDistance, 1) }} KM</span></span>
-                                            <span>₱{{ number_format($deliveryFee, 2) }}</span>
+                                        <div class="flex items-center gap-2">
+                                            <h4 class="text-[13px] font-black text-slate-900 uppercase truncate" x-text="item.ingredient_name"></h4>
                                         </div>
-                                        <div class="flex justify-between text-[14px] font-black text-slate-900 mt-1 pt-1 border-t border-slate-50"><span>Est. Total</span><span class="text-indigo-600">₱{{ number_format($this->cartTotal, 2) }}</span></div>
+                                        <div class="flex items-center gap-3 mt-0.5">
+                                            <span class="text-[11px] font-bold text-slate-700">Qty: <span class="text-indigo-600" x-text="formatStockQty(item.quantity, item.unit)"></span></span>
+                                            <div class="w-0.5 h-0.5 rounded-full bg-slate-200"></div>
+                                            <span class="text-[10px] font-black text-slate-900 italic">₱<span x-text="parseFloat(item.subtotal).toFixed(2)"></span></span>
+                                        </div>
+                                        <template x-if="item.notes">
+                                            <p class="text-[10px] text-slate-400 italic truncate mt-0.5" x-text="item.notes"></p>
+                                        </template>
+                                    </div>
+                                    <button type="button" @click="promptRemoveItem(index)" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="Remove item">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                    </button>
+                                </div>
+                            </template>
+                            
+                            <div x-show="cartItems.length === 0" class="flex flex-col items-center justify-center h-full py-10 opacity-30">
+                                <svg class="w-10 h-10 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                                <p class="text-[11px] font-black uppercase">Cart is Empty</p>
+                            </div>
+                        </div>
+
+                        <div x-show="cartItems.length > 0" class="p-6 bg-slate-50 border-t border-slate-100">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                <div>
+                                    <x-input-label value="Priority" class="text-[10px]" />
+                                    <div class="mt-1 flex items-center gap-1.5">
+                                        <button type="button" @click="orderPriority = 'normal'" class="flex-1 h-10 rounded-xl border text-[9px] font-black uppercase transition-all" :class="orderPriority === 'normal' ? 'bg-slate-700 border-slate-700 text-white shadow-md' : 'bg-white border-slate-200 text-slate-500'">Normal</button>
+                                        <button type="button" @click="orderPriority = 'urgent'" class="flex-1 h-10 rounded-xl border text-[9px] font-black uppercase transition-all" :class="orderPriority === 'urgent' ? 'bg-amber-600 border-amber-600 text-white shadow-md' : 'bg-white border-slate-200 text-slate-500'">Urgent</button>
+                                        <button type="button" @click="orderPriority = 'critical'" class="flex-1 h-10 rounded-xl border text-[9px] font-black uppercase transition-all" :class="orderPriority === 'critical' ? 'bg-red-600 border-red-600 text-white shadow-md' : 'bg-white border-slate-200 text-slate-500'">Critical</button>
+                                    </div>
+                                    <div class="mt-3">
+                                        <x-input-label value="Order Notes (Optional)" class="text-[10px]" />
+                                        <textarea x-model="orderNotes" class="mt-1 w-full bg-white border border-slate-200 rounded-xl text-[11px] focus:ring-indigo-500 focus:border-indigo-500 h-14 resize-none placeholder-slate-300" placeholder="Special delivery or packaging instructions..."></textarea>
                                     </div>
                                 </div>
-                                <button wire:click="validateBeforeSubmit" class="w-full h-12 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-[13px] uppercase tracking-[0.2em] shadow-lg shadow-indigo-100 transition-all">Submit Order Request</button>
+                                <div class="bg-white rounded-xl border border-slate-200 p-4 flex flex-col justify-center">
+                                    <div class="flex justify-between text-[10px] font-black text-slate-400 uppercase mb-1">
+                                        <span>Subtotal</span>
+                                        <span>₱<span x-text="cartSubtotal.toFixed(2)"></span></span>
+                                    </div>
+                                    <div class="flex justify-between text-[10px] font-black text-slate-400 uppercase mb-1">
+                                        <span class="flex items-center gap-1.5">
+                                            Delivery (Est.)
+                                            <span class="text-[8px] px-1.5 py-0.5 bg-slate-100 rounded text-slate-500 font-mono" x-text="Number(logistics.branchDistance || 0).toFixed(1) + ' KM'"></span>
+                                        </span>
+                                        <span>₱<span x-text="calculatedDeliveryFee.toFixed(2)"></span></span>
+                                    </div>
+                                    <div class="flex justify-between text-[14px] font-black text-slate-900 mt-2 pt-2 border-t border-slate-100">
+                                        <span>Est. Total</span>
+                                        <span class="text-indigo-600">₱<span x-text="cartTotal.toFixed(2)"></span></span>
+                                    </div>
+                                </div>
                             </div>
-                        @endif
+                            <button type="button" @click="promptSubmitOrder()" :disabled="isSubmitting" class="w-full h-12 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-[13px] uppercase tracking-[0.2em] shadow-lg shadow-indigo-100 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <span x-show="!isSubmitting">Submit Order Request</span>
+                                <span x-show="isSubmitting" x-cloak class="flex items-center gap-2">
+                                    <svg class="animate-spin w-4 h-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                    Processing...
+                                </span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -552,8 +726,24 @@
                 <div class="flex-1 overflow-y-auto custom-scrollbar-slate p-5 space-y-4">
                     @foreach($selectedOrder->items as $item)
                         <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-100 flex items-center justify-between">
-                            <div class="flex-1 min-w-0"><p class="text-[12px] font-black text-slate-900 uppercase truncate">{{ $item->ingredient->name }}</p><p class="text-[9px] text-slate-400 font-bold uppercase">{{ $item->unit }}</p></div>
-                            <div class="text-right"><p class="text-[13px] font-black text-slate-900 tabular-nums">{{ number_format($item->requested_quantity, 1) }}</p><p class="text-[10px] font-black text-indigo-600 italic">₱{{ number_format($item->subtotal, 2) }}</p></div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-[12px] font-black text-slate-900 uppercase truncate">{{ $item->ingredient->name }}</p>
+                                @php
+                                    $qty = (float)$item->requested_quantity;
+                                    $u = strtolower(trim($item->unit ?? ''));
+                                    if (in_array($u, ['g', 'grams', 'gram']) && $qty >= 1000) {
+                                        $formattedQty = number_format($qty / 1000, 2) . ' kg';
+                                    } elseif (in_array($u, ['ml', 'milliliters', 'milliliter']) && $qty >= 1000) {
+                                        $formattedQty = number_format($qty / 1000, 2) . ' L';
+                                    } elseif (in_array($u, ['kg', 'l'])) {
+                                        $formattedQty = number_format($qty, 2) . ' ' . strtoupper($item->unit);
+                                    } else {
+                                        $formattedQty = number_format($qty, 1) . ' ' . $item->unit;
+                                    }
+                                @endphp
+                                <p class="text-[10px] text-slate-500 font-bold">Qty: {{ $formattedQty }}</p>
+                            </div>
+                            <div class="text-right"><p class="text-[12px] font-black text-indigo-600 italic">₱{{ number_format($item->subtotal, 2) }}</p></div>
                         </div>
                     @endforeach
                     <div class="p-5 bg-slate-900 rounded-3xl text-white space-y-2"><div class="flex justify-between opacity-50 text-[10px] font-black uppercase"><span>Items</span><span>₱{{ number_format($selectedOrder->items->sum('subtotal'), 2) }}</span></div><div class="flex justify-between opacity-50 text-[10px] font-black uppercase"><span>Delivery</span><span>₱{{ number_format($selectedOrder->delivery_fee, 2) }}</span></div><div class="pt-2 border-t border-white/10 flex justify-between text-[15px] font-black tracking-tight"><span>Total</span><span class="text-amber-400">₱{{ number_format($selectedOrder->total_amount, 2) }}</span></div></div>
@@ -576,22 +766,34 @@
         @endif
     </x-side-panel>
 
-    {{-- Confi    {{-- 1. Submit Order Modal --}}
+    {{-- 1. Submit Order Modal --}}
     <x-modal name="confirm-submit-order" maxWidth="sm">
         <div class="p-6 text-center">
             <div class="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-3">
                 <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
             </div>
-            <h3 class="text-[15px] font-black text-slate-900 uppercase">Submit Stock Request?</h3>
-            <p class="mt-2 text-[11px] text-slate-500 font-medium">This will notify HQ to process your inventory request.</p>
+            <h3 class="text-[15px] font-black text-slate-900 uppercase tracking-tight">Submit Stock Request?</h3>
+            <p class="mt-2 text-[11px] text-slate-500 font-medium leading-relaxed">
+                You are submitting <span class="font-bold text-slate-900" x-text="cartItems.length"></span> item(s) totaling 
+                <span class="font-bold text-indigo-600">₱<span x-text="cartTotal.toFixed(2)"></span></span> to HQ.
+            </p>
             <div class="flex items-center gap-3 mt-6">
-                <x-secondary-button @click="$dispatch('close-modal', 'confirm-submit-order')" class="flex-1 justify-center h-10 text-[11px]">Back</x-secondary-button>
-                <x-primary-button 
-                    @click="$dispatch('close-modal', 'confirm-submit-order'); panel = 'requests'; $wire.submitOrder();" 
-                    class="flex-1 justify-center h-10 text-[11px] bg-indigo-600"
+                <x-secondary-button x-bind:disabled="isSubmitting" @click="$dispatch('close-modal', 'confirm-submit-order')" class="flex-1 justify-center h-10 text-[11px]">Back</x-secondary-button>
+                <button 
+                    type="button"
+                    :disabled="isSubmitting"
+                    @click="confirmSubmitOrder()" 
+                    class="flex-1 inline-flex items-center justify-center h-10 text-[11px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 rounded-xl transition-all shadow-sm disabled:opacity-50"
                 >
-                    Confirm Submit
-                </x-primary-button>
+                    <span x-show="!isSubmitting">Confirm Submit</span>
+                    <span x-show="isSubmitting" x-cloak class="flex items-center gap-2">
+                        <svg class="w-4 h-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                        </svg>
+                        <span>Submitting...</span>
+                    </span>
+                </button>
             </div>
         </div>
     </x-modal>
@@ -607,10 +809,16 @@
             <div class="flex items-center gap-3 mt-6">
                 <x-secondary-button @click="$dispatch('close-modal', 'confirm-cancel-order')" class="flex-1 justify-center h-10 text-[11px]">Back</x-secondary-button>
                 <x-primary-button 
-                    @click="$dispatch('close-modal', 'confirm-cancel-order'); $dispatch('close-modal', 'order-details'); $wire.cancelOrder();" 
+                    wire:click="cancelOrder()"
+                    wire:loading.attr="disabled"
+                    @click="$dispatch('close-modal', 'confirm-cancel-order'); $dispatch('close-modal', 'order-details');" 
                     class="flex-1 justify-center h-10 text-[11px] !bg-red-600"
                 >
-                    Yes, Cancel
+                    <span wire:loading.remove wire:target="cancelOrder">Yes, Cancel</span>
+                    <span wire:loading wire:target="cancelOrder" class="flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5 animate-spin text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                        <span>Cancelling...</span>
+                    </span>
                 </x-primary-button>
             </div>
         </div>
@@ -627,11 +835,59 @@
             <div class="flex items-center gap-3 mt-6">
                 <x-secondary-button @click="$dispatch('close-modal', 'confirm-delivery')" class="flex-1 justify-center h-10 text-[11px]">Back</x-secondary-button>
                 <x-primary-button 
-                    @click="$dispatch('close-modal', 'confirm-delivery'); $dispatch('close-modal', 'order-details'); $wire.markDelivered();" 
+                    wire:click="markDelivered()"
+                    wire:loading.attr="disabled"
+                    @click="$dispatch('close-modal', 'confirm-delivery'); $dispatch('close-modal', 'order-details');" 
                     class="flex-1 justify-center h-10 text-[11px] !bg-emerald-600"
                 >
-                    Yes, Received
+                    <span wire:loading.remove wire:target="markDelivered">Yes, Received</span>
+                    <span wire:loading wire:target="markDelivered" class="flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5 animate-spin text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                        <span>Receiving...</span>
+                    </span>
                 </x-primary-button>
+            </div>
+        </div>
+    </x-modal>
+
+    {{-- 4. Remove Item Confirmation Modal --}}
+    <x-modal name="confirm-remove-cart-item" maxWidth="sm">
+        <div class="p-6 text-center">
+            <div class="w-14 h-14 bg-red-50 text-red-600 rounded-xl flex items-center justify-center mx-auto mb-3">
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </div>
+            <h3 class="text-[15px] font-black text-slate-900 uppercase tracking-tight">Remove Item?</h3>
+            <p class="mt-2 text-[11px] text-slate-500 font-medium leading-relaxed">Are you sure you want to remove <span class="font-bold text-slate-900" x-text="itemToRemoveName"></span> from your request cart?</p>
+            <div class="flex items-center gap-3 mt-6">
+                <x-secondary-button @click="$dispatch('close-modal', 'confirm-remove-cart-item')" class="flex-1 justify-center h-10 text-[11px]">Cancel</x-secondary-button>
+                <button 
+                    type="button" 
+                    @click="confirmRemoveItem()" 
+                    class="flex-1 inline-flex items-center justify-center h-10 text-[11px] font-bold text-white bg-red-600 hover:bg-red-700 active:bg-red-800 rounded-xl transition-all shadow-sm"
+                >
+                    Yes, Remove
+                </button>
+            </div>
+        </div>
+    </x-modal>
+
+    {{-- 5. Clear Cart Confirmation Modal --}}
+    <x-modal name="confirm-clear-cart" maxWidth="sm">
+        <div class="p-6 text-center">
+            <div class="w-14 h-14 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center mx-auto mb-3">
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </div>
+            <h3 class="text-[15px] font-black text-slate-900 uppercase tracking-tight">Clear Entire Cart?</h3>
+            <p class="mt-2 text-[11px] text-slate-500 font-medium leading-relaxed">Are you sure you want to remove all <span class="font-bold text-slate-900" x-text="cartItems.length"></span> item(s) from your request cart?</p>
+            <div class="flex items-center gap-3 mt-6">
+                <x-secondary-button @click="$dispatch('close-modal', 'confirm-clear-cart')" class="flex-1 justify-center h-10 text-[11px]">Cancel</x-secondary-button>
+                <button 
+                    type="button" 
+                    @click="confirmClearCart()" 
+                    class="flex-1 inline-flex items-center justify-center h-10 text-[11px] font-bold text-white bg-red-600 hover:bg-red-700 active:bg-red-800 rounded-xl transition-all shadow-sm"
+                >
+                    Yes, Clear All
+                </button>
             </div>
         </div>
     </x-modal>

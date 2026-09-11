@@ -710,6 +710,406 @@
         };
     };
 
+    // Branch Stock Ordering Component (0ms Instant Operations & Combobox)
+    window.branchStockOrdering = function($wire, config) {
+        config = config || {};
+        const tabState = (typeof slidingTabsLogic === 'function') 
+            ? slidingTabsLogic($wire.entangle('panel').live, 'panel')
+            : { init() {} };
+
+        return {
+            ...tabState,
+            panel: $wire.entangle('panel').live,
+
+            // Data lists (frozen to prevent Alpine deep reactive proxy overhead)
+            ingredientsList: Object.freeze(config.ingredients || []),
+            branchStock: Object.freeze(config.branchStock || {}),
+            mainStock: Object.freeze(config.mainStock || {}),
+            logistics: Object.freeze(config.logistics || {}),
+            restockSuggestions: config.restockSuggestions || [],
+
+            // Combobox state
+            comboboxOpen: false,
+            comboboxSearch: '',
+            comboboxDropUp: false,
+            selectedIngredientId: config.initialIngredientId ? Number(config.initialIngredientId) : null,
+
+            // Item Form state
+            cartQty: '',
+            cartUnit: '',
+            cartPrice: 0,
+            cartNotes: '',
+            qtyErrorMessage: '',
+
+            // Cart state
+            cartItems: [],
+            orderPriority: 'normal',
+            orderNotes: '',
+            isSubmitting: false,
+            itemToRemoveIndex: null,
+            itemToRemoveName: '',
+
+            // Helper: Convert g/ml to higher unit (kg/L) when >= 1000
+            formatStockQty(quantity, baseUnit) {
+                if (quantity === null || quantity === undefined || isNaN(quantity)) return '0 ' + (baseUnit || '');
+                const qty = parseFloat(quantity);
+                const unit = (baseUnit || '').toLowerCase().trim();
+
+                if (unit === 'g' || unit === 'grams' || unit === 'gram') {
+                    if (Math.abs(qty) >= 1000) {
+                        const val = qty / 1000;
+                        return (val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })) + ' kg';
+                    }
+                    return (qty.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 })) + ' g';
+                }
+
+                if (unit === 'kg') {
+                    return (qty.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })) + ' kg';
+                }
+
+                if (unit === 'ml' || unit === 'milliliters' || unit === 'milliliter') {
+                    if (Math.abs(qty) >= 1000) {
+                        const val = qty / 1000;
+                        return (val.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })) + ' L';
+                    }
+                    return (qty.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 })) + ' ml';
+                }
+
+                if (unit === 'l' || unit === 'liter' || unit === 'liters') {
+                    return (qty.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })) + ' L';
+                }
+
+                return (qty.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })) + ' ' + (baseUnit || '');
+            },
+
+            // Getters
+            get selectedIngredient() {
+                if (!this.selectedIngredientId) return null;
+                return this.ingredientsList.find(i => Number(i.id) === Number(this.selectedIngredientId)) || null;
+            },
+
+            get filteredIngredients() {
+                const q = (this.comboboxSearch || '').toLowerCase().trim();
+                if (!q) return this.ingredientsList;
+                return this.ingredientsList.filter(i => (i.name || '').toLowerCase().includes(q));
+            },
+
+            get currentBranchStock() {
+                if (!this.selectedIngredientId) return 0;
+                return parseFloat(this.branchStock[this.selectedIngredientId] || 0);
+            },
+
+            get currentHqStock() {
+                if (!this.selectedIngredientId) return 0;
+                return parseFloat(this.mainStock[this.selectedIngredientId] || 0);
+            },
+
+            get qtyInBase() {
+                const ing = this.selectedIngredient;
+                const qty = parseFloat(this.cartQty) || 0;
+                if (!ing || qty <= 0) return 0;
+                const selectedUnit = this.cartUnit || ing.unit;
+                if (selectedUnit === ing.unit) return qty;
+                const conv = (ing.unit_conversions || []).find(c => c.unit_name === selectedUnit);
+                if (conv && parseFloat(conv.qty_in_base) > 0) {
+                    return qty * parseFloat(conv.qty_in_base);
+                }
+                return qty;
+            },
+
+            get isStockExceeded() {
+                if (!this.selectedIngredientId || !this.cartQty) return false;
+                return this.qtyInBase > this.currentHqStock;
+            },
+
+            get itemSubtotal() {
+                const qty = parseFloat(this.cartQty) || 0;
+                const price = parseFloat(this.cartPrice) || 0;
+                return qty * price;
+            },
+
+            get cartSubtotal() {
+                return this.cartItems.reduce((sum, item) => sum + (parseFloat(item.subtotal) || 0), 0);
+            },
+
+            get calculatedDeliveryFee() {
+                const subtotal = this.cartSubtotal;
+                const freeThreshold = parseFloat(this.logistics.freeThreshold || 0);
+                if (freeThreshold > 0 && subtotal >= freeThreshold) {
+                    return 0;
+                }
+                const baseFee = parseFloat(this.logistics.baseFee || 0);
+                const distance = parseFloat(this.logistics.branchDistance || 0);
+                const rate = parseFloat(this.logistics.globalRate || 50);
+                const minFee = parseFloat(this.logistics.minFee || 0);
+                const maxFee = parseFloat(this.logistics.maxFee || 5000);
+
+                const computed = baseFee + (distance * rate);
+                return Math.max(minFee, Math.min(maxFee, computed));
+            },
+
+            get cartTotal() {
+                return this.cartSubtotal + this.calculatedDeliveryFee;
+            },
+
+            // Combobox Actions
+            openCombobox() {
+                this.checkComboboxFlip();
+                this.comboboxOpen = true;
+                this.comboboxSearch = '';
+            },
+
+            closeCombobox() {
+                this.comboboxOpen = false;
+                this.comboboxSearch = '';
+            },
+
+            checkComboboxFlip() {
+                const container = this.$refs.comboboxContainer;
+                if (!container) return;
+                const rect = container.getBoundingClientRect();
+                const spaceBelow = window.innerHeight - rect.bottom;
+                this.comboboxDropUp = spaceBelow < 250 && rect.top > 250;
+            },
+
+            selectIngredient(id) {
+                this.selectedIngredientId = Number(id);
+                this.comboboxOpen = false;
+                this.comboboxSearch = '';
+                this.qtyErrorMessage = '';
+
+                const ing = this.selectedIngredient;
+                if (ing) {
+                    this.cartUnit = ing.unit || 'pcs';
+                    this.cartPrice = parseFloat(ing.cost || 0);
+                } else {
+                    this.cartUnit = '';
+                    this.cartPrice = 0;
+                }
+                this.validateQty();
+            },
+
+            clearIngredient() {
+                this.selectedIngredientId = null;
+                this.comboboxOpen = false;
+                this.comboboxSearch = '';
+                this.cartQty = '';
+                this.cartUnit = '';
+                this.cartPrice = 0;
+                this.cartNotes = '';
+                this.qtyErrorMessage = '';
+            },
+
+            selectUnit(unitName) {
+                const ing = this.selectedIngredient;
+                if (!ing) return;
+                this.cartUnit = unitName;
+                if (unitName === ing.unit) {
+                    this.cartPrice = parseFloat(ing.cost || 0);
+                } else {
+                    const conv = (ing.unit_conversions || []).find(c => c.unit_name === unitName);
+                    this.cartPrice = conv ? parseFloat(conv.price_per_unit || 0) : 0;
+                }
+                this.validateQty();
+            },
+
+            validateQty() {
+                this.qtyErrorMessage = '';
+                const qty = parseFloat(this.cartQty);
+                if (!this.selectedIngredientId || !this.cartQty) return true;
+                if (isNaN(qty) || qty <= 0) {
+                    this.qtyErrorMessage = 'Quantity must be greater than zero.';
+                    return false;
+                }
+                const ing = this.selectedIngredient;
+                if (!ing) return true;
+
+                const inBase = this.qtyInBase;
+                const hqStock = this.currentHqStock;
+                if (inBase > hqStock) {
+                    let msg = `Insufficient stock at HQ. Only ${this.formatStockQty(hqStock, ing.unit)} available.`;
+                    if (this.cartUnit !== ing.unit) {
+                        const conv = (ing.unit_conversions || []).find(c => c.unit_name === this.cartUnit);
+                        if (conv && parseFloat(conv.qty_in_base) > 0) {
+                            const inUnits = Math.floor(hqStock / parseFloat(conv.qty_in_base));
+                            msg += ` (Approx. ${inUnits} ${this.cartUnit})`;
+                        }
+                    }
+                    this.qtyErrorMessage = msg;
+                    return false;
+                }
+                return true;
+            },
+
+            // Cart Actions (0ms Instant)
+            addToCart() {
+                if (!this.selectedIngredientId) {
+                    this.$dispatch('notify', { type: 'error', message: 'Please select an ingredient.' });
+                    return;
+                }
+                const qty = parseFloat(this.cartQty);
+                if (!qty || qty <= 0) {
+                    this.qtyErrorMessage = 'Quantity must be greater than zero.';
+                    return;
+                }
+                if (!this.validateQty()) {
+                    this.$dispatch('notify', { type: 'error', message: this.qtyErrorMessage });
+                    return;
+                }
+                if (this.isInCart(this.selectedIngredientId)) {
+                    this.$dispatch('notify', { type: 'warning', message: 'This item is already in your cart.' });
+                    return;
+                }
+
+                const ing = this.selectedIngredient;
+                const selectedUnit = this.cartUnit || ing.unit;
+                const qtyInBase = this.qtyInBase;
+                const branchQty = this.currentBranchStock;
+
+                this.cartItems.push({
+                    ingredient_id: ing.id,
+                    ingredient_name: ing.name,
+                    unit: selectedUnit,
+                    order_unit: selectedUnit,
+                    quantity: qty,
+                    qty_in_base: qtyInBase,
+                    unit_price: this.cartPrice,
+                    subtotal: this.itemSubtotal,
+                    notes: this.cartNotes,
+                    current_stock: branchQty,
+                    min_stock: ing.minimum_stock,
+                    is_low: branchQty <= ing.minimum_stock,
+                });
+
+                this.$dispatch('notify', { type: 'success', message: `${ing.name} added to cart.` });
+                this.clearIngredient();
+            },
+
+            isInCart(id) {
+                return this.cartItems.some(item => Number(item.ingredient_id) === Number(id));
+            },
+
+            promptRemoveItem(index) {
+                const item = this.cartItems[index];
+                if (!item) return;
+                this.itemToRemoveIndex = index;
+                this.itemToRemoveName = item.ingredient_name;
+                this.$dispatch('open-modal', 'confirm-remove-cart-item');
+            },
+
+            confirmRemoveItem() {
+                if (this.itemToRemoveIndex !== null && this.itemToRemoveIndex >= 0) {
+                    const name = this.itemToRemoveName;
+                    this.cartItems.splice(this.itemToRemoveIndex, 1);
+                    this.itemToRemoveIndex = null;
+                    this.itemToRemoveName = '';
+                    this.$dispatch('close-modal', 'confirm-remove-cart-item');
+                    this.$dispatch('notify', { type: 'info', message: `${name} removed from cart.` });
+                }
+            },
+
+            removeFromCart(index) {
+                this.promptRemoveItem(index);
+            },
+
+            promptClearCart() {
+                if (this.cartItems.length === 0) return;
+                this.$dispatch('open-modal', 'confirm-clear-cart');
+            },
+
+            confirmClearCart() {
+                this.cartItems = [];
+                this.clearIngredient();
+                this.$dispatch('close-modal', 'confirm-clear-cart');
+                this.$dispatch('notify', { type: 'info', message: 'Cart cleared.' });
+            },
+
+            clearCart() {
+                this.promptClearCart();
+            },
+
+            addSuggestionToCart(item) {
+                if (this.isInCart(item.id)) return;
+                const ing = this.ingredientsList.find(i => Number(i.id) === Number(item.id));
+                if (!ing) return;
+
+                const branchQty = parseFloat(this.branchStock[ing.id] || 0);
+                const mainQty = parseFloat(this.mainStock[ing.id] || 0);
+                const deficit = Math.max(1, (parseFloat(ing.minimum_stock) || 0) - branchQty);
+                const finalQty = Math.min(deficit, mainQty);
+
+                if (finalQty <= 0 || mainQty <= 0) {
+                    this.$dispatch('notify', { type: 'warning', message: `Cannot suggest ${ing.name} - HQ is out of stock.` });
+                    return;
+                }
+
+                this.cartItems.push({
+                    ingredient_id: ing.id,
+                    ingredient_name: ing.name,
+                    unit: ing.unit,
+                    order_unit: ing.unit,
+                    quantity: finalQty,
+                    qty_in_base: finalQty,
+                    unit_price: parseFloat(ing.cost || 0),
+                    subtotal: finalQty * parseFloat(ing.cost || 0),
+                    notes: 'Auto-replenishment for low stock.',
+                    current_stock: branchQty,
+                    min_stock: ing.minimum_stock,
+                    is_low: true,
+                });
+
+                this.$dispatch('notify', { type: 'info', message: `${ing.name} added to cart.` });
+            },
+
+            promptSubmitOrder() {
+                if (this.cartItems.length === 0) {
+                    this.$dispatch('notify', { type: 'error', message: 'Your cart is empty.' });
+                    return;
+                }
+                this.$dispatch('open-modal', 'confirm-submit-order');
+            },
+
+            async confirmSubmitOrder() {
+                if (this.cartItems.length === 0) return;
+                this.isSubmitting = true;
+                try {
+                    const success = await this.$wire.submitOrder(
+                        JSON.parse(JSON.stringify(this.cartItems)),
+                        this.orderPriority,
+                        this.orderNotes
+                    );
+                    if (success !== false) {
+                        this.cartItems = [];
+                        this.clearIngredient();
+                        this.orderNotes = '';
+                        this.orderPriority = 'normal';
+                        this.panel = 'requests';
+                        this.$dispatch('close-modal', 'confirm-submit-order');
+                    }
+                } catch (err) {
+                    console.error('Order submission failed', err);
+                } finally {
+                    this.isSubmitting = false;
+                }
+            },
+
+            init() {
+                if (tabState.init) tabState.init.call(this);
+                this.$watch('cartQty', () => this.validateQty());
+                if (this.selectedIngredientId) {
+                    this.selectIngredient(this.selectedIngredientId);
+                }
+                window.addEventListener('update-stock-data', (event) => {
+                    if (event.detail) {
+                        if (event.detail.branchStock) this.branchStock = Object.freeze(event.detail.branchStock);
+                        if (event.detail.mainStock) this.mainStock = Object.freeze(event.detail.mainStock);
+                        if (event.detail.restockSuggestions) this.restockSuggestions = event.detail.restockSuggestions;
+                    }
+                });
+            }
+        };
+    };
+
     const registerAlpineFactories = () => {
         if (!window.Alpine) return;
 
@@ -718,6 +1118,7 @@
         window.Alpine.data('sidePanel', ({ name, show }) => window.sidePanel({ name, show }));
         window.Alpine.data('optionLibraryManagement', ($wire, allIngredients) => window.optionLibraryManagement($wire, allIngredients));
         window.Alpine.data('stockManagement', ($wire) => window.stockManagement($wire));
+        window.Alpine.data('branchStockOrdering', ($wire, config) => window.branchStockOrdering($wire, config));
     };
 
     document.addEventListener('alpine:init', registerAlpineFactories);

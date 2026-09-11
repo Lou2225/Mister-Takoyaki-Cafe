@@ -609,7 +609,7 @@ public $filterCategoryId = '';
             'ingredientName'       => ['required', 'string', 'max:255', 'regex:' . ValidationHelper::REGEX_NAME, Rule::unique('ingredients', 'name')->ignore($this->editIngredientId)],
             'ingredientCategoryId' => ['nullable', 'exists:ingredient_categories,id'],
             'ingredientUnit'       => ['required', 'in:' . implode(',', array_keys($this->availableUnits))],
-            'ingredientMinStock'   => ['required', 'numeric', 'min:0'],
+            'ingredientMinStock'   => ['nullable', 'numeric', 'min:0'],
             
             // Dynamic Conversion Rows Validation
             'conversionRows'                  => ['nullable', 'array'],
@@ -637,7 +637,7 @@ public $filterCategoryId = '';
             'ingredientName'       => ['required', 'string', 'max:255', 'regex:' . ValidationHelper::REGEX_NAME, Rule::unique('ingredients', 'name')->ignore($this->editIngredientId)],
             'ingredientCategoryId' => ['nullable', 'exists:ingredient_categories,id'],
             'ingredientUnit'       => ['required', 'in:' . implode(',', array_keys($this->availableUnits))],
-            'ingredientMinStock'   => ['required', 'numeric', 'min:0'],
+            'ingredientMinStock'   => ['nullable', 'numeric', 'min:0'],
             
             // Dynamic Conversion Rows Validation
             'conversionRows'                  => ['nullable', 'array'],
@@ -651,8 +651,7 @@ public $filterCategoryId = '';
             $rules['assignedBranchIds.*'] = ['exists:branches,id'];
         }
 
-        // Validate and close modal on error, show scroll-to-error
-        $this->validateSecure($rules, ValidationHelper::commonMessages(), [], 'confirm-save-ingredient');
+        $this->validateBeforeModal($rules, ValidationHelper::commonMessages(), 'confirm-save-ingredient');
 
 
 

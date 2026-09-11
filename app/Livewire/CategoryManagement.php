@@ -232,21 +232,25 @@ class CategoryManagement extends Component
 
         $model = $this->editCategoryType === 'product' ? ProductCategory::class : IngredientCategory::class;
         $category = $model::findOrFail($this->deleteTargetId);
-        
-        // Safety check: restricted deletion
-        $count = $this->editCategoryType === 'product' ? $category->products()->count() : $category->ingredients()->count();
-        
-        if ($count > 0) {
-            $this->dispatch('notify', 
-                type: 'error', 
-                message: "Cannot delete category. It still has $count assigned " . ($this->editCategoryType === 'product' ? 'products' : 'ingredients') . "."
-            );
-            $this->dispatch('close-modal', 'confirm-delete-category');
-            return;
-        }
 
-        $category->delete();
-        $this->dispatch('notify', type: 'success', message: 'Category removed.');
+        $count = $this->editCategoryType === 'product' ? $category->products()->count() : $category->ingredients()->count();
+
+        DB::transaction(function () use ($category) {
+            // Unassign associated items — they fall back to Uncategorized
+            if ($this->editCategoryType === 'product') {
+                $category->products()->update(['category_id' => null]);
+            } else {
+                $category->ingredients()->update(['category_id' => null]);
+            }
+
+            $category->delete();
+        });
+
+        $msg = $count > 0
+            ? "Category removed. $count " . ($this->editCategoryType === 'product' ? 'product(s)' : 'ingredient(s)') . " moved to Uncategorized."
+            : 'Category removed.';
+
+        $this->dispatch('notify', type: 'success', message: $msg);
         $this->dispatch('close-modal', 'confirm-delete-category');
         $this->panel = 'list';
         $this->dispatch('switch-panel', panel: 'list');
