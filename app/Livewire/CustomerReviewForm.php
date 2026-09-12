@@ -9,6 +9,7 @@ use App\Models\CustomerReview;
 use App\Models\SystemSetting;
 use App\Traits\HandlesValidations;
 use App\Helpers\ValidationHelper;
+use Illuminate\Support\Facades\Cookie;
 
 class CustomerReviewForm extends Component
 {
@@ -56,6 +57,7 @@ class CustomerReviewForm extends Component
         $cookieDeviceId = request()->cookie('mtc_device_id') ?? ($_COOKIE['mtc_device_id'] ?? null);
         if (!empty($cookieDeviceId)) {
             $this->device_id = substr(trim($cookieDeviceId), 0, 64);
+            $this->queueDeviceCookie($this->device_id);
         }
 
         // 2. Resolve token from param, property, query parameter, or route parameter
@@ -89,12 +91,10 @@ class CustomerReviewForm extends Component
                     $this->isExpired = true;
                 }
 
-                // Check if this device already reviewed this order
-                if (!empty($this->device_id)) {
-                    $this->checkIfDeviceAlreadyReviewed();
-                    if (!$this->alreadyReviewed) {
-                        $this->checkIfDeviceIsCoolingDown();
-                    }
+                // Check if this device already reviewed this order (checks device_id, IP/subnet + User-Agent)
+                $this->checkIfDeviceAlreadyReviewed();
+                if (!$this->alreadyReviewed) {
+                    $this->checkIfDeviceIsCoolingDown();
                 }
 
                 // Check if maximum devices cap per receipt has been reached
@@ -168,10 +168,82 @@ class CustomerReviewForm extends Component
     /**
      * Called by Alpine.js on page load once client device UUID and fingerprint are resolved.
      */
+    /**
+     * Queue persistent first-party cookie in HTTP response headers (1-year duration).
+     */
+    protected function queueDeviceCookie(?string $deviceId): void
+    {
+        if (empty($deviceId)) {
+            return;
+        }
+        try {
+            Cookie::queue(Cookie::make(
+                'mtc_device_id',
+                $deviceId,
+                525600, // 1 year in minutes
+                '/',
+                null,
+                request()->secure(),
+                false, // httpOnly = false so Alpine / JS can also read it
+                false,
+                'Lax'
+            ));
+        } catch (\Throwable $e) {
+            // Suppress cookie queue failures
+        }
+    }
+
+    /**
+     * Extract network subnet prefix for dynamic carrier IP and local proxy tolerance.
+     */
+    protected function getIpSubnet(?string $ip): ?string
+    {
+        if (empty($ip)) {
+            return null;
+        }
+        // IPv4: match /24 subnet (e.g., "112.198.170.")
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            $parts = explode('.', $ip);
+            if (count($parts) === 4) {
+                return $parts[0] . '.' . $parts[1] . '.' . $parts[2] . '.';
+            }
+        }
+        // IPv6: match /64 prefix (first 4 segments)
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+            $parts = explode(':', $ip);
+            if (count($parts) >= 4) {
+                return implode(':', array_slice($parts, 0, 4)) . ':';
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Flag device as already reviewed for this receipt and prioritize state.
+     */
+    protected function markAsAlreadyReviewed(CustomerReview $existing): void
+    {
+        $this->alreadyReviewed = true;
+        $this->isCoolingDown = false;
+        $this->existingReviewDate = $existing->created_at ? $existing->created_at->format('M d, Y h:i A') : null;
+    }
+
+    /**
+     * Called by Alpine.js on page load once client device UUID and fingerprint are resolved.
+     */
     public function setDeviceId(string $deviceId, string $fingerprint = '')
     {
-        $this->device_id = substr(trim($deviceId), 0, 64);
-        $this->device_fingerprint = substr(trim($fingerprint), 0, 64);
+        $cleanId = substr(trim($deviceId), 0, 64);
+        if (!empty($cleanId)) {
+            $this->device_id = $cleanId;
+            $this->queueDeviceCookie($this->device_id);
+        }
+
+        $cleanFingerprint = substr(trim($fingerprint), 0, 64);
+        if (!empty($cleanFingerprint)) {
+            $this->device_fingerprint = $cleanFingerprint;
+        }
+
         $this->checkIfDeviceAlreadyReviewed();
         if (!$this->alreadyReviewed) {
             $this->checkIfDeviceIsCoolingDown();
@@ -180,31 +252,100 @@ class CustomerReviewForm extends Component
 
     public function updatedDeviceId()
     {
+        if (!empty($this->device_id)) {
+            $this->queueDeviceCookie($this->device_id);
+        }
         $this->checkIfDeviceAlreadyReviewed();
         if (!$this->alreadyReviewed) {
             $this->checkIfDeviceIsCoolingDown();
         }
     }
 
+    /**
+     * Robust Multi-Signal Duplicate Check for the specific order.
+     * Prevents re-submitting on the same receipt even if client storage was cleared or IP rotated.
+     */
     public function checkIfDeviceAlreadyReviewed(): void
     {
         $order = $this->getOrder();
-        if ($order && !empty($this->device_id)) {
+        if (!$order) {
+            return;
+        }
+
+        // 1. Direct device_id match
+        if (!empty($this->device_id)) {
             $existing = CustomerReview::where('order_id', $order->id)
-                ->where(function ($q) {
-                    $q->where('device_id', $this->device_id);
-                    if (!empty($this->device_fingerprint) && $this->device_fingerprint !== 'default') {
-                        $q->orWhere(function ($sub) {
-                            $sub->where('device_fingerprint', $this->device_fingerprint)
-                                ->where('ip_address', request()->ip());
-                        });
+                ->where('device_id', $this->device_id)
+                ->first();
+
+            if ($existing) {
+                $this->markAsAlreadyReviewed($existing);
+                return;
+            }
+        }
+
+        // 2. High-fidelity hardware/canvas device_fingerprint match on this order
+        if (!empty($this->device_fingerprint) && !in_array($this->device_fingerprint, ['default', 'default_fp'])) {
+            $existing = CustomerReview::where('order_id', $order->id)
+                ->where('device_fingerprint', $this->device_fingerprint)
+                ->first();
+
+            if ($existing) {
+                // Synchronize device_id back if existing review had one
+                if (!empty($existing->device_id) && $existing->device_id !== $this->device_id) {
+                    $this->device_id = $existing->device_id;
+                    $this->queueDeviceCookie($this->device_id);
+                    $this->dispatch('device-id-synced', deviceId: $this->device_id);
+                }
+                $this->markAsAlreadyReviewed($existing);
+                return;
+            }
+        }
+
+        // 3. User-Agent + IP / IP Subnet Match on this order
+        $clientIp = request()->ip();
+        $userAgent = request()->userAgent();
+        if (!empty($clientIp) && !empty($userAgent) && strlen($userAgent) > 15) {
+            $ipSubnet = $this->getIpSubnet($clientIp);
+            $existing = CustomerReview::where('order_id', $order->id)
+                ->where('user_agent', substr($userAgent, 0, 500))
+                ->where(function ($q) use ($clientIp, $ipSubnet) {
+                    $q->where('ip_address', $clientIp);
+                    if ($ipSubnet) {
+                        $q->orWhere('ip_address', 'LIKE', $ipSubnet . '%');
                     }
                 })
                 ->first();
 
             if ($existing) {
-                $this->alreadyReviewed = true;
-                $this->existingReviewDate = $existing->created_at ? $existing->created_at->format('M d, Y h:i A') : null;
+                if (!empty($existing->device_id) && $existing->device_id !== $this->device_id) {
+                    $this->device_id = $existing->device_id;
+                    $this->queueDeviceCookie($this->device_id);
+                    $this->dispatch('device-id-synced', deviceId: $this->device_id);
+                }
+                $this->markAsAlreadyReviewed($existing);
+                return;
+            }
+        }
+
+        // 4. Contact Number match on this order (if entered by customer)
+        if (!empty($this->contact_number)) {
+            $cleanPhone = preg_replace('/[^0-9]/', '', $this->contact_number);
+            if (strlen($cleanPhone) >= 7) {
+                $existing = CustomerReview::where('order_id', $order->id)
+                    ->whereNotNull('contact_number')
+                    ->whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(contact_number, ' ', ''), '-', ''), '(', ''), ')', '') LIKE ?", ["%{$cleanPhone}%"])
+                    ->first();
+
+                if ($existing) {
+                    if (!empty($existing->device_id) && $existing->device_id !== $this->device_id) {
+                        $this->device_id = $existing->device_id;
+                        $this->queueDeviceCookie($this->device_id);
+                        $this->dispatch('device-id-synced', deviceId: $this->device_id);
+                    }
+                    $this->markAsAlreadyReviewed($existing);
+                    return;
+                }
             }
         }
     }
@@ -214,6 +355,12 @@ class CustomerReviewForm extends Component
      */
     public function checkIfDeviceIsCoolingDown(): bool
     {
+        // If already reviewed this order, the permanent already-reviewed screen takes priority
+        if ($this->alreadyReviewed) {
+            $this->isCoolingDown = false;
+            return false;
+        }
+
         $cooldownMinutes = max(0, min(120, (int) SystemSetting::get('review_device_cooldown_minutes', 10, $this->branchId)));
         $this->cooldownMinutes = $cooldownMinutes;
 
@@ -227,19 +374,30 @@ class CustomerReviewForm extends Component
         }
 
         $cutoff = now()->subMinutes($cooldownMinutes);
+        $clientIp = request()->ip();
+        $userAgent = request()->userAgent();
+        $ipSubnet = $this->getIpSubnet($clientIp);
 
-        $recentReview = CustomerReview::where(function ($q) {
+        $recentReview = CustomerReview::where('created_at', '>=', $cutoff)
+            ->where(function ($q) use ($clientIp, $userAgent, $ipSubnet) {
                 if (!empty($this->device_id)) {
                     $q->where('device_id', $this->device_id);
                 }
-                if (!empty($this->device_fingerprint) && $this->device_fingerprint !== 'default') {
-                    $q->orWhere(function ($sub) {
-                        $sub->where('device_fingerprint', $this->device_fingerprint)
-                            ->where('ip_address', request()->ip());
+                if (!empty($this->device_fingerprint) && !in_array($this->device_fingerprint, ['default', 'default_fp'])) {
+                    $q->orWhere('device_fingerprint', $this->device_fingerprint);
+                }
+                if (!empty($clientIp) && !empty($userAgent) && strlen($userAgent) > 15) {
+                    $q->orWhere(function ($sub) use ($clientIp, $userAgent, $ipSubnet) {
+                        $sub->where('user_agent', substr($userAgent, 0, 500))
+                            ->where(function ($ipQ) use ($clientIp, $ipSubnet) {
+                                $ipQ->where('ip_address', $clientIp);
+                                if ($ipSubnet) {
+                                    $ipQ->orWhere('ip_address', 'LIKE', $ipSubnet . '%');
+                                }
+                            });
                     });
                 }
             })
-            ->where('created_at', '>=', $cutoff)
             ->latest('created_at')
             ->first();
 
@@ -265,6 +423,7 @@ class CustomerReviewForm extends Component
     public function updatedContactNumber()
     {
         $this->validateFieldLive('contact_number', ['nullable', 'string', 'max:50', 'regex:' . ValidationHelper::REGEX_PHONE], ValidationHelper::commonMessages());
+        $this->checkIfDeviceAlreadyReviewed();
     }
 
     public function updatedAnswers($value, $key)
@@ -309,17 +468,18 @@ class CustomerReviewForm extends Component
             return;
         }
 
-        // 4. Ensure device_id is never empty
+        // 4. Ensure device_id is never empty and lock into persistent cookie
         if (empty($this->device_id)) {
             $this->device_id = request()->cookie('mtc_device_id') 
                 ?? ($_COOKIE['mtc_device_id'] ?? null) 
-                ?? 'dev_' . substr(hash('sha256', request()->ip() . '|' . request()->userAgent()), 0, 28);
+                ?? 'dev_' . substr(hash('sha256', request()->ip() . '|' . (request()->userAgent() ?? '')), 0, 28);
         }
+        $this->queueDeviceCookie($this->device_id);
 
         // 5. Order & Receipt-Level Limits
         $order = $this->getOrder();
         if ($order) {
-            // Check if this device already reviewed this order
+            // Check if this device or contact number already reviewed this order
             $this->checkIfDeviceAlreadyReviewed();
             if ($this->alreadyReviewed) {
                 return;
@@ -377,11 +537,11 @@ class CustomerReviewForm extends Component
 
         // 8. Atomic Review Creation with Compound Unique Constraint Safety
         try {
-            CustomerReview::create([
+            $review = CustomerReview::create([
                 'branch_id'          => $this->branchId,
                 'order_id'           => $order?->id,
-                'device_id'          => $this->device_id,
-                'device_fingerprint' => $this->device_fingerprint ?: null,
+                'device_id'          => substr(trim($this->device_id), 0, 64),
+                'device_fingerprint' => $this->device_fingerprint ? substr(trim($this->device_fingerprint), 0, 64) : null,
                 'answers'            => $structuredAnswers,
                 'customer_name'      => $this->customer_name,
                 'contact_number'     => $this->contact_number,
@@ -389,11 +549,14 @@ class CustomerReviewForm extends Component
                 'user_agent'         => substr(request()->userAgent() ?? '', 0, 500),
             ]);
 
+            $this->queueDeviceCookie($this->device_id);
+            $this->dispatch('device-id-synced', deviceId: $this->device_id);
             $this->isSubmitted = true;
         } catch (\Illuminate\Database\QueryException $e) {
             // Catch duplicate key collision on (order_id, device_id)
             if ($e->getCode() == 23000 || str_contains($e->getMessage(), 'Duplicate entry') || str_contains($e->getMessage(), 'unique_order_device_review')) {
                 $this->alreadyReviewed = true;
+                $this->isCoolingDown = false;
                 return;
             }
             throw $e;

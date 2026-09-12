@@ -1,4 +1,4 @@
-<div x-data="deviceReviewManager()" x-init="initDevice()">
+<div x-data="deviceReviewManager()" x-init="initDevice()" @device-id-synced.window="syncDeviceId($event.detail.deviceId)">
     @if($isSubmitted)
         <div class="bg-white rounded-3xl shadow-xl shadow-rose-100/50 p-8 text-center border border-gray-100 relative overflow-hidden transform transition-all duration-500 scale-100 opacity-100">
             <div class="w-20 h-20 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -211,6 +211,8 @@
     <script>
         function deviceReviewManager() {
             return {
+                deviceId: '',
+                fingerprint: '',
                 initDevice() {
                     const COOKIE_NAME = 'mtc_device_id';
                     let deviceId = '';
@@ -220,16 +222,25 @@
                         deviceId = localStorage.getItem(COOKIE_NAME);
                     } catch(e) {}
 
-                    // 2. Try Cookie if not in localStorage
+                    // 2. Try sessionStorage
                     if (!deviceId) {
-                        const match = document.cookie.match(new RegExp('(^| )' + COOKIE_NAME + '=([^;]+)'));
-                        if (match) {
-                            deviceId = decodeURIComponent(match[2]);
-                        }
+                        try {
+                            deviceId = sessionStorage.getItem(COOKIE_NAME);
+                        } catch(e) {}
                     }
 
-                    // 3. Generate cryptographic UUID if still absent
+                    // 3. Try document.cookie
                     if (!deviceId) {
+                        try {
+                            const match = document.cookie.match(new RegExp('(^| )' + COOKIE_NAME + '=([^;]+)'));
+                            if (match) {
+                                deviceId = decodeURIComponent(match[2]);
+                            }
+                        } catch(e) {}
+                    }
+
+                    // 4. Generate cryptographic UUID if still absent
+                    if (!deviceId || typeof deviceId !== 'string' || deviceId.trim().length < 10) {
                         if (window.crypto && window.crypto.randomUUID) {
                             deviceId = window.crypto.randomUUID();
                         } else {
@@ -237,37 +248,107 @@
                         }
                     }
 
-                    // 4. Persist in both localStorage and Cookie (1-year lifetime)
-                    try {
-                        localStorage.setItem(COOKIE_NAME, deviceId);
-                    } catch(e) {}
+                    deviceId = deviceId.trim();
 
-                    try {
-                        const expires = new Date(Date.now() + 365 * 864e5).toUTCString();
-                        const isSecure = window.location.protocol === 'https:';
-                        document.cookie = COOKIE_NAME + '=' + encodeURIComponent(deviceId) + '; expires=' + expires + '; path=/; SameSite=Lax' + (isSecure ? '; Secure' : '');
-                    } catch(e) {}
+                    // 5. Persist across all client storage tiers (1-year lifetime)
+                    this.persistDeviceId(deviceId);
 
-                    // 5. Build client fingerprint
-                    let fingerprint = '';
-                    try {
-                        fingerprint = [
-                            screen.width + 'x' + screen.height,
-                            screen.colorDepth,
-                            Intl.DateTimeFormat().resolvedOptions().timeZone || '',
-                            navigator.language || '',
-                            navigator.platform || ''
-                        ].join('|');
-                    } catch(e) {
-                        fingerprint = 'default';
-                    }
+                    // 6. Build high-fidelity canvas & hardware fingerprint
+                    const fingerprint = this.computeFingerprint();
 
                     this.deviceId = deviceId;
                     this.fingerprint = fingerprint;
 
-                    // 6. Send to Livewire component
+                    // 7. Dispatch to Livewire component
                     if (this.$wire && typeof this.$wire.setDeviceId === 'function') {
                         this.$wire.setDeviceId(deviceId, fingerprint);
+                    }
+                },
+
+                persistDeviceId(id) {
+                    if (!id) return;
+                    const COOKIE_NAME = 'mtc_device_id';
+                    try { localStorage.setItem(COOKIE_NAME, id); } catch(e) {}
+                    try { sessionStorage.setItem(COOKIE_NAME, id); } catch(e) {}
+                    try {
+                        const expires = new Date(Date.now() + 365 * 864e5).toUTCString();
+                        const isSecure = window.location.protocol === 'https:';
+                        document.cookie = COOKIE_NAME + '=' + encodeURIComponent(id) + '; expires=' + expires + '; path=/; SameSite=Lax' + (isSecure ? '; Secure' : '');
+                    } catch(e) {}
+                },
+
+                syncDeviceId(newId) {
+                    if (newId && newId !== this.deviceId) {
+                        this.deviceId = newId;
+                        this.persistDeviceId(newId);
+                    }
+                },
+
+                computeFingerprint() {
+                    try {
+                        // Off-screen Canvas 2D render hash (captures GPU font-rasterization micro-signatures)
+                        let canvasHash = '';
+                        try {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = 160;
+                            canvas.height = 40;
+                            const ctx = canvas.getContext('2d');
+                            if (ctx) {
+                                ctx.textBaseline = 'alphabetic';
+                                ctx.font = '14px Arial';
+                                ctx.fillStyle = '#f43f5e';
+                                ctx.fillRect(10, 5, 80, 25);
+                                ctx.fillStyle = '#0284c7';
+                                ctx.fillText('MTC-Review-2026', 15, 22);
+                                ctx.fillStyle = 'rgba(234, 88, 12, 0.7)';
+                                ctx.fillText('Takoyaki!✨', 20, 24);
+                                const dataUrl = canvas.toDataURL();
+                                let h = 0;
+                                for (let i = 0; i < dataUrl.length; i++) {
+                                    h = Math.imul(31, h) + dataUrl.charCodeAt(i) | 0;
+                                }
+                                canvasHash = (h >>> 0).toString(16);
+                            }
+                        } catch(e) {}
+
+                        // WebGL GPU Renderer (e.g. Apple GPU, Adreno, Mali)
+                        let glInfo = '';
+                        try {
+                            const glCanvas = document.createElement('canvas');
+                            const gl = glCanvas.getContext('webgl') || glCanvas.getContext('experimental-webgl');
+                            if (gl) {
+                                const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+                                if (debugInfo) {
+                                    glInfo = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || '';
+                                }
+                            }
+                        } catch(e) {}
+
+                        const raw = [
+                            screen.width + 'x' + screen.height,
+                            window.devicePixelRatio || 1,
+                            screen.colorDepth || '',
+                            Intl.DateTimeFormat().resolvedOptions().timeZone || '',
+                            navigator.language || '',
+                            navigator.platform || '',
+                            navigator.hardwareConcurrency || '',
+                            navigator.maxTouchPoints || '',
+                            canvasHash,
+                            glInfo
+                        ].join('|');
+
+                        // Produce deterministic 32-character hex hash
+                        let h1 = 0x12345678, h2 = 0x87654321, h3 = 0xdeadbeef, h4 = 0x41c6ce57;
+                        for (let i = 0; i < raw.length; i++) {
+                            const c = raw.charCodeAt(i);
+                            h1 = Math.imul(h1 ^ c, 2654435761);
+                            h2 = Math.imul(h2 ^ c, 1597334677);
+                            h3 = Math.imul(h3 ^ c, 2246822507);
+                            h4 = Math.imul(h4 ^ c, 3266489909);
+                        }
+                        return [h1, h2, h3, h4].map(h => (h >>> 0).toString(16).padStart(8, '0')).join('');
+                    } catch(e) {
+                        return 'default_fp';
                     }
                 }
             };
