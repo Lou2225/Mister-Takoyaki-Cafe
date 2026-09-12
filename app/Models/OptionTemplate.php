@@ -9,9 +9,10 @@ class OptionTemplate extends Model
 {
     use HasFactory;
 
-        protected $fillable = ['name', 'price_mode', 'is_required', 'no_recipe_required'];
+        protected $fillable = ['name', 'price_mode', 'max_select', 'is_required', 'no_recipe_required'];
 
     protected $casts = [
+        'max_select' => 'integer',
         'is_required' => 'boolean',
         'no_recipe_required' => 'boolean',
     ];

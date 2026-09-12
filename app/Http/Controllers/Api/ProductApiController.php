@@ -117,7 +117,7 @@ class ProductApiController extends Controller
                 'price_mode'  => $group->price_mode,
                 'price_mode_label' => $group->price_mode === 'fixed' ? 'Sets the price' : 'Adds to base price',
                 'min_select'  => $group->is_required ? 1 : 0,
-                'max_select'  => $group->price_mode === 'additive' ? 999 : 1,
+                'max_select'  => $group->max_select ?? ($group->price_mode === 'fixed' ? 1 : null),
                 'options'     => $group->options->map(fn($opt) => [
                     'id'           => $opt->id,
                     'name'         => $opt->name,

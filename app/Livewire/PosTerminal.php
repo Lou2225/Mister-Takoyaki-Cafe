@@ -1115,6 +1115,20 @@ public function openEditItem(string $key, array $item): void
             $selectedOptions   = $allOptions->filter(fn ($o) => in_array($o->id, $requestedOptionIds));
             $selectedModifiers = $product->modifiers->filter(fn ($m) => in_array($m->id, $requestedModifierIds));
 
+            // Enforce max_select limit per option group
+            $groupedSelected = $selectedOptions->groupBy('group_id');
+            $clampedOptions = collect();
+            foreach ($groupedSelected as $groupId => $groupOpts) {
+                $group = $product->optionGroups->firstWhere('id', $groupId);
+                $maxSelect = $group ? ($group->max_select ?: ($group->price_mode === 'fixed' ? 1 : null)) : null;
+                if ($maxSelect && $groupOpts->count() > $maxSelect) {
+                    $clampedOptions = $clampedOptions->concat($groupOpts->take($maxSelect));
+                } else {
+                    $clampedOptions = $clampedOptions->concat($groupOpts);
+                }
+            }
+            $selectedOptions = $clampedOptions;
+
             $hasFixed = $selectedOptions->contains(function ($o) use ($product) {
                 $group = $product->optionGroups->firstWhere('id', $o->group_id);
                 return $group && $group->price_mode === 'fixed';
@@ -1399,6 +1413,7 @@ public function openEditItem(string $key, array $item): void
                     'name' => $group->name,
                     'is_required' => (bool) $group->is_required,
                     'price_mode' => $group->price_mode,
+                    'max_select' => $group->max_select ? (int)$group->max_select : ($group->price_mode === 'fixed' ? 1 : null),
                     'no_recipe_required' => (bool) $group->no_recipe_required,
                     'options' => $group->options->map(fn ($option) => [
                         'id' => $option->id,

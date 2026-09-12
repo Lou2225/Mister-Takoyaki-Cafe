@@ -10,12 +10,14 @@ class ProductOptionGroup extends Model
         'product_id',
         'name',
         'price_mode',
+        'max_select',
         'is_required',
         'no_recipe_required',
         'sort_order'
     ];
 
     protected $casts = [
+        'max_select' => 'integer',
         'is_required' => 'boolean',
         'no_recipe_required' => 'boolean',
     ];

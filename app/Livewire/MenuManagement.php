@@ -55,6 +55,7 @@ class MenuManagement extends Component
                 $this->optionGroups[] = [
             'name'        => $template->name,
             'price_mode'  => $template->price_mode,
+            'max_select'  => $template->max_select,
             'is_required' => $template->is_required,
             'no_recipe_required' => (bool) $template->no_recipe_required,
             'options'     => $options
@@ -239,6 +240,8 @@ public function getOwnerLabel(string $owner): string
         DB::transaction(function () use ($groupData, $index, $existingTemplate) {
                         $noRecipe = (bool)($groupData['no_recipe_required'] ?? false);
 
+            $maxSelect = !empty($groupData['max_select']) ? (int)$groupData['max_select'] : null;
+
             if ($existingTemplate) {
                 // Update in place, rather than blocking — this is the
                 // path that lets ingredients added on a product's Recipe
@@ -248,6 +251,7 @@ public function getOwnerLabel(string $owner): string
                 $template = $existingTemplate;
                 $template->update([
                     'price_mode'  => $groupData['price_mode'],
+                    'max_select'  => $maxSelect,
                     'is_required' => $groupData['is_required'],
                     'no_recipe_required' => $noRecipe,
                 ]);
@@ -255,6 +259,7 @@ public function getOwnerLabel(string $owner): string
                 $template = OptionTemplate::create([
                     'name'        => $groupData['name'],
                     'price_mode'  => $groupData['price_mode'],
+                    'max_select'  => $maxSelect,
                     'is_required' => $groupData['is_required'],
                     'no_recipe_required' => $noRecipe,
                 ]);
@@ -365,8 +370,9 @@ public function getOwnerLabel(string $owner): string
 
     // ── Option Groups ─────────────────────────────────────────────
     public $optionGroups = [];
-        public $newGroupName = '';
+    public $newGroupName = '';
     public $newGroupPriceMode = 'additive';
+    public $newGroupMaxSelect = 1;
     public $newGroupIsRequired = false;
     public $newGroupNoRecipeRequired = false;
     public $activeGroupIndex = 0;
@@ -534,6 +540,7 @@ public function getOwnerLabel(string $owner): string
             'id'          => $g->id,
             'name'        => $g->name,
             'price_mode'  => $g->price_mode,
+            'max_select'  => $g->max_select !== null ? (int)$g->max_select : null,
             'is_required' => (bool)$g->is_required,
             'no_recipe_required' => (bool)$g->no_recipe_required,
             'options'     => $g->options->map(fn($o) => [
@@ -726,7 +733,11 @@ public function getOwnerLabel(string $owner): string
     // ── Option Group Actions ──────────────────────────────────────
     public function addOptionGroup()
     {
-        $this->validate(['newGroupName' => 'required|string|max:100', 'newGroupPriceMode' => 'required|in:fixed,additive']);
+        $this->validate([
+            'newGroupName' => 'required|string|max:100',
+            'newGroupPriceMode' => 'required|in:fixed,additive',
+            'newGroupMaxSelect' => 'nullable|integer|min:1',
+        ]);
 
         // Duplicate check
         foreach ($this->optionGroups as $group) {
@@ -736,15 +747,17 @@ public function getOwnerLabel(string $owner): string
             }
         }
 
-                $this->optionGroups[] = [
+        $this->optionGroups[] = [
             'id' => null, 'name' => $this->newGroupName,
             'price_mode' => $this->newGroupPriceMode,
+            'max_select' => $this->newGroupMaxSelect ? (int)$this->newGroupMaxSelect : null,
             'is_required' => (bool)$this->newGroupIsRequired,
             'no_recipe_required' => (bool)$this->newGroupNoRecipeRequired,
             'options' => [],
         ];
         $this->newGroupName = '';
         $this->newGroupPriceMode = 'additive';
+        $this->newGroupMaxSelect = 1;
         $this->newGroupIsRequired = false;
         $this->newGroupNoRecipeRequired = false;
 
@@ -961,6 +974,7 @@ public function getOwnerLabel(string $owner): string
             'sortOrder'    => ['integer', 'min:0'],
             'optionGroups.*.name'              => 'required|string|max:100',
             'optionGroups.*.price_mode'        => 'required|in:fixed,additive',
+            'optionGroups.*.max_select'        => 'nullable|integer|min:1',
             'optionGroups.*.options.*.name'    => 'required|string|max:100',
             'optionGroups.*.options.*.price'   => 'nullable|numeric|min:0',
             'recipeIngredients.*.id'           => 'required|exists:ingredients,id',
@@ -984,6 +998,7 @@ public function getOwnerLabel(string $owner): string
             'image'                              => 'image',
             'optionGroups.*.name'               => 'group name',
             'optionGroups.*.price_mode'         => 'price mode',
+            'optionGroups.*.max_select'         => 'selection limit',
             'optionGroups.*.options.*.name'     => 'option name',
             'optionGroups.*.options.*.price'    => 'option price',
             'recipeIngredients.*.id'            => 'ingredient',
@@ -1086,6 +1101,7 @@ public function getOwnerLabel(string $owner): string
                     $groupPayload = [
                         'name' => $gData['name'],
                         'price_mode' => $gData['price_mode'],
+                        'max_select' => !empty($gData['max_select']) ? (int)$gData['max_select'] : null,
                         'is_required' => (bool)$gData['is_required'],
                         'no_recipe_required' => (bool)($gData['no_recipe_required'] ?? false),
                         'sort_order' => $gIdx,
@@ -1242,8 +1258,9 @@ public function getOwnerLabel(string $owner): string
         $this->sortOrder         = 0;
         $this->recipeIngredients = [];
         $this->optionGroups      = [];
-                $this->newGroupName      = '';
+        $this->newGroupName      = '';
         $this->newGroupPriceMode = 'additive';
+        $this->newGroupMaxSelect = 1;
         $this->newGroupIsRequired = false;
         $this->newGroupNoRecipeRequired = false;
         $this->newIngredientId   = '';
@@ -1339,6 +1356,7 @@ public function getOwnerLabel(string $owner): string
             'id' => (int)$t->id,
             'name' => (string)$t->name,
             'price_mode' => (string)$t->price_mode,
+            'max_select' => $t->max_select !== null ? (int)$t->max_select : null,
             'is_required' => (bool)$t->is_required,
             'no_recipe_required' => (bool)$t->no_recipe_required,
             'items' => $t->items->map(fn($item) => [

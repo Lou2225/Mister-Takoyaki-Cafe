@@ -285,6 +285,9 @@
                                             <div class="flex items-center gap-3">
                                                 <span class="text-[13px] font-bold text-slate-900 uppercase tracking-tight" x-text="group.name"></span>
                                                 <span class="px-2 py-0.5 bg-white border border-slate-200 rounded text-[9px] font-black text-slate-400 uppercase tracking-widest" x-text="group.price_mode"></span>
+                                                <span class="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider"
+                                                    :class="group.max_select == 1 ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-blue-50 text-blue-700 border border-blue-100'"
+                                                    x-text="group.max_select ? (group.max_select == 1 ? 'Single (Max 1)' : 'Multi (Max ' + group.max_select + ')') : 'Multi (Unlimited)'"></span>
                                                 <span x-show="group.is_required" class="text-[9px] font-black text-rose-500 uppercase tracking-widest animate-pulse">Required</span>
                                                 <span x-show="group.no_recipe_required" class="text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded uppercase tracking-widest">No Recipe</span>
                                             </div>
@@ -297,6 +300,11 @@
                                                 </ul>
                                             </div>                                        </div>
                                         <div class="flex items-center gap-1.5">
+                                            <div class="flex items-center gap-1 mr-2" title="Maximum selections allowed (1 for single, or blank for unlimited)">
+                                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Limit:</span>
+                                                <input type="number" min="1" x-model="group.max_select" placeholder="∞"
+                                                    class="w-11 h-6 px-1 text-[11px] font-bold text-center rounded border border-slate-200 focus:border-indigo-500 bg-white" />
+                                            </div>
                                             <label class="flex items-center gap-1.5 cursor-pointer mr-2" title="Options in this group skip ingredient tracking and are always available">
                                                 <input type="checkbox" x-model="group.no_recipe_required" class="w-3.5 h-3.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500">
                                                 <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">No Recipe</span>
@@ -1523,6 +1531,27 @@
                         </select>
                     </div>
                 </div>
+                <div>
+                    <x-input-label value="Selection Mode" />
+                    <div class="grid grid-cols-2 gap-2 mt-1.5">
+                        <button type="button" @click="newGroupMaxSelect = 1" 
+                            class="h-10 rounded-xl border text-[12px] font-bold transition-all"
+                            :class="newGroupMaxSelect == 1 ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'">
+                            Single (Pick 1)
+                        </button>
+                        <button type="button" @click="if (newGroupMaxSelect == 1) newGroupMaxSelect = null" 
+                            class="h-10 rounded-xl border text-[12px] font-bold transition-all"
+                            :class="newGroupMaxSelect != 1 ? 'bg-indigo-50 border-indigo-500 text-indigo-700 shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'">
+                            Multiple Choice
+                        </button>
+                    </div>
+                    <div x-show="newGroupMaxSelect != 1" class="mt-2.5 p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
+                        <label class="text-[11px] font-bold text-slate-600 block">Max Selection Limit (Leave blank for unlimited)</label>
+                        <input type="number" min="1" x-model="newGroupMaxSelect" placeholder="e.g. 2 for max 2 flavors, or blank"
+                            class="w-full h-9 px-3 text-[12px] font-bold rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 bg-white" />
+                        <p class="text-[10px] text-slate-400">Leave blank if customers can select any number of options in this group.</p>
+                    </div>
+                </div>
                 <div class="flex items-center gap-3 p-3 bg-amber-50/50 rounded-xl border border-amber-100 transition-all hover:bg-amber-50">
                     <input type="checkbox" x-model="newGroupNoRecipeRequired" id="no_recipe_group" class="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500">
                     <label for="no_recipe_group" class="text-[12px] font-medium text-slate-700 cursor-pointer">No Recipe Required (options always available, skip ingredient tracking)</label>
@@ -1600,6 +1629,7 @@
                     // Add group modal state
                     newGroupName: '',
                     newGroupPriceMode: 'additive',
+                    newGroupMaxSelect: 1,
                     newGroupIsRequired: false,
                     newGroupNoRecipeRequired: false,
                     newGroupError: '',
@@ -1633,6 +1663,7 @@
                     openAddGroupModal() {
                         this.newGroupName = '';
                         this.newGroupPriceMode = 'additive';
+                        this.newGroupMaxSelect = 1;
                         this.newGroupIsRequired = false;
                         this.newGroupNoRecipeRequired = false;
                         this.newGroupError = '';
@@ -1654,11 +1685,13 @@
                             id: null,
                             name: name,
                             price_mode: this.newGroupPriceMode,
+                            max_select: this.newGroupMaxSelect ? Number(this.newGroupMaxSelect) : null,
                             is_required: !!this.newGroupIsRequired,
                             no_recipe_required: !!this.newGroupNoRecipeRequired,
                             options: []
                         });
                         this.newGroupName = '';
+                        this.newGroupMaxSelect = 1;
                         this.newGroupError = '';
                         this.$dispatch('close-modal', 'add-option-group');
                         this.$dispatch('notify', { type: 'success', message: "Group '" + name + "' added." });
@@ -1894,6 +1927,7 @@
                             id: null,
                             name: template.name,
                             price_mode: template.price_mode,
+                            max_select: template.max_select !== undefined ? template.max_select : (template.price_mode === 'fixed' ? 1 : null),
                             is_required: !!template.is_required,
                             no_recipe_required: !!template.no_recipe_required,
                             options: options

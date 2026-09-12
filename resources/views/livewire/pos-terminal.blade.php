@@ -182,16 +182,27 @@
             const productOptionGroups = product.option_groups || product.optionGroups || [];
             if (productOptionGroups) {
                 productOptionGroups.forEach(group => {
+                    const maxSelect = group.max_select ?? (group.price_mode === 'fixed' ? 1 : null);
+                    const isSingle = maxSelect === 1;
                     const def = group.options.find(o => o.is_default && isAvailable(o, group));
-                    if (def) {
-                        this.selectedOptions[group.id] = group.price_mode === 'additive' ? [def.id] : def.id;
-                    } else if (group.is_required) {
-                        const firstAvailable = group.options.find(o => isAvailable(o, group));
-                        this.selectedOptions[group.id] = firstAvailable
-                            ? (group.price_mode === 'additive' ? [firstAvailable.id] : firstAvailable.id)
-                            : (group.price_mode === 'additive' ? [] : null);
+                    const firstAvailable = group.options.find(o => isAvailable(o, group));
+
+                    if (isSingle) {
+                        if (def) {
+                            this.selectedOptions[group.id] = def.id;
+                        } else if (group.is_required && firstAvailable) {
+                            this.selectedOptions[group.id] = firstAvailable.id;
+                        } else {
+                            this.selectedOptions[group.id] = null;
+                        }
                     } else {
-                        this.selectedOptions[group.id] = group.price_mode === 'additive' ? [] : null;
+                        if (def) {
+                            this.selectedOptions[group.id] = [def.id];
+                        } else if (group.is_required && firstAvailable) {
+                            this.selectedOptions[group.id] = [firstAvailable.id];
+                        } else {
+                            this.selectedOptions[group.id] = [];
+                        }
                     }
                 });
             }
@@ -310,14 +321,35 @@
                 return Math.min(maximum, Math.floor(availableIngredient / recipeQuantity));
             }, Number.MAX_SAFE_INTEGER));
         },
-        toggleOpt(groupId, optId, isAdditive, isRequired) {
-            if (isAdditive) {
-                if (!this.selectedOptions[groupId]) this.selectedOptions[groupId] = [];
-                const idx = this.selectedOptions[groupId].indexOf(optId);
-                if (idx > -1) this.selectedOptions[groupId].splice(idx, 1);
-                else this.selectedOptions[groupId].push(optId);
+        toggleOpt(group, optId) {
+            const groupId = group.id;
+            const maxSelect = group.max_select ?? (group.price_mode === 'fixed' ? 1 : null);
+            const isSingle = maxSelect === 1;
+            const isRequired = !!group.is_required;
+
+            if (isSingle) {
+                if (this.selectedOptions[groupId] === optId) {
+                    if (!isRequired) this.selectedOptions[groupId] = null;
+                } else {
+                    this.selectedOptions[groupId] = optId;
+                }
             } else {
-                this.selectedOptions[groupId] = (this.selectedOptions[groupId] === optId && !isRequired) ? null : optId;
+                if (!Array.isArray(this.selectedOptions[groupId])) {
+                    this.selectedOptions[groupId] = this.selectedOptions[groupId] ? [this.selectedOptions[groupId]] : [];
+                }
+                const idx = this.selectedOptions[groupId].indexOf(optId);
+                if (idx > -1) {
+                    this.selectedOptions[groupId].splice(idx, 1);
+                } else {
+                    if (maxSelect && this.selectedOptions[groupId].length >= maxSelect) {
+                        this.$dispatch('notify', {
+                            type: 'warning',
+                            message: `You can only select up to ${maxSelect} option(s) for ${group.name}.`
+                        });
+                        return;
+                    }
+                    this.selectedOptions[groupId].push(optId);
+                }
             }
         },
         toggleMod(modId) {
@@ -337,22 +369,45 @@
             if (product) {
                 const groups = product.option_groups || product.optionGroups || [];
                 groups.forEach(g => {
+                    const maxSelect = g.max_select ?? (g.price_mode === 'fixed' ? 1 : null);
+                    const isSingle = maxSelect === 1;
                     const selectedIds = (item.options || [])
                         .filter(o => g.options.some(go => go.id === o.id))
                         .map(o => o.id);
-                    this.editSelectedOptions[g.id] = g.price_mode === 'additive' ? selectedIds : (selectedIds[0] ?? null);
+                    this.editSelectedOptions[g.id] = isSingle ? (selectedIds[0] ?? null) : selectedIds;
                 });
             }
             this.$dispatch('open-modal', 'edit-cart-item');
         },
-        toggleEditOpt(groupId, optId, isAdditive, isRequired) {
-            if (isAdditive) {
-                if (!this.editSelectedOptions[groupId]) this.editSelectedOptions[groupId] = [];
-                const idx = this.editSelectedOptions[groupId].indexOf(optId);
-                if (idx > -1) this.editSelectedOptions[groupId].splice(idx, 1);
-                else this.editSelectedOptions[groupId].push(optId);
+        toggleEditOpt(group, optId) {
+            const groupId = group.id;
+            const maxSelect = group.max_select ?? (group.price_mode === 'fixed' ? 1 : null);
+            const isSingle = maxSelect === 1;
+            const isRequired = !!group.is_required;
+
+            if (isSingle) {
+                if (this.editSelectedOptions[groupId] === optId) {
+                    if (!isRequired) this.editSelectedOptions[groupId] = null;
+                } else {
+                    this.editSelectedOptions[groupId] = optId;
+                }
             } else {
-                this.editSelectedOptions[groupId] = (this.editSelectedOptions[groupId] === optId && !isRequired) ? null : optId;
+                if (!Array.isArray(this.editSelectedOptions[groupId])) {
+                    this.editSelectedOptions[groupId] = this.editSelectedOptions[groupId] ? [this.editSelectedOptions[groupId]] : [];
+                }
+                const idx = this.editSelectedOptions[groupId].indexOf(optId);
+                if (idx > -1) {
+                    this.editSelectedOptions[groupId].splice(idx, 1);
+                } else {
+                    if (maxSelect && this.editSelectedOptions[groupId].length >= maxSelect) {
+                        this.$dispatch('notify', {
+                            type: 'warning',
+                            message: `You can only select up to ${maxSelect} option(s) for ${group.name}.`
+                        });
+                        return;
+                    }
+                    this.editSelectedOptions[groupId].push(optId);
+                }
             }
         },
         toggleEditMod(modId) {
@@ -432,9 +487,12 @@
             if (this.remainingStockForEdit(this.editingProduct) < this.editQty) return false;
             const groups = this.editingProduct.option_groups || this.editingProduct.optionGroups || [];
             return groups.every(group => {
-                if (!group.is_required) return true;
                 const sel = this.editSelectedOptions[group.id];
-                return Array.isArray(sel) ? sel.length > 0 : !!sel;
+                const count = Array.isArray(sel) ? sel.length : (sel ? 1 : 0);
+                if (group.is_required && count === 0) return false;
+                const maxSelect = group.max_select ?? (group.price_mode === 'fixed' ? 1 : null);
+                if (maxSelect && count > maxSelect) return false;
+                return true;
             });
         },
         saveEditOrder() {
@@ -613,12 +671,14 @@
             if (maxAvailable <= 0) return false;
 
             const groups = product.option_groups || product.optionGroups || [];
-            // Every required group must have a real, in-stock selection.
+            // Every required group must have a real, in-stock selection, and selection count must not exceed max_select.
             return groups.every(group => {
-                if (!group.is_required) return true;
                 const sel = this.selectedOptions[group.id];
-                const hasSelection = Array.isArray(sel) ? sel.length > 0 : !!sel;
-                return hasSelection;
+                const count = Array.isArray(sel) ? sel.length : (sel ? 1 : 0);
+                if (group.is_required && count === 0) return false;
+                const maxSelect = group.max_select ?? (group.price_mode === 'fixed' ? 1 : null);
+                if (maxSelect && count > maxSelect) return false;
+                return true;
             });
         },
         init() {
@@ -1350,17 +1410,27 @@
                                     <div class="flex items-center justify-between mb-4">
                                         <div>
                                             <p class="text-[14px] font-bold text-gray-900" x-text="group.name"></p>
-                                            <template x-if="group.is_required">
-                                                <span class="text-[11px] font-semibold text-red-600 mt-0.5 block">Required selection</span>
-                                            </template>
-                                            <template x-if="group.price_mode === 'additive'">
-                                                <span class="text-[11px] font-semibold text-blue-600 mt-0.5 block">Multiple allowed</span>
-                                            </template>
+                                            <div class="flex items-center gap-2 mt-0.5">
+                                                <template x-if="group.is_required">
+                                                    <span class="text-[11px] font-semibold text-red-600">Required selection</span>
+                                                </template>
+                                                <template x-if="(group.max_select ?? (group.price_mode === 'fixed' ? 1 : null)) === 1">
+                                                    <span class="text-[11px] font-semibold text-amber-600">Choose 1</span>
+                                                </template>
+                                                <template x-if="(group.max_select ?? (group.price_mode === 'fixed' ? 1 : null)) > 1">
+                                                    <span class="text-[11px] font-semibold text-blue-600"
+                                                          x-text="`Choose up to ${group.max_select} (${Array.isArray(selectedOptions[group.id]) ? selectedOptions[group.id].length : (selectedOptions[group.id] ? 1 : 0)}/${group.max_select})`">
+                                                    </span>
+                                                </template>
+                                                <template x-if="!(group.max_select ?? (group.price_mode === 'fixed' ? 1 : null))">
+                                                    <span class="text-[11px] font-semibold text-blue-600">Multiple allowed</span>
+                                                </template>
+                                            </div>
                                         </div>
                                     </div>
                                     <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                         <template x-for="opt in group.options" :key="opt.id">
-                                            <div @click="remainingOptionStock(localProduct, opt.id) > 0 && toggleOpt(group.id, opt.id, group.price_mode === 'additive', group.is_required)"
+                                            <div @click="remainingOptionStock(localProduct, opt.id) > 0 && toggleOpt(group, opt.id)"
                                                 class="relative flex flex-col p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 hover:shadow-md"
                                                 :class="{
                                                     'opacity-50 cursor-not-allowed border-gray-200 bg-gray-50': remainingOptionStock(localProduct, opt.id) <= 0,
@@ -1388,8 +1458,8 @@
                                                 
                                                 <template x-if="isSelected(group.id, opt.id)">
                                                     <div class="absolute top-2 right-2">
-                                                        <div class="w-5 h-5 bg-indigo-500 rounded flex items-center justify-center shadow-md"
-                                                             :class="group.price_mode === 'additive' ? 'rounded' : 'rounded-full'">
+                                                        <div class="w-5 h-5 bg-indigo-500 flex items-center justify-center shadow-md"
+                                                             :class="(group.max_select ?? (group.price_mode === 'fixed' ? 1 : null)) === 1 ? 'rounded-full' : 'rounded'">
                                                             <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
                                                         </div>
                                                     </div>
@@ -1823,17 +1893,27 @@
                             <div class="flex items-center justify-between mb-4">
                                 <div>
                                     <p class="text-[14px] font-bold text-gray-900" x-text="group.name"></p>
-                                    <template x-if="group.is_required">
-                                        <span class="text-[11px] font-semibold text-red-600 mt-0.5 block">Required selection</span>
-                                    </template>
-                                    <template x-if="group.price_mode === 'additive'">
-                                        <span class="text-[11px] font-semibold text-blue-600 mt-0.5 block">Multiple allowed</span>
-                                    </template>
+                                    <div class="flex items-center gap-2 mt-0.5">
+                                        <template x-if="group.is_required">
+                                            <span class="text-[11px] font-semibold text-red-600">Required selection</span>
+                                        </template>
+                                        <template x-if="(group.max_select ?? (group.price_mode === 'fixed' ? 1 : null)) === 1">
+                                            <span class="text-[11px] font-semibold text-amber-600">Choose 1</span>
+                                        </template>
+                                        <template x-if="(group.max_select ?? (group.price_mode === 'fixed' ? 1 : null)) > 1">
+                                            <span class="text-[11px] font-semibold text-blue-600"
+                                                  x-text="`Choose up to ${group.max_select} (${Array.isArray(editSelectedOptions[group.id]) ? editSelectedOptions[group.id].length : (editSelectedOptions[group.id] ? 1 : 0)}/${group.max_select})`">
+                                            </span>
+                                        </template>
+                                        <template x-if="!(group.max_select ?? (group.price_mode === 'fixed' ? 1 : null))">
+                                            <span class="text-[11px] font-semibold text-blue-600">Multiple allowed</span>
+                                        </template>
+                                    </div>
                                 </div>
                             </div>
                             <div class="grid grid-cols-2 gap-3">
                                 <template x-for="opt in group.options" :key="opt.id">
-                                    <div @click="remainingOptionStockForEdit(editingProduct, opt.id) > 0 && toggleEditOpt(group.id, opt.id, group.price_mode === 'additive', group.is_required)"
+                                    <div @click="remainingOptionStockForEdit(editingProduct, opt.id) > 0 && toggleEditOpt(group, opt.id)"
                                         class="relative flex flex-col p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 hover:shadow-md"
                                         :class="{
                                             'opacity-50 cursor-not-allowed border-gray-200 bg-gray-50': remainingOptionStockForEdit(editingProduct, opt.id) <= 0,
@@ -1857,8 +1937,8 @@
                                         </div>
                                         <template x-if="isEditSelected(group.id, opt.id)">
                                             <div class="absolute top-2 right-2">
-                                                <div class="w-5 h-5 bg-indigo-500 rounded flex items-center justify-center shadow-md"
-                                                     :class="group.price_mode === 'additive' ? 'rounded' : 'rounded-full'">
+                                                <div class="w-5 h-5 bg-indigo-500 flex items-center justify-center shadow-md"
+                                                     :class="(group.max_select ?? (group.price_mode === 'fixed' ? 1 : null)) === 1 ? 'rounded-full' : 'rounded'">
                                                     <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
                                                 </div>
                                             </div>

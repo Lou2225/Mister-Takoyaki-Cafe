@@ -121,7 +121,7 @@ class OrderApiController extends Controller
                 $orderItemsToCreate = [];
 
                 foreach (array_values($mergedItems) as $itemData) {
-                    $product = Product::findOrFail($itemData['product_id']);
+                    $product = Product::with('optionGroups')->findOrFail($itemData['product_id']);
 
                     // Stock Validation
                     $availableQty = $product->getMaxAvailableQuantity((int)$request->branch_id);
@@ -136,6 +136,7 @@ class OrderApiController extends Controller
                     $additiveOptionsPrice = 0;
                     $hasFixedOption = false;
 
+                    $dbOptions = collect();
                     if (!empty($itemData['options'])) {
                         $optionAvailabilities = $product->getOptionAvailability((int)$request->branch_id);
                         $dbOptions = ProductOption::with('group')->whereIn('id', $itemData['options'])->get();
@@ -155,6 +156,21 @@ class OrderApiController extends Controller
                             }
 
                             $options[] = ['id' => $opt->id, 'price' => $opt->price, 'name' => $opt->name];
+                        }
+                    }
+
+                    // Validate option groups selection constraints (required and max_select)
+                    foreach ($product->optionGroups as $group) {
+                        $selectedInGroup = $dbOptions->where('group_id', $group->id);
+                        $count = $selectedInGroup->count();
+
+                        if ($group->is_required && $count === 0) {
+                            throw new \Exception("Please select an option for {$group->name}.");
+                        }
+
+                        $maxSelect = $group->max_select ?? ($group->price_mode === 'fixed' ? 1 : null);
+                        if ($maxSelect !== null && $count > $maxSelect) {
+                            throw new \Exception("You can only select up to {$maxSelect} option(s) for {$group->name}.");
                         }
                     }
 

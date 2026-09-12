@@ -16,6 +16,7 @@
         'id' => (int)$t->id,
         'name' => (string)$t->name,
         'price_mode' => (string)$t->price_mode,
+        'max_select' => $t->max_select !== null ? (int)$t->max_select : null,
         'is_required' => (bool)$t->is_required,
         'no_recipe_required' => (bool)$t->no_recipe_required,
         'items_count' => (int)$t->items->count(),
@@ -147,6 +148,7 @@
                     <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Template Name</th>
                     <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-center">Required</th>
                     <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-center">Price Mode</th>
+                    <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-center">Selection Limit</th>
                     <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-center">Option Items</th>
                     <th class="py-3 px-4 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest">Actions</th>
                 </x-slot>
@@ -173,6 +175,11 @@
                             </div>
                         </td>
                         <td class="py-4 px-4 text-center">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider {{ ($tmpl->max_select == 1) ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-blue-50 text-blue-700 border border-blue-100' }}">
+                                {{ $tmpl->max_select ? ($tmpl->max_select == 1 ? 'Single (1)' : 'Multi (Max ' . $tmpl->max_select . ')') : 'Multi (Unlimited)' }}
+                            </span>
+                        </td>
+                        <td class="py-4 px-4 text-center">
                             <span class="text-[13px] font-bold text-slate-600">{{ $tmpl->items->count() }} Items</span>
                         </td>
                         <td class="py-4 px-4 text-right whitespace-nowrap" @click.stop>
@@ -187,7 +194,7 @@
                 @empty
                     @if($allTemplates->count() === 0)
                         <tr>
-                            <td colspan="5" class="py-0">
+                            <td colspan="6" class="py-0">
                                 <x-empty-state title="Library Empty" description="Start building your configuration templates to speed up product management." />
                             </td>
                         </tr>
@@ -195,7 +202,7 @@
                 @endforelse
 
                 <tr x-show="filteredTemplateIds.length === 0" x-cloak>
-                    <td colspan="5" class="py-0">
+                    <td colspan="6" class="py-0">
                         <x-empty-state title="No templates match your search" description="Try changing your filters or search terms." />
                     </td>
                 </tr>
@@ -224,11 +231,14 @@
                         </div>
 
                         <h3 class="text-[16px] font-black text-slate-900 tracking-tight mb-1 group-hover:text-indigo-600 transition-colors">{{ $tmpl->name }}</h3>
-                        <div class="flex items-center gap-2 mb-6">
+                        <div class="flex flex-wrap items-center gap-2 mb-6">
                             <span class="text-[10px] font-black {{ $tmpl->is_required ? 'text-rose-500 bg-rose-50 border-rose-100' : 'text-slate-400 bg-slate-50 border-slate-100' }} border px-2 py-0.5 rounded-lg uppercase tracking-widest">{{ $tmpl->is_required ? 'Required' : 'Optional' }}</span>
                             <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-white border border-slate-100 shadow-sm">
                                 <span class="h-1.5 w-1.5 rounded-full {{ $tmpl->price_mode === 'fixed' ? 'bg-indigo-500' : 'bg-sky-500' }}"></span>
                                 <span class="text-[10px] font-bold {{ $tmpl->price_mode === 'fixed' ? 'text-indigo-600' : 'text-sky-600' }} uppercase tracking-wider">{{ $tmpl->price_mode }}</span>
+                            </span>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider {{ ($tmpl->max_select == 1) ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-blue-50 text-blue-700 border border-blue-100' }}">
+                                {{ $tmpl->max_select ? ($tmpl->max_select == 1 ? 'Single (1)' : 'Multi (Max ' . $tmpl->max_select . ')') : 'Multi (Unlimited)' }}
                             </span>
                         </div>
 
@@ -707,6 +717,28 @@
                             </div>
                         </div>
 
+                        <div>
+                            <x-input-label value="Selection Mode" />
+                            <div class="grid grid-cols-2 gap-2 mt-1.5">
+                                <button type="button" @click="maxSelect = 1" 
+                                    class="h-10 rounded-lg border-2 text-[11px] font-black uppercase tracking-wider transition-all"
+                                    :class="maxSelect == 1 ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'">
+                                    Single (Pick 1)
+                                </button>
+                                <button type="button" @click="if (maxSelect == 1) maxSelect = null" 
+                                    class="h-10 rounded-lg border-2 text-[11px] font-black uppercase tracking-wider transition-all"
+                                    :class="maxSelect != 1 ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'">
+                                    Multiple Choice
+                                </button>
+                            </div>
+                            <div x-show="maxSelect != 1" class="mt-2.5 p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1.5">
+                                <label class="text-[11px] font-bold text-slate-600 block">Max Selection Limit (Leave blank for unlimited)</label>
+                                <input type="number" min="1" x-model="maxSelect" placeholder="e.g. 2 for max 2 flavors, or blank"
+                                    class="w-full h-9 px-3 text-[12px] font-bold rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 bg-white" />
+                                <p class="text-[10px] text-slate-400">Specify maximum number of options a customer can pick, or leave blank for unlimited.</p>
+                            </div>
+                        </div>
+
                         <div class="pt-5 border-t border-slate-50 space-y-4">
                             <label class="flex items-center gap-3 cursor-pointer group">
                                 <input type="checkbox" x-model="noRecipeRequired" @change="if(noRecipeRequired) templateItems.forEach(it => it.ingredients = [])" class="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500">
@@ -821,6 +853,7 @@
                         editTemplateId: $wire.entangle('editTemplateId'),
                         templateName: $wire.entangle('name'),
                         priceMode: $wire.entangle('priceMode'),
+                        maxSelect: $wire.entangle('maxSelect'),
                         isRequired: $wire.entangle('isRequired'),
                         noRecipeRequired: $wire.entangle('noRecipeRequired'),
                         templateItems: $wire.entangle('templateItems'),
@@ -877,6 +910,7 @@
                             this.editTemplateId = null;
                             this.templateName = '';
                             this.priceMode = 'additive';
+                            this.maxSelect = 1;
                             this.isRequired = false;
                             this.noRecipeRequired = false;
                             this.templateItems = [
@@ -894,6 +928,7 @@
                                 this.editTemplateId = tmpl.id;
                                 this.templateName = tmpl.name;
                                 this.priceMode = tmpl.price_mode;
+                                this.maxSelect = tmpl.max_select;
                                 this.isRequired = tmpl.is_required;
                                 this.noRecipeRequired = tmpl.no_recipe_required;
                                 this.templateItems = JSON.parse(JSON.stringify(tmpl.items || []));

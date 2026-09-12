@@ -26,7 +26,8 @@ class OptionLibraryManagement extends Component
     public $editTemplateId = null;
     public $name = '';
     public $priceMode = 'additive';
-        public $isRequired = false;
+    public $maxSelect = 1;
+    public $isRequired = false;
     public $noRecipeRequired = false;
     public $templateItems = [];
 
@@ -132,6 +133,7 @@ class OptionLibraryManagement extends Component
         $this->editTemplateId = $template->id;
         $this->name = $template->name;
         $this->priceMode = $template->price_mode;
+        $this->maxSelect = $template->max_select;
         $this->isRequired = (bool)$template->is_required;
         $this->noRecipeRequired = (bool)$template->no_recipe_required;
         
@@ -270,11 +272,13 @@ class OptionLibraryManagement extends Component
         $this->validate([
             'name' => 'required|string|max:255',
             'priceMode' => 'required|in:fixed,additive',
+            'maxSelect' => 'nullable|integer|min:1',
             'templateItems' => 'required|array|min:1',
             'templateItems.*.name' => 'required|string|max:100',
             'templateItems.*.price' => 'nullable|numeric|min:0',
         ], [
             'name.required' => 'Template name is required.',
+            'maxSelect.min' => 'Maximum selections must be at least 1.',
             'templateItems.required' => 'At least one variation option is required.',
             'templateItems.min' => 'At least one variation option is required.',
             'templateItems.*.name.required' => 'Every option must have a name.',
@@ -301,6 +305,7 @@ class OptionLibraryManagement extends Component
 
                 $template->name = $this->name;
                 $template->price_mode = $this->priceMode;
+                $template->max_select = $this->maxSelect ? (int)$this->maxSelect : null;
                 $template->is_required = $this->isRequired;
                 $template->no_recipe_required = $this->noRecipeRequired;
                 $template->save();
@@ -369,6 +374,7 @@ class OptionLibraryManagement extends Component
         $this->editTemplateId = null;
         $this->name = '';
         $this->priceMode = 'additive';
+        $this->maxSelect = 1;
         $this->isRequired = false;
         $this->noRecipeRequired = false;
         $this->templateItems = [];
