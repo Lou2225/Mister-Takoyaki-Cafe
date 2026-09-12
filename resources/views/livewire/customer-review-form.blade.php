@@ -58,6 +58,24 @@
                 We couldn't locate this receipt. Please scan the QR code printed directly on your physical receipt.
             </p>
         </div>
+    @elseif($isCoolingDown)
+        <div class="bg-white rounded-3xl shadow-xl shadow-gray-200/50 p-8 text-center border border-gray-100 relative overflow-hidden">
+            <div class="w-20 h-20 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center mx-auto mb-5 border border-indigo-100">
+                <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 mb-3">
+                ⏱️ Review Cooldown Active
+            </div>
+            <h2 class="text-2xl font-black text-gray-900 tracking-tight mb-2">Please Wait a Moment</h2>
+            <p class="text-[14px] text-gray-500 font-medium leading-relaxed mb-4">
+                You recently submitted a review from this device. To prevent spam and duplicate feedback, please wait 
+                <span class="font-bold text-gray-900">{{ $cooldownRemainingMinutes }} minute{{ $cooldownRemainingMinutes > 1 ? 's' : '' }}</span> 
+                before reviewing another receipt.
+            </p>
+            <div class="p-4 bg-gray-50 rounded-2xl border border-gray-100 inline-block text-[12px] text-gray-500 font-medium">
+                Thank you for your patience and for dining with us!
+            </div>
+        </div>
     @else
         <form wire:submit="submit" action="javascript:void(0);" onsubmit="return false;" class="bg-white rounded-3xl shadow-xl shadow-gray-200/50 p-6 sm:p-8 border border-gray-100 transition-all">
             
@@ -226,7 +244,8 @@
 
                     try {
                         const expires = new Date(Date.now() + 365 * 864e5).toUTCString();
-                        document.cookie = COOKIE_NAME + '=' + encodeURIComponent(deviceId) + '; expires=' + expires + '; path=/; SameSite=Lax';
+                        const isSecure = window.location.protocol === 'https:';
+                        document.cookie = COOKIE_NAME + '=' + encodeURIComponent(deviceId) + '; expires=' + expires + '; path=/; SameSite=Lax' + (isSecure ? '; Secure' : '');
                     } catch(e) {}
 
                     // 5. Build client fingerprint

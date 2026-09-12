@@ -41,6 +41,9 @@ class CustomerReviewForm extends Component
     public $isExpired = false;
     public $expiryDays = 7;
     public $orderNotFound = false;
+    public $isCoolingDown = false;
+    public $cooldownRemainingMinutes = 0;
+    public $cooldownMinutes = 10;
 
     // In-memory order cache
     protected ?Order $cachedOrder = null;
@@ -89,6 +92,9 @@ class CustomerReviewForm extends Component
                 // Check if this device already reviewed this order
                 if (!empty($this->device_id)) {
                     $this->checkIfDeviceAlreadyReviewed();
+                    if (!$this->alreadyReviewed) {
+                        $this->checkIfDeviceIsCoolingDown();
+                    }
                 }
 
                 // Check if maximum devices cap per receipt has been reached
@@ -110,6 +116,11 @@ class CustomerReviewForm extends Component
                     $this->branchId = $this->branch->id;
                 }
             }
+        }
+
+        // Check cooldown if device_id is present and not already marked as reviewed
+        if (!empty($this->device_id) && !$this->alreadyReviewed && !$this->isCoolingDown) {
+            $this->checkIfDeviceIsCoolingDown();
         }
 
         // 5. Load configuration from System Settings
@@ -162,11 +173,17 @@ class CustomerReviewForm extends Component
         $this->device_id = substr(trim($deviceId), 0, 64);
         $this->device_fingerprint = substr(trim($fingerprint), 0, 64);
         $this->checkIfDeviceAlreadyReviewed();
+        if (!$this->alreadyReviewed) {
+            $this->checkIfDeviceIsCoolingDown();
+        }
     }
 
     public function updatedDeviceId()
     {
         $this->checkIfDeviceAlreadyReviewed();
+        if (!$this->alreadyReviewed) {
+            $this->checkIfDeviceIsCoolingDown();
+        }
     }
 
     public function checkIfDeviceAlreadyReviewed(): void
@@ -190,6 +207,54 @@ class CustomerReviewForm extends Component
                 $this->existingReviewDate = $existing->created_at ? $existing->created_at->format('M d, Y h:i A') : null;
             }
         }
+    }
+
+    /**
+     * Check if this device is within the anti-spam cooldown window across receipts.
+     */
+    public function checkIfDeviceIsCoolingDown(): bool
+    {
+        $cooldownMinutes = max(0, min(120, (int) SystemSetting::get('review_device_cooldown_minutes', 10, $this->branchId)));
+        $this->cooldownMinutes = $cooldownMinutes;
+
+        if ($cooldownMinutes <= 0) {
+            $this->isCoolingDown = false;
+            return false;
+        }
+
+        if (empty($this->device_id) && empty($this->device_fingerprint)) {
+            return false;
+        }
+
+        $cutoff = now()->subMinutes($cooldownMinutes);
+
+        $recentReview = CustomerReview::where(function ($q) {
+                if (!empty($this->device_id)) {
+                    $q->where('device_id', $this->device_id);
+                }
+                if (!empty($this->device_fingerprint) && $this->device_fingerprint !== 'default') {
+                    $q->orWhere(function ($sub) {
+                        $sub->where('device_fingerprint', $this->device_fingerprint)
+                            ->where('ip_address', request()->ip());
+                    });
+                }
+            })
+            ->where('created_at', '>=', $cutoff)
+            ->latest('created_at')
+            ->first();
+
+        if ($recentReview && $recentReview->created_at) {
+            $cooldownEnd = $recentReview->created_at->copy()->addMinutes($cooldownMinutes);
+            if ($cooldownEnd->isFuture()) {
+                $this->isCoolingDown = true;
+                $secondsRemaining = now()->diffInSeconds($cooldownEnd);
+                $this->cooldownRemainingMinutes = max(1, (int) ceil($secondsRemaining / 60));
+                return true;
+            }
+        }
+
+        $this->isCoolingDown = false;
+        return false;
     }
 
     public function updatedCustomerName()
@@ -272,16 +337,9 @@ class CustomerReviewForm extends Component
         }
 
         // 6. Anti-Spam: Device Cooldown across receipts (default 10 minutes, max 120)
-        $cooldownMinutes = max(0, min(120, (int) SystemSetting::get('review_device_cooldown_minutes', 10, $this->branchId)));
-        if ($cooldownMinutes > 0 && !empty($this->device_id)) {
-            $recentReview = CustomerReview::where('device_id', $this->device_id)
-                ->where('created_at', '>=', now()->subMinutes($cooldownMinutes))
-                ->first();
-
-            if ($recentReview) {
-                $this->addError('submission', 'You have recently submitted a review. Please wait a few minutes before submitting another.');
-                return;
-            }
+        if ($this->checkIfDeviceIsCoolingDown()) {
+            $this->addError('submission', "You have recently submitted a review. Please wait {$this->cooldownRemainingMinutes} minute(s) before submitting another.");
+            return;
         }
 
         // 7. Form Field Validations
