@@ -403,7 +403,8 @@ function generateQrRasterBytes(text, charsPerLine = 32) {
 
         const qr = QREngine.create(qrText);
         const moduleCount = qr.getModuleCount();
-        const quietZone = 6; // More "air" around the QR makes the black squares look cleaner and easier to read.
+        // 0-module quiet zone so there is no blank space above or below the QR code
+        const quietZone = 2;
         const totalModules = moduleCount + quietZone * 2;
 
         // Keep the black area a little less packed so the pattern prints with cleaner contrast
@@ -411,9 +412,18 @@ function generateQrRasterBytes(text, charsPerLine = 32) {
         const maxDots = charsPerLine > 32 ? 220 : 180;
         const dotScale = Math.max(8, Math.min(12, Math.floor(maxDots / totalModules)));
         const rawWidth = totalModules * dotScale;
-        // Width in bytes must be integer multiple of 8
-        const bytesPerLine = Math.ceil(rawWidth / 8);
         const heightDots = totalModules * dotScale;
+
+        // Render onto a canvas spanning the printer's FULL printable width
+        // (not just the QR's own width), with the QR padded into the middle
+        // ourselves. Many thermal printer firmwares ignore ESC a (align)
+        // for raster bit images and always paint them flush-left — baking
+        // the centering into the image itself is the only way to guarantee
+        // it lands in the middle of the receipt on those printers.
+        const paperWidthDots = charsPerLine > 32 ? 576 : 384; // 80mm vs 58mm
+        const bytesPerLine = Math.ceil(paperWidthDots / 8);
+        const fullWidthDots = bytesPerLine * 8;
+        const leftPadDots = Math.max(0, Math.floor((fullWidthDots - rawWidth) / 2));
 
         const bitmapBytes = [];
 
@@ -422,10 +432,10 @@ function generateQrRasterBytes(text, charsPerLine = 32) {
             for (let bx = 0; bx < bytesPerLine; bx++) {
                 let byteVal = 0;
                 for (let b = 0; b < 8; b++) {
-                    const x = bx * 8 + b;
+                    const x = bx * 8 + b - leftPadDots;
                     const modX = Math.floor(x / dotScale) - quietZone;
                     let isDark = false;
-                    if (modY >= 0 && modY < moduleCount && modX >= 0 && modX < moduleCount) {
+                    if (x >= 0 && modY >= 0 && modY < moduleCount && modX >= 0 && modX < moduleCount) {
                         isDark = qr.isDark(modY, modX);
                     }
                     if (isDark) {
@@ -442,10 +452,10 @@ function generateQrRasterBytes(text, charsPerLine = 32) {
         const yH = (heightDots >> 8) & 0xFF;
 
         return [
-            ESC, 0x61, 0x01, // Center align
+            ESC, 0x61, 0x01, // Kept as a harmless fallback for printers that DO honor centering on raster images
             GS, 0x76, 0x30, 0x00, xL, xH, yL, yH,
-            ...bitmapBytes,
-            0x0D, 0x0A
+            ...bitmapBytes
+            // Trailing 0x0D, 0x0A omitted so no extra blank line is fed after the QR
         ];
     } catch (err) {
         console.warn('Thermal printer: QR raster generation failed:', err);
@@ -933,9 +943,6 @@ class ThermalBluetoothPrinter {
                         }
                         ln(this.divider('-'));
                     }
-
-                    ln('');
-
                     // Footer
                     if (settings.show_receipt_footer !== false) {
                         push(CMD.alignCenter());
@@ -952,19 +959,14 @@ class ThermalBluetoothPrinter {
                     const qrTarget = settings.qr_url || '';
                     if (settings.show_receipt_qr_code !== false && qrTarget) {
                         push(CMD.alignCenter());
-                        ln('');
                         ln(this.divider('-'));
                         ln('SCAN TO REVIEW & RATE ORDER');
                         ln(this.divider('-'));
-                        ln('');
-                        // Generate enlarged, high-contrast 1-bit raster QR code bytes
                         const qrBytes = generateQrRasterBytes(qrTarget, this.charsPerLine);
                         if (qrBytes.length > 0) {
                             push(qrBytes);
                         }
-                        ln('');
-                        ln(this.wrap(qrTarget));
-                        ln('');
+                        ln(this.wrap('Review us: ' + qrTarget));
                     }
                 }
 

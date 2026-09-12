@@ -512,9 +512,6 @@
 
         .receipt-qr-wrap {
             text-align: center;
-            margin-top: 8px;
-            padding-top: 6px;
-            border-top: 1px dashed #000;
             width: 100%;
             box-sizing: border-box;
         }
@@ -522,17 +519,18 @@
         .receipt-qr-title {
             font-size: var(--font-size-xs);
             font-weight: 900;
-            margin-bottom: 4px;
             letter-spacing: 0.5px;
             text-transform: uppercase;
             text-align: center;
             width: 100%;
+            padding: 1px 0;
         }
 
         .qr-canvas-container {
             display: block;
             text-align: center;
-            margin: 4px auto 6px;
+            margin: 2px auto 0;
+            line-height: 0;
             width: 100%;
         }
 
@@ -548,9 +546,9 @@
         }
 
         .receipt-qr-url {
-            font-size: 7.5px;
+            font-size: var(--font-size-xs);
             word-break: break-all;
-            line-height: 1.15;
+            line-height: 1.25;
             margin-top: 3px;
             text-align: center;
             width: 100%;
@@ -983,18 +981,15 @@
                     {{-- Crystal-Clear 1-Bit Monochrome QR Code --}}
                     @if(($settings['show_receipt_qr_code'] ?? true) && !empty($reviewUrl))
                         <div class="receipt-qr-wrap">
+                            <div class="divider-dashed"></div>
                             <div class="receipt-qr-title">SCAN TO REVIEW & RATE ORDER</div>
+                            <div class="divider-dashed"></div>
                             <div class="qr-canvas-container">
                                 <canvas id="receiptQrCanvas" class="qr-code-canvas" width="100" height="100"></canvas>
                             </div>
-                            <div class="receipt-qr-url">{{ $reviewUrl }}</div>
+                            <div class="receipt-qr-url">Review us: {{ $reviewUrl }}</div>
                         </div>
                     @endif
-
-                    <div class="divider-solid" style="margin-top: 8px;"></div>
-                    <div style="text-align: center; font-size: 8px; margin-top: 3px; font-weight: bold;">
-                        *** THANK YOU FOR YOUR ORDER ***
-                    </div>
                 </div>
             </div>
         </div>

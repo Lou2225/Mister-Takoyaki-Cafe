@@ -957,8 +957,13 @@
                 </div>
 
             {{-- Customer Feedback --}}
-            <div x-show="tab === 'reviews'" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="space-y-6">
-                <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+<div x-show="tab === 'reviews'" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="space-y-6"
+    x-data="{
+        maxDevices: @entangle('reviewMaxDevicesPerReceipt').live,
+        expiryDays: @entangle('reviewExpiryDays').live,
+        cooldownMins: @entangle('reviewDeviceCooldownMinutes').live,
+        bump(prop, delta, min, max) { this[prop] = Math.max(min, Math.min(max, (parseInt(this[prop]) || 0) + delta)); }
+    }">                <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
                     <div class="xl:col-span-2 space-y-6">
                         <div class="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
                             <h2 class="text-[13px] font-bold text-gray-900 uppercase tracking-widest mb-6 border-b border-gray-50 pb-2">Feedback Questionnaire</h2>
@@ -983,100 +988,80 @@
                                     <p class="text-[12px] text-gray-500 font-medium">Configure table multi-device rules, receipt expiry, and spam limits.</p>
                                 </div>
 
-                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                                     {{-- Max Devices per Receipt (1 - 10) --}}
                                     <div>
-                                        <div class="flex items-center justify-between mb-1">
-                                            <x-input-label for="reviewMaxDevicesPerReceipt" value="Max Devices per Receipt" class="!mb-0" />
-                                            <span class="text-[10px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">1 – 10</span>
+                                        <div class="mb-1.5">
+                                            <x-input-label for="reviewMaxDevicesPerReceipt" value="Max Devices per Receipt" class="!mb-1" />
+                                            <span class="inline-block text-[10px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">1 – 10</span>
                                         </div>
-                                        <div class="relative flex items-center h-10 border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all">
-                                            <input type="number" min="1" max="10" step="1" id="reviewMaxDevicesPerReceipt"
-                                                wire:model.live.debounce.300ms="reviewMaxDevicesPerReceipt"
-                                                x-on:input="if (parseInt($el.value) > 10) $el.value = 10; if (parseInt($el.value) < 1 && $el.value !== '') $el.value = 1;"
-                                                x-on:blur="if ($el.value === '' || parseInt($el.value) < 1) { $el.value = 1; $el.dispatchEvent(new Event('input')); }"
-                                                x-on:keydown="if ($event.key === 'e' || $event.key === 'E' || $event.key === '+' || $event.key === '-') $event.preventDefault();"
-                                                class="w-full h-full pl-3 pr-2 text-[13px] font-semibold text-gray-800 border-0 focus:ring-0 bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
-                                            <div class="flex flex-col border-l border-gray-200 h-full w-8 shrink-0 bg-gray-50">
-                                                <button type="button" wire:click="incrementReviewMaxDevices"
-                                                    @if((int)$reviewMaxDevicesPerReceipt >= 10) disabled @endif
-                                                    class="flex-1 flex items-center justify-center text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/50 disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500 transition-colors border-b border-gray-200"
-                                                    title="Increase (Max: 10)">
-                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 15l7-7 7 7"/></svg>
-                                                </button>
-                                                <button type="button" wire:click="decrementReviewMaxDevices"
-                                                    @if((int)$reviewMaxDevicesPerReceipt <= 1) disabled @endif
-                                                    class="flex-1 flex items-center justify-center text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/50 disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500 transition-colors"
-                                                    title="Decrease (Min: 1)">
-                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
-                                                </button>
-                                            </div>
+                                        <div class="mt-1 flex items-center h-10 border border-gray-200 rounded-lg overflow-hidden shadow-sm bg-white">
+                                                                                        <button type="button" @click="bump('maxDevices', -1, 1, 10)"
+                                                :disabled="maxDevices <= 1"
+                                                class="w-10 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors border-r border-gray-200 shrink-0">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                                            </button>
+                                            <input id="reviewMaxDevicesPerReceipt" type="number" readonly tabindex="-1"
+                                                x-model="maxDevices"
+                                                class="flex-1 w-full h-full text-center text-[13px] font-bold text-gray-900 border-0 focus:ring-0 bg-transparent cursor-default [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+                                            <button type="button" @click="bump('maxDevices', 1, 1, 10)"
+                                                :disabled="maxDevices >= 10"
+                                                class="w-10 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors border-l border-gray-200 shrink-0">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                            </button>
                                         </div>
-                                        <p class="text-[10px] text-gray-400 mt-1 font-medium leading-tight">Max unique customer phones per table receipt (e.g. 5 for group dining).</p>
+                                        <p class="text-[10px] text-gray-400 mt-1.5 font-medium leading-tight">Max unique customer phones per table receipt (e.g. 5 for group dining).</p>
                                         <x-input-error :messages="$errors->get('reviewMaxDevicesPerReceipt')" class="mt-1" />
                                     </div>
 
                                     {{-- Receipt Expiry (1 - 30 Days) --}}
                                     <div>
-                                        <div class="flex items-center justify-between mb-1">
-                                            <x-input-label for="reviewExpiryDays" value="Receipt Expiry (Days)" class="!mb-0" />
-                                            <span class="text-[10px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">1 – 30 days</span>
+                                        <div class="mb-1.5">
+                                            <x-input-label for="reviewExpiryDays" value="Receipt Expiry (Days)" class="!mb-1" />
+                                            <span class="inline-block text-[10px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">1 – 30 days</span>
                                         </div>
-                                        <div class="relative flex items-center h-10 border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all">
-                                            <input type="number" min="1" max="30" step="1" id="reviewExpiryDays"
-                                                wire:model.live.debounce.300ms="reviewExpiryDays"
-                                                x-on:input="if (parseInt($el.value) > 30) $el.value = 30; if (parseInt($el.value) < 1 && $el.value !== '') $el.value = 1;"
-                                                x-on:blur="if ($el.value === '' || parseInt($el.value) < 1) { $el.value = 1; $el.dispatchEvent(new Event('input')); }"
-                                                x-on:keydown="if ($event.key === 'e' || $event.key === 'E' || $event.key === '+' || $event.key === '-') $event.preventDefault();"
-                                                class="w-full h-full pl-3 pr-2 text-[13px] font-semibold text-gray-800 border-0 focus:ring-0 bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
-                                            <div class="flex flex-col border-l border-gray-200 h-full w-8 shrink-0 bg-gray-50">
-                                                <button type="button" wire:click="incrementReviewExpiryDays"
-                                                    @if((int)$reviewExpiryDays >= 30) disabled @endif
-                                                    class="flex-1 flex items-center justify-center text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/50 disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500 transition-colors border-b border-gray-200"
-                                                    title="Increase (Max: 30 days)">
-                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 15l7-7 7 7"/></svg>
-                                                </button>
+                                        <div class="mt-1 flex items-center h-10 border border-gray-200 rounded-lg overflow-hidden shadow-sm bg-white">
                                                 <button type="button" wire:click="decrementReviewExpiryDays"
-                                                    @if((int)$reviewExpiryDays <= 1) disabled @endif
-                                                    class="flex-1 flex items-center justify-center text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/50 disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500 transition-colors"
-                                                    title="Decrease (Min: 1 day)">
-                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
-                                                </button>
-                                            </div>
+                                            <button type="button" @click="bump('expiryDays', -1, 1, 30)"
+                                                :disabled="expiryDays <= 1"
+                                                class="w-10 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors border-r border-gray-200 shrink-0">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                                            </button>
+                                            <input id="reviewExpiryDays" type="number" readonly tabindex="-1"
+                                                x-model="expiryDays"
+                                                class="flex-1 w-full h-full text-center text-[13px] font-bold text-gray-900 border-0 focus:ring-0 bg-transparent cursor-default [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+                                            <button type="button" @click="bump('expiryDays', 1, 1, 30)"
+                                                :disabled="expiryDays >= 30"
+                                                class="w-10 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors border-l border-gray-200 shrink-0">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                            </button>
                                         </div>
-                                        <p class="text-[10px] text-gray-400 mt-1 font-medium leading-tight">Days before printed receipt QR code expires.</p>
+                                        <p class="text-[10px] text-gray-400 mt-1.5 font-medium leading-tight">Days before printed receipt QR code expires.</p>
                                         <x-input-error :messages="$errors->get('reviewExpiryDays')" class="mt-1" />
                                     </div>
 
                                     {{-- Device Cooldown (0 - 120 Mins) --}}
                                     <div>
-                                        <div class="flex items-center justify-between mb-1">
-                                            <x-input-label for="reviewDeviceCooldownMinutes" value="Device Cooldown (Mins)" class="!mb-0" />
-                                            <span class="text-[10px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">0 – 120 mins</span>
+                                        <div class="mb-1.5">
+                                            <x-input-label for="reviewDeviceCooldownMinutes" value="Device Cooldown (Mins)" class="!mb-1" />
+                                            <span class="inline-block text-[10px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">0 – 120 mins</span>
                                         </div>
-                                        <div class="relative flex items-center h-10 border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all">
-                                            <input type="number" min="0" max="120" step="1" id="reviewDeviceCooldownMinutes"
-                                                wire:model.live.debounce.300ms="reviewDeviceCooldownMinutes"
-                                                x-on:input="if (parseInt($el.value) > 120) $el.value = 120; if (parseInt($el.value) < 0 && $el.value !== '') $el.value = 0;"
-                                                x-on:blur="if ($el.value === '' || parseInt($el.value) < 0) { $el.value = 0; $el.dispatchEvent(new Event('input')); }"
-                                                x-on:keydown="if ($event.key === 'e' || $event.key === 'E' || $event.key === '+' || $event.key === '-') $event.preventDefault();"
-                                                class="w-full h-full pl-3 pr-2 text-[13px] font-semibold text-gray-800 border-0 focus:ring-0 bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
-                                            <div class="flex flex-col border-l border-gray-200 h-full w-8 shrink-0 bg-gray-50">
-                                                <button type="button" wire:click="incrementReviewCooldown"
-                                                    @if((int)$reviewDeviceCooldownMinutes >= 120) disabled @endif
-                                                    class="flex-1 flex items-center justify-center text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/50 disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500 transition-colors border-b border-gray-200"
-                                                    title="Increase (Max: 120 mins)">
-                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 15l7-7 7 7"/></svg>
-                                                </button>
-                                                <button type="button" wire:click="decrementReviewCooldown"
-                                                    @if((int)$reviewDeviceCooldownMinutes <= 0) disabled @endif
-                                                    class="flex-1 flex items-center justify-center text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/50 disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500 transition-colors"
-                                                    title="Decrease (Min: 0 mins)">
-                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
-                                                </button>
-                                            </div>
+                                        <div class="mt-1 flex items-center h-10 border border-gray-200 rounded-lg overflow-hidden shadow-sm bg-white">
+                                            <button type="button" @click="bump('cooldownMins', -1, 0, 120)"
+                                                :disabled="cooldownMins <= 0"
+                                                class="w-10 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors border-r border-gray-200 shrink-0">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                                            </button>
+                                            <input id="reviewDeviceCooldownMinutes" type="number" readonly tabindex="-1"
+                                                x-model="cooldownMins"
+                                                class="flex-1 w-full h-full text-center text-[13px] font-bold text-gray-900 border-0 focus:ring-0 bg-transparent cursor-default [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+                                            <button type="button" @click="bump('cooldownMins', 1, 0, 120)"
+                                                :disabled="cooldownMins >= 120"
+                                                class="w-10 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors border-l border-gray-200 shrink-0">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                            </button>
                                         </div>
-                                        <p class="text-[10px] text-gray-400 mt-1 font-medium leading-tight">Minutes a device must wait before reviewing another receipt.</p>
+                                        <p class="text-[10px] text-gray-400 mt-1.5 font-medium leading-tight">Minutes a device must wait before reviewing another receipt.</p>
                                         <x-input-error :messages="$errors->get('reviewDeviceCooldownMinutes')" class="mt-1" />
                                     </div>
                                 </div>
