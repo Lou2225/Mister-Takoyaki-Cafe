@@ -541,14 +541,7 @@ class ThermalPrinterService
         }
 
         if (($settings['show_receipt_qr_code'] ?? true) !== false) {
-            $qrUrl = $settings['qr_url'] ?? '';
-            if (empty($qrUrl)) {
-                $qrUrl = route('customer.review', ['branch' => $order->branch_id]);
-            } else {
-                $qrUrl = str_replace('{order_id}', $order->id, $qrUrl);
-                $separator = str_contains($qrUrl, '?') ? '&' : '?';
-                $qrUrl .= $separator . 'branch=' . $order->branch_id;
-            }
+            $qrUrl = ReceiptService::buildReviewQrUrl($order, $settings['qr_url'] ?? null);
             $content .= "\n" . self::mbCenter("SCAN TO REVIEW & RATE ORDER") . "\n";
             foreach (self::mbWrap($qrUrl, $w) as $l) {
                 $content .= self::mbCenter($l) . "\n";

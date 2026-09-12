@@ -515,6 +515,8 @@
             margin-top: 8px;
             padding-top: 6px;
             border-top: 1px dashed #000;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .receipt-qr-title {
@@ -523,18 +525,20 @@
             margin-bottom: 4px;
             letter-spacing: 0.5px;
             text-transform: uppercase;
+            text-align: center;
+            width: 100%;
         }
 
         .qr-canvas-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            display: block;
+            text-align: center;
             margin: 4px auto 6px;
+            width: 100%;
         }
 
         .qr-code-canvas {
-            display: block;
-            margin: 0 auto;
+            display: inline-block;
+            margin: 0 auto !important;
             image-rendering: pixelated;
             image-rendering: -moz-crisp-edges;
             image-rendering: crisp-edges;
@@ -548,14 +552,8 @@
             word-break: break-all;
             line-height: 1.15;
             margin-top: 3px;
-        }
-
-        .receipt-review-link {
-            margin-top: 4px;
-            font-size: 7.5px;
-            word-break: break-all;
-            line-height: 1.25;
-            color: #111827;
+            text-align: center;
+            width: 100%;
         }
 
         .cut-line {
@@ -573,7 +571,7 @@
     @php
         $kitchenItems = $order->items->filter(fn ($item) => (optional($item->product->category)->production_station ?? 'kitchen') === 'kitchen');
         $baristaItems = $order->items->filter(fn ($item) => (optional($item->product->category)->production_station ?? '') === 'barista');
-        $reviewUrl = $qrUrl ?? route('customer.review', ['branch' => $order->branch_id]);
+        $reviewUrl = $qrUrl ?? \App\Services\ReceiptService::buildReviewQrUrl($order);
 
         // Format Titles cleanly without non-ASCII junk that breaks printers
         $kitchenTitle = trim(preg_replace('/[^\x20-\x7E]/', '', $settings['kitchen_slip_title'] ?? 'KITCHEN SLIP')) ?: 'KITCHEN SLIP';
@@ -990,7 +988,6 @@
                                 <canvas id="receiptQrCanvas" class="qr-code-canvas" width="100" height="100"></canvas>
                             </div>
                             <div class="receipt-qr-url">{{ $reviewUrl }}</div>
-                            <div class="receipt-review-link">Review us: {{ $reviewUrl }}</div>
                         </div>
                     @endif
 
@@ -1440,17 +1437,16 @@
             };
 
             global.QRCodeGen = {
-                drawToCanvas: function(canvasId, text) {
-                    var canvas = document.getElementById(canvasId);
+                drawCanvasElement: function(canvas, text) {
                     if (!canvas || !text) return;
                     try {
-                        var qr = new QRCode(0, QRErrorCorrectLevel.H);
+                        var qr = new QRCode(0, QRErrorCorrectLevel.M);
                         qr.addData(text);
                         qr.make();
 
                         var moduleCount = qr.getModuleCount();
-                        var margin = 4;
-                        var targetSize = 92;
+                        var margin = 2;
+                        var targetSize = 96;
                         var totalModules = moduleCount + margin * 2;
                         var scale = Math.max(1, Math.floor(targetSize / totalModules));
                         var finalSize = totalModules * scale;
@@ -1472,6 +1468,12 @@
                         }
                     } catch (e) {
                         console.error('QR Canvas paint failed:', e);
+                    }
+                },
+                drawToCanvas: function(canvasId, text) {
+                    var canvas = document.getElementById(canvasId);
+                    if (canvas) {
+                        this.drawCanvasElement(canvas, text);
                     }
                 }
             };
@@ -1530,10 +1532,12 @@
             var savedWidth = localStorage.getItem('pos_receipt_width_pref') || '58mm';
             setPaperWidth(savedWidth);
 
-            // Paint QR code canvas
-            var qrText = @json($qrUrl ?? '');
+            // Paint QR code canvas (supports single and multiple printed receipt copies)
+            var qrText = @json($reviewUrl ?? ($qrUrl ?? ''));
             if (qrText && window.QRCodeGen) {
-                window.QRCodeGen.drawToCanvas('receiptQrCanvas', qrText);
+                document.querySelectorAll('.qr-code-canvas').forEach(function(canvas) {
+                    window.QRCodeGen.drawCanvasElement(canvas, qrText);
+                });
             }
 
             // Auto-print support if requested via URL

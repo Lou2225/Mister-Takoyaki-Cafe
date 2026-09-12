@@ -11,7 +11,8 @@
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800,900&display=swap" rel="stylesheet" />
 
-        <!-- Scripts -->
+        <!-- Tailwind CDN & Styles -->
+        <script src="https://cdn.tailwindcss.com"></script>
         @vite(['resources/js/app.js'])
         @livewireStyles
     </head>

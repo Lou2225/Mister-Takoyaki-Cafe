@@ -976,6 +976,112 @@
                                 </div>
                             </div>
 
+                            {{-- Receipt Limits & Device Anti-Spam Security --}}
+                            <div class="mb-6 pb-6 border-b border-gray-50 space-y-4">
+                                <div>
+                                    <h3 class="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-1">Receipt Limits & Anti-Spam Security</h3>
+                                    <p class="text-[12px] text-gray-500 font-medium">Configure table multi-device rules, receipt expiry, and spam limits.</p>
+                                </div>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    {{-- Max Devices per Receipt (1 - 10) --}}
+                                    <div>
+                                        <div class="flex items-center justify-between mb-1">
+                                            <x-input-label for="reviewMaxDevicesPerReceipt" value="Max Devices per Receipt" class="!mb-0" />
+                                            <span class="text-[10px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">1 – 10</span>
+                                        </div>
+                                        <div class="relative flex items-center h-10 border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all">
+                                            <input type="number" min="1" max="10" step="1" id="reviewMaxDevicesPerReceipt"
+                                                wire:model.live.debounce.300ms="reviewMaxDevicesPerReceipt"
+                                                x-on:input="if (parseInt($el.value) > 10) $el.value = 10; if (parseInt($el.value) < 1 && $el.value !== '') $el.value = 1;"
+                                                x-on:blur="if ($el.value === '' || parseInt($el.value) < 1) { $el.value = 1; $el.dispatchEvent(new Event('input')); }"
+                                                x-on:keydown="if ($event.key === 'e' || $event.key === 'E' || $event.key === '+' || $event.key === '-') $event.preventDefault();"
+                                                class="w-full h-full pl-3 pr-2 text-[13px] font-semibold text-gray-800 border-0 focus:ring-0 bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                                            <div class="flex flex-col border-l border-gray-200 h-full w-8 shrink-0 bg-gray-50">
+                                                <button type="button" wire:click="incrementReviewMaxDevices"
+                                                    @if((int)$reviewMaxDevicesPerReceipt >= 10) disabled @endif
+                                                    class="flex-1 flex items-center justify-center text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/50 disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500 transition-colors border-b border-gray-200"
+                                                    title="Increase (Max: 10)">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 15l7-7 7 7"/></svg>
+                                                </button>
+                                                <button type="button" wire:click="decrementReviewMaxDevices"
+                                                    @if((int)$reviewMaxDevicesPerReceipt <= 1) disabled @endif
+                                                    class="flex-1 flex items-center justify-center text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/50 disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500 transition-colors"
+                                                    title="Decrease (Min: 1)">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <p class="text-[10px] text-gray-400 mt-1 font-medium leading-tight">Max unique customer phones per table receipt (e.g. 5 for group dining).</p>
+                                        <x-input-error :messages="$errors->get('reviewMaxDevicesPerReceipt')" class="mt-1" />
+                                    </div>
+
+                                    {{-- Receipt Expiry (1 - 30 Days) --}}
+                                    <div>
+                                        <div class="flex items-center justify-between mb-1">
+                                            <x-input-label for="reviewExpiryDays" value="Receipt Expiry (Days)" class="!mb-0" />
+                                            <span class="text-[10px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">1 – 30 days</span>
+                                        </div>
+                                        <div class="relative flex items-center h-10 border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all">
+                                            <input type="number" min="1" max="30" step="1" id="reviewExpiryDays"
+                                                wire:model.live.debounce.300ms="reviewExpiryDays"
+                                                x-on:input="if (parseInt($el.value) > 30) $el.value = 30; if (parseInt($el.value) < 1 && $el.value !== '') $el.value = 1;"
+                                                x-on:blur="if ($el.value === '' || parseInt($el.value) < 1) { $el.value = 1; $el.dispatchEvent(new Event('input')); }"
+                                                x-on:keydown="if ($event.key === 'e' || $event.key === 'E' || $event.key === '+' || $event.key === '-') $event.preventDefault();"
+                                                class="w-full h-full pl-3 pr-2 text-[13px] font-semibold text-gray-800 border-0 focus:ring-0 bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                                            <div class="flex flex-col border-l border-gray-200 h-full w-8 shrink-0 bg-gray-50">
+                                                <button type="button" wire:click="incrementReviewExpiryDays"
+                                                    @if((int)$reviewExpiryDays >= 30) disabled @endif
+                                                    class="flex-1 flex items-center justify-center text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/50 disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500 transition-colors border-b border-gray-200"
+                                                    title="Increase (Max: 30 days)">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 15l7-7 7 7"/></svg>
+                                                </button>
+                                                <button type="button" wire:click="decrementReviewExpiryDays"
+                                                    @if((int)$reviewExpiryDays <= 1) disabled @endif
+                                                    class="flex-1 flex items-center justify-center text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/50 disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500 transition-colors"
+                                                    title="Decrease (Min: 1 day)">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <p class="text-[10px] text-gray-400 mt-1 font-medium leading-tight">Days before printed receipt QR code expires.</p>
+                                        <x-input-error :messages="$errors->get('reviewExpiryDays')" class="mt-1" />
+                                    </div>
+
+                                    {{-- Device Cooldown (0 - 120 Mins) --}}
+                                    <div>
+                                        <div class="flex items-center justify-between mb-1">
+                                            <x-input-label for="reviewDeviceCooldownMinutes" value="Device Cooldown (Mins)" class="!mb-0" />
+                                            <span class="text-[10px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">0 – 120 mins</span>
+                                        </div>
+                                        <div class="relative flex items-center h-10 border border-gray-200 rounded-xl bg-white shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all">
+                                            <input type="number" min="0" max="120" step="1" id="reviewDeviceCooldownMinutes"
+                                                wire:model.live.debounce.300ms="reviewDeviceCooldownMinutes"
+                                                x-on:input="if (parseInt($el.value) > 120) $el.value = 120; if (parseInt($el.value) < 0 && $el.value !== '') $el.value = 0;"
+                                                x-on:blur="if ($el.value === '' || parseInt($el.value) < 0) { $el.value = 0; $el.dispatchEvent(new Event('input')); }"
+                                                x-on:keydown="if ($event.key === 'e' || $event.key === 'E' || $event.key === '+' || $event.key === '-') $event.preventDefault();"
+                                                class="w-full h-full pl-3 pr-2 text-[13px] font-semibold text-gray-800 border-0 focus:ring-0 bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                                            <div class="flex flex-col border-l border-gray-200 h-full w-8 shrink-0 bg-gray-50">
+                                                <button type="button" wire:click="incrementReviewCooldown"
+                                                    @if((int)$reviewDeviceCooldownMinutes >= 120) disabled @endif
+                                                    class="flex-1 flex items-center justify-center text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/50 disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500 transition-colors border-b border-gray-200"
+                                                    title="Increase (Max: 120 mins)">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 15l7-7 7 7"/></svg>
+                                                </button>
+                                                <button type="button" wire:click="decrementReviewCooldown"
+                                                    @if((int)$reviewDeviceCooldownMinutes <= 0) disabled @endif
+                                                    class="flex-1 flex items-center justify-center text-gray-500 hover:text-indigo-600 hover:bg-indigo-50/50 disabled:opacity-25 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gray-500 transition-colors"
+                                                    title="Decrease (Min: 0 mins)">
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <p class="text-[10px] text-gray-400 mt-1 font-medium leading-tight">Minutes a device must wait before reviewing another receipt.</p>
+                                        <x-input-error :messages="$errors->get('reviewDeviceCooldownMinutes')" class="mt-1" />
+                                    </div>
+                                </div>
+                            </div>
+
                             <div class="space-y-4">
                                 <div class="flex items-center justify-between">
                                     <h3 class="text-[11px] font-black text-gray-400 uppercase tracking-widest">Question Stack</h3>

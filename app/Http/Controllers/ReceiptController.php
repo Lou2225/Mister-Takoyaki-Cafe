@@ -76,20 +76,7 @@ class ReceiptController extends Controller
             }
         }
 
-        $qrUrl = $posConfig['qr_url'] ?? '';
-        if (empty($qrUrl)) {
-            $qrUrl = route('customer.review', ['branch' => $order->branch_id]);
-        } else {
-            // Append branch context to custom URLs so reviews are attributed correctly
-            $separator = str_contains($qrUrl, '?') ? '&' : '?';
-            $qrUrl .= $separator . 'branch=' . $order->branch_id;
-        }
-        
-        // Rewrite localhost to local LAN IP so phones can connect
-        if (str_contains($qrUrl, 'localhost') || str_contains($qrUrl, '127.0.0.1')) {
-            $localIp = gethostbyname(gethostname());
-            $qrUrl = str_replace(['localhost', '127.0.0.1'], $localIp, $qrUrl);
-        }
+        $qrUrl = \App\Services\ReceiptService::buildReviewQrUrl($order, $posConfig['qr_url'] ?? null);
 
         $settings['qr_url'] = $qrUrl;
 

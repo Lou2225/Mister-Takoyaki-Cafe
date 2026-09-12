@@ -915,23 +915,8 @@
                         $showVat = (bool)\App\Models\SystemSetting::get('receipt_show_vat', true);
                         $footer = \App\Models\SystemSetting::get('receipt_footer_message', 'Thank you for your visit!');
                         $returnPolicy = \App\Models\SystemSetting::get('receipt_return_policy', 'No return, no exchange.');
-                        $qrUrl = \App\Models\SystemSetting::get('receipt_qr_url', '');
                         $currencySymbol = '₱';
-
-                        if (empty($qrUrl)) {
-                            $qrUrl = route('customer.review', ['branch' => $order->branch_id]);
-                        } else {
-                            $qrUrl = str_replace('{order_id}', $order->id, $qrUrl);
-                            // Append branch context to custom URLs so reviews are attributed correctly
-                            $separator = str_contains($qrUrl, '?') ? '&' : '?';
-                            $qrUrl .= $separator . 'branch=' . $order->branch_id;
-                        }
-
-                        // Rewrite localhost to local LAN IP so phones can scan it
-                        if (str_contains($qrUrl, 'localhost') || str_contains($qrUrl, '127.0.0.1')) {
-                            $localIp = gethostbyname(gethostname());
-                            $qrUrl = str_replace(['localhost', '127.0.0.1'], $localIp, $qrUrl);
-                        }
+                        $qrUrl = \App\Services\ReceiptService::buildReviewQrUrl($order);
 
                         // Generate dynamic QR code
                         $qrCodeSvg = null;

@@ -63,20 +63,7 @@ class PosReceiptController extends Controller
             }
         }
 
-        $qrUrl = $posConfig['qr_url'] ?? '';
-        if (empty($qrUrl)) {
-            $qrUrl = route('customer.review', ['branch' => $order->branch_id]);
-        } else {
-            $qrUrl = str_replace('{order_id}', $order->id, $qrUrl);
-            $separator = str_contains($qrUrl, '?') ? '&' : '?';
-            $qrUrl .= $separator . 'branch=' . $order->branch_id;
-        }
-
-        // Rewrite localhost / 127.0.0.1 to LAN IP so phone cameras can scan the QR code
-        if (str_contains($qrUrl, 'localhost') || str_contains($qrUrl, '127.0.0.1')) {
-            $localIp = gethostbyname(gethostname());
-            $qrUrl = str_replace(['localhost', '127.0.0.1'], $localIp, $qrUrl);
-        }
+        $qrUrl = \App\Services\ReceiptService::buildReviewQrUrl($order, $posConfig['qr_url'] ?? null);
 
         $qrCode = null;
         try {

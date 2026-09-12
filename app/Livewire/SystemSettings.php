@@ -109,6 +109,9 @@ class SystemSettings extends Component
     public $reviewFormTitle = 'How was your experience?';
     public $reviewFormSubtitle = 'Thank you for your feedback!';
     public $reviewQuestions = [];
+    public $reviewMaxDevicesPerReceipt = 5;
+    public $reviewExpiryDays = 7;
+    public $reviewDeviceCooldownMinutes = 10;
     public $sampleQrCode = ''; // Data URI for sample QR code in receipt preview
 
     // Thermal Printer Settings
@@ -282,6 +285,10 @@ class SystemSettings extends Component
         $this->reviewQuestions = is_string($reviewQuestionsRaw)
             ? json_decode($reviewQuestionsRaw, true)
             : ($reviewQuestionsRaw ?? $defaultQuestions);
+
+        $this->reviewMaxDevicesPerReceipt = max(1, min(10, (int) SystemSetting::get('review_max_devices_per_receipt', 5, $this->settingsBranchId)));
+        $this->reviewExpiryDays = max(1, min(30, (int) SystemSetting::get('review_expiry_days', 7, $this->settingsBranchId)));
+        $this->reviewDeviceCooldownMinutes = max(0, min(120, (int) SystemSetting::get('review_device_cooldown_minutes', 10, $this->settingsBranchId)));
             // Thermal Printer Settings
         $printerConfig = SystemSetting::get('thermal_printer_config', [], $this->settingsBranchId);
         if (is_string($printerConfig)) {
@@ -572,6 +579,9 @@ class SystemSettings extends Component
             'reviews' => [
                 'reviewFormTitle' => ['required', 'string', 'max:255'],
                 'reviewFormSubtitle' => ['nullable', 'string', 'max:255'],
+                'reviewMaxDevicesPerReceipt' => ['required', 'integer', 'min:1', 'max:10'],
+                'reviewExpiryDays' => ['required', 'integer', 'min:1', 'max:30'],
+                'reviewDeviceCooldownMinutes' => ['required', 'integer', 'min:0', 'max:120'],
             ]
         ];
 
@@ -591,6 +601,12 @@ class SystemSettings extends Component
             'gcashAccountNumber.regex' => 'Enter 10-digit mobile number (e.g. 9123456789).',
             'printerName.required' => 'Printer name/address is required while the printer is enabled.',
             'printerName.regex' => 'Enter a network address in the format IP:PORT (e.g. 192.168.1.100:9100) — not a printer name.',
+            'reviewMaxDevicesPerReceipt.min' => 'Max devices per receipt must be between 1 and 10.',
+            'reviewMaxDevicesPerReceipt.max' => 'Max devices per receipt must be between 1 and 10.',
+            'reviewExpiryDays.min' => 'Receipt expiry must be between 1 and 30 days.',
+            'reviewExpiryDays.max' => 'Receipt expiry must be between 1 and 30 days.',
+            'reviewDeviceCooldownMinutes.min' => 'Device cooldown must be between 0 and 120 minutes.',
+            'reviewDeviceCooldownMinutes.max' => 'Device cooldown must be between 0 and 120 minutes.',
         ]);
     }
 
@@ -802,6 +818,54 @@ class SystemSettings extends Component
         SystemSetting::set('review_form_title', $this->reviewFormTitle, $this->settingsBranchId);
         SystemSetting::set('review_form_subtitle', $this->reviewFormSubtitle, $this->settingsBranchId);
         SystemSetting::set('review_questions', json_encode($this->reviewQuestions), $this->settingsBranchId);
+        SystemSetting::set('review_max_devices_per_receipt', max(1, min(10, (int) $this->reviewMaxDevicesPerReceipt)), $this->settingsBranchId);
+        SystemSetting::set('review_expiry_days', max(1, min(30, (int) $this->reviewExpiryDays)), $this->settingsBranchId);
+        SystemSetting::set('review_device_cooldown_minutes', max(0, min(120, (int) $this->reviewDeviceCooldownMinutes)), $this->settingsBranchId);
+    }
+
+    public function incrementReviewMaxDevices(): void
+    {
+        $this->reviewMaxDevicesPerReceipt = min(10, ((int) $this->reviewMaxDevicesPerReceipt) + 1);
+    }
+
+    public function decrementReviewMaxDevices(): void
+    {
+        $this->reviewMaxDevicesPerReceipt = max(1, ((int) $this->reviewMaxDevicesPerReceipt) - 1);
+    }
+
+    public function incrementReviewExpiryDays(): void
+    {
+        $this->reviewExpiryDays = min(30, ((int) $this->reviewExpiryDays) + 1);
+    }
+
+    public function decrementReviewExpiryDays(): void
+    {
+        $this->reviewExpiryDays = max(1, ((int) $this->reviewExpiryDays) - 1);
+    }
+
+    public function incrementReviewCooldown(): void
+    {
+        $this->reviewDeviceCooldownMinutes = min(120, ((int) $this->reviewDeviceCooldownMinutes) + 1);
+    }
+
+    public function decrementReviewCooldown(): void
+    {
+        $this->reviewDeviceCooldownMinutes = max(0, ((int) $this->reviewDeviceCooldownMinutes) - 1);
+    }
+
+    public function updatedReviewMaxDevicesPerReceipt($value): void
+    {
+        $this->reviewMaxDevicesPerReceipt = max(1, min(10, (int) $value));
+    }
+
+    public function updatedReviewExpiryDays($value): void
+    {
+        $this->reviewExpiryDays = max(1, min(30, (int) $value));
+    }
+
+    public function updatedReviewDeviceCooldownMinutes($value): void
+    {
+        $this->reviewDeviceCooldownMinutes = max(0, min(120, (int) $value));
     }
 
         public function regenerateQrCode()

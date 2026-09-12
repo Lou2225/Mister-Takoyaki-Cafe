@@ -23,7 +23,13 @@ class Order extends Model
      */
     protected static function booted()
     {
-              static::updated(function ($order) {
+        static::creating(function ($order) {
+            if (empty($order->review_token)) {
+                $order->review_token = (string) \Illuminate\Support\Str::random(32);
+            }
+        });
+
+        static::updated(function ($order) {
 
     // Trigger recording if payment status transitions to 'Paid'
     if ($order->wasChanged('payment_status') && $order->payment_status === 'Paid') {
@@ -96,6 +102,9 @@ if ($order->wasChanged('rider_id') && $order->rider_id) {
         'rider_longitude',     // ADD
         'location_updated_at', // ADD
         'source',
+        'review_token',
+        'review_scan_count',
+        'review_last_scanned_at',
     ];
 
     protected $casts = [
@@ -184,6 +193,19 @@ if ($order->wasChanged('rider_id') && $order->rider_id) {
     public function proofOfDelivery(): HasOne
     {
         return $this->hasOne(ProofOfDelivery::class);
+    }
+
+    public function customerReviews(): HasMany
+    {
+        return $this->hasMany(CustomerReview::class);
+    }
+
+    /**
+     * Get the customer review QR URL for this order.
+     */
+    public function getReviewQrUrl(?string $configuredUrl = null): string
+    {
+        return \App\Services\ReceiptService::buildReviewQrUrl($this, $configuredUrl);
     }
 
     // ─── Accessors & Attributes ───

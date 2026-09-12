@@ -11,9 +11,14 @@ class CustomerReview extends Model
 
     protected $fillable = [
         'branch_id',
+        'order_id',
+        'device_id',
+        'device_fingerprint',
         'answers',
         'customer_name',
         'contact_number',
+        'ip_address',
+        'user_agent',
     ];
 
     protected $casts = [
@@ -23,5 +28,10 @@ class CustomerReview extends Model
     public function branch()
     {
         return $this->belongsTo(Branch::class);
+    }
+
+    public function order()
+    {
+        return $this->belongsTo(Order::class);
     }
 }

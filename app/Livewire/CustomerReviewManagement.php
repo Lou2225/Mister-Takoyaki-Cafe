@@ -67,7 +67,7 @@ class CustomerReviewManagement extends Component
     public function viewReview($id)
     {
         $user = auth()->user();
-        $query = CustomerReview::with('branch');
+        $query = CustomerReview::with(['branch', 'order']);
         
         if ($user->role_id !== 1) {
             $query->where('branch_id', $user->branch_id);
@@ -86,7 +86,7 @@ class CustomerReviewManagement extends Component
     public function render()
     {
         $user = auth()->user();
-        $query = CustomerReview::with('branch');
+        $query = CustomerReview::with(['branch', 'order']);
 
         // Force branch restriction for non-super admins
         if ($user->role_id !== 1) {
@@ -103,6 +103,9 @@ class CustomerReviewManagement extends Component
                   ->orWhere('contact_number', 'like', '%' . $this->search . '%')
                   ->orWhereHas('branch', function($bq) {
                       $bq->where('branch_name', 'like', '%' . $this->search . '%');
+                  })
+                  ->orWhereHas('order', function($oq) {
+                      $oq->where('reference_no', 'like', '%' . $this->search . '%');
                   });
             });
         }

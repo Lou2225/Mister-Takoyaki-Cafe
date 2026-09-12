@@ -45,25 +45,9 @@ class ReceiptService
         // Generate QR code for review
         $qrCode = null;
         try {
-            $qrUrl = $settings['receipt_qr_url'];
-            if (empty($qrUrl)) {
-                $qrUrl = route('customer.review', ['branch' => $order->branch_id]);
-            } else {
-                $qrUrl = str_replace('{order_id}', $order->id, $qrUrl);
-                // Append branch context to custom URLs so reviews are attributed correctly
-                $separator = str_contains($qrUrl, '?') ? '&' : '?';
-                $qrUrl .= $separator . 'branch=' . $order->branch_id;
-            }
-
-            // Rewrite localhost to local LAN IP so phones can scan it
-            if (str_contains($qrUrl, 'localhost') || str_contains($qrUrl, '127.0.0.1')) {
-                $localIp = gethostbyname(gethostname());
-                $qrUrl = str_replace(['localhost', '127.0.0.1'], $localIp, $qrUrl);
-            }
-
+            $qrUrl = self::buildReviewQrUrl($order, $settings['receipt_qr_url'] ?? null);
             $qrCode = QrCodeHelper::generateReviewQrCode($qrUrl);
-        } catch (\Exception $e) {
-            // Silently fail QR generation - receipt will still work without it
+        } catch (\Throwable $e) {
             $qrCode = null;
         }
 
@@ -87,5 +71,42 @@ class ReceiptService
     public static function calculateSubtotal(Order $order): float
     {
         return $order->total_amount + $order->discount_amount;
+    }
+
+    /**
+     * Build the fully-qualified customer review QR code URL for an order.
+     */
+    public static function buildReviewQrUrl(Order $order, ?string $configuredUrl = null): string
+    {
+        if (empty($order->review_token)) {
+            $order->updateQuietly(['review_token' => (string) \Illuminate\Support\Str::random(32)]);
+        }
+
+        $qrUrl = $configuredUrl ?? SystemSetting::get('receipt_qr_url', '', $order->branch_id);
+        if (empty($qrUrl)) {
+            $qrUrl = route('customer.review', [
+                'token'  => $order->review_token,
+                'branch' => $order->branch_id,
+            ]);
+        } else {
+            $qrUrl = str_replace(['{order_id}', '{token}'], [$order->id, $order->review_token], $qrUrl);
+            if (!str_contains($qrUrl, 'token=')) {
+                $separator = str_contains($qrUrl, '?') ? '&' : '?';
+                $qrUrl .= $separator . http_build_query([
+                    'token'  => $order->review_token,
+                    'branch' => $order->branch_id,
+                ]);
+            }
+        }
+
+        // Rewrite localhost / 127.0.0.1 to LAN IP so phone cameras can scan the QR code on local development
+        if (app()->environment('local') || str_contains($qrUrl, 'localhost') || str_contains($qrUrl, '127.0.0.1')) {
+            $lanIp = gethostbyname(gethostname());
+            if (!empty($lanIp) && $lanIp !== '127.0.0.1') {
+                $qrUrl = preg_replace('#^https?://(?:localhost|127\.0\.0\.1)(?::\d+)?#', "http://{$lanIp}:8000", $qrUrl);
+            }
+        }
+
+        return $qrUrl;
     }
 }

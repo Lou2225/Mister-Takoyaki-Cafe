@@ -116,6 +116,7 @@
             <x-data-table>
                 <x-slot name="header">
                     <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Customer Details</th>
+                    <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Order Ref</th>
                     <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Branch</th>
                     <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Overall Sentiment</th>
                     <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Submitted Date</th>
@@ -141,6 +142,19 @@
                                     <div class="text-[11px] font-medium text-slate-400 italic">{{ $review->contact_number ?: 'Hidden' }}</div>
                                 </div>
                             </div>
+                        </td>
+                        <td class="py-3 px-4 whitespace-nowrap">
+                            @if($review->order)
+                                <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                    <svg class="w-3 h-3 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                    <span>#{{ $review->order->reference_no }}</span>
+                                </div>
+                                @if($review->order->table_number)
+                                    <span class="text-[10px] font-bold text-slate-400 block mt-0.5">Tbl {{ $review->order->table_number }}</span>
+                                @endif
+                            @else
+                                <span class="text-[11px] font-medium text-slate-400 italic">Direct QR</span>
+                            @endif
                         </td>
                         <td class="py-3 px-4 whitespace-nowrap">
                             <div class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-slate-50 text-slate-500 border border-slate-100">
@@ -186,7 +200,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" class="py-0">
+                        <td colspan="6" class="py-0">
                             <x-empty-state title="No Feedbacks Yet" description="Feedback will appear here." icon="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
                         </td>
                     </tr>
@@ -243,6 +257,45 @@
                             </div>
                         </div>
                     </div>
+
+                    {{-- Order & Device Attribution Section --}}
+                    @if($viewingReview->order || $viewingReview->device_id)
+                        @php
+                            $sameDeviceCount = $viewingReview->device_id 
+                                ? \App\Models\CustomerReview::where('device_id', $viewingReview->device_id)->count() 
+                                : 0;
+                        @endphp
+                        <div class="px-6 py-3 bg-slate-50/50 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                            <div class="flex items-center gap-2">
+                                @if($viewingReview->order)
+                                    <span class="font-bold text-slate-700">Order:</span>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-md font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                        #{{ $viewingReview->order->reference_no }}
+                                    </span>
+                                    @if($viewingReview->order->table_number)
+                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-100">
+                                            Table {{ $viewingReview->order->table_number }}
+                                        </span>
+                                    @endif
+                                @else
+                                    <span class="text-slate-400 italic">Direct Branch QR</span>
+                                @endif
+                            </div>
+
+                            <div class="flex items-center gap-2">
+                                @if($viewingReview->device_id)
+                                    <span class="text-slate-400 font-mono text-[10px]" title="{{ $viewingReview->device_id }}">
+                                        📱 {{ substr($viewingReview->device_id, 0, 8) }}...
+                                    </span>
+                                    @if($sameDeviceCount > 1)
+                                        <span class="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-50 text-amber-700 border border-amber-200" title="{{ $sameDeviceCount }} reviews from this device">
+                                            ⚠️ {{ $sameDeviceCount }}x Device
+                                        </span>
+                                    @endif
+                                @endif
+                            </div>
+                        </div>
+                    @endif
 
                     {{-- Responses Section --}}
                     <div class="p-6">
