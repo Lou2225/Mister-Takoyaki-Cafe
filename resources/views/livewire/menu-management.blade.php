@@ -280,44 +280,85 @@
                         <div x-show="optionGroups && optionGroups.length > 0" class="space-y-4">
                             <template x-for="(group, idx) in (optionGroups || [])" :key="idx">
                                 <div class="border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
-                                    <div class="flex items-center justify-between p-4 bg-slate-50/50 border-b border-slate-100">
-                                        <div class="flex flex-col gap-1">
-                                            <div class="flex items-center gap-3">
-                                                <span class="text-[13px] font-bold text-slate-900 uppercase tracking-tight" x-text="group.name"></span>
-                                                <span class="px-2 py-0.5 bg-white border border-slate-200 rounded text-[9px] font-black text-slate-400 uppercase tracking-widest" x-text="group.price_mode"></span>
-                                                <span class="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider"
-                                                    :class="group.max_select == 1 ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-blue-50 text-blue-700 border border-blue-100'"
-                                                    x-text="group.max_select ? (group.max_select == 1 ? 'Single (Max 1)' : 'Multi (Max ' + group.max_select + ')') : 'Multi (Unlimited)'"></span>
-                                                <span x-show="group.is_required" class="text-[9px] font-black text-rose-500 uppercase tracking-widest animate-pulse">Required</span>
-                                                <span x-show="group.no_recipe_required" class="text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded uppercase tracking-widest">No Recipe</span>
+                                    <div class="p-4 bg-slate-50/50 border-b border-slate-100 space-y-3">
+                                        <div class="flex items-start justify-between gap-3">
+                                            <div class="min-w-0">
+                                                <div class="flex items-center gap-2 flex-wrap">
+                                                    <span class="text-[14px] font-bold text-slate-900 uppercase tracking-tight" x-text="group.name"></span>
+                                                    <span class="px-2 py-0.5 bg-white border border-slate-200 rounded text-[9px] font-black text-slate-400 uppercase tracking-widest" x-text="group.price_mode"></span>
+                                                    <span class="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider"
+                                                        :class="group.max_select == 1 ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-blue-50 text-blue-700 border border-blue-100'"
+                                                        x-text="group.max_select == 1 ? 'Single (Max 1)' : (group.max_select ? 'Multi (Max ' + group.max_select + ')' : 'Multi (No Limit)')"></span>
+                                                    <span x-show="group.is_required" class="text-[9px] font-black text-rose-500 uppercase tracking-widest animate-pulse">Required</span>
+                                                    <span x-show="group.no_recipe_required" class="text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-100 px-1.5 py-0.5 rounded uppercase tracking-widest">No Recipe</span>
+                                                </div>
+                                                <div x-show="fieldError('optionGroups.' + idx + '.name')" x-cloak class="text-[11px] font-medium text-red-500 mt-1.5 flex items-start gap-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                                                    <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                    </svg>
+                                                    <ul class="space-y-0.5">
+                                                        <li x-text="fieldError('optionGroups.' + idx + '.name')"></li>
+                                                    </ul>
+                                                </div>
                                             </div>
-                                            <div x-show="fieldError('optionGroups.' + idx + '.name')" x-cloak class="text-[11px] font-medium text-red-500 mt-1.5 flex items-start gap-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
-                                                <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                                </svg>
-                                                <ul class="space-y-0.5">
-                                                    <li x-text="fieldError('optionGroups.' + idx + '.name')"></li>
-                                                </ul>
-                                            </div>                                        </div>
-                                        <div class="flex items-center gap-1.5">
-                                            <div class="flex items-center gap-1 mr-2" title="Maximum selections allowed (1 for single, or blank for unlimited)">
-                                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Limit:</span>
-                                                <input type="number" min="1" x-model="group.max_select" placeholder="∞"
-                                                    class="w-11 h-6 px-1 text-[11px] font-bold text-center rounded border border-slate-200 focus:border-indigo-500 bg-white" />
+                                            {{-- Top-right aligned actions: Sync, Save, Delete --}}
+                                            <div class="flex items-center gap-1.5 shrink-0">
+                                                <button type="button" @click="promptSyncGroup(idx)" class="flex items-center gap-1.5 h-9 px-3 rounded-lg bg-white border border-slate-200 text-emerald-600 hover:bg-emerald-50 hover:border-emerald-300 transition-all text-[11px] font-bold shadow-sm" title="Sync options, prices, and ingredients from Library">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                                    <span>Sync</span>
+                                                </button>
+                                                <button type="button" @click="promptSaveGroup(idx)" class="flex items-center gap-1.5 h-9 px-3 rounded-lg bg-white border border-slate-200 text-indigo-600 hover:bg-indigo-50 hover:border-indigo-300 transition-all text-[11px] font-bold shadow-sm" title="Save as Template">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                                                    <span>Save</span>
+                                                </button>
+                                                <button type="button" @click="promptDeleteGroup(idx)" class="w-9 h-9 flex items-center justify-center rounded-lg bg-white border border-slate-200 text-rose-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-all shadow-sm" title="Delete Group">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                </button>
                                             </div>
-                                            <label class="flex items-center gap-1.5 cursor-pointer mr-2" title="Options in this group skip ingredient tracking and are always available">
-                                                <input type="checkbox" x-model="group.no_recipe_required" class="w-3.5 h-3.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500">
-                                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">No Recipe</span>
+                                        </div>
+
+                                        <div class="flex flex-wrap items-center gap-2.5">
+                                            {{-- Selection Mode Toggle --}}
+                                            <div class="inline-flex rounded-xl border border-slate-200 bg-white p-0.5 shadow-sm h-10 shrink-0">
+                                                <button type="button" @click="setGroupSingleMode(idx)"
+                                                    class="px-3 h-full rounded-lg text-[11px] font-bold transition-all flex items-center gap-1.5"
+                                                    :class="group.max_select == 1 ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'">
+                                                    Single (Pick 1)
+                                                </button>
+                                                <button type="button" @click="setGroupMultiMode(idx)"
+                                                    class="px-3 h-full rounded-lg text-[11px] font-bold transition-all flex items-center gap-1.5"
+                                                    :class="group.max_select != 1 ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'">
+                                                    Multiple Choice
+                                                </button>
+                                            </div>
+
+                                            {{-- Selection Limit (System Settings Print Copies Style, only for Multiple Choice, bounded by options count) --}}
+                                            <div x-show="group.max_select != 1" x-cloak class="flex items-center h-10 border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white"
+                                                :title="(group.options && group.options.length > 2) ? ('Maximum selections allowed (2–' + (group.options.length - 1) + ', or No Limit)') : 'Multiple choice selections (No Limit)'">
+                                                <button type="button" tabindex="-1" @click="decrementGroupMaxSelect(idx)"
+                                                    :disabled="!group.options || group.options.length <= 2 || (group.max_select !== null && group.max_select <= 2)"
+                                                    class="w-10 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors border-r border-gray-200 shrink-0">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                                                </button>
+                                                <input type="text" inputmode="numeric" maxlength="2"
+                                                    :value="group.max_select === null || group.max_select === undefined || group.max_select === '' ? '' : group.max_select"
+                                                    @input="handleGroupMaxSelectInput(idx, $event)"
+                                                    placeholder="No Limit"
+                                                    class="w-20 h-full text-center text-[13px] font-bold text-gray-900 border-0 focus:ring-0 bg-transparent placeholder:text-gray-400 placeholder:font-bold placeholder:text-[11px] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+                                                <button type="button" tabindex="-1" @click="incrementGroupMaxSelect(idx)"
+                                                    :disabled="!group.options || group.options.length <= 2 || group.max_select === null || group.max_select >= group.options.length"
+                                                    class="w-10 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors border-l border-gray-200 shrink-0">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                                </button>
+                                            </div>
+
+                                            {{-- No Recipe Checkbox (Consistent with Options Library) --}}
+                                            <label class="flex items-center gap-2 cursor-pointer bg-white border border-slate-200 rounded-xl px-3 h-10 shadow-sm hover:border-amber-300 transition-all select-none group" title="Options in this group skip ingredient tracking and are always available">
+                                                <input type="checkbox" x-model="group.no_recipe_required"
+                                                    @change="if (group.no_recipe_required) { (group.options || []).forEach((o, oIdx) => { const ownerA = 'option:' + idx + '_' + oIdx; const ownerB = o.id ? ('option:' + o.id) : null; if (recipeIngredients) recipeIngredients = recipeIngredients.filter(ri => ri.owner !== ownerA && (!ownerB || ri.owner !== ownerB)); }); }"
+                                                    class="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+                                                <span class="text-[11px] font-bold text-slate-700 group-hover:text-amber-700 transition-colors whitespace-nowrap">No Recipe</span>
                                             </label>
-                                            <button type="button" @click="promptSyncGroup(idx)" class="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all" title="Sync ingredients from Library">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                            </button>
-                                            <button type="button" @click="promptSaveGroup(idx)" class="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="Save as Template">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
-                                            </button>
-                                            <button type="button" @click="promptDeleteGroup(idx)" class="text-rose-400 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-lg transition-all" title="Delete Group">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                            </button>
                                         </div>
                                     </div>
                                     <div class="p-4 bg-white space-y-3">
@@ -356,12 +397,15 @@
                                                             <li x-text="fieldError('optionGroups.' + idx + '.options.' + oIdx + '.price')"></li>
                                                         </ul>
                                                     </div>                                                </div>
-                                                <div class="flex items-center gap-3 h-10">
-                                                    <label class="flex items-center gap-2 cursor-pointer">
-                                                        <input type="radio" :name="'default_opt_' + idx" :checked="!!option.is_default" @change="setDefaultOption(idx, oIdx)" class="w-3.5 h-3.5 text-indigo-600 border-slate-200">
-                                                        <span class="text-[11px] font-black text-slate-400 uppercase tracking-widest">Default</span>
-                                                    </label>
-                                                    <button type="button" @click="promptDeleteOption(idx, oIdx)" class="text-slate-300 hover:text-rose-500 transition-colors p-1.5" title="Remove Option">
+                                                <div class="flex items-center gap-2 h-10">
+                                                    <button type="button" @click="toggleDefaultOption(idx, oIdx)"
+                                                        class="flex items-center gap-1.5 h-9 px-3 rounded-lg border-2 transition-all shrink-0"
+                                                        :class="option.is_default ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm shadow-emerald-100' : 'bg-white border-slate-200 text-slate-400 hover:text-emerald-600 hover:border-emerald-200'"
+                                                        title="Toggle system default (click again to unset)">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                                                        <span class="text-[10px] font-black uppercase tracking-widest whitespace-nowrap">Default</span>
+                                                    </button>
+                                                    <button type="button" @click="promptDeleteOption(idx, oIdx)" class="w-9 h-9 flex items-center justify-center text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors shrink-0" title="Remove Option">
                                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                                                     </button>
                                                 </div>
@@ -1545,11 +1589,26 @@
                             Multiple Choice
                         </button>
                     </div>
-                    <div x-show="newGroupMaxSelect != 1" class="mt-2.5 p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
-                        <label class="text-[11px] font-bold text-slate-600 block">Max Selection Limit (Leave blank for unlimited)</label>
-                        <input type="number" min="1" x-model="newGroupMaxSelect" placeholder="e.g. 2 for max 2 flavors, or blank"
-                            class="w-full h-9 px-3 text-[12px] font-bold rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 bg-white" />
-                        <p class="text-[10px] text-slate-400">Leave blank if customers can select any number of options in this group.</p>
+                    <div x-show="newGroupMaxSelect != 1" x-cloak class="mt-2.5 p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1.5">
+                        <label class="text-[11px] font-bold text-slate-600 block">Max Selection Limit</label>
+                        <div class="mt-1 flex items-center h-10 border border-gray-200 rounded-lg overflow-hidden shadow-sm bg-white">
+                            <button type="button" tabindex="-1" @click="decrementNewGroupMaxSelect()"
+                                :disabled="newGroupMaxSelect === null || newGroupMaxSelect === undefined"
+                                class="w-10 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors border-r border-gray-200 shrink-0">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                            </button>
+                            <input type="text" inputmode="numeric" maxlength="2"
+                                :value="newGroupMaxSelect === null || newGroupMaxSelect === undefined || newGroupMaxSelect === '' ? '' : newGroupMaxSelect"
+                                @input="handleNewGroupMaxSelectInput($event)"
+                                placeholder="No Limit"
+                                class="flex-1 w-full h-full text-center text-[13px] font-bold text-gray-900 border-0 focus:ring-0 bg-transparent placeholder:text-gray-400 placeholder:font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+                            <button type="button" tabindex="-1" @click="incrementNewGroupMaxSelect()"
+                                :disabled="newGroupMaxSelect >= 99"
+                                class="w-10 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors border-l border-gray-200 shrink-0">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                            </button>
+                        </div>
+                        <p class="text-[10px] text-slate-400">2–99 selections. Leave blank for no limit.</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-3 p-3 bg-amber-50/50 rounded-xl border border-amber-100 transition-all hover:bg-amber-50">
@@ -1706,11 +1765,117 @@
                             is_default: this.optionGroups[gIdx].options.length === 0
                         });
                     },
-                    setDefaultOption(gIdx, oIdx) {
+                    toggleDefaultOption(gIdx, oIdx) {
                         if (!this.optionGroups[gIdx] || !this.optionGroups[gIdx].options) return;
+                        const isCurrent = !!this.optionGroups[gIdx].options[oIdx].is_default;
                         this.optionGroups[gIdx].options.forEach((opt, index) => {
-                            opt.is_default = (index === oIdx);
+                            opt.is_default = (index === oIdx && !isCurrent);
                         });
+                    },
+                    // ── Per-group selection mode and max-select stepper (bounded by option count) ──
+                    setGroupSingleMode(gIdx) {
+                        const group = this.optionGroups[gIdx];
+                        if (!group) return;
+                        if (group.max_select !== 1) {
+                            group._lastMulti = group.max_select;
+                        }
+                        group.max_select = 1;
+                    },
+                    setGroupMultiMode(gIdx) {
+                        const group = this.optionGroups[gIdx];
+                        if (!group) return;
+                        if (group.max_select === 1) {
+                            const optCount = (group.options || []).length;
+                            let last = (group._lastMulti !== undefined && group._lastMulti !== 1) ? group._lastMulti : null;
+                            if (last !== null && optCount > 0 && last >= optCount) {
+                                last = null;
+                            }
+                            group.max_select = last;
+                        }
+                    },
+                    handleGroupMaxSelectInput(gIdx, e) {
+                        const group = this.optionGroups[gIdx];
+                        if (!group) return;
+                        const optCount = (group.options || []).length;
+                        let digits = e.target.value.replace(/\D/g, '').slice(0, 2);
+                        if (digits === '') {
+                            group.max_select = null;
+                        } else {
+                            let n = parseInt(digits, 10);
+                            if (n < 2) n = 2;
+                            // If it reaches or exceeds the number of options, it limits and sets No Limit
+                            if (optCount > 0 && n >= optCount) {
+                                group.max_select = null;
+                            } else {
+                                group.max_select = n;
+                            }
+                        }
+                        group._lastMulti = group.max_select;
+                        e.target.value = (group.max_select === null || group.max_select === undefined) ? '' : String(group.max_select);
+                    },
+                    incrementGroupMaxSelect(gIdx) {
+                        const group = this.optionGroups[gIdx];
+                        if (!group) return;
+                        const optCount = (group.options || []).length;
+                        if (optCount <= 2) {
+                            group.max_select = null;
+                            return;
+                        }
+                        if (group.max_select === null || group.max_select === undefined) {
+                            return;
+                        }
+                        let n = (typeof group.max_select === 'number' && group.max_select >= 2) ? group.max_select : 1;
+                        let next = n + 1;
+                        // If it reaches the number of options that will be the limit of multi choice,
+                        // if you add it up to maximum it will limit and show "No Limit"
+                        if (next >= optCount) {
+                            group.max_select = null;
+                        } else {
+                            group.max_select = next;
+                        }
+                        group._lastMulti = group.max_select;
+                    },
+                    decrementGroupMaxSelect(gIdx) {
+                        const group = this.optionGroups[gIdx];
+                        if (!group) return;
+                        const optCount = (group.options || []).length;
+                        if (optCount <= 2) {
+                            group.max_select = null;
+                            return;
+                        }
+                        if (group.max_select === null || group.max_select === undefined) {
+                            group.max_select = Math.max(2, optCount - 1);
+                        } else if (group.max_select <= 2) {
+                            group.max_select = 2;
+                        } else {
+                            group.max_select = group.max_select - 1;
+                        }
+                        group._lastMulti = group.max_select;
+                    },
+                    // ── Same stepper, for the "Add Option Group" modal's local field ──
+                    handleNewGroupMaxSelectInput(e) {
+                        let digits = e.target.value.replace(/\D/g, '').slice(0, 2);
+                        if (digits === '') {
+                            this.newGroupMaxSelect = null;
+                        } else {
+                            let n = parseInt(digits, 10);
+                            if (n < 2) n = 2;
+                            if (n > 99) n = 99;
+                            this.newGroupMaxSelect = n;
+                        }
+                        e.target.value = (this.newGroupMaxSelect === null || this.newGroupMaxSelect === undefined) ? '' : String(this.newGroupMaxSelect);
+                    },
+                    incrementNewGroupMaxSelect() {
+                        let n = (typeof this.newGroupMaxSelect === 'number' && this.newGroupMaxSelect >= 2) ? this.newGroupMaxSelect : 1;
+                        this.newGroupMaxSelect = Math.min(99, n + 1);
+                    },
+                    decrementNewGroupMaxSelect() {
+                        if (this.newGroupMaxSelect === null || this.newGroupMaxSelect === undefined) return;
+                        if (this.newGroupMaxSelect <= 2) {
+                            this.newGroupMaxSelect = null;
+                        } else {
+                            this.newGroupMaxSelect = this.newGroupMaxSelect - 1;
+                        }
                     },
                     promptDeleteOption(gIdx, oIdx) {
                         const group = this.optionGroups[gIdx];
@@ -1782,6 +1947,10 @@
                                     });
                                 }
                                 this.optionGroups[gIdx].options.splice(oIdx, 1);
+                                const remainingOpts = this.optionGroups[gIdx].options.length;
+                                if (this.optionGroups[gIdx].max_select !== 1 && this.optionGroups[gIdx].max_select !== null && this.optionGroups[gIdx].max_select >= remainingOpts) {
+                                    this.optionGroups[gIdx].max_select = null;
+                                }
                                 this.$dispatch('notify', { type: 'info', message: 'Option removed.' });
                             }
                         } else if (type === 'delete_group') {
@@ -1828,17 +1997,33 @@
                             return;
                         }
 
+                        // Pull group-level settings from the template too — pricing
+                        // mode, selection limit, required flag, and no-recipe flag
+                        // are all part of "the template", not just its ingredients.
+                        group.price_mode = template.price_mode;
+                        group.max_select = template.max_select !== undefined ? template.max_select : group.max_select;
+                        group.is_required = !!template.is_required;
+                        group.no_recipe_required = !!template.no_recipe_required;
+
                         let addedOptionCount = 0;
+                        let updatedOptionCount = 0;
                         let addedIngredientCount = 0;
                         const noRecipe = !!group.no_recipe_required;
                         const matchedItemIds = [];
                         if (!this.recipeIngredients) this.recipeIngredients = [];
 
-                        // 1) Sync ingredients into existing options
+                        // 1) Sync price, default flag, and ingredients into existing options
                         (group.options || []).forEach((opt, optIndex) => {
                             const templateItem = (template.items || []).find(ti => (ti.name || '').toLowerCase() === (opt.name || '').toLowerCase());
                             if (!templateItem) return;
                             matchedItemIds.push(templateItem.id);
+
+                            const templatePrice = Number(templateItem.price) === 0 ? '' : templateItem.price;
+                            if (String(opt.price ?? '') !== String(templatePrice ?? '') || !!opt.is_default !== !!templateItem.is_default) {
+                                updatedOptionCount++;
+                            }
+                            opt.price = templatePrice;
+                            opt.is_default = !!templateItem.is_default;
 
                             if (noRecipe) return;
 
@@ -1861,6 +2046,23 @@
                                 addedIngredientCount++;
                             });
                         });
+
+                        // If the group is now flagged No Recipe (either it already
+                        // was, or the template just turned it on), strip any
+                        // ingredients staged for its options — same rule the
+                        // checkbox's own @change handler enforces.
+                        if (noRecipe) {
+                            this.recipeIngredients = this.recipeIngredients.filter(ri => {
+                                if (!ri.owner || !ri.owner.startsWith('option:')) return true;
+                                const ref = ri.owner.replace('option:', '');
+                                if (ref.includes('_')) {
+                                    const [refG] = ref.split('_');
+                                    return Number(refG) !== Number(gIdx);
+                                }
+                                const stillBelongs = (group.options || []).some(o => o.id && String(o.id) === ref);
+                                return !stillBelongs;
+                            });
+                        }
 
                         // 2) Pull in template items that aren't options yet
                         (template.items || []).forEach(templateItem => {
@@ -1893,15 +2095,17 @@
                             }
                         });
 
-                        if (addedOptionCount > 0 || addedIngredientCount > 0) {
+                        if (addedOptionCount > 0 || updatedOptionCount > 0 || addedIngredientCount > 0) {
                             const parts = [];
-                            if (addedOptionCount > 0) parts.push(addedOptionCount + ' option(s)');
+                            if (addedOptionCount > 0) parts.push(addedOptionCount + ' new option(s)');
+                            if (updatedOptionCount > 0) parts.push(updatedOptionCount + ' price/default update(s)');
                             if (addedIngredientCount > 0) parts.push(addedIngredientCount + ' ingredient(s)');
-                            this.$dispatch('notify', { type: 'success', message: 'Synced ' + parts.join(' and ') + " from the '" + template.name + "' template." });
+                            this.$dispatch('notify', { type: 'success', message: 'Synced ' + parts.join(', ') + " from the '" + template.name + "' template." });
                         } else {
                             this.$dispatch('notify', { type: 'info', message: 'Already up to date — nothing new to sync.' });
                         }
                     },
+                    
                     importTemplate(templateId) {
                         const template = (this.templates || []).find(t => Number(t.id) === Number(templateId));
                         if (!template) return;

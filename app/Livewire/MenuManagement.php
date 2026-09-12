@@ -137,9 +137,8 @@ public function getOwnerLabel(string $owner): string
      */
     public function syncGroupFromLibrary(int $groupIndex)
     {
-                $groupData = $this->optionGroups[$groupIndex] ?? null;
+        $groupData = $this->optionGroups[$groupIndex] ?? null;
         if (!$groupData) return;
-        $noRecipe = (bool)($groupData['no_recipe_required'] ?? false);
 
         $template = OptionTemplate::with('items.ingredients.ingredient')
             ->whereRaw('LOWER(name) = ?', [strtolower($groupData['name'])])
@@ -150,17 +149,35 @@ public function getOwnerLabel(string $owner): string
             return;
         }
 
+        // Pull group-level settings from the template too — pricing mode,
+        // selection limit, required flag, and no-recipe flag are all part
+        // of "the template", not just its ingredients.
+        $this->optionGroups[$groupIndex]['price_mode'] = $template->price_mode;
+        $this->optionGroups[$groupIndex]['max_select'] = $template->max_select;
+        $this->optionGroups[$groupIndex]['is_required'] = (bool) $template->is_required;
+        $this->optionGroups[$groupIndex]['no_recipe_required'] = (bool) $template->no_recipe_required;
+        $noRecipe = (bool) $template->no_recipe_required;
+
         $addedIngredientCount = 0;
+        $updatedOptionCount = 0;
         $addedOptionCount = 0;
         $matchedItemIds = [];
 
-        // 1) Sync ingredients into options that already exist on this product.
+        // 1) Sync price, default flag, and ingredients into options that
+        // already exist on this product.
         foreach ($this->optionGroups[$groupIndex]['options'] as $optIndex => $option) {
             $templateItem = $template->items->first(
                 fn($ti) => strtolower($ti->name) === strtolower($option['name'])
             );
-                        if (!$templateItem) continue;
+            if (!$templateItem) continue;
             $matchedItemIds[] = $templateItem->id;
+
+            $templatePrice = $templateItem->price == 0 ? '' : $templateItem->price;
+            if ((string)($option['price'] ?? '') !== (string)$templatePrice || (bool)($option['is_default'] ?? false) !== (bool)$templateItem->is_default) {
+                $updatedOptionCount++;
+            }
+            $this->optionGroups[$groupIndex]['options'][$optIndex]['price'] = $templatePrice;
+            $this->optionGroups[$groupIndex]['options'][$optIndex]['is_default'] = (bool) $templateItem->is_default;
 
             if ($noRecipe) continue;
 
@@ -201,7 +218,7 @@ public function getOwnerLabel(string $owner): string
                 'price'      => $templateItem->price == 0 ? '' : $templateItem->price,
                 'is_default' => $templateItem->is_default,
             ];
-                        $addedOptionCount++;
+            $addedOptionCount++;
 
             if (!$noRecipe) {
                 $owner = "option:{$groupIndex}_{$newOptIndex}";
@@ -219,11 +236,25 @@ public function getOwnerLabel(string $owner): string
             }
         }
 
-        if ($addedIngredientCount > 0 || $addedOptionCount > 0) {
+        // If the group is now flagged No Recipe (either it already was, or
+        // the template just turned it on), strip any ingredients staged
+        // for its options so state can't disagree with the flag.
+        if ($noRecipe) {
+            foreach ($this->optionGroups[$groupIndex]['options'] as $optIndex => $option) {
+                $ownerIndexed = "option:{$groupIndex}_{$optIndex}";
+                $ownerReal = !empty($option['id']) ? "option:{$option['id']}" : null;
+                $this->recipeIngredients = collect($this->recipeIngredients)
+                    ->reject(fn($ri) => $ri['owner'] === $ownerIndexed || ($ownerReal && $ri['owner'] === $ownerReal))
+                    ->values()->all();
+            }
+        }
+
+        if ($addedIngredientCount > 0 || $addedOptionCount > 0 || $updatedOptionCount > 0) {
             $parts = [];
-            if ($addedOptionCount > 0) $parts[] = "{$addedOptionCount} option(s)";
+            if ($addedOptionCount > 0) $parts[] = "{$addedOptionCount} new option(s)";
+            if ($updatedOptionCount > 0) $parts[] = "{$updatedOptionCount} price/default update(s)";
             if ($addedIngredientCount > 0) $parts[] = "{$addedIngredientCount} ingredient(s)";
-            $this->dispatch('notify', type: 'success', message: 'Synced ' . implode(' and ', $parts) . " from the '{$template->name}' template.");
+            $this->dispatch('notify', type: 'success', message: 'Synced ' . implode(', ', $parts) . " from the '{$template->name}' template.");
         } else {
             $this->dispatch('notify', type: 'info', message: 'Already up to date — nothing new to sync.');
         }

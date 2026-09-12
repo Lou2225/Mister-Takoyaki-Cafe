@@ -197,109 +197,70 @@ class OptionLibraryManagement extends Component
         }
     }
 
-    public function validateBeforeSave(?array $payload = null)
+
+    public function saveTemplate(array $payload = [])
     {
-        if (!empty($payload)) {
-            if (isset($payload['name'])) $this->name = trim($payload['name']);
-            if (isset($payload['priceMode'])) $this->priceMode = $payload['priceMode'];
-            if (isset($payload['isRequired'])) $this->isRequired = (bool) $payload['isRequired'];
-            if (isset($payload['noRecipeRequired'])) $this->noRecipeRequired = (bool) $payload['noRecipeRequired'];
-            if (isset($payload['templateItems'])) $this->templateItems = $payload['templateItems'];
-        }
+        if (isset($payload['id'])) $this->editTemplateId = $payload['id'] ?: null;
+        if (isset($payload['name'])) $this->name = trim($payload['name']);
+        if (isset($payload['priceMode'])) $this->priceMode = $payload['priceMode'];
+        if (isset($payload['maxSelect'])) $this->maxSelect = $payload['maxSelect'];
+        if (isset($payload['isRequired'])) $this->isRequired = (bool) $payload['isRequired'];
+        if (isset($payload['noRecipeRequired'])) $this->noRecipeRequired = (bool) $payload['noRecipeRequired'];
+        if (isset($payload['templateItems'])) $this->templateItems = $payload['templateItems'];
 
         foreach ($this->templateItems as $i => $it) {
-            if (!isset($it['price']) || $it['price'] === '' || $it['price'] === null) {
-                $this->templateItems[$i]['price'] = 0;
-            } else {
-                $this->templateItems[$i]['price'] = (float) $it['price'];
-            }
+            $this->templateItems[$i]['price'] = (!isset($it['price']) || $it['price'] === '' || $it['price'] === null)
+                ? 0 : (float) $it['price'];
             if (!isset($it['ingredients']) || !is_array($it['ingredients'])) {
                 $this->templateItems[$i]['ingredients'] = [];
             }
         }
 
-        $this->validate([
-            'name' => 'required|string|max:255',
-            'priceMode' => 'required|in:fixed,additive',
-            'templateItems' => 'required|array|min:1',
-            'templateItems.*.name' => 'required|string|max:100',
-            'templateItems.*.price' => 'nullable|numeric|min:0',
-        ], [
-            'name.required' => 'Template name is required.',
-            'templateItems.required' => 'At least one variation option is required.',
-            'templateItems.min' => 'At least one variation option is required.',
-            'templateItems.*.name.required' => 'Every option must have a name.',
-            'templateItems.*.price.numeric' => 'Option price must be a valid number.',
-            'templateItems.*.price.min' => 'Option price cannot be negative.',
-        ]);
+        // Use Validator manually instead of $this->validate() — the latter throws
+        // ValidationException, which Livewire intercepts before our JS ever sees
+        // a return value. We need a plain array back so $wire.saveTemplate()
+        // can resolve with {success:false, errors:{...}}.
+        $validator = \Illuminate\Support\Facades\Validator::make(
+            [
+                'name' => $this->name,
+                'priceMode' => $this->priceMode,
+                'maxSelect' => $this->maxSelect,
+                'templateItems' => $this->templateItems,
+            ],
+            [
+                'name' => 'required|string|max:255',
+                'priceMode' => 'required|in:fixed,additive',
+                'maxSelect' => 'nullable|integer|min:1',
+                'templateItems' => 'required|array|min:1',
+                'templateItems.*.name' => 'required|string|max:100',
+                'templateItems.*.price' => 'nullable|numeric|min:0',
+            ],
+            [
+                'name.required' => 'Template name is required.',
+                'maxSelect.min' => 'Maximum selections must be at least 1.',
+                'templateItems.required' => 'At least one variation option is required.',
+                'templateItems.min' => 'At least one variation option is required.',
+                'templateItems.*.name.required' => 'Every option must have a name.',
+                'templateItems.*.price.numeric' => 'Option price must be a valid number.',
+                'templateItems.*.price.min' => 'Option price cannot be negative.',
+            ]
+        );
 
-        // Duplicate check
+        if ($validator->fails()) {
+            return ['success' => false, 'errors' => $validator->errors()->toArray()];
+        }
+
         $exists = OptionTemplate::where('name', $this->name)
             ->when($this->editTemplateId, fn($q) => $q->where('id', '!=', $this->editTemplateId))
             ->exists();
 
         if ($exists) {
-            $this->addError('name', "A template named '{$this->name}' already exists in the library.");
-            $this->dispatch('notify', type: 'error', message: "A template named '{$this->name}' already exists in the library.");
-            return false;
-        }
-
-        $this->dispatch('open-modal', 'confirm-save-template');
-        return true;
-    }
-
-    public function saveTemplate(?array $payload = null)
-    {
-        if (!empty($payload)) {
-            if (isset($payload['name'])) $this->name = trim($payload['name']);
-            if (isset($payload['priceMode'])) $this->priceMode = $payload['priceMode'];
-            if (isset($payload['isRequired'])) $this->isRequired = (bool) $payload['isRequired'];
-            if (isset($payload['noRecipeRequired'])) $this->noRecipeRequired = (bool) $payload['noRecipeRequired'];
-            if (isset($payload['templateItems'])) $this->templateItems = $payload['templateItems'];
-        }
-
-        foreach ($this->templateItems as $i => $it) {
-            if (!isset($it['price']) || $it['price'] === '' || $it['price'] === null) {
-                $this->templateItems[$i]['price'] = 0;
-            } else {
-                $this->templateItems[$i]['price'] = (float) $it['price'];
-            }
-            if (!isset($it['ingredients']) || !is_array($it['ingredients'])) {
-                $this->templateItems[$i]['ingredients'] = [];
-            }
-        }
-
-        $this->validate([
-            'name' => 'required|string|max:255',
-            'priceMode' => 'required|in:fixed,additive',
-            'maxSelect' => 'nullable|integer|min:1',
-            'templateItems' => 'required|array|min:1',
-            'templateItems.*.name' => 'required|string|max:100',
-            'templateItems.*.price' => 'nullable|numeric|min:0',
-        ], [
-            'name.required' => 'Template name is required.',
-            'maxSelect.min' => 'Maximum selections must be at least 1.',
-            'templateItems.required' => 'At least one variation option is required.',
-            'templateItems.min' => 'At least one variation option is required.',
-            'templateItems.*.name.required' => 'Every option must have a name.',
-            'templateItems.*.price.numeric' => 'Option price must be a valid number.',
-            'templateItems.*.price.min' => 'Option price cannot be negative.',
-        ]);
-
-        // Duplicate check
-        $exists = OptionTemplate::where('name', $this->name)
-            ->when($this->editTemplateId, fn($q) => $q->where('id', '!=', $this->editTemplateId))
-            ->exists();
-
-        if ($exists) {
-            $this->addError('name', "A template named '{$this->name}' already exists in the library.");
-            $this->dispatch('notify', type: 'error', message: "A template named '{$this->name}' already exists in the library.");
-            return;
+            return ['success' => false, 'errors' => ['name' => "A template named '{$this->name}' already exists in the library."]];
         }
 
         try {
-            DB::transaction(function () {
-                $template = $this->editTemplateId 
+            $template = DB::transaction(function () {
+                $template = $this->editTemplateId
                     ? OptionTemplate::findOrFail($this->editTemplateId)
                     : new OptionTemplate();
 
@@ -313,16 +274,15 @@ class OptionLibraryManagement extends Component
                 $keepIds = [];
                 foreach ($this->templateItems as $itemData) {
                     $item = !empty($itemData['id']) ? $template->items()->find($itemData['id']) : null;
-                    $payload = [
+                    $itemPayload = [
                         'name' => $itemData['name'],
                         'price' => (float)($itemData['price'] ?: 0),
                         'is_default' => (bool)($itemData['is_default'] ?? false),
                     ];
 
-                    $item = $item ? tap($item, fn($i) => $i->update($payload)) : $template->items()->create($payload);
+                    $item = $item ? tap($item, fn($i) => $i->update($itemPayload)) : $template->items()->create($itemPayload);
                     $keepIds[] = $item->id;
 
-                    // Rebuild this item's ingredient recipe from scratch
                     $item->ingredients()->delete();
                     if (!$this->noRecipeRequired && !empty($itemData['ingredients'])) {
                         foreach ($itemData['ingredients'] as $ri) {
@@ -336,13 +296,40 @@ class OptionLibraryManagement extends Component
                     }
                 }
                 $template->items()->whereNotIn('id', $keepIds)->delete();
+
+                return $template;
             });
 
-            $this->dispatch('notify', type: 'success', message: 'Template saved to library.');
-            $this->backToList();
+            $template->load('items.ingredients.ingredient');
+
+            return [
+                'success' => true,
+                'template' => [
+                    'id' => (int) $template->id,
+                    'name' => (string) $template->name,
+                    'price_mode' => (string) $template->price_mode,
+                    'max_select' => $template->max_select !== null ? (int) $template->max_select : null,
+                    'is_required' => (bool) $template->is_required,
+                    'no_recipe_required' => (bool) $template->no_recipe_required,
+                    'items_count' => $template->items->count(),
+                    'items' => $template->items->map(fn($i) => [
+                        'id' => (int) $i->id,
+                        'name' => (string) $i->name,
+                        'price' => (float) $i->price == 0 ? '' : (float) $i->price,
+                        'is_default' => (bool) $i->is_default,
+                        'ingredients' => $i->ingredients->map(fn($ri) => [
+                            'id' => (int) $ri->ingredient_id,
+                            'name' => $ri->ingredient ? (string) $ri->ingredient->name : 'Unknown',
+                            'unit' => $ri->ingredient ? (string) StockHelper::getAbbreviation($ri->ingredient->unit) : '',
+                            'quantity' => (float) $ri->quantity,
+                            'cost' => (float) ($ri->ingredient?->cost ?? 0),
+                        ])->values(),
+                    ])->values(),
+                ],
+            ];
         } catch (\Exception $e) {
             Log::error('OptionLibraryManagement.saveTemplate failed: ' . $e->getMessage());
-            $this->dispatch('notify', type: 'error', message: 'Failed to save template: ' . $e->getMessage());
+            return ['success' => false, 'errors' => ['general' => 'Failed to save template: ' . $e->getMessage()]];
         }
     }
 
@@ -354,19 +341,26 @@ class OptionLibraryManagement extends Component
         $this->dispatch('open-modal', name: 'delete-template');
     }
 
-    public function deleteTemplate()
+    public function deleteTemplate($id = null)
     {
-        if (!$this->deleteTargetId) return;
+        // Alpine passes the id as an argument now — don't rely on the
+        // server-side $this->deleteTargetId, which the JS never sets.
+        $id = $id ?? $this->deleteTargetId;
 
-        $template = OptionTemplate::findOrFail($this->deleteTargetId);
-        $name = $template->name;
-        $template->delete();
+        if (!$id) {
+            return ['success' => false, 'errors' => ['general' => 'No template selected for deletion.']];
+        }
 
-        $this->deleteTargetId = null;
-        $this->deleteTargetName = '';
-        $this->dispatch('notify', type: 'success', message: "Template '{$name}' removed from library.");
-        $this->dispatch('close-modal', name: 'delete-template');
-        $this->backToList();
+        try {
+            $template = OptionTemplate::findOrFail($id);
+            $name = $template->name;
+            $template->delete();
+
+            return ['success' => true, 'name' => $name];
+        } catch (\Exception $e) {
+            Log::error('OptionLibraryManagement.deleteTemplate failed: ' . $e->getMessage());
+            return ['success' => false, 'errors' => ['general' => 'Failed to delete template.']];
+        }
     }
 
     private function resetForm()

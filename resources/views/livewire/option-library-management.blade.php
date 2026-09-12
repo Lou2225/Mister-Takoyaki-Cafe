@@ -5,14 +5,8 @@
     $fixedTemplates = $allTemplates->where('price_mode', 'fixed')->count();
 @endphp
 
-<div 
-    x-data="typeof window.optionLibraryManagement === 'function' ? window.optionLibraryManagement($wire, @js($allIngredients)) : { panel: 'list', mode: 'list', tableView: 'table', searchQuery: '', templatesList: [], filteredTemplateIds: [], currentPage: 1, perPage: 5, isItemVisible: () => true, formErrors: {}, formSubmitted: false, isSaving: false }"
-    class="relative"
-    wire:ignore.self
-    wire:key="option-library-main-container">
-
-    {{-- Hidden reactive sync helper under wire:ignore --}}
-    <div x-effect="updateTemplatesList(@js($allTemplates->map(fn($t) => [
+<div
+    x-data="typeof window.optionLibraryManagement === 'function' ? window.optionLibraryManagement($wire, @js($allIngredients), @js($allTemplates->map(fn($t) => [
         'id' => (int)$t->id,
         'name' => (string)$t->name,
         'price_mode' => (string)$t->price_mode,
@@ -33,7 +27,10 @@
                 'cost' => (float)($ri->ingredient?->cost ?? 0),
             ])->values(),
         ])->values(),
-    ])))" class="hidden" wire:key="templates-sync-helper"></div>
+    ]))) : { panel: 'list', mode: 'list', tableView: 'table', searchQuery: '', templatesList: [], filteredTemplateIds: [], currentPage: 1, perPage: 5, isItemVisible: () => true, formErrors: {}, formSubmitted: false, isSaving: false }"
+    class="relative"
+    wire:ignore
+    wire:key="option-library-main-container">
 
     {{-- ════════════════ PANEL 1 — LIST ════════════════ --}}
     <div x-show="panel === 'list'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="px-1">
@@ -176,8 +173,7 @@
                         </td>
                         <td class="py-4 px-4 text-center">
                             <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider {{ ($tmpl->max_select == 1) ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-blue-50 text-blue-700 border border-blue-100' }}">
-                                {{ $tmpl->max_select ? ($tmpl->max_select == 1 ? 'Single (1)' : 'Multi (Max ' . $tmpl->max_select . ')') : 'Multi (Unlimited)' }}
-                            </span>
+{{ $tmpl->max_select ? ($tmpl->max_select == 1 ? 'Single (1)' : 'Multi (Max ' . $tmpl->max_select . ')') : 'Multi (No Limit)' }}                            </span>
                         </td>
                         <td class="py-4 px-4 text-center">
                             <span class="text-[13px] font-bold text-slate-600">{{ $tmpl->items->count() }} Items</span>
@@ -238,8 +234,7 @@
                                 <span class="text-[10px] font-bold {{ $tmpl->price_mode === 'fixed' ? 'text-indigo-600' : 'text-sky-600' }} uppercase tracking-wider">{{ $tmpl->price_mode }}</span>
                             </span>
                             <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase tracking-wider {{ ($tmpl->max_select == 1) ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-blue-50 text-blue-700 border border-blue-100' }}">
-                                {{ $tmpl->max_select ? ($tmpl->max_select == 1 ? 'Single (1)' : 'Multi (Max ' . $tmpl->max_select . ')') : 'Multi (Unlimited)' }}
-                            </span>
+{{ $tmpl->max_select ? ($tmpl->max_select == 1 ? 'Single (1)' : 'Multi (Max ' . $tmpl->max_select . ')') : 'Multi (No Limit)' }}                            </span>
                         </div>
 
                         <div class="space-y-2.5 pt-4 border-t border-slate-50">
@@ -378,6 +373,14 @@
             </x-secondary-button>
         </div>
 
+        <div x-show="formErrors && formErrors.general" x-cloak
+            class="mb-4 text-[12px] font-medium text-red-600 p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2">
+            <svg class="w-4 h-4 shrink-0 mt-0.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span x-text="formErrors.general"></span>
+        </div>
+
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {{-- Main Content: Variation Items --}}
             <div class="lg:col-span-2 space-y-6">
@@ -402,9 +405,7 @@
                         </svg>
                         <span x-text="(typeof formErrors !== 'undefined' && formErrors && formErrors.templateItems) || ''"></span>
                     </div>
-                    @error('templateItems')
-                        <p class="mb-3 text-xs text-rose-600 font-semibold">{{ $message }}</p>
-                    @enderror
+
 
                     {{-- Dynamic Alpine-driven Option Cards List --}}
                     <div class="space-y-4 flex-1">
@@ -696,9 +697,6 @@
                                     <li x-text="(typeof formErrors !== 'undefined' && formErrors && formErrors.name) || ''"></li>
                                 </ul>
                             </div>
-                            @error('name')
-                                <p class="mt-1 text-xs text-rose-600 font-semibold">{{ $message }}</p>
-                            @enderror
                         </div>
 
                         <div>
@@ -717,25 +715,44 @@
                             </div>
                         </div>
 
-                        <div>
+                         <div>
                             <x-input-label value="Selection Mode" />
                             <div class="grid grid-cols-2 gap-2 mt-1.5">
-                                <button type="button" @click="maxSelect = 1" 
+                                <button type="button" @click="setSingleMode()"
                                     class="h-10 rounded-lg border-2 text-[11px] font-black uppercase tracking-wider transition-all"
                                     :class="maxSelect == 1 ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'">
                                     Single (Pick 1)
                                 </button>
-                                <button type="button" @click="if (maxSelect == 1) maxSelect = null" 
+                                <button type="button" @click="setMultiMode()"
                                     class="h-10 rounded-lg border-2 text-[11px] font-black uppercase tracking-wider transition-all"
                                     :class="maxSelect != 1 ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'">
                                     Multiple Choice
                                 </button>
                             </div>
-                            <div x-show="maxSelect != 1" class="mt-2.5 p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1.5">
-                                <label class="text-[11px] font-bold text-slate-600 block">Max Selection Limit (Leave blank for unlimited)</label>
-                                <input type="number" min="1" x-model="maxSelect" placeholder="e.g. 2 for max 2 flavors, or blank"
-                                    class="w-full h-9 px-3 text-[12px] font-bold rounded-lg border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 bg-white" />
-                                <p class="text-[10px] text-slate-400">Specify maximum number of options a customer can pick, or leave blank for unlimited.</p>
+
+                             <div x-show="maxSelect != 1" x-cloak class="mt-2.5 p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1.5">
+                                <label class="text-[11px] font-bold text-slate-600 block">Max Selection Limit</label>
+                                <div class="mt-1 flex items-center h-10 border border-gray-200 rounded-lg overflow-hidden shadow-sm bg-white">
+                                    <button type="button" tabindex="-1" @click="decrementMaxSelect()"
+                                        :disabled="!templateItems || templateItems.length <= 2 || (maxSelect !== null && maxSelect <= 2)"
+                                        class="w-10 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors border-r border-gray-200 shrink-0">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                                    </button>
+                                    <input
+                                        type="text"
+                                        inputmode="numeric"
+                                        maxlength="2"
+                                        :value="maxSelect === null || maxSelect === '' ? '' : maxSelect"
+                                        @input="handleMaxSelectInput($event)"
+                                        placeholder="No Limit"
+                                        class="flex-1 w-full h-full text-center text-[13px] font-bold text-gray-900 border-0 focus:ring-0 bg-transparent placeholder:text-gray-400 placeholder:font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+                                    <button type="button" tabindex="-1" @click="incrementMaxSelect()"
+                                        :disabled="!templateItems || templateItems.length <= 2 || maxSelect === null || maxSelect >= templateItems.length"
+                                        class="w-10 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors border-l border-gray-200 shrink-0">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                    </button>
+                                </div>
+                                <p class="text-[10px] text-slate-400 mt-1.5" x-text="templateItems.length > 2 ? ('2–' + (templateItems.length - 1) + ' selections. Maximum (' + templateItems.length + ') or blank for no limit.') : (templateItems.length === 2 ? '2 selections available (No Limit to allow all).' : 'Add at least 2 options for multiple choice.')"></p>
                             </div>
                         </div>
 
@@ -801,8 +818,7 @@
 
             <div class="flex items-center justify-end gap-2">
                 <x-secondary-button @click="$dispatch('close-modal', 'delete-template')">Cancel</x-secondary-button>
-                <x-danger-button wire:click="deleteTemplate" @click="$dispatch('close-modal', 'delete-template')">Delete</x-danger-button>
-            </div>
+                <x-danger-button type="button" @click="deleteTemplateConfirmed()" ::disabled="isSaving">Delete</x-danger-button>            </div>
         </div>
     </x-modal>
 
@@ -845,41 +861,50 @@
     <script>
         (function() {
             const defineFn = function() {
-                window.optionLibraryManagement = function($wire, allIngredients) {
+                window.optionLibraryManagement = function($wire, allIngredients, initialTemplates) {
                     return {
-                        panel: $wire.entangle('panel').live,
-                        mode: $wire.entangle('mode').live,
-                        tableView: $wire.entangle('view').live,
-                        editTemplateId: $wire.entangle('editTemplateId'),
-                        templateName: $wire.entangle('name'),
-                        priceMode: $wire.entangle('priceMode'),
-                        maxSelect: $wire.entangle('maxSelect'),
-                        isRequired: $wire.entangle('isRequired'),
-                        noRecipeRequired: $wire.entangle('noRecipeRequired'),
-                        templateItems: $wire.entangle('templateItems'),
-                        deleteTargetId: $wire.entangle('deleteTargetId'),
-                        deleteTargetName: $wire.entangle('deleteTargetName'),
+                        // ── Panel / navigation state (100% local — Livewire is only
+                        //    ever called for saveTemplate() and deleteTemplate()) ──
+                        panel: 'list',
+                        mode: 'list',
+                        tableView: 'table',
+
+                        // ── Form state ──
+                        editTemplateId: null,
+                        templateName: '',
+                        priceMode: 'additive',
+                        maxSelect: 1,
+                        lastMultiValue: null, // remembers the last custom multi-select value across toggles
+                        isRequired: false,
+                        noRecipeRequired: false,
+                        templateItems: [],
+                        formErrors: {},
+                        formSubmitted: false,
+                        isSaving: false,
+
+                        // ── Delete modal state ──
+                        deleteTargetId: null,
+                        deleteTargetName: '',
+
+                        // ── List / table state ──
                         priceModeFilter: '',
                         searchQuery: '',
                         currentPage: 1,
                         perPage: 5,
-                        templatesList: [],
+                        templatesList: initialTemplates || [],
                         ingredientsList: allIngredients || [],
-                        formErrors: {},
-                        formSubmitted: false,
-                        isSaving: false,
 
                         get filteredTemplateIds() {
                             const query = (this.searchQuery || '').toLowerCase().trim();
                             const filter = this.priceModeFilter;
                             return (this.templatesList || [])
                                 .filter(t => {
-                                    const matchesSearch = !query || 
-                                        (t.name || '').toLowerCase().includes(query) || 
+                                    const matchesSearch = !query ||
+                                        (t.name || '').toLowerCase().includes(query) ||
                                         (t.items && t.items.some(item => (item.name || '').toLowerCase().includes(query)));
-                                    
+
                                     const matchesMode = !filter || t.price_mode === filter;
-                                    
+
                                     return matchesSearch && matchesMode;
                                 })
                                 .map(t => t.id);
@@ -901,16 +926,14 @@
                         isItemVisible(id) {
                             return this.paginatedTemplateIds.includes(id);
                         },
-                        updateTemplatesList(newList) {
-                            this.templatesList = newList || [];
-                        },
 
-                        // ── Instant 0ms Actions ──
+                        // ── Instant (0ms) local panel actions — no server round-trip ──
                         createTemplate() {
                             this.editTemplateId = null;
                             this.templateName = '';
                             this.priceMode = 'additive';
                             this.maxSelect = 1;
+                            this.lastMultiValue = null;
                             this.isRequired = false;
                             this.noRecipeRequired = false;
                             this.templateItems = [
@@ -918,39 +941,36 @@
                             ];
                             this.formErrors = {};
                             this.formSubmitted = false;
-                            this.panel = 'form';
                             this.mode = 'create';
-                            this.$wire.showCreate();
+                            this.panel = 'form';
                         },
                         editTemplate(id) {
+                            // All template data (including ingredients) is already available
+                            // locally in templatesList, so this needs zero network calls.
                             const tmpl = (this.templatesList || []).find(t => Number(t.id) === Number(id));
-                            if (tmpl) {
-                                this.editTemplateId = tmpl.id;
-                                this.templateName = tmpl.name;
-                                this.priceMode = tmpl.price_mode;
-                                this.maxSelect = tmpl.max_select;
-                                this.isRequired = tmpl.is_required;
-                                this.noRecipeRequired = tmpl.no_recipe_required;
-                                this.templateItems = JSON.parse(JSON.stringify(tmpl.items || []));
-                                this.formErrors = {};
-                                this.formSubmitted = false;
-                                this.panel = 'form';
-                                this.mode = 'edit';
-                            }
-                            this.$wire.showEdit(id);
+                            if (!tmpl) return;
+                            this.editTemplateId = tmpl.id;
+                            this.templateName = tmpl.name;
+                            this.priceMode = tmpl.price_mode;
+                            this.maxSelect = tmpl.max_select;
+                            this.lastMultiValue = tmpl.max_select !== 1 ? tmpl.max_select : null;
+                            this.isRequired = tmpl.is_required;
+                            this.noRecipeRequired = tmpl.no_recipe_required;
+                            this.templateItems = JSON.parse(JSON.stringify(tmpl.items || []));
+                            this.formErrors = {};
+                            this.formSubmitted = false;
+                            this.mode = 'edit';
+                            this.panel = 'form';
                         },
                         backToList() {
                             this.panel = 'list';
                             this.mode = 'list';
                             this.formErrors = {};
                             this.formSubmitted = false;
-                            this.$wire.backToList();
                         },
                         confirmDelete(id, name) {
                             this.deleteTargetId = id;
                             this.deleteTargetName = name;
-                            this.$wire.deleteTargetId = id;
-                            this.$wire.deleteTargetName = name;
                             this.$dispatch('open-modal', 'delete-template');
                         },
                         addOption() {
@@ -962,11 +982,15 @@
                                 is_default: this.templateItems.length === 0,
                                 ingredients: []
                             });
-                            delete this.formErrors.templateItems;
+                            if (this.formErrors) delete this.formErrors.templateItems;
                         },
                         removeOption(idx) {
                             if (this.templateItems) {
                                 this.templateItems.splice(idx, 1);
+                                const remainingOpts = this.templateItems.length;
+                                if (this.maxSelect !== 1 && this.maxSelect !== null && this.maxSelect >= remainingOpts) {
+                                    this.maxSelect = null;
+                                }
                             }
                         },
                         toggleDefault(idx) {
@@ -977,7 +1001,78 @@
                             });
                         },
 
-                        // ── Validation & Save Actions ──
+                        // ── Selection mode toggle (fixed) ──
+                        setSingleMode() {
+                            if (this.maxSelect !== 1) {
+                                this.lastMultiValue = this.maxSelect;
+                            }
+                            this.maxSelect = 1;
+                        },
+                        setMultiMode() {
+                            if (this.maxSelect === 1) {
+                                const optCount = (this.templateItems || []).length;
+                                let last = (this.lastMultiValue !== undefined && this.lastMultiValue !== 1) ? this.lastMultiValue : null;
+                                if (last !== null && optCount > 0 && last >= optCount) {
+                                    last = null;
+                                }
+                                this.maxSelect = last;
+                            }
+                        },
+
+                        // ── Max-select stepper (bounded by option count) ──
+                        // Floor is 2 in multi-mode. If limit reaches the number of options, it limits and shows "No Limit".
+                        handleMaxSelectInput(e) {
+                            const optCount = (this.templateItems || []).length;
+                            let digits = e.target.value.replace(/\D/g, '').slice(0, 2);
+                            if (digits === '') {
+                                this.maxSelect = null;
+                            } else {
+                                let n = parseInt(digits, 10);
+                                if (n < 2) n = 2;
+                                if (optCount > 0 && n >= optCount) {
+                                    this.maxSelect = null;
+                                } else {
+                                    this.maxSelect = n;
+                                }
+                            }
+                            this.lastMultiValue = this.maxSelect;
+                            e.target.value = (this.maxSelect === null) ? '' : String(this.maxSelect);
+                        },
+                        incrementMaxSelect() {
+                            const optCount = (this.templateItems || []).length;
+                            if (optCount <= 2) {
+                                this.maxSelect = null;
+                                return;
+                            }
+                            if (this.maxSelect === null) {
+                                return;
+                            }
+                            let n = (typeof this.maxSelect === 'number' && this.maxSelect >= 2) ? this.maxSelect : 1;
+                            let next = n + 1;
+                            if (next >= optCount) {
+                                this.maxSelect = null;
+                            } else {
+                                this.maxSelect = next;
+                            }
+                            this.lastMultiValue = this.maxSelect;
+                        },
+                        decrementMaxSelect() {
+                            const optCount = (this.templateItems || []).length;
+                            if (optCount <= 2) {
+                                this.maxSelect = null;
+                                return;
+                            }
+                            if (this.maxSelect === null) {
+                                this.maxSelect = Math.max(2, optCount - 1);
+                            } else if (this.maxSelect <= 2) {
+                                this.maxSelect = 2;
+                            } else {
+                                this.maxSelect = this.maxSelect - 1;
+                            }
+                            this.lastMultiValue = this.maxSelect;
+                        },
+
+                        // ── Client-side validation before opening the confirm modal ──
                         validateAndPromptSave() {
                             this.formErrors = {};
                             this.formSubmitted = true;
@@ -986,8 +1081,8 @@
                             if (!trimmedName) {
                                 this.formErrors.name = 'Template name is required.';
                             } else {
-                                const dup = (this.templatesList || []).find(t => 
-                                    (t.name || '').trim().toLowerCase() === trimmedName.toLowerCase() && 
+                                const dup = (this.templatesList || []).find(t =>
+                                    (t.name || '').trim().toLowerCase() === trimmedName.toLowerCase() &&
                                     Number(t.id) !== Number(this.editTemplateId)
                                 );
                                 if (dup) {
@@ -1005,30 +1100,73 @@
                             }
 
                             if (Object.keys(this.formErrors).length > 0) {
-                                return; // DO NOT OPEN MODAL! Inline errors appear below fields
+                                return; // inline errors shown below fields, modal stays closed
                             }
 
                             this.$dispatch('open-modal', 'confirm-save-template');
                         },
 
+                        // ── The only two actions that actually touch the server ──
                         async confirmSave() {
                             this.$dispatch('close-modal', 'confirm-save-template');
                             this.isSaving = true;
+                            this.formErrors = {};
                             try {
                                 const payload = {
                                     id: this.editTemplateId,
                                     name: (this.templateName || '').trim(),
                                     priceMode: this.priceMode || 'additive',
+                                    maxSelect: this.maxSelect,
                                     isRequired: !!this.isRequired,
                                     noRecipeRequired: !!this.noRecipeRequired,
                                     templateItems: JSON.parse(JSON.stringify(this.templateItems || []))
                                 };
-                                await this.$wire.saveTemplate(payload);
+                                const res = await this.$wire.saveTemplate(payload);
+                                if (res && res.success) {
+                                    const idx = this.templatesList.findIndex(t => Number(t.id) === Number(res.template.id));
+                                    if (idx >= 0) {
+                                        this.templatesList[idx] = res.template;
+                                    } else {
+                                        this.templatesList.push(res.template);
+                                    }
+                                    this.$dispatch('notify', { type: 'success', message: 'Template saved to library.' });
+                                    this.backToList();
+                                } else {
+                                    this.formErrors = (res && res.errors) || { general: 'Failed to save template.' };
+                                    this.formSubmitted = true;
+                                    this.$dispatch('notify', { type: 'error', message: (res && res.errors && (res.errors.name || res.errors.general)) || 'Failed to save template.' });
+                                }
                             } catch (err) {
                                 console.error('Error saving template:', err);
+                                this.formErrors = { general: 'Failed to save template.' };
                                 this.$dispatch('notify', { type: 'error', message: 'Failed to save template.' });
                             } finally {
                                 this.isSaving = false;
+                            }
+                        },
+                        async deleteTemplateConfirmed() {
+                            const id = this.deleteTargetId;
+                            if (!id) return;
+                            this.$dispatch('close-modal', 'delete-template');
+                            this.isSaving = true;
+                            try {
+                                const res = await this.$wire.deleteTemplate(id);
+                                if (res && res.success) {
+                                    this.templatesList = this.templatesList.filter(t => Number(t.id) !== Number(id));
+                                    this.$dispatch('notify', { type: 'success', message: `Template "${res.name}" removed from library.` });
+                                    if (this.panel === 'form' && Number(this.editTemplateId) === Number(id)) {
+                                        this.backToList();
+                                    }
+                                } else {
+                                    this.$dispatch('notify', { type: 'error', message: (res && res.errors && res.errors.general) || 'Failed to delete template.' });
+                                }
+                            } catch (err) {
+                                console.error('Error deleting template:', err);
+                                this.$dispatch('notify', { type: 'error', message: 'Failed to delete template.' });
+                            } finally {
+                                this.isSaving = false;
+                                this.deleteTargetId = null;
+                                this.deleteTargetName = '';
                             }
                         },
 
