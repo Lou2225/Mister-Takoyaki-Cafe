@@ -38,7 +38,6 @@ class ProductApiController extends Controller
     /**
      * Get detailed product info
      */
-    public function show(int $id)
     public function show($id)
     {
         $branchId = request()->query('branch_id');
@@ -62,7 +61,6 @@ class ProductApiController extends Controller
     /**
      * Get product customizations for the app
      */
-    public function customizations(int $id)
     public function customizations($id)
     {
         $branchId = request()->query('branch_id');
