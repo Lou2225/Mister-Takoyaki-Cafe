@@ -1262,6 +1262,7 @@ window.printOrderReceipt = async function(orderId) {
         get label() { return this.sectionType === 'barista' ? 'Barista Slip' : 'Kitchen Slip'; },
         startCountdown(timeoutMs) {
             this.secondsLeft = Math.ceil((timeoutMs || 15000) / 1000);
+            this.secondsLeft = Math.ceil((timeoutMs || 5000) / 1000);
             if (this.countdownTimer) clearInterval(this.countdownTimer);
             this.countdownTimer = setInterval(() => {
                 this.secondsLeft = Math.max(0, this.secondsLeft - 1);
@@ -1275,6 +1276,7 @@ window.printOrderReceipt = async function(orderId) {
             const onPrintWaiting = (e) => {
                 this.sectionType = (e && e.detail && e.detail.sectionType) ? e.detail.sectionType : '';
                 this.startCountdown(e && e.detail ? e.detail.timeoutMs : 15000);
+                this.startCountdown(e && e.detail && e.detail.timeoutMs ? e.detail.timeoutMs : 5000);
                 this.show = true;
             };
             const onPrintResumed = () => {

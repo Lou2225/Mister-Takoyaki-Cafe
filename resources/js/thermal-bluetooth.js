@@ -987,7 +987,8 @@ class ThermalBluetoothPrinter {
 
                 if (oneSlipAtATime && isTearOffSlip && !isLastSection) {
                     console.log(`⏸ Waiting for "${section.type}" slip to be torn off before continuing...`);
-                    await this.waitForTearOff(section.type);
+                    const tearTimeout = settings.tear_off_timeout_ms || 5000;
+                    await this.waitForTearOff(section.type, tearTimeout);
                 }
             }
 

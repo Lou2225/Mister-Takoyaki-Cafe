@@ -634,6 +634,7 @@ Tapping the pencil/edit icon on any cart row opens the Two-Column Item Customiza
 
   - Direct Web Bluetooth ESC/POS Integration: Pairs directly to Bluetooth 58mm/80mm thermal printers via Google Chrome or Microsoft Edge without opening standard browser print dialogs.
   - Multi-Slip Separation Alert: When printing multiple slips (Customer Receipt, Kitchen Order Slip, Barista Slip), the system displays an on-screen prompt: "Please tear off slip 1 of 2", featuring an automated 15-second countdown timer to prevent paper jams.
+  - Multi-Slip Separation Alert: When printing multiple slips (Customer Receipt, Kitchen Order Slip, Barista Slip), the system displays an on-screen prompt: "Please tear off slip 1 of 2", featuring an automated 5-second countdown timer to prevent paper jams.
   - Receipt Review QR Code Binding: Customer receipts print an aligned, high-contrast QR code linked directly to the store feedback portal (/review/{branch}?order_ref=...). The QR code is cryptographically bound to the specific transaction, ensuring legitimate customer reviews.
 
 
@@ -2104,6 +2105,7 @@ Appendix B  -  Role-Specific Troubleshooting Matrix
 | Product is grayed out / disabled on POS | Mandatory recipe ingredient depleted | The POS checks live raw material stock in real time. Replenish inventory via Stock Ordering or perform physical reconciliation. |
 | GCash payment modal cannot be closed / cart cannot be cleared | GCash payment marked as verified | To safeguard against cashflow discrepancies, verified GCash transactions are locked. Complete the checkout, then execute an authorized Void in Order Management. |
 | Multi-slip separation countdown alert appears | Multi-slip printing active | Tear off the first printed receipt slip. Printing of the kitchen or barista slip will resume automatically when the 15-second countdown expires or when clicking Continue. |
+| Multi-slip separation countdown alert appears | Multi-slip printing active | Tear off the first printed receipt slip. Printing of the kitchen or barista slip will resume automatically when the 5-second countdown expires or when clicking Continue. |
 | Thermal printer not responding | Bluetooth pairing disconnected | Ensure printer is powered on and paired via Web Bluetooth in Chrome/Edge. Run "Test Print Connection" in System Settings (Tab 7). |
 | PSGC address combobox not populating | Parent geographic tier not selected | Select Region first, then Province, then City/Municipality, then Barangay to ensure cascading geographic hierarchy loads properly. |
 | Cannot delete branch in Branch Management | Registered staff still assigned to branch | Reassign or transfer all cashiers and riders to another branch in User Management before deleting the store. |

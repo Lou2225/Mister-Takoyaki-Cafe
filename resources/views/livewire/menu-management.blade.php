@@ -1,6 +1,7 @@
 <div 
     x-data="typeof window.menuManagement === 'function' ? window.menuManagement($wire, @js($templatesData), @js($allCategories)) : { activeTab: $wire.entangle('activeTab').live, panel: $wire.entangle('panel').live, mode: $wire.entangle('mode').live }"
     x-on:switch-panel.window="panel = $event.detail.panel"
+    x-on:templates-updated.window="templates = $event.detail.templates"
     class="relative min-h-full flex flex-col p-2 md:p-4"
     wire:ignore.self
     wire:key="menu-management-main-container">
@@ -240,7 +241,7 @@
                     </div>
 
                     {{-- Tab: Options and Groups --}}
-                    <div x-show="activeTab === 'variants'" class="space-y-6">
+                    <div x-show="activeTab === 'variants'" wire:ignore class="space-y-6">
                         {{-- Operation Guide --}}
                         <div class="flex items-start gap-4 p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100/50 mb-2">
                             <div class="w-8 h-8 bg-white rounded-xl flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
@@ -278,7 +279,7 @@
                         </div>
 
                         <div x-show="optionGroups && optionGroups.length > 0" class="space-y-4">
-                            <template x-for="(group, idx) in (optionGroups || [])" :key="idx">
+                            <template x-for="(group, idx) in (optionGroups || [])" :key="getGroupKey(group, idx)">
                                 <div class="border border-slate-100 rounded-2xl overflow-hidden shadow-sm">
                                     <div class="p-4 bg-slate-50/50 border-b border-slate-100 space-y-3">
                                         <div class="flex items-start justify-between gap-3">
@@ -362,7 +363,7 @@
                                         </div>
                                     </div>
                                     <div class="p-4 bg-white space-y-3">
-                                        <template x-for="(option, oIdx) in (group.options || [])" :key="oIdx">
+                                        <template x-for="(option, oIdx) in (group.options || [])" :key="getOptionKey(group, option, oIdx)">
                                             <div class="flex items-start gap-4">
                                                 <div class="flex-1">
                                                     <input type="text" x-model="option.name"
@@ -861,7 +862,7 @@
                 {{-- Summary & Actions (Hidden on mobile as we use the sticky footer) --}}
                 <div class="hidden lg:block bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
                     <div class="space-y-3">
-                        <x-primary-button type="button" wire:click="validateBeforeSave" class="w-full justify-center h-12 text-[12px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">
+                        <x-primary-button type="button" @click="syncToWire()" wire:click="validateBeforeSave" class="w-full justify-center h-12 text-[12px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">
                             <span x-text="mode === 'edit' ? 'Update Catalog' : 'Register Product'"></span>
                         </x-primary-button>
                         <x-secondary-button @click="panel = 'list'; mode = 'list'; $wire.discardDraft();" class="w-full justify-center h-11 text-[12px] font-black uppercase tracking-widest border-slate-200 text-slate-500">
@@ -887,7 +888,7 @@
     {{-- Mobile Sticky Action Bar --}}
     <div x-show="panel === 'form'" class="lg:hidden shrink-0 p-4 bg-white border-t border-slate-100 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-30">
         <div class="flex flex-col gap-2">
-            <x-primary-button type="button" wire:click="validateBeforeSave" class="w-full justify-center h-12 text-[12px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">
+            <x-primary-button type="button" @click="syncToWire()" wire:click="validateBeforeSave" class="w-full justify-center h-12 text-[12px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">
                 <span x-text="mode === 'edit' ? 'Update Catalog' : 'Register Product'"></span>
             </x-primary-button>
             <x-secondary-button @click="panel = 'list'; mode = 'list'; $wire.discardDraft();" class="w-full justify-center h-11 text-[11px] font-black uppercase tracking-widest border-slate-100 text-slate-400">
@@ -1206,7 +1207,7 @@
                                 </td>
                             </tr>
                         @endforelse
-                        <tr x-show="filteredProductIds.length === 0" x-cloak>
+                        <tr x-show="productsList.length > 0 && filteredProductIds.length === 0" x-cloak>
                             <td colspan="{{ $this->isSuperAdmin() ? 4 : 3 }}" class="py-12">
                                 <x-empty-state title="No products match your search" description="Try typing a different name or checking your filters." />
                             </td>
@@ -1346,7 +1347,7 @@
                             <x-empty-state title="Catalog is empty" description="Try changing your filters or adding a new item." />
                         </div>
                     @endforelse
-                    <div x-show="filteredProductIds.length === 0" x-cloak class="col-span-full py-24 text-center bg-white rounded-2xl border border-slate-100 shadow-sm">
+                    <div x-show="productsList.length > 0 && filteredProductIds.length === 0" x-cloak class="col-span-full py-24 text-center bg-white rounded-2xl border border-slate-100 shadow-sm">
                         <x-empty-state title="No products match your search" description="Try changing your filters or search terms." />
                     </div>
                 </div>
@@ -1463,7 +1464,7 @@
                 <x-secondary-button @click="$dispatch('close-modal', 'confirm-save-product')" class="h-10">Cancel</x-secondary-button>
                 <x-primary-button 
                     wire:click="saveProduct" 
-                    @click="$dispatch('close-modal', 'confirm-save-product')" 
+                    @click="syncToWire(); $dispatch('close-modal', 'confirm-save-product')" 
                     class="h-10">
                     Confirm & Save
                 </x-primary-button>
@@ -1719,6 +1720,29 @@
                         }
                     },
 
+                    syncToWire() {
+                        if (typeof $wire !== 'undefined' && $wire.set) {
+                            $wire.set('optionGroups', this.optionGroups, false);
+                            if (this.recipeIngredients) {
+                                $wire.set('recipeIngredients', this.recipeIngredients, false);
+                            }
+                        }
+                    },
+                    getGroupKey(group, idx) {
+                        if (!group) return 'g_' + idx;
+                        if (!group._uid) {
+                            group._uid = group.id ? ('gid_' + group.id) : ('guid_' + idx + '_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
+                        }
+                        return group._uid;
+                    },
+                    getOptionKey(group, option, oIdx) {
+                        if (!option) return 'o_' + oIdx;
+                        if (!option._uid) {
+                            option._uid = option.id ? ('oid_' + option.id) : ('ouid_' + oIdx + '_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
+                        }
+                        return option._uid;
+                    },
+
                     openAddGroupModal() {
                         this.newGroupName = '';
                         this.newGroupPriceMode = 'additive';
@@ -1741,6 +1765,7 @@
                         }
                         if (!this.optionGroups) this.optionGroups = [];
                         this.optionGroups.push({
+                            _uid: 'guid_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
                             id: null,
                             name: name,
                             price_mode: this.newGroupPriceMode,
@@ -1754,16 +1779,19 @@
                         this.newGroupError = '';
                         this.$dispatch('close-modal', 'add-option-group');
                         this.$dispatch('notify', { type: 'success', message: "Group '" + name + "' added." });
+                        this.syncToWire();
                     },
                     addOption(gIdx) {
                         if (!this.optionGroups[gIdx]) return;
                         if (!this.optionGroups[gIdx].options) this.optionGroups[gIdx].options = [];
                         this.optionGroups[gIdx].options.push({
+                            _uid: 'ouid_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
                             id: null,
                             name: '',
                             price: '',
                             is_default: this.optionGroups[gIdx].options.length === 0
                         });
+                        this.syncToWire();
                     },
                     toggleDefaultOption(gIdx, oIdx) {
                         if (!this.optionGroups[gIdx] || !this.optionGroups[gIdx].options) return;
@@ -1771,6 +1799,7 @@
                         this.optionGroups[gIdx].options.forEach((opt, index) => {
                             opt.is_default = (index === oIdx && !isCurrent);
                         });
+                        this.syncToWire();
                     },
                     // ── Per-group selection mode and max-select stepper (bounded by option count) ──
                     setGroupSingleMode(gIdx) {
@@ -1951,6 +1980,7 @@
                                 if (this.optionGroups[gIdx].max_select !== 1 && this.optionGroups[gIdx].max_select !== null && this.optionGroups[gIdx].max_select >= remainingOpts) {
                                     this.optionGroups[gIdx].max_select = null;
                                 }
+                                this.syncToWire();
                                 this.$dispatch('notify', { type: 'info', message: 'Option removed.' });
                             }
                         } else if (type === 'delete_group') {
@@ -1979,6 +2009,7 @@
                                     });
                                 }
                                 this.optionGroups.splice(gIdx, 1);
+                                this.syncToWire();
                                 this.$dispatch('notify', { type: 'info', message: "Group '" + grp.name + "' removed." });
                             }
                         } else if (type === 'sync') {
@@ -2072,6 +2103,7 @@
 
                             const newOptIndex = group.options.length;
                             group.options.push({
+                                _uid: 'ouid_' + Date.now() + '_' + newOptIndex + '_' + Math.random().toString(36).substr(2, 6),
                                 id: null,
                                 name: templateItem.name,
                                 price: Number(templateItem.price) === 0 ? '' : templateItem.price,
@@ -2094,6 +2126,8 @@
                                 });
                             }
                         });
+
+                        this.syncToWire();
 
                         if (addedOptionCount > 0 || updatedOptionCount > 0 || addedIngredientCount > 0) {
                             const parts = [];
@@ -2119,6 +2153,7 @@
                         }
 
                         const options = (template.items || []).map((item, idx) => ({
+                            _uid: 'ouid_' + Date.now() + '_' + idx + '_' + Math.random().toString(36).substr(2, 6),
                             id: null,
                             name: item.name,
                             price: Number(item.price) === 0 ? '' : item.price,
@@ -2128,6 +2163,7 @@
 
                         const newGroupIndex = this.optionGroups.length;
                         this.optionGroups.push({
+                            _uid: 'guid_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
                             id: null,
                             name: template.name,
                             price_mode: template.price_mode,
@@ -2160,6 +2196,7 @@
                             });
                         }
 
+                        this.syncToWire();
                         this.$dispatch('close-modal', 'import-template-library');
                         let msg = "Imported '" + template.name + "' template.";
                         if (addedIngredientCount > 0) {

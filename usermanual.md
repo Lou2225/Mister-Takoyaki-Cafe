@@ -494,6 +494,7 @@ Tapping the note/pencil icon on any cart row opens the **Two-Column Item Customi
 - Finalizing an order dispatches print commands directly to connected printers.
 - **Web Bluetooth ESC/POS Support:** Connects directly to Bluetooth thermal receipt printers from Chrome/Edge browsers without triggering default browser print dialogs.
 - **Multi-Slip Separation Alert:** When printing multiple slips (e.g., customer receipt followed by kitchen order slip or barista slip), an on-screen prompt alerts the cashier to tear off the first slip before printing continues, complete with a 15-second automatic progression timer.
+- **Multi-Slip Separation Alert:** When printing multiple slips (e.g., customer receipt followed by kitchen order slip or barista slip), an on-screen prompt alerts the cashier to tear off the first slip before printing continues, complete with a 5-second automatic progression timer.
 
 ---
 

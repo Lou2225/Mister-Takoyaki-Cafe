@@ -28,78 +28,6 @@ class MenuManagement extends Component
     use WithPagination, WithFileUploads, HandlesValidations;
     public $noPadding = true;
 
-    public function importOptionTemplate(int $templateId)
-    {
-        $template = OptionTemplate::with('items.ingredients.ingredient')->find($templateId);
-        if (!$template) return;
-
-        // Duplicate check
-        foreach ($this->optionGroups as $group) {
-            if (strtolower($group['name']) === strtolower($template->name)) {
-                $this->dispatch('close-modal', name: 'import-template-library');
-                $this->dispatch('notify', type: 'warning', message: "The '{$template->name}' template is already added to this product.");
-                return;
-            }
-        }
-
-        $options = [];
-        foreach ($template->items as $item) {
-            $options[] = [
-                'name'       => $item->name,
-                'price'      => $item->price == 0 ? '' : $item->price,
-                'is_default' => $item->is_default,
-                'sort_order' => count($options)
-            ];
-        }
-
-                $this->optionGroups[] = [
-            'name'        => $template->name,
-            'price_mode'  => $template->price_mode,
-            'max_select'  => $template->max_select,
-            'is_required' => $template->is_required,
-            'no_recipe_required' => (bool) $template->no_recipe_required,
-            'options'     => $options
-        ];
-
-        // The group we just pushed sits at the end of optionGroups — carry
-        // over each item's saved ingredient recipe into recipeIngredients,
-        // tagged with the same "option:{groupIndex}_{optionIndex}" owner
-        // key the rest of the form already uses (see showEdit()). This is
-        // the whole point of the feature: importing a template no longer
-        // means re-typing every ingredient mapping by hand.
-        $groupIndex = count($this->optionGroups) - 1;
-        $addedIngredientCount = 0;
-
-        if (!$template->no_recipe_required) {
-            foreach ($template->items as $optIndex => $item) {
-                foreach ($item->ingredients as $ri) {
-                    $owner = "option:{$groupIndex}_{$optIndex}";
-
-                    $alreadyPresent = collect($this->recipeIngredients)
-                        ->contains(fn($existing) => $existing['owner'] === $owner && $existing['id'] == $ri->ingredient_id);
-                    if ($alreadyPresent) continue;
-
-                    $this->recipeIngredients[] = [
-                        'id'       => $ri->ingredient_id,
-                        'name'     => $ri->ingredient->name,
-                        'unit'     => $ri->ingredient->unit,
-                        'quantity' => (float) $ri->quantity,
-                        'cost'     => $ri->ingredient->cost,
-                        'owner'    => $owner,
-                    ];
-                    $addedIngredientCount++;
-                }
-            }
-        }
-
-        $this->dispatch('close-modal', name: 'import-template-library');
-        $msg = "Imported '{$template->name}' template.";
-        if ($addedIngredientCount > 0) {
-            $msg .= " {$addedIngredientCount} recipe ingredient(s) auto-mapped — review under the Recipe tab.";
-        }
-        $this->dispatch('notify', type: 'success', message: $msg);
-    }
-    
 public function getOwnerLabel(string $owner): string
     {
         if ($owner === 'base') return 'Base';
@@ -127,137 +55,33 @@ public function getOwnerLabel(string $owner): string
 
         return 'Option';
     }
-    /**
-     * Pulls ingredient mappings from the Library into an option group
-     * already on this product, matched by group name + option name. This
-     * covers the case importOptionTemplate() can't: a group that was
-     * added to the product BEFORE its ingredients were defined (or
-     * edited) in the Library. Only fills in missing ingredients — never
-     * touches prices, defaults, or ingredients already present.
-     */
-    public function syncGroupFromLibrary(int $groupIndex)
+
+    public function getTemplatesData(): array
     {
-        $groupData = $this->optionGroups[$groupIndex] ?? null;
-        if (!$groupData) return;
-
-        $template = OptionTemplate::with('items.ingredients.ingredient')
-            ->whereRaw('LOWER(name) = ?', [strtolower($groupData['name'])])
-            ->first();
-
-        if (!$template) {
-            $this->dispatch('notify', type: 'warning', message: "No Library template named '{$groupData['name']}' found to sync from.");
-            return;
-        }
-
-        // Pull group-level settings from the template too — pricing mode,
-        // selection limit, required flag, and no-recipe flag are all part
-        // of "the template", not just its ingredients.
-        $this->optionGroups[$groupIndex]['price_mode'] = $template->price_mode;
-        $this->optionGroups[$groupIndex]['max_select'] = $template->max_select;
-        $this->optionGroups[$groupIndex]['is_required'] = (bool) $template->is_required;
-        $this->optionGroups[$groupIndex]['no_recipe_required'] = (bool) $template->no_recipe_required;
-        $noRecipe = (bool) $template->no_recipe_required;
-
-        $addedIngredientCount = 0;
-        $updatedOptionCount = 0;
-        $addedOptionCount = 0;
-        $matchedItemIds = [];
-
-        // 1) Sync price, default flag, and ingredients into options that
-        // already exist on this product.
-        foreach ($this->optionGroups[$groupIndex]['options'] as $optIndex => $option) {
-            $templateItem = $template->items->first(
-                fn($ti) => strtolower($ti->name) === strtolower($option['name'])
-            );
-            if (!$templateItem) continue;
-            $matchedItemIds[] = $templateItem->id;
-
-            $templatePrice = $templateItem->price == 0 ? '' : $templateItem->price;
-            if ((string)($option['price'] ?? '') !== (string)$templatePrice || (bool)($option['is_default'] ?? false) !== (bool)$templateItem->is_default) {
-                $updatedOptionCount++;
-            }
-            $this->optionGroups[$groupIndex]['options'][$optIndex]['price'] = $templatePrice;
-            $this->optionGroups[$groupIndex]['options'][$optIndex]['is_default'] = (bool) $templateItem->is_default;
-
-            if ($noRecipe) continue;
-
-            $owner = "option:{$groupIndex}_{$optIndex}";
-            $legacyOwner = !empty($option['id']) ? "option:{$option['id']}" : null;
-
-            foreach ($templateItem->ingredients as $ri) {
-                $alreadyPresent = collect($this->recipeIngredients)->contains(
-                    fn($existing) => $existing['id'] == $ri->ingredient_id
-                        && ($existing['owner'] === $owner || ($legacyOwner && $existing['owner'] === $legacyOwner))
-                );
-                if ($alreadyPresent) continue;
-
-                $this->recipeIngredients[] = [
-                    'id'       => $ri->ingredient_id,
-                    'name'     => $ri->ingredient->name,
-                    'unit'     => $ri->ingredient->unit,
-                    'quantity' => (float) $ri->quantity,
-                    'cost'     => $ri->ingredient->cost,
-                    'owner'    => $legacyOwner ?? $owner,
-                ];
-                $addedIngredientCount++;
-            }
-        }
-
-        // 2) Pull in template items that aren't options on this product yet.
-        foreach ($template->items as $templateItem) {
-            if (in_array($templateItem->id, $matchedItemIds)) continue;
-
-            $alreadyExistsByName = collect($this->optionGroups[$groupIndex]['options'])
-                ->contains(fn($o) => strtolower($o['name']) === strtolower($templateItem->name));
-            if ($alreadyExistsByName) continue;
-
-            $newOptIndex = count($this->optionGroups[$groupIndex]['options']);
-            $this->optionGroups[$groupIndex]['options'][] = [
-                'id'         => null,
-                'name'       => $templateItem->name,
-                'price'      => $templateItem->price == 0 ? '' : $templateItem->price,
-                'is_default' => $templateItem->is_default,
-            ];
-            $addedOptionCount++;
-
-            if (!$noRecipe) {
-                $owner = "option:{$groupIndex}_{$newOptIndex}";
-                foreach ($templateItem->ingredients as $ri) {
-                    $this->recipeIngredients[] = [
-                        'id'       => $ri->ingredient_id,
-                        'name'     => $ri->ingredient->name,
-                        'unit'     => $ri->ingredient->unit,
-                        'quantity' => (float) $ri->quantity,
-                        'cost'     => $ri->ingredient->cost,
-                        'owner'    => $owner,
-                    ];
-                    $addedIngredientCount++;
-                }
-            }
-        }
-
-        // If the group is now flagged No Recipe (either it already was, or
-        // the template just turned it on), strip any ingredients staged
-        // for its options so state can't disagree with the flag.
-        if ($noRecipe) {
-            foreach ($this->optionGroups[$groupIndex]['options'] as $optIndex => $option) {
-                $ownerIndexed = "option:{$groupIndex}_{$optIndex}";
-                $ownerReal = !empty($option['id']) ? "option:{$option['id']}" : null;
-                $this->recipeIngredients = collect($this->recipeIngredients)
-                    ->reject(fn($ri) => $ri['owner'] === $ownerIndexed || ($ownerReal && $ri['owner'] === $ownerReal))
-                    ->values()->all();
-            }
-        }
-
-        if ($addedIngredientCount > 0 || $addedOptionCount > 0 || $updatedOptionCount > 0) {
-            $parts = [];
-            if ($addedOptionCount > 0) $parts[] = "{$addedOptionCount} new option(s)";
-            if ($updatedOptionCount > 0) $parts[] = "{$updatedOptionCount} price/default update(s)";
-            if ($addedIngredientCount > 0) $parts[] = "{$addedIngredientCount} ingredient(s)";
-            $this->dispatch('notify', type: 'success', message: 'Synced ' . implode(', ', $parts) . " from the '{$template->name}' template.");
-        } else {
-            $this->dispatch('notify', type: 'info', message: 'Already up to date — nothing new to sync.');
-        }
+        return $this->optionTemplates->map(fn($t) => [
+            'id' => (int)$t->id,
+            'name' => (string)$t->name,
+            'price_mode' => (string)$t->price_mode,
+            'max_select' => $t->max_select !== null ? (int)$t->max_select : null,
+            'is_required' => (bool)$t->is_required,
+            'no_recipe_required' => (bool)$t->no_recipe_required,
+            'items' => $t->items->map(fn($item) => [
+                'id' => (int)$item->id,
+                'name' => (string)$item->name,
+                'price' => (float)($item->price ?: 0),
+                'is_default' => (bool)$item->is_default,
+                'ingredients' => $item->ingredients->map(fn($ri) => [
+                    'ingredient_id' => (int)$ri->ingredient_id,
+                    'quantity' => (float)$ri->quantity,
+                    'ingredient' => $ri->ingredient ? [
+                        'id' => (int)$ri->ingredient->id,
+                        'name' => (string)$ri->ingredient->name,
+                        'unit' => (string)\App\Helpers\StockHelper::getAbbreviation($ri->ingredient->unit),
+                        'cost' => (float)($ri->ingredient->cost ?? 0),
+                    ] : null,
+                ])->values(),
+            ])->values(),
+        ])->values()->toArray();
     }
 
     public function saveGroupToLibrary(int $index)
@@ -265,102 +89,86 @@ public function getOwnerLabel(string $owner): string
         $groupData = $this->optionGroups[$index] ?? null;
         if (!$groupData) return;
 
-        $existingTemplate = OptionTemplate::where('name', $groupData['name'])->first();
+        $groupName = trim($groupData['name'] ?? '');
+        if ($groupName === '') return;
+
+        $existingTemplate = OptionTemplate::whereRaw('LOWER(name) = ?', [strtolower($groupName)])->first();
 
         try {
-        DB::transaction(function () use ($groupData, $index, $existingTemplate) {
-                        $noRecipe = (bool)($groupData['no_recipe_required'] ?? false);
+            DB::transaction(function () use ($groupData, $groupName, $index, $existingTemplate) {
+                $noRecipe = (bool)($groupData['no_recipe_required'] ?? false);
+                $maxSelect = !empty($groupData['max_select']) ? (int)$groupData['max_select'] : null;
 
-            $maxSelect = !empty($groupData['max_select']) ? (int)$groupData['max_select'] : null;
-
-            if ($existingTemplate) {
-                // Update in place, rather than blocking — this is the
-                // path that lets ingredients added on a product's Recipe
-                // tab flow back into an already-existing Library
-                // template, matching options by name (same convention
-                // syncGroupFromLibrary uses going the other direction).
-                $template = $existingTemplate;
-                $template->update([
-                    'price_mode'  => $groupData['price_mode'],
-                    'max_select'  => $maxSelect,
-                    'is_required' => $groupData['is_required'],
-                    'no_recipe_required' => $noRecipe,
-                ]);
-            } else {
-                $template = OptionTemplate::create([
-                    'name'        => $groupData['name'],
-                    'price_mode'  => $groupData['price_mode'],
-                    'max_select'  => $maxSelect,
-                    'is_required' => $groupData['is_required'],
-                    'no_recipe_required' => $noRecipe,
-                ]);
-            }
-
-            $keepItemIds = [];
-
-            foreach ($groupData['options'] as $oIdx => $oData) {
-                $item = $existingTemplate
-                    ? $template->items()->whereRaw('LOWER(name) = ?', [strtolower($oData['name'])])->first()
-                    : null;
-
-                if ($item) {
-                    $item->update([
-                        'price'      => (float)($oData['price'] ?: 0),
-                        'is_default' => $oData['is_default'],
+                if ($existingTemplate) {
+                    $template = $existingTemplate;
+                    $template->update([
+                        'price_mode'  => $groupData['price_mode'],
+                        'max_select'  => $maxSelect,
+                        'is_required' => (bool)$groupData['is_required'],
+                        'no_recipe_required' => $noRecipe,
                     ]);
                 } else {
-                    $item = $template->items()->create([
-                        'name'       => $oData['name'],
-                        'price'      => (float)($oData['price'] ?: 0),
-                        'is_default' => $oData['is_default'],
+                    $template = OptionTemplate::create([
+                        'name'        => $groupName,
+                        'price_mode'  => $groupData['price_mode'],
+                        'max_select'  => $maxSelect,
+                        'is_required' => (bool)$groupData['is_required'],
+                        'no_recipe_required' => $noRecipe,
                     ]);
                 }
-                $keepItemIds[] = $item->id;
 
-                $owner = "option:{$index}_{$oIdx}";
-                $legacyOwner = !empty($oData['id']) ? "option:{$oData['id']}" : null;
+                $keepItemIds = [];
 
-                // Ingredients can be keyed either by the unsaved
-                // "{groupIndex}_{optionIndex}" reference or, for options
-                // that already exist in the DB, by their real option ID
-                // (see showEdit()). Match against both so ingredients
-                // aren't lost when saving an already-saved group.
-                $matchingIngredients = collect($this->recipeIngredients)
-                    ->filter(fn($ri) => $ri['owner'] === $owner || ($legacyOwner && $ri['owner'] === $legacyOwner))
-                    // Same ingredient can appear twice here — once under the
-                    // index-based owner key, once under the legacy real-ID
-                    // owner key — if both got added before the row was fully
-                    // normalized. Keep one row per ingredient_id so the
-                    // insert below never collides with the unique index.
-                    ->unique('id');
+                foreach (($groupData['options'] ?? []) as $oIdx => $oData) {
+                    $optName = trim($oData['name'] ?? '');
+                    if ($optName === '') continue;
 
-                // Rebuild this item's ingredients from what's currently on
-                // the product, so updates (additions AND removals on the
-                // product side) are reflected in the template.
-                                $item->ingredients()->delete();
-                if (!$noRecipe) {
-                    foreach ($matchingIngredients as $ri) {
-                        $item->ingredients()->create([
-                            'ingredient_id' => $ri['id'],
-                            'quantity'      => $ri['quantity'],
+                    $item = $existingTemplate
+                        ? $template->items()->whereRaw('LOWER(name) = ?', [strtolower($optName)])->first()
+                        : null;
+
+                    if ($item) {
+                        $item->update([
+                            'price'      => (float)($oData['price'] ?: 0),
+                            'is_default' => (bool)($oData['is_default'] ?? false),
+                        ]);
+                    } else {
+                        $item = $template->items()->create([
+                            'name'       => $optName,
+                            'price'      => (float)($oData['price'] ?: 0),
+                            'is_default' => (bool)($oData['is_default'] ?? false),
                         ]);
                     }
+                    $keepItemIds[] = $item->id;
+
+                    $owner = "option:{$index}_{$oIdx}";
+                    $legacyOwner = !empty($oData['id']) ? "option:{$oData['id']}" : null;
+
+                    $matchingIngredients = collect($this->recipeIngredients)
+                        ->filter(fn($ri) => $ri['owner'] === $owner || ($legacyOwner && $ri['owner'] === $legacyOwner))
+                        ->unique('id');
+
+                    $item->ingredients()->delete();
+                    if (!$noRecipe) {
+                        foreach ($matchingIngredients as $ri) {
+                            $item->ingredients()->create([
+                                'ingredient_id' => $ri['id'],
+                                'quantity'      => $ri['quantity'],
+                            ]);
+                        }
+                    }
                 }
-            }
 
-            // Don't delete template items whose names simply don't appear
-            // in this product's current option list (e.g. this product
-            // only uses a subset of a shared template) — only cleanup
-            // makes sense when this product is genuinely the template's
-            // source of truth, which we can't reliably assume here. Skip
-            // deletion to avoid destroying items other products may
-            // still rely on.
-        });
+                if ($existingTemplate && !empty($keepItemIds)) {
+                    $template->items()->whereNotIn('id', $keepItemIds)->delete();
+                }
+            });
 
-        $msg = $existingTemplate
-            ? "Template '{$groupData['name']}' updated in library."
-            : "Group '{$groupData['name']}' saved to library.";
-        $this->dispatch('notify', type: 'success', message: $msg);
+            $msg = $existingTemplate
+                ? "Template '{$groupName}' updated in library."
+                : "Group '{$groupName}' saved to library.";
+            $this->dispatch('notify', type: 'success', message: $msg);
+            $this->dispatch('templates-updated', templates: $this->getTemplatesData());
         } catch (\Exception $e) {
             Log::error('MenuManagement.saveGroupToLibrary failed: ' . $e->getMessage());
             $this->dispatch('notify', type: 'error', message: 'Failed to save group to library. Please check option prices and try again.');
@@ -510,7 +318,7 @@ public function getOwnerLabel(string $owner): string
 
         // 2. Live Validation
         $formFields = ['Name', 'Price', 'Description', 'CategoryId', 'IsActive',
-            'NewGroupName', 'NewIngredientId', 'NewIngredientQty', 'NewCategoryName'];
+            'NewIngredientId', 'NewIngredientQty', 'NewCategoryName'];
 
         foreach ($formFields as $field) {
             if ($method === 'updated' . $field) {
@@ -1141,7 +949,7 @@ public function getOwnerLabel(string $owner): string
                     $keepGroupIds[] = $group->id;
 
                     $keepOptionIds = [];
-                    foreach ($gData['options'] as $oIdx => $oData) {
+                    foreach (($gData['options'] ?? []) as $oIdx => $oData) {
                         $option = !empty($oData['id']) ? $group->options()->find($oData['id']) : null;
                         $optPayload = [
                             'name' => $oData['name'], 
@@ -1407,6 +1215,7 @@ public function getOwnerLabel(string $owner): string
                 ])->values(),
             ])->values(),
         ])->values();
+        $templatesData = $this->getTemplatesData();
 
         return view('livewire.menu-management', compact(
             'products', 'categories', 'filterCategories', 'branches', 'allIngredients',
