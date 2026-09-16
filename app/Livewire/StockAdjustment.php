@@ -367,7 +367,7 @@ class StockAdjustment extends Component
     public function validateBeforeCommit()
     {
         if (empty($this->rows)) {
-            $this->dispatch('notify', type: 'error', message: 'Add at least one item to the queue before saving.');
+            $this->dispatch('notify', type: 'warning', message: 'Add at least one item to the queue before saving.');
             $this->addError('rows', 'Add at least one item to the queue before saving.');
             return;
         }
@@ -389,7 +389,7 @@ class StockAdjustment extends Component
     public function commitAdjustment()
     {
         if (empty($this->rows)) {
-            $this->dispatch('notify', type: 'error', message: 'Add at least one item to the queue before saving.');
+            $this->dispatch('notify', type: 'warning', message: 'Add at least one item to the queue before saving.');
             $this->addError('rows', 'Add at least one item to the queue before saving.');
             return;
         }
@@ -435,7 +435,7 @@ class StockAdjustment extends Component
         $hasActual = collect($this->bulkAdjustments)->contains(fn($i) => $i['actual'] !== '');
         
         if (!$hasActual) {
-            $this->dispatch('notify', type: 'error', message: 'Please enter at least one physical count.');
+            $this->dispatch('notify', type: 'warning', message: 'Please enter at least one physical count.');
             $this->addError('bulkAdjustments', 'Please enter at least one physical count.');
             return;
         }

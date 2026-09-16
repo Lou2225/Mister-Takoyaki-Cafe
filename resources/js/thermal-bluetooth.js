@@ -607,7 +607,7 @@ class ThermalBluetoothPrinter {
      * off. Resolves once confirmContinue() is called (or auto-resumes after
      * a timeout as a safety net in case the UI never confirms).
      */
-            waitForTearOff(sectionType, timeoutMs = 15000) {
+            waitForTearOff(sectionType, timeoutMs = 5000) {
         return new Promise((resolve) => {
             let settled = false;
             const finish = (autoResumed) => {
@@ -857,7 +857,7 @@ class ThermalBluetoothPrinter {
                 ln('Date:    ' + (order.date || 'N/A'));
                 ln('Type:    ' + (order.type || order.order_type || 'N/A').toUpperCase());
                 if (order.table_number) {
-                    ln('Table:   ' + order.table_number);
+                    ln('Claim No: ' + order.table_number);
                 }
                 if (order.customer_name) {
                     ln('Customer:' + order.customer_name);

@@ -413,7 +413,7 @@ class SystemSettings extends Component
         // falling back to editing the global default.
         if ($this->missingBranchAssignment && in_array($tab, self::BRANCH_SCOPED_TABS)) {
             $this->dispatch('notify',
-                type: 'error',
+                type: 'warning',
                 message: 'You are not assigned to a branch, so branch-specific settings are unavailable. Contact a super admin.'
             );
             return;
@@ -483,7 +483,7 @@ class SystemSettings extends Component
     {
         if (!$this->authorizeTabAccess()) {
             $this->dispatch('notify', 
-                type: 'error', 
+                type: 'warning', 
                 message: 'Unauthorized operation. You only have permission to modify operational settings.'
             );
             return;
@@ -614,7 +614,7 @@ class SystemSettings extends Component
     {
         if (!$this->authorizeTabAccess()) {
             $this->dispatch('notify',
-                type: 'error',
+                type: 'warning',
                 message: 'Unauthorized: You only have permission to modify operational settings.'
             );
             return;

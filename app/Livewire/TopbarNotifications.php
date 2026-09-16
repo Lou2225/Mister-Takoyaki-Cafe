@@ -1,12 +1,15 @@
 <?php
+
 namespace App\Livewire;
+
 use Livewire\Component;
 use Livewire\Attributes\Poll;
 use App\Models\Notification;
 use App\Services\BranchContext;
+use App\Services\NotificationService;
 use Illuminate\Support\Facades\Auth;
 
-#[Poll(5000)]  // polls every 5 seconds via Livewire, not wire:poll on the blade
+#[Poll(15000)] // Standardized 15s interval via Livewire
 class TopbarNotifications extends Component
 {
     protected $listeners = [
@@ -35,7 +38,15 @@ class TopbarNotifications extends Component
     public function markAsRead(int $id): void
     {
         $notification = Notification::find($id);
-        if ($notification && $notification->user_id === Auth::id()) {
+        $user = Auth::user();
+        $branchId = $this->activeBranchId();
+
+        $canRead = $notification && (
+            $notification->user_id === $user?->id ||
+            ($notification->user_id === null && ($notification->branch_id === null || $notification->branch_id === $branchId))
+        );
+
+        if ($canRead) {
             $notification->update(['is_read' => true]);
             $this->dispatch('refreshHistory');
         }
@@ -54,10 +65,12 @@ class TopbarNotifications extends Component
     {
         $notification = Notification::find($id);
         if (!$notification) return;
-        $notification->update(['is_read' => true]);
-        $this->dispatch('refreshHistory');
-        if ($notification->link) {
-            $this->redirect($notification->link, navigate: true);
+
+        $this->markAsRead($id);
+
+        $targetLink = NotificationService::resolveSmartLink($notification);
+        if ($targetLink) {
+            $this->redirect($targetLink, navigate: true);
         }
     }
 
@@ -71,6 +84,7 @@ class TopbarNotifications extends Component
                 $color = match ($n->type) {
                     'stock', 'stock_order' => 'indigo',
                     'expiry'               => 'amber',
+                    'order'                => 'emerald',
                     default                => 'indigo',
                 };
                 return [

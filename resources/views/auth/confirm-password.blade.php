@@ -6,6 +6,9 @@
     <form method="POST" action="{{ route('password.confirm') }}">
         @csrf
 
+        {{-- Hidden username field for accessibility & password managers --}}
+        <input type="text" name="username" value="{{ auth()->user()?->email }}" autocomplete="username" class="hidden" style="display:none;" aria-hidden="true" tabindex="-1" readonly>
+
         <!-- Password -->
         <div>
             <x-input-label for="password" :value="__('Password')" />

@@ -1110,6 +1110,55 @@
         };
     };
 
+    window.thermalTearOffModal = function() {
+        return {
+            show: false,
+            sectionType: '',
+            secondsLeft: 0,
+            countdownTimer: null,
+            get label() {
+                return this.sectionType === 'barista' ? 'Barista Slip' : 'Kitchen Slip';
+            },
+            startCountdown(timeoutMs) {
+                this.secondsLeft = Math.ceil((timeoutMs || 15000) / 1000);
+                if (this.countdownTimer) clearInterval(this.countdownTimer);
+                this.countdownTimer = setInterval(() => {
+                    this.secondsLeft = Math.max(0, this.secondsLeft - 1);
+                    if (this.secondsLeft <= 0 && this.countdownTimer) {
+                        clearInterval(this.countdownTimer);
+                        this.countdownTimer = null;
+                    }
+                }, 1000);
+            },
+            init() {
+                const onPrintWaiting = (e) => {
+                    this.sectionType = (e && e.detail && e.detail.sectionType) ? e.detail.sectionType : '';
+                    this.startCountdown(e && e.detail ? e.detail.timeoutMs : 15000);
+                    this.show = true;
+                };
+                const onPrintResumed = () => {
+                    this.show = false;
+                    if (this.countdownTimer) {
+                        clearInterval(this.countdownTimer);
+                        this.countdownTimer = null;
+                    }
+                };
+                window.addEventListener('thermal-print-waiting', onPrintWaiting);
+                window.addEventListener('thermal-print-resumed', onPrintResumed);
+                if (typeof this.$cleanup === 'function') {
+                    this.$cleanup(() => {
+                        window.removeEventListener('thermal-print-waiting', onPrintWaiting);
+                        window.removeEventListener('thermal-print-resumed', onPrintResumed);
+                        if (this.countdownTimer) {
+                            clearInterval(this.countdownTimer);
+                            this.countdownTimer = null;
+                        }
+                    });
+                }
+            }
+        };
+    };
+
     const registerAlpineFactories = () => {
         if (!window.Alpine) return;
 
@@ -1119,6 +1168,7 @@
         window.Alpine.data('optionLibraryManagement', ($wire, allIngredients) => window.optionLibraryManagement($wire, allIngredients));
         window.Alpine.data('stockManagement', ($wire) => window.stockManagement($wire));
         window.Alpine.data('branchStockOrdering', ($wire, config) => window.branchStockOrdering($wire, config));
+        window.Alpine.data('thermalTearOffModal', () => window.thermalTearOffModal());
     };
 
     document.addEventListener('alpine:init', registerAlpineFactories);

@@ -11,6 +11,7 @@ use App\Mail\StockAlertMail;
 use Carbon\Carbon;
 use App\Helpers\StockHelper;
 use App\Services\ConfigurationService;
+use App\Services\NotificationService;
 use Illuminate\Support\Facades\Cache;
 class CheckStockAlerts extends Command
 {
@@ -149,6 +150,39 @@ class CheckStockAlerts extends Command
 
                 Mail::to($admin->email)->send(new StockAlertMail($reportData));
                 $this->line("Sent alert to: " . $admin->email . ($admin->role_id == 1 ? " (Enterprise)" : " (Branch: " . $admin->branch_id . ")"));
+
+                // In-App Notification: Low Stock
+                if (!empty($userLow)) {
+                    $lowItemCount = 0;
+                    foreach ($userLow as $items) {
+                        $lowItemCount += count($items);
+                    }
+                    $branchNames = implode(', ', array_keys($userLow));
+                    NotificationService::sendToUser(
+                        $admin->id,
+                        'stock',
+                        "Low Stock Alert ({$lowItemCount} items)",
+                        "Critical inventory levels detected in {$branchNames}. Please restock.",
+                        route('stock.index'),
+                        $admin->branch_id
+                    );
+                }
+
+                // In-App Notification: Expiries
+                if (!empty($userExpiring) || !empty($userExpired)) {
+                    $expItemCount = 0;
+                    foreach ($userExpiring as $items) { $expItemCount += count($items); }
+                    foreach ($userExpired as $items) { $expItemCount += count($items); }
+                    $branchNames = implode(', ', array_unique(array_merge(array_keys($userExpiring), array_keys($userExpired))));
+                    NotificationService::sendToUser(
+                        $admin->id,
+                        'expiry',
+                        "Expiry Alert ({$expItemCount} batches)",
+                        "Batches approaching or past expiration in {$branchNames}.",
+                        route('stock.index', ['panel' => 'expiry']),
+                        $admin->branch_id
+                    );
+                }
             }
         }
 

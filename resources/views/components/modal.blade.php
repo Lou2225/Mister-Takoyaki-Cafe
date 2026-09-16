@@ -29,24 +29,25 @@ $maxWidth = [
     x-on:keydown.escape.window="typeof isModalOpen !== 'undefined' && (typeof cartLocked === 'undefined' || !cartLocked) && (isModalOpen = false)"
     x-on:keydown.tab.prevent="$event.shiftKey || nextFocusable()?.focus()"
     x-on:keydown.shift.tab.prevent="prevFocusable()?.focus()"
+    x-on:click.self="(typeof cartLocked !== 'undefined' && cartLocked) ? $dispatch('notify', { type: 'warning', message: 'This payment is already verified — you must Place the Order to complete it.' }) : (typeof isModalOpen !== 'undefined' && (isModalOpen = false))"
     x-show="typeof isModalOpen !== 'undefined' && isModalOpen"
     x-cloak
     class="fixed inset-0 z-[9999] overflow-y-auto px-4 py-6 sm:px-0"
     style="display: none;"
 >
     <div
-    x-show="typeof isModalOpen !== 'undefined' && isModalOpen"
-    class="fixed inset-0 transform transition-all"
-    x-on:click.self="(typeof cartLocked !== 'undefined' && cartLocked) ? $dispatch('notify', { type: 'warning', message: 'This payment is already verified — you must Place the Order to complete it.' }) : (typeof isModalOpen !== 'undefined' && (isModalOpen = false))"
-    x-transition:enter="ease-out duration-300"
-    x-transition:enter-start="opacity-0"
-    x-transition:enter-end="opacity-100"
-    x-transition:leave="ease-in duration-200"
-    x-transition:leave-start="opacity-100"
-    x-transition:leave-end="opacity-0"
->
-    <div class="absolute inset-0 bg-gray-900/40 pointer-events-none" style="backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);"></div>
-</div>
+        x-show="typeof isModalOpen !== 'undefined' && isModalOpen"
+        class="fixed inset-0 transform transition-all"
+        x-on:click.self="(typeof cartLocked !== 'undefined' && cartLocked) ? $dispatch('notify', { type: 'warning', message: 'This payment is already verified — you must Place the Order to complete it.' }) : (typeof isModalOpen !== 'undefined' && (isModalOpen = false))"
+        x-transition:enter="ease-out duration-300"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="ease-in duration-200"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+    >
+        <div class="absolute inset-0 bg-gray-900/40 pointer-events-none" style="backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);"></div>
+    </div>
 
     <div
         x-show="typeof isModalOpen !== 'undefined' && isModalOpen"
@@ -61,4 +62,3 @@ $maxWidth = [
         {{ $slot }}
     </div>
 </div>
-

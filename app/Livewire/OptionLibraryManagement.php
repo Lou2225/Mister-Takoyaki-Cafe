@@ -85,7 +85,7 @@ class OptionLibraryManagement extends Component
 
         foreach (($this->templateItems[$itemIndex]['ingredients'] ?? []) as $ri) {
             if ($ri['id'] == $ing->id) {
-                $this->dispatch('notify', type: 'error', message: 'Ingredient already added to this option.');
+                $this->dispatch('notify', type: 'warning', message: 'Ingredient already added to this option.');
                 return;
             }
         }

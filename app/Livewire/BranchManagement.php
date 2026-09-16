@@ -280,7 +280,7 @@ class BranchManagement extends Component
             ->count();
         if ($staffCount > 0) {
             $this->dispatch('notify', 
-                type: 'error',
+                type: 'warning',
                 message: "Integrity Guard: '{$branch->branch_name}' has {$staffCount} staff members registered. Transfer these users before decommissioning the node."
             );
             return;
@@ -319,7 +319,7 @@ class BranchManagement extends Component
             })
             ->count();
         if ($staffCount > 0) {
-            $this->dispatch('notify', type: 'error', message: "Integrity Guard: '{$branch->branch_name}' has {$staffCount} staff members registered. Transfer these users before decommissioning the node.");
+            $this->dispatch('notify', type: 'warning', message: "Integrity Guard: '{$branch->branch_name}' has {$staffCount} staff members registered. Transfer these users before decommissioning the node.");
             $this->dispatch('close-modal', 'confirm-delete-with-manager');
             return;
         }
@@ -355,7 +355,7 @@ class BranchManagement extends Component
         // have changed since confirmDeleteBranch() first checked, and this
         // method is reachable directly regardless of that earlier check.
         if ($branch->user_id) {
-            $this->dispatch('notify', type: 'error', message: "Safety Lock: '{$branch->branch_name}' currently has an active Branch Manager assigned. Reassign or remove the manager before deleting.");
+            $this->dispatch('notify', type: 'warning', message: "Safety Lock: '{$branch->branch_name}' currently has an active Branch Manager assigned. Reassign or remove the manager before deleting.");
             $this->dispatch('close-modal', 'delete-branch');
             return;
         }
@@ -368,7 +368,7 @@ class BranchManagement extends Component
             })
             ->count();
         if ($staffCount > 0) {
-            $this->dispatch('notify', type: 'error', message: "Integrity Guard: '{$branch->branch_name}' has {$staffCount} staff members registered. Transfer these users before decommissioning the node.");
+            $this->dispatch('notify', type: 'warning', message: "Integrity Guard: '{$branch->branch_name}' has {$staffCount} staff members registered. Transfer these users before decommissioning the node.");
             $this->dispatch('close-modal', 'delete-branch');
             return;
         }
@@ -474,7 +474,7 @@ class BranchManagement extends Component
         // for it — block registration in that state rather than allowing
         // it and merely warning after the fact.
         if ($this->status && !$this->user_id) {
-            $this->dispatch('notify', type: 'error', message: 'Cannot register branch as Active without an assigned manager.');
+            $this->dispatch('notify', type: 'warning', message: 'Cannot register branch as Active without an assigned manager.');
             return;
         }
 
@@ -560,7 +560,7 @@ class BranchManagement extends Component
 
         // A branch cannot remain/become Active without an assigned manager.
         if ($this->status && !$newManagerId) {
-            $this->dispatch('notify', type: 'error', message: 'Cannot save as Active without an assigned manager.');
+            $this->dispatch('notify', type: 'warning', message: 'Cannot save as Active without an assigned manager.');
             return;
         }
 
@@ -623,7 +623,7 @@ class BranchManagement extends Component
         // is always allowed regardless of manager status.
         $activating = !$branch->status;
         if ($activating && !$branch->user_id) {
-            $this->dispatch('notify', type: 'error', message: "Cannot activate '{$branch->branch_name}': assign a manager first.");
+            $this->dispatch('notify', type: 'warning', message: "Cannot activate '{$branch->branch_name}': assign a manager first.");
             return;
         }
 

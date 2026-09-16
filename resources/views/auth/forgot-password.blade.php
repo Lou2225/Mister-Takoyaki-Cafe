@@ -218,6 +218,9 @@
         </div>
 
         <form wire:submit="resetPassword" class="space-y-6">
+            {{-- Hidden username field for accessibility & password managers --}}
+            <input type="text" name="username" wire:model="email" autocomplete="username" class="hidden" style="display:none;" aria-hidden="true" tabindex="-1" readonly>
+
             <div x-data="{ show: false }">
                 <label for="fp_password" class="block text-[12px] font-semibold text-slate-900 uppercase tracking-[0.24em] mb-2">New Password</label>
                 <div class="relative">

@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\StockOrderMail;
 use App\Services\BranchContext;
+use App\Services\NotificationService;
 use App\Traits\HandlesValidations;
 use App\Traits\RequiresOperatingBranch;
 
@@ -550,6 +551,7 @@ class BranchStockOrdering extends Component
                 'link'      => $link,
             ]);
         }
+        NotificationService::sendToAdmins('stock_order', $title, $message, $link, $this->mainBranchId);
     }
 
     private function updateHeader(): void

@@ -13,6 +13,9 @@
                     <form method="POST" action="{{ route('password.confirm') }}">
                         @csrf
 
+                        {{-- Hidden username field for accessibility & password managers --}}
+                        <input type="text" name="username" value="{{ auth()->user()?->email }}" autocomplete="username" class="d-none" style="display:none;" aria-hidden="true" tabindex="-1" readonly>
+
                         <div class="row mb-3">
                             <label for="password" class="col-md-4 col-form-label text-md-end">{{ __('Password') }}</label>
 

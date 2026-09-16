@@ -30,6 +30,7 @@ class OrderManagement extends Component
     public $refundAmount = 0;
     public $refundReason = '';
     public $rejectReason = '';
+    public $cancelReason = '';
     
     // Rider Assignment
     public $riders = [];
@@ -345,13 +346,13 @@ class OrderManagement extends Component
     public function openRefundModal(Order $order)
     {
         if (!auth()->user()->can('manage', $order)) {
-            $this->dispatch('notify', type: 'error', message: 'Unauthorized.');
+            $this->dispatch('notify', type: 'warning', message: 'Access Restricted: You do not have permission to refund this order.');
             return;
         }
 
         if (!$order->canBeRefunded()) {
             $this->dispatch('notify', 
-                type: 'error',
+                type: 'warning',
                 message: 'This order cannot be refunded.'
             );
             return;
@@ -365,13 +366,13 @@ class OrderManagement extends Component
     public function openVoidModal(Order $order)
     {
         if (!auth()->user()->can('manage', $order)) {
-            $this->dispatch('notify', type: 'error', message: 'Unauthorized.');
+            $this->dispatch('notify', type: 'warning', message: 'Access Restricted: You do not have permission to void this order.');
             return;
         }
 
         if (!$order->canBeVoided()) {
             $this->dispatch('notify', 
-                type: 'error',
+                type: 'warning',
                 message: 'This order cannot be voided.'
             );
             return;
@@ -399,8 +400,8 @@ class OrderManagement extends Component
         // alone but this stricter second check silently blocked the confirm.
         if (!$order || !auth()->user()->can('manage', $order)) {
             $this->dispatch('notify', 
-                type: 'error',
-                message: 'You do not have permission to void this order.'
+                type: 'warning',
+                message: 'Access Restricted: You do not have permission to void this order.'
             );
             return;
         }
@@ -428,8 +429,8 @@ class OrderManagement extends Component
 
         if (!$order || !auth()->user()->can('manage', $order) || !$order->canBeRefunded()) {
             $this->dispatch('notify', 
-                type: 'error',
-                message: 'Refund not possible.'
+                type: 'warning',
+                message: 'Refund not possible for this order status.'
             );
             return;
         }
@@ -466,7 +467,7 @@ class OrderManagement extends Component
         public function acceptOrder(Order $order)
     {
         if (!auth()->user()->can('manage', $order)) {
-            $this->dispatch('notify', type: 'error', message: 'Unauthorized.');
+            $this->dispatch('notify', type: 'warning', message: 'Access Restricted: You do not have permission to accept this order.');
             return;
         }
 
@@ -493,7 +494,7 @@ class OrderManagement extends Component
     public function markAsOutForDelivery(Order $order)
     {
         if (!auth()->user()->can('manage', $order)) {
-            $this->dispatch('notify', type: 'error', message: 'Unauthorized.');
+            $this->dispatch('notify', type: 'warning', message: 'Access Restricted: You do not have permission to update delivery status.');
             return;
         }
 
@@ -531,7 +532,7 @@ class OrderManagement extends Component
         try {
             $order = Order::findOrFail($this->selectedOrderId);
             if (!auth()->user()->can('manage', $order)) {
-                $this->dispatch('notify', type: 'error', message: 'Unauthorized.');
+                $this->dispatch('notify', type: 'warning', message: 'Access Restricted: You do not have permission to assign riders.');
                 return;
             }
             $order->updateStatus(Order::STATUS_HANDED_TO_RIDER, [
@@ -558,7 +559,7 @@ class OrderManagement extends Component
     public function markAsDelivered(Order $order)
     {
         if (!auth()->user()->can('manage', $order)) {
-            $this->dispatch('notify', type: 'error', message: 'Unauthorized.');
+            $this->dispatch('notify', type: 'warning', message: 'Access Restricted: You do not have permission to mark orders as delivered.');
             return;
         }
 
@@ -579,34 +580,43 @@ class OrderManagement extends Component
     public function cancelOrder(Order $order)
     {
         if (!auth()->user()->can('manage', $order)) return;
-        if (!in_array($order->status, [Order::STATUS_PENDING, Order::STATUS_PREPARING])) return;
-        $order->update(['status' => Order::STATUS_CANCELLED]);
-
-        // Refresh selected order if it's currently being viewed
-        if ($this->selectedOrderId === $order->id) {
-            $this->selectedOrder = Order::with(['branch', 'user', 'items.product', 'customer', 'refundedBy', 'rider'])
-                ->find($order->id);
-        }
-
-        event(new OrderStatusUpdated($order));
-
-        $this->dispatch('notify', type: 'info', message: "Order #{$order->reference_no} cancelled.");
+        $this->selectedOrder = $order;
+        $this->cancelReason = '';
+        $this->dispatch('open-modal', 'cancel-order-modal');
     }
 
-    public function rejectOrder()
+    public function submitCancelOrder()
     {
-        if (!$this->selectedOrder || !auth()->user()->can('manage', $this->selectedOrder)) return;
-        if ($this->selectedOrder->status !== Order::STATUS_PENDING) return;
-        
         $order = $this->selectedOrder;
-        $reason = trim($this->rejectReason) ?: "Rejected by branch staff.";
+        if (!$order || !auth()->user()->can('manage', $order)) return;
 
-        $order->reject($reason);
+        $this->validate([
+            'cancelReason' => 'required|string|min:3|max:255',
+        ], [
+            'cancelReason.required' => 'Please provide a reason for cancelling this order.',
+            'cancelReason.min'      => 'The cancellation reason must be at least 3 characters.',
+        ]);
 
-        // Refresh selected order if it's currently being viewed
-        if ($this->selectedOrderId === $order->id) {
-            $this->selectedOrder = $order->fresh(['branch', 'user', 'items.product', 'customer', 'refundedBy', 'rider']);
-        }
+        $order->cancel($this->cancelReason);
+
+        $this->dispatch('notify', type: 'success', message: "Order #{$order->reference_no} cancelled.");
+        $this->dispatch('close-modal', 'cancel-order-modal');
+        $this->backToList();
+    }
+
+    public function submitRejectOrder()
+    {
+        $order = $this->selectedOrder;
+        if (!$order || !auth()->user()->can('manage', $order)) return;
+
+        $this->validate([
+            'rejectReason' => 'required|string|min:3|max:255',
+        ], [
+            'rejectReason.required' => 'Please provide a reason for rejecting this order.',
+            'rejectReason.min'      => 'The rejection reason must be at least 3 characters.',
+        ]);
+
+        $order->reject($this->rejectReason);
 
         $this->dispatch('notify', type: 'success', message: "Order #{$order->reference_no} rejected.");
         $this->dispatch('close-modal', 'reject-modal');
@@ -616,7 +626,7 @@ class OrderManagement extends Component
     public function restoreDraft(Order $order)
     {
         if (!auth()->user()->can('manageDraft', $order)) {
-            $this->dispatch('notify', type: 'error', message: 'Unauthorized.');
+            $this->dispatch('notify', type: 'warning', message: 'Access Restricted: Unauthorized to restore this draft.');
             return;
         }
 
@@ -646,7 +656,7 @@ class OrderManagement extends Component
     public function deleteDraft(Order $order)
     {
         if (!auth()->user()->can('manageDraft', $order)) {
-            $this->dispatch('notify', type: 'error', message: 'Unauthorized.');
+            $this->dispatch('notify', type: 'warning', message: 'Access Restricted: Unauthorized to delete this draft.');
             return;
         }
 

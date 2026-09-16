@@ -284,8 +284,13 @@ class Product extends Model
     public function getModifierAvailability(int $branchId, $prefetchedStocks = null): array
     {
         $availability = [];
-        $this->loadMissing(['modifiers', 'recipes']);
-        $allRecipes = Recipe::whereIn('modifier_id', $this->modifiers->pluck('id'))->get();
+        $this->loadMissing(['modifiers']);
+
+        if ($this->relationLoaded('recipes')) {
+            $allRecipes = $this->recipes->whereNotNull('modifier_id');
+        } else {
+            $allRecipes = Recipe::whereIn('modifier_id', $this->modifiers->pluck('id'))->get();
+        }
 
         if ($prefetchedStocks === null) {
             $ingredientIds = $allRecipes->pluck('ingredient_id')->unique();

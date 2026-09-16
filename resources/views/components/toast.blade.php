@@ -1,8 +1,53 @@
 <div
     x-data="{
         notifications: [],
+        playChime(type) {
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+                const ctx = new AudioCtx();
+                if (ctx.state === 'suspended') {
+                    ctx.resume();
+                }
+                const now = ctx.currentTime;
+                let f1 = 587.33; // D5
+                let f2 = 880.00; // A5
+                if (type === 'error') {
+                    f1 = 440.00; // A4
+                    f2 = 349.23; // F4
+                } else if (type === 'warning') {
+                    f1 = 659.25; // E5
+                    f2 = 587.33; // D5
+                }
+
+                const osc1 = ctx.createOscillator();
+                const gain1 = ctx.createGain();
+                osc1.type = 'sine';
+                osc1.frequency.setValueAtTime(f1, now);
+                gain1.gain.setValueAtTime(0.08, now);
+                gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+                osc1.connect(gain1);
+                gain1.connect(ctx.destination);
+                osc1.start(now);
+                osc1.stop(now + 0.3);
+
+                const osc2 = ctx.createOscillator();
+                const gain2 = ctx.createGain();
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(f2, now + 0.1);
+                gain2.gain.setValueAtTime(0.08, now + 0.1);
+                gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+                osc2.connect(gain2);
+                gain2.connect(ctx.destination);
+                osc2.start(now + 0.1);
+                osc2.stop(now + 0.45);
+            } catch (e) {
+                // AudioContext policy blocked or unsupported
+            }
+        },
         add(notificationDetail) {
             // Livewire 2 sometimes wraps event detail in an array
+            // Livewire 2/3 sometimes wraps event detail in an array
             const notification = notificationDetail?.type ? notificationDetail : (notificationDetail?.[0]?.type ? notificationDetail[0] : notificationDetail);
             
             const id = Math.random().toString(36).substr(2, 9);
@@ -12,22 +57,21 @@
                 message: notification.message || '',
                 duration: notification.duration || 4000
             });
+
+            if (notification.sound === true || (notification.sound !== false && (notification.type === 'error' || notification.type === 'warning'))) {
+                this.playChime(notification.type);
+            }
+
             setTimeout(() => {
                 this.remove(id);
             }, notification.duration || 4000);
             
-            // If this is a success notification, close the associated modal after a short delay
-            if (notification.type === 'success') {
+            // If a specific modal was targeted for closure on completion, close it cleanly
+            if (notification.type === 'success' && notification.modal) {
                 setTimeout(() => {
-                    const modalToClose = notification.modal || 'confirm-save-user';
                     window.dispatchEvent(new CustomEvent('close-modal', { 
-                        detail: modalToClose
+                        detail: notification.modal
                     }));
-                    
-                    // Also close conflict modal if it was the one open
-                    if (!notification.modal) {
-                        window.dispatchEvent(new CustomEvent('close-modal', { detail: 'confirm-manager-replace' }));
-                    }
                 }, 500); // Give toast time to appear before closing modal
             }
         },
@@ -38,10 +82,19 @@
     @notify.window="add($event.detail)"
     x-init="
         @if(session('success'))
-            add({ type: 'success', message: '{{ session('success') }}' });
+            add({ type: 'success', message: '{{ addslashes(session('success')) }}' });
         @endif
         @if(session('error'))
-            add({ type: 'error', message: '{{ session('error') }}' });
+            add({ type: 'error', message: '{{ addslashes(session('error')) }}' });
+        @endif
+        @if(session('warning'))
+            add({ type: 'warning', message: '{{ addslashes(session('warning')) }}' });
+        @endif
+        @if(session('status'))
+            add({ type: 'info', message: '{{ addslashes(session('status')) }}' });
+        @endif
+        @if(session('info'))
+            add({ type: 'info', message: '{{ addslashes(session('info')) }}' });
         @endif
     "
     class="fixed bottom-6 right-6 flex flex-col items-end gap-3 z-[10000] pointer-events-none"
@@ -60,6 +113,7 @@
             <div :class="{
                 'bg-green-500': notification.type === 'success',
                 'bg-red-500': notification.type === 'error',
+                'bg-amber-500': notification.type === 'warning',
                 'bg-blue-500': notification.type === 'info'
             }" class="absolute left-0 top-0 bottom-0 w-1.5 h-full"></div>
 
@@ -67,6 +121,7 @@
             <div :class="{
                 'bg-green-50 text-green-600 border-green-100': notification.type === 'success',
                 'bg-red-50 text-red-600 border-red-100': notification.type === 'error',
+                'bg-amber-50 text-amber-600 border-amber-100': notification.type === 'warning',
                 'bg-blue-50 text-blue-600 border-blue-100': notification.type === 'info'
             }" class="w-10 h-10 rounded-xl border flex items-center justify-center flex-shrink-0">
                 
@@ -79,6 +134,13 @@
 
                 {{-- Error Icon --}}
                 <template x-if="notification.type === 'error'">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </template>
+
+                {{-- Warning Icon --}}
+                <template x-if="notification.type === 'warning'">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>

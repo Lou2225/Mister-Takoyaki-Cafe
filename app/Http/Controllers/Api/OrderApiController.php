@@ -14,6 +14,7 @@ use App\Models\Recipe;
 use App\Models\FinancialLedger;
 use App\Models\SystemSetting;
 use App\Services\StockDeductionService;
+use App\Services\NotificationService;
 use App\Events\OrderStatusUpdated;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -272,6 +273,20 @@ class OrderApiController extends Controller
 
                 return $order;
             });
+
+            // Dispatch in-app notification to branch staff & management
+            try {
+                NotificationService::sendToBranch(
+                    (int) $order->branch_id,
+                    'order',
+                    "New Order #{$order->reference_no}",
+                    "{$order->customer_name} placed an order ({$order->order_type}) - ₱" . number_format($order->total_amount, 2),
+                    route('orders.index'),
+                    [1, 2, 3] // Super Admins, Branch Admins, Cashiers
+                );
+            } catch (\Throwable $ne) {
+                Log::warning("Failed to dispatch order in-app notification: " . $ne->getMessage());
+            }
 
             return response()->json([
                 'success' => true,

@@ -1,15 +1,86 @@
 <div id="pos-terminal-root" class="flex flex-col h-[calc(100vh-58px)] sm:h-[calc(100vh-65px)] overflow-hidden bg-gray-100" 
     wire:key="pos-terminal-root"
-    @cart-loaded.window="cart = $event.detail.cart || {}"
-    @cart-item-updated.window="
-        if ($event.detail.remove) {
-            delete cart[$event.detail.key];
-        } else if (cart[$event.detail.key]) {
-            Object.assign(cart[$event.detail.key], $event.detail.item);
+    wire:ignore.self
+    @cart-loaded.window="
+        cart = $event.detail.cart || {};
+        if ($event.detail.orderType) orderType = $event.detail.orderType;
+        if ($event.detail.paymentMethod) paymentMethod = $event.detail.paymentMethod;
+        if ($event.detail.tableNumber !== undefined) {
+            tableNumber = $event.detail.tableNumber || '';
         }
-        cart = { ...cart };
+        if ($event.detail.referenceNo) currentReferenceNo = $event.detail.referenceNo;
+        if ($event.detail.loadedDraftId) {
+            draftsList = draftsList.filter(d => d.id !== $event.detail.loadedDraftId);
+        }
+        if ($event.detail.draftsCount !== undefined) {
+            draftsCount = $event.detail.draftsCount;
+        } else {
+            draftsCount = draftsList.length;
+        }
+        cartExpanded = Object.keys(cart).length > 0;
+        cartUsageCache = {};
+        cartUsageCacheKey = '';
     "
-    @cart-reset.window="cart = {}; cartExpanded = false"
+    @cart-reset.window="
+        _isResettingCart = true;
+        if (Object.keys(cart).length > 0) {
+            cart = {};
+        }
+        cartExpanded = false;
+        tableNumber = '';
+        amountTendered = 0;
+        currentReferenceNo = '';
+        cartUsageCache = {};
+        cartUsageCacheKey = '';
+        editingItem = null;
+        editingKey = null;
+        editingProduct = null;
+        pendingDeleteKey = null;
+        setTimeout(() => { _isResettingCart = false; }, 100);
+    "
+    @stocks-updated.window="
+        stockData = $event.detail.stocks || stockData;
+        cartUsageCache = {};
+        cartUsageCacheKey = '';
+    "
+    @reference-ready.window="currentReferenceNo = $event.detail.referenceNo || currentReferenceNo"
+    @draft-saved.window="
+        isSavingDraft = false; 
+        if ($event.detail && $event.detail.draft) {
+            draftsList.unshift($event.detail.draft);
+        }
+        if ($event.detail && $event.detail.count !== undefined) {
+            draftsCount = $event.detail.count;
+        } else {
+            draftsCount = draftsList.length;
+        }
+        _isResettingCart = true;
+        if (Object.keys(cart).length > 0) {
+            cart = {};
+        }
+        cartExpanded = false;
+        tableNumber = '';
+        amountTendered = 0;
+        currentReferenceNo = '';
+        cartUsageCache = {};
+        cartUsageCacheKey = '';
+        editingItem = null;
+        editingKey = null;
+        editingProduct = null;
+        pendingDeleteKey = null;
+        setTimeout(() => { _isResettingCart = false; }, 100);
+        $dispatch('close-modal', 'pos-drafts-list');
+    "
+    @draft-deleted.window="
+        if ($event.detail && $event.detail.draftId) {
+            draftsList = draftsList.filter(d => d.id !== $event.detail.draftId);
+        }
+        if ($event.detail && $event.detail.count !== undefined) {
+            draftsCount = $event.detail.count;
+        } else {
+            draftsCount = draftsList.length;
+        }
+    "
     @pos-category-sortable-init.window="setupCategorySortable()"
     x-data="{ 
         isMobile: window.matchMedia('(max-width: 767px)').matches,
@@ -33,11 +104,15 @@
             }).length;
         },
         isSavingDraft: false,
+        draftsList: @js($draftsData ?? []),
+        draftsCount: {{ count($draftsData ?? []) }},
         isSavingLayout: false,
         isSubmitting: false,
         cartExpanded: false,
         isEditMode: @entangle('isEditMode').live,
         cart: @js($cart),
+        currentReferenceNo: @js($referenceNo),
+        tableNumber: @entangle('tableNumber'),
         paymentMethod: @entangle('paymentMethod'),
         gcashVerified: @entangle('gcashVerified').live,
         amountTendered: @entangle('amountTendered'),
@@ -74,7 +149,8 @@
         get cartLocked() {
             return this.paymentMethod === 'GCash' && this.gcashVerified;
         },
-        productsData: {},
+        productsData: @js($productData ?? []),
+        _isResettingCart: false,
         cartUsageCacheKey: '',
         cartUsageCache: {},
         stockData: @js($stockData),
@@ -87,10 +163,30 @@
         editSelectedModifierIds: [],
         isSavingNote: false,
         pendingDeleteDraftId: null,
-        hiddenDraftIds: [],
         selectedOptions: {},
         selectedModifierIds: [],
         pendingDeleteKey: null,
+        resetCartIfEmpty(forceServerSync = true) {
+            if (this._isResettingCart) return;
+            if (Object.keys(this.cart).length === 0) {
+                this._isResettingCart = true;
+                this.cart = {};
+                this.cartExpanded = false;
+                this.tableNumber = '';
+                this.amountTendered = 0;
+                this.currentReferenceNo = '';
+                this.cartUsageCache = {};
+                this.cartUsageCacheKey = '';
+                this.editingItem = null;
+                this.editingKey = null;
+                this.editingProduct = null;
+                this.pendingDeleteKey = null;
+                if (forceServerSync) {
+                    this.$wire.clearCart(true);
+                }
+                setTimeout(() => { this._isResettingCart = false; }, 100);
+            }
+        },
         removeItem(key) {
             if (this.cartLocked) {
                 this.$dispatch('notify', { type: 'warning', message: 'Order is locked — payment already verified.' });
@@ -103,6 +199,9 @@
             }
             this.pendingDeleteKey = null;
             this.$dispatch('close-modal', 'confirm-delete-item');
+            if (Object.keys(this.cart).length === 0) {
+                this.resetCartIfEmpty(true);
+            }
         },
         categorySortable: null,
         categorySortableTimeout: null,
@@ -359,11 +458,23 @@
         },
         // ── Edit Order modal (options + qty + notes + discount, all in one) ──
         openEditOrder(key, item) {
-            const product = this.productsData[item.id];
-            this.editingKey = key;
+            if (!item) return;
+            const pid = item.id;
+            let product = this.productsData[pid];
+            if (!product) {
+                const el = document.getElementById('hidden-products-data');
+                if (el) {
+                    try { this.productsData = JSON.parse(el.textContent || '{}'); } catch(e){}
+                    product = this.productsData[pid];
+                }
+            }
+            this.editingKey = key || item.key;
             this.editingProduct = product || null;
-            this.editingItem = { ...item };
-            this.editQty = item.qty;
+            this.editingItem = JSON.parse(JSON.stringify(item));
+            if (this.editingItem && this.editingItem.instructions === undefined) {
+                this.editingItem.instructions = '';
+            }
+            this.editQty = item.qty || 1;
             this.editSelectedModifierIds = (item.modifiers || []).map(m => m.id);
             this.editSelectedOptions = {};
             if (product) {
@@ -372,7 +483,7 @@
                     const maxSelect = g.max_select ?? (g.price_mode === 'fixed' ? 1 : null);
                     const isSingle = maxSelect === 1;
                     const selectedIds = (item.options || [])
-                        .filter(o => g.options.some(go => go.id === o.id))
+                        .filter(o => (g.options || []).some(go => go.id === o.id))
                         .map(o => o.id);
                     this.editSelectedOptions[g.id] = isSingle ? (selectedIds[0] ?? null) : selectedIds;
                 });
@@ -530,12 +641,13 @@
             const modifiersPrice = selectedModifiers.reduce((sum, m) => sum + parseFloat(m.price || 0), 0);
             const finalPrice = basePrice + additivePrice + modifiersPrice;
 
-            const optKey = optionIds.length > 0 ? '-' + optionIds.slice().sort().join(',') : '';
-            const modKey = this.editSelectedModifierIds.length > 0 ? '-' + this.editSelectedModifierIds.slice().sort().join(',') : '';
+            const optKey = optionIds.length > 0 ? '-' + optionIds.slice().sort((a, b) => Number(a) - Number(b)).join(',') : '';
+            const modKey = this.editSelectedModifierIds.length > 0 ? '-' + this.editSelectedModifierIds.slice().sort((a, b) => Number(a) - Number(b)).join(',') : '';
             const newKey = 'p' + product.id + optKey + modKey;
 
             const updatedLine = {
                 id: product.id,
+                key: newKey,
                 name: product.name,
                 price: finalPrice,
                 qty: qty,
@@ -589,8 +701,8 @@
             });
 
             // 1. Generate Key
-            const optKey = optionIds.length > 0 ? '-' + optionIds.sort().join(',') : '';
-            const modKey = selectedModifierIds.length > 0 ? '-' + selectedModifierIds.sort().join(',') : '';
+            const optKey = optionIds.length > 0 ? '-' + optionIds.slice().sort((a, b) => Number(a) - Number(b)).join(',') : '';
+            const modKey = selectedModifierIds.length > 0 ? '-' + selectedModifierIds.slice().sort((a, b) => Number(a) - Number(b)).join(',') : '';
             // Prefixed with a letter so this key is never treated as a
             // numeric array index — plain JS objects always sort
             // integer-like string keys ascending, ignoring insertion
@@ -639,6 +751,7 @@
             } else {
                 this.cart[key] = {
                     id: pid,
+                    key: key,
                     name: product.name,
                     price: finalPrice,
                     qty: 1,
@@ -695,8 +808,10 @@
             });
 
             this.$watch('cart', value => { 
+                if (this._isResettingCart) return;
                 if (!value || Object.keys(value).length === 0) {
                     this.cartExpanded = false; 
+                    this.resetCartIfEmpty(true);
                 }
             });
 
@@ -774,19 +889,9 @@
                 });
             }
             
-            const setupHook = () => {
-                window.Livewire?.hook?.('commit', ({ succeed }) => {
-                    succeed(() => {
-                        setTimeout(() => window.__posSyncProducts?.(), 50);
-                        requestAnimationFrame(() => window.__posSyncProducts?.());
-                    });
-                });
-            };
-
-            if (!window.__posCommitHookAttached) {
-                window.__posCommitHookAttached = true;
-                if (window.Livewire) setupHook();
-                else document.addEventListener('livewire:initialized', setupHook, { once: true });
+            if (!window.__posProductsRefreshedListenerAttached) {
+                window.__posProductsRefreshedListenerAttached = true;
+                window.addEventListener('products-refreshed', () => window.__posSyncProducts?.());
             }
         },
         destroy() {
@@ -953,11 +1058,18 @@
                         class="pl-8 pr-3 py-1.5 w-full sm:w-36 text-[12px] font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-0 focus:border-gray-300 placeholder-gray-400 transition-all sm:focus:w-44">
                 </div>
 
-                                <button type="button" @click="$dispatch('open-modal', 'pos-drafts-list')" title="Held Orders" class="relative p-2 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all border border-indigo-100 flex items-center justify-center">
+                <button type="button" 
+                    wire:key="pos-held-orders-btn"
+                    @click="$dispatch('open-modal', 'pos-drafts-list')" 
+                    title="Held Orders" 
+                    class="relative p-2 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all border border-indigo-100 flex items-center justify-center">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    @if($this->drafts->count() > 0)
-                        <span class="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] font-black text-white shadow-sm ring-2 ring-white animate-bounce">{{ $this->drafts->count() }}</span>
-                    @endif
+                    <span x-show="draftsCount > 0" 
+                          x-cloak 
+                          x-text="draftsCount" 
+                          class="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] font-black text-white shadow-sm ring-2 ring-white animate-bounce">
+                        {{ count($draftsData ?? []) }}
+                    </span>
                 </button>
 
                 {{-- Bluetooth Thermal Printer connect/status --}}
@@ -967,7 +1079,11 @@
                         supported: 'bluetooth' in navigator,
                         printerName: localStorage.getItem('thermal_printer_name') || ''
                     }"
-                    x-init="window.addEventListener('thermal-bt-disconnected', () => { connected = false; })"
+                    x-init="
+                        const onBtDisconnected = () => { connected = false; };
+                        window.addEventListener('thermal-bt-disconnected', onBtDisconnected);
+                        $el.addEventListener('alpine:destroy', () => window.removeEventListener('thermal-bt-disconnected', onBtDisconnected));
+                    "
                     class="shrink-0">
                     <button type="button"
                         :disabled="!supported || connecting"
@@ -1061,6 +1177,7 @@
                             data-id="{{ $pid }}"
                             data-category-id="{{ $product->category_id }}"
                             data-search-name="{{ strtolower(addslashes($product->name)) }}"
+                            x-data="{ get remStock() { return remainingStock({{ $pid }}); }, get inCart() { return getCartQty({{ $pid }}); } }"
                             class="product-card group relative bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden flex flex-col transition-all duration-300 hover:shadow-md {{ !$isAvailable ? 'opacity-75' : '' }}"
                             :class="isEditMode ? 'opacity-90 grayscale-[0.2] scale-[0.98]' : ''">
 
@@ -1076,14 +1193,14 @@
 
                                 {{-- Availability Badge --}}
                                 <div class="absolute top-2 right-2">
-                                    <span x-show="remainingStock({{ $pid }}) <= 0" x-cloak class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/90 text-red-600 shadow-sm border border-red-100">
+                                    <span x-show="remStock <= 0" x-cloak class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/90 text-red-600 shadow-sm border border-red-100">
                                         <span class="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>Out of Stock
                                     </span>
-                                    <span x-show="remainingStock({{ $pid }}) > 0 && remainingStock({{ $pid }}) <= 10" x-cloak class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/90 text-amber-600 shadow-sm border border-amber-100">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></span>Low (<span x-text="remainingStock({{ $pid }})"></span> left)
+                                    <span x-show="remStock > 0 && remStock <= 10" x-cloak class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/90 text-amber-600 shadow-sm border border-amber-100">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></span>Low (<span x-text="remStock"></span> left)
                                     </span>
-                                    <span x-show="remainingStock({{ $pid }}) > 10" x-cloak class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/90 text-emerald-600 shadow-sm border border-emerald-100">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span><span x-text="remainingStock({{ $pid }})"></span> left
+                                    <span x-show="remStock > 10" x-cloak class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-white/90 text-emerald-600 shadow-sm border border-emerald-100">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span><span x-text="remStock"></span> left
                                     </span>
                                 </div>
                             </div>
@@ -1108,7 +1225,7 @@
                                     @else
                                         {{-- Max Qty Reached --}}
                                         <x-danger-button type="button" disabled class="w-full justify-center" 
-                                            x-show="remainingStock({{ $pid }}) <= 0">
+                                            x-show="remStock <= 0">
                                             <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                                             </svg>
@@ -1118,16 +1235,16 @@
                                         {{-- Add More --}}
                                         <x-secondary-button type="button" 
                                             @click="!isEditMode && {{ $clickAction }}" 
-                                            x-show="getCartQty({{ $pid }}) > 0 && remainingStock({{ $pid }}) > 0"
+                                            x-show="inCart > 0 && remStock > 0"
                                             :class="isEditMode ? 'opacity-50 cursor-not-allowed' : ''"
                                             id="pos_addmore_{{ $pid }}" class="w-full justify-center">
-                                            Add More (<span x-text="getCartQty({{ $pid }})"></span>/<span x-text="maxAvailableForProduct({{ $pid }})"></span>)
+                                            Add More (<span x-text="inCart"></span>/<span x-text="inCart + remStock"></span>)
                                         </x-secondary-button>
 
                                         {{-- Add to Cart --}}
                                         <x-primary-button type="button" 
                                             @click="!isEditMode && {{ $clickAction }}" 
-                                            x-show="getCartQty({{ $pid }}) == 0"
+                                            x-show="inCart == 0 && remStock > 0"
                                             :class="isEditMode ? 'opacity-50 cursor-not-allowed' : ''"
                                             id="pos_addcart_{{ $pid }}" class="w-full justify-center">
                                             <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1184,9 +1301,13 @@
                             <span class="md:hidden flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-black text-white" x-text="Object.values(cart).reduce((sum, item) => sum + item.qty, 0)"></span>
                         </template>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <span class="text-[11px] font-black text-gray-900 font-mono tracking-tighter uppercase">{{ $referenceNo ? '#' . $referenceNo : 'New Order' }}</span>
-<button type="button" title="Hold Order" class="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed" :disabled="Object.keys(cart).length === 0 || cartLocked" @click.stop="!cartLocked && (isSavingDraft = true, $wire.cart = cart, $wire.saveDraft().finally(() => { isSavingDraft = false; cartExpanded = false }))">                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
+                    <div class="flex items-center gap-1 sm:gap-2">
+                        <span class="text-[11px] font-black text-gray-900 font-mono tracking-tighter uppercase" x-text="currentReferenceNo ? '#' + currentReferenceNo : 'New Order'">{{ $referenceNo ? '#' . $referenceNo : 'New Order' }}</span>
+                        <button type="button" title="Hold Order" 
+                            class="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed" 
+                            :disabled="Object.keys(cart).length === 0 || cartLocked || isSavingDraft" 
+                            @click.stop="!cartLocked && !isSavingDraft && (isSavingDraft = true, $wire.saveDraft(JSON.parse(JSON.stringify(cart)), tableNumber, orderType, paymentMethod).finally(() => { isSavingDraft = false; cartExpanded = false; }))">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
                         </button>
                         <div class="flex items-center md:hidden ml-2">
                              <span class="text-[14px] font-black text-indigo-600 font-mono" x-show="!cartExpanded">{{ $currencySymbol }}<span x-text="total.toFixed(2)"></span></span>
@@ -1235,7 +1356,7 @@
             <span class="absolute top-1 right-1 w-1.5 h-1.5 bg-amber-500 rounded-full border border-white"></span>
         </template>
     </button>
-    <button @click="!cartLocked && (pendingDeleteKey = key, $dispatch('open-modal', 'confirm-delete-item'))" class="p-1.5 text-gray-300 hover:text-red-500 transition-all rounded-lg hover:bg-red-50 disabled:opacity-40" :disabled="cartLocked">        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+    <button @click="!cartLocked && (pendingDeleteKey = key, $dispatch('open-modal', 'confirm-delete-item'))" class="p-1.5 text-red-500 hover:text-red-700 transition-all rounded-lg hover:bg-red-50 disabled:opacity-40" :disabled="cartLocked">        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
     </button>
 </div>
                                     </div>
@@ -1249,9 +1370,7 @@
                                             <span class="px-1 text-[12px] font-black text-gray-900 min-w-[20px] text-center font-mono" x-text="item.qty"></span>
                                             <button @click="
                                                 if (cartLocked) { $dispatch('notify', { type: 'warning', message: 'Order is locked — payment already verified.' }); return; }
-                                                const productQty = getCartQty(item.id);
-                                                const maxQty = maxAvailableForProduct(item.id);
-                                                if (remainingStock(item.id) > 0 && productQty < maxQty) { item.qty++; cart = {...cart} }
+                                                if (remainingStock(item.id) > 0) { item.qty++; cart = {...cart} }
                                                 else { $dispatch('notify', { type: 'warning', message: 'Maximum available stock reached' }) }"
                                                 class="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all active:scale-95 disabled:opacity-40" :disabled="cartLocked">
                                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
@@ -1305,7 +1424,7 @@
                         <span class="text-[14px] font-black text-gray-900 font-mono">{{ $currencySymbol }}<span x-text="total.toFixed(2)">{{ number_format($total, 2) }}</span></span>
                     </div>
 
-                    {{-- Order Meta: Type + Table --}}
+                    {{-- Order Meta: Type + Claim No. --}}
                     <div class="pt-2 space-y-3">
                         <div class="flex items-center justify-between">
                             <span class="text-[12px] text-gray-500">Order Method</span>
@@ -1331,27 +1450,29 @@
                             </x-dropdown>
                         </div>
 
-                        {{-- Table input — dynamic, not hardcoded --}}
+                        {{-- Claim Number — 2 digits only --}}
                         <div>
                             <div class="flex items-center justify-between">
-                                <span class="text-[12px] text-gray-500">Table / Ref</span>
-                                <input type="text" wire:model.live.debounce.400ms="tableNumber" placeholder="Table #"
-                                    inputFilter="number" maxlength="2" inputmode="numeric" pattern="[0-9]*"
-                                    @keydown="FormFilters.numberKeydown($event)" @paste="FormFilters.numberPaste($event)"
+                                <span class="text-[12px] text-gray-500">Claim No.</span>
+                                <input type="text" 
+                                    x-model="tableNumber"
+                                    placeholder="00"
+                                    inputmode="numeric"
+                                    maxlength="2"
+                                    @input="tableNumber = $event.target.value.replace(/\D/g, '').slice(0, 2)"
                                     class="text-[12px] font-bold text-gray-800 bg-transparent border-0 p-0 focus:ring-0 text-right w-24 placeholder-gray-300 {{ $errors->has('tableNumber') ? 'text-red-500 placeholder-red-300' : '' }}">
                             </div>
                             <x-input-error :messages="$errors->get('tableNumber')" class="mt-1 text-right" />
                         </div>
 
-                                          {{-- Confirm Payment --}}
+                                           {{-- Confirm Payment --}}
                     <x-primary-button type="button"
                         @click="
                             if (Object.keys(cart).length === 0) return;
                             amountTendered = total;
-                            $wire.cart = cart;
                             $wire.paymentReference = '';
                             $dispatch('open-modal', 'pos-payment');
-                            $wire.openPaymentModal();
+                            $wire.openPaymentModal(JSON.parse(JSON.stringify(cart)));
                         "
                         x-bind:disabled="Object.keys(cart).length === 0" id="pos_confirm_payment_btn" class="w-full mt-2 justify-center">
                         <span x-show="Object.keys(cart).length > 0">Proceed to Payment</span>
@@ -1360,10 +1481,10 @@
 
 
                     <div x-show="Object.keys(cart).length > 0">
-                                                <x-secondary-button type="button"
-                            @click="$dispatch('open-modal', 'confirm-clear-order')"
+                        <x-secondary-button type="button"
+                            @click="if (cartLocked) { $dispatch('notify', { type: 'warning', message: 'Order is locked — payment already verified.' }); } else { $dispatch('open-modal', 'confirm-clear-order'); }"
                             x-bind:class="(paymentMethod === 'GCash' && gcashVerified) ? 'opacity-50 cursor-not-allowed' : ''"
-                                                    id="pos_clear_cart_btn" class="w-full mt-1.5 justify-center text-red-600">
+                            id="pos_clear_cart_btn" class="w-full mt-1.5 justify-center text-red-600">
                             Clear Order
                         </x-secondary-button>
                     </div>
@@ -1771,7 +1892,7 @@
                                 </div>
 
                                 <p class="text-[12px] font-bold text-blue-900">{{ $currencySymbol }}<span x-text="total.toFixed(2)">{{ number_format($this->total, 2) }}</span> due</p>
-                                <p class="text-[10px] text-blue-500 mt-0.5">Order #{{ $referenceNo }}</p>
+                                <p class="text-[10px] text-blue-500 mt-0.5" x-text="'Order #' + (currentReferenceNo || '{{ $referenceNo }}')">Order #{{ $referenceNo }}</p>
 
                                 <a :href="gcashUrl" target="_blank"
                                    class="mt-3 text-[11px] text-blue-600 font-bold underline underline-offset-2">
@@ -1848,8 +1969,26 @@
 @click.prevent="
     if (isSubmitting || amountTenderedError) return;
     isSubmitting = true;
-    $wire.confirmPayment(JSON.parse(JSON.stringify(cart)))
-        .finally(() => { isSubmitting = false; });
+    $wire.confirmPayment(
+        JSON.parse(JSON.stringify(cart)),
+        parseFloat(amountTendered) || 0,
+        paymentMethod,
+        $wire.paymentReference || '',
+        tableNumber || '',
+        orderType
+    ).then(() => {
+        if (Object.keys(cart).length > 0 && window.pendingThermalReceiptWindow && !window.pendingThermalReceiptWindow.closed) {
+            window.pendingThermalReceiptWindow.close();
+            window.pendingThermalReceiptWindow = null;
+        }
+    }).catch(() => {
+        if (window.pendingThermalReceiptWindow && !window.pendingThermalReceiptWindow.closed) {
+            window.pendingThermalReceiptWindow.close();
+            window.pendingThermalReceiptWindow = null;
+        }
+    }).finally(() => { 
+        isSubmitting = false; 
+    });
 "
                 x-bind:disabled="isSubmitting || !!amountTenderedError"
                 x-bind:class="(isSubmitting || amountTenderedError) ? 'opacity-60 cursor-not-allowed' : ''"
@@ -1871,14 +2010,19 @@
     <div class="h-1 w-full bg-gradient-to-r from-amber-400 to-orange-500 rounded-t-xl"></div>
     <template x-if="editingItem">
     <div class="p-8">
-        <div class="flex items-center gap-3 mb-6">
-            <div class="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-500 shadow-sm border border-amber-100">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
+        <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-500 shadow-sm border border-amber-100">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
+                </div>
+                <div>
+                    <h2 class="text-[18px] font-black text-gray-900">Edit Order</h2>
+                    <p class="text-[12px] text-gray-500" x-text="editingItem?.name"></p>
+                </div>
             </div>
-            <div>
-                <h2 class="text-[18px] font-black text-gray-900">Edit Order</h2>
-                <p class="text-[12px] text-gray-500" x-text="editingItem?.name"></p>
-            </div>
+            <button type="button" @click="editingItem = null; editingKey = null; editingProduct = null; $dispatch('close-modal', 'edit-cart-item')" class="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-all">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -2095,6 +2239,10 @@
         </div>
     </div>
     </template>
+    <div x-show="!editingItem" class="p-8 text-center">
+        <p class="text-[14px] text-gray-500 mb-4">No item selected for editing.</p>
+        <x-secondary-button @click="$dispatch('close-modal', 'edit-cart-item')" class="justify-center">Close</x-secondary-button>
+    </div>
 </x-modal>
     {{-- ══════════════════════════════════════════════
          CONFIRM DELETE ITEM MODAL
@@ -2148,14 +2296,22 @@
             <div class="flex items-center justify-end gap-2 mt-6">
                 <x-secondary-button @click="$dispatch('close-modal', 'confirm-clear-order')" class="h-10">Cancel</x-secondary-button>
                 <button type="button"
-                    @click="(paymentMethod === 'GCash' && gcashVerified) ? $wire.clearCart() : (cart = {}, $wire.clearCart()); $dispatch('close-modal', 'confirm-clear-order')"
+                    @click="
+                        if (cartLocked) {
+                            $dispatch('notify', { type: 'warning', message: 'Order is locked — payment already verified.' });
+                        } else {
+                            cart = {};
+                            resetCartIfEmpty(true);
+                        }
+                        $dispatch('close-modal', 'confirm-clear-order');
+                    "
                     class="h-10 px-4 inline-flex items-center justify-center rounded-lg bg-red-600 hover:bg-red-700 text-white text-[13px] font-bold transition-colors">
                     Clear Order
                 </button>
             </div>
         </div>
     </x-modal>
-                <x-modal name="pos-drafts-list" maxWidth="2xl" focusable>
+    <x-modal name="pos-drafts-list" maxWidth="2xl" focusable>
         <div class="h-1 w-full bg-gradient-to-r from-indigo-500 to-purple-600 rounded-t-xl"></div>
         <div class="p-8">
             <div class="flex items-center justify-between mb-8">
@@ -2170,46 +2326,54 @@
                 </button>
             </div>
 
-            <div class="max-h-[450px] overflow-y-auto pr-2 custom-scrollbar">
-                @forelse($this->drafts as $draft)
-    <div wire:key="draft-item-{{ $draft->id }}" 
-        x-show="!hiddenDraftIds.includes({{ $draft->id }})"
-        class="mb-3 bg-white border border-gray-100 p-5 rounded-2xl shadow-sm hover:shadow-md hover:border-indigo-100 transition-all group/item">
+            <div wire:key="pos-drafts-scrollable-list" class="max-h-[450px] overflow-y-auto pr-2 custom-scrollbar">
+                <template x-for="draft in draftsList" :key="draft.id">
+                    <div class="mb-3 bg-white border border-gray-100 p-5 rounded-2xl shadow-sm hover:shadow-md hover:border-indigo-100 transition-all group/item">
                         <div class="flex items-start justify-between">
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center gap-2 mb-1.5">
-                                    <span class="text-[14px] font-black text-indigo-600 font-mono tracking-tight">#{{ $draft->reference_no }}</span>
+                                    <span class="text-[14px] font-black text-indigo-600 font-mono tracking-tight" x-text="'#' + draft.reference_no"></span>
                                     <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black bg-indigo-50 text-indigo-500 uppercase tracking-widest border border-indigo-100/50">DRAFT</span>
                                 </div>
                                 <div class="space-y-1">
-                                    <p class="text-[13px] font-bold text-gray-800 flex items-center gap-1.5 leading-tight">
-                                        {{ $draft->table_number ? 'Table: ' . $draft->table_number : 'No Table Reference' }}
+                                    <p class="text-[13px] font-bold text-gray-800 flex items-center gap-1.5 leading-tight" x-text="draft.table_number ? 'Claim No: ' + draft.table_number : 'No Claim No'">
                                     </p>
-                                    <p class="text-[11px] text-gray-500 font-medium line-clamp-1 italic">"{{ $draft->notes }}"</p>
+                                    <p class="text-[11px] text-gray-500 font-medium line-clamp-1 italic" x-show="draft.notes" x-text="'&quot;' + draft.notes + '&quot;'"></p>
                                     <div class="flex items-center gap-3 pt-1">
                                         <p class="text-[11px] font-bold text-gray-400 flex items-center gap-1">
                                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 11-8 0m8 4v5a9 9 0 11-18 0v-5m18 0h-18" /></svg>
-                                            {{ $draft->items->count() }} Items
+                                            <span x-text="draft.items_count + ' Items'"></span>
                                         </p>
                                         <p class="text-[11px] font-bold text-gray-400 flex items-center gap-1 lowercase">
                                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                            {{ $draft->created_at->diffForHumans() }}
+                                            <span x-text="draft.created_at_human"></span>
                                         </p>
                                     </div>
                                 </div>
                             </div>
                             <div class="flex flex-col items-end gap-3 shrink-0">
                                 <div class="text-right">
-                                    <p class="text-[16px] font-black text-gray-900 font-mono tracking-tight leading-none">{{ $currencySymbol }}{{ number_format($draft->total_amount, 2) }}</p>
+                                    <p class="text-[16px] font-black text-gray-900 font-mono tracking-tight leading-none" x-text="'{{ $currencySymbol }}' + parseFloat(draft.total_amount).toFixed(2)"></p>
                                     <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-1">Order value</p>
                                 </div>
                                 <div class="flex gap-2">
-                                    <x-secondary-button type="button" @click="pendingDeleteDraftId = {{ $draft->id }}; $dispatch('open-modal', 'confirm-delete-draft')" class="!px-3 !py-1.5 text-red-500 hover:text-red-700 bg-red-50/50 border-red-100 hover:bg-red-50 transition-all">
-    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-</x-secondary-button>
+                                    <x-secondary-button type="button" @click="pendingDeleteDraftId = draft.id; $dispatch('open-modal', 'confirm-delete-draft')" class="!px-3 !py-1.5 text-red-500 hover:text-red-700 bg-red-50/50 border-red-100 hover:bg-red-50 transition-all">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                    </x-secondary-button>
                                     <x-primary-button type="button"
                                         x-data="{ loading: false }"
-                                        @click="loading = true; $wire.loadDraft({{ $draft->id }}).finally(() => loading = false)"
+                                        @click="
+                                            loading = true;
+                                            $wire.loadDraft(draft.id)
+                                                .then(() => {
+                                                    draftsList = draftsList.filter(d => d.id !== draft.id);
+                                                    draftsCount = draftsList.length;
+                                                    $dispatch('close-modal', 'pos-drafts-list');
+                                                })
+                                                .finally(() => {
+                                                    loading = false;
+                                                });
+                                        "
                                         x-bind:disabled="loading"
                                         class="!px-5 !py-1.5 shadow-none border-none min-w-[110px] justify-center">
                                         <span x-show="!loading">Load Order</span>
@@ -2222,19 +2386,19 @@
                             </div>
                         </div>
                     </div>
-                @empty
-                    <div class="flex flex-col items-center justify-center py-16 text-center">
-                        <div class="w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center mb-4 text-gray-300">
-                            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>
-                        </div>
-                        <h3 class="text-[15px] font-bold text-gray-800">No drafts found</h3>
-                        <p class="text-[12px] text-gray-500 mt-1 max-w-[240px]">All saved drafts for this branch will appear here for quick recovery.</p>
+                </template>
+
+                <div x-show="draftsList.length === 0" class="flex flex-col items-center justify-center py-16 text-center">
+                    <div class="w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center mb-4 text-gray-300">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></svg>
                     </div>
-                @endforelse
+                    <h3 class="text-[15px] font-bold text-gray-800">No drafts found</h3>
+                    <p class="text-[12px] text-gray-500 mt-1 max-w-[240px]">All saved drafts for this branch will appear here for quick recovery.</p>
+                </div>
             </div>
 
-                        <div class="mt-8 pt-6 border-t border-gray-100">
-                                <x-secondary-button @click="$dispatch('close-modal', 'pos-drafts-list')" class="w-full justify-center py-3">
+            <div class="mt-8 pt-6 border-t border-gray-100">
+                <x-secondary-button @click="$dispatch('close-modal', 'pos-drafts-list')" class="w-full justify-center py-3">
                     Close Monitor
                 </x-secondary-button>
             </div>
@@ -2259,7 +2423,16 @@
             <div class="flex items-center justify-end gap-2 mt-6">
                 <x-secondary-button @click="pendingDeleteDraftId = null; $dispatch('close-modal', 'confirm-delete-draft')" class="h-10">Cancel</x-secondary-button>
                 <button type="button"
-                    @click="hiddenDraftIds.push(pendingDeleteDraftId); $wire.deleteDraft(pendingDeleteDraftId); $dispatch('close-modal', 'confirm-delete-draft'); pendingDeleteDraftId = null"
+                    @click="
+                        const idToDelete = pendingDeleteDraftId;
+                        pendingDeleteDraftId = null;
+                        $dispatch('close-modal', 'confirm-delete-draft');
+                        if (idToDelete) {
+                            draftsList = draftsList.filter(d => d.id !== idToDelete);
+                            draftsCount = draftsList.length;
+                            $wire.deleteDraft(idToDelete);
+                        }
+                    "
                     class="h-10 px-4 inline-flex items-center justify-center rounded-lg bg-red-600 hover:bg-red-700 text-white text-[13px] font-bold transition-colors">
                     Delete Draft
                 </button>
@@ -2270,50 +2443,59 @@
     {{-- ══════════════════════════════════════════════
          TEAR-OFF CONFIRMATION MODAL (multi-slip printing)
     ══════════════════════════════════════════════ --}}
-    <div x-data="{
-        show: false,
-        sectionType: '',
-        secondsLeft: 0,
-        countdownTimer: null,
-        get label() { return this.sectionType === 'barista' ? 'Barista Slip' : 'Kitchen Slip'; },
-        startCountdown(timeoutMs) {
-            this.secondsLeft = Math.ceil((timeoutMs || 15000) / 1000);
-            clearInterval(this.countdownTimer);
-            this.countdownTimer = setInterval(() => {
-                this.secondsLeft = Math.max(0, this.secondsLeft - 1);
-                if (this.secondsLeft <= 0) clearInterval(this.countdownTimer);
-            }, 1000);
-        }
-    }"
-    x-init="
-        window.addEventListener('thermal-print-waiting', (e) => {
-            sectionType = e.detail.sectionType;
-            startCountdown(e.detail.timeoutMs);
-            show = true;
-        });
-        window.addEventListener('thermal-print-resumed', () => {
-            show = false;
-            clearInterval(countdownTimer);
-        });
-    "
-    x-show="show" x-cloak
-    class="fixed inset-0 z-[9999] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
-        <div class="w-14 h-14 mx-auto rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-500 mb-4">
-            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+    <div wire:ignore
+        x-data="typeof thermalTearOffModal === 'function' ? thermalTearOffModal() : {
+            show: false,
+            sectionType: '',
+            secondsLeft: 0,
+            countdownTimer: null,
+            get label() { return this.sectionType === 'barista' ? 'Barista Slip' : 'Kitchen Slip'; },
+            startCountdown(timeoutMs) {
+                this.secondsLeft = Math.ceil((timeoutMs || 15000) / 1000);
+                if (this.countdownTimer) clearInterval(this.countdownTimer);
+                this.countdownTimer = setInterval(() => {
+                    this.secondsLeft = Math.max(0, this.secondsLeft - 1);
+                    if (this.secondsLeft <= 0 && this.countdownTimer) {
+                        clearInterval(this.countdownTimer);
+                        this.countdownTimer = null;
+                    }
+                }, 1000);
+            },
+            init() {
+                const onPrintWaiting = (e) => {
+                    this.sectionType = (e && e.detail && e.detail.sectionType) ? e.detail.sectionType : '';
+                    this.startCountdown(e && e.detail ? e.detail.timeoutMs : 15000);
+                    this.show = true;
+                };
+                const onPrintResumed = () => {
+                    this.show = false;
+                    if (this.countdownTimer) {
+                        clearInterval(this.countdownTimer);
+                        this.countdownTimer = null;
+                    }
+                };
+                window.addEventListener('thermal-print-waiting', onPrintWaiting);
+                window.addEventListener('thermal-print-resumed', onPrintResumed);
+            }
+        }"
+        x-show="show" x-cloak
+        class="fixed inset-0 z-[9999] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
+            <div class="w-14 h-14 mx-auto rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-500 mb-4">
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            </div>
+            <h3 class="text-[16px] font-black text-gray-900 mb-1" x-text="(typeof label !== 'undefined' ? label : (typeof sectionType !== 'undefined' && sectionType === 'barista' ? 'Barista Slip' : 'Kitchen Slip')) + ' Printed'"></h3>
+            <p class="text-[13px] text-gray-500 mb-4">Tear off the slip, then tap Continue to print the next one.</p>
+            <p class="text-[12px] font-bold text-amber-600 mb-6">
+                Auto-continuing in <span x-text="typeof secondsLeft !== 'undefined' ? secondsLeft : 0" class="font-mono"></span>s…
+            </p>
+            <button type="button"
+                @click="window.thermalBluetoothPrinter && window.thermalBluetoothPrinter.confirmContinue()"
+                class="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[14px] font-black transition-all active:scale-[0.98]">
+                Continue Printing
+            </button>
         </div>
-        <h3 class="text-[16px] font-black text-gray-900 mb-1" x-text="label + ' Printed'"></h3>
-        <p class="text-[13px] text-gray-500 mb-4">Tear off the slip, then tap Continue to print the next one.</p>
-        <p class="text-[12px] font-bold text-amber-600 mb-6">
-            Auto-continuing in <span x-text="secondsLeft" class="font-mono"></span>s…
-        </p>
-        <button type="button"
-            @click="window.thermalBluetoothPrinter.confirmContinue()"
-            class="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[14px] font-black transition-all active:scale-[0.98]">
-            Continue Printing
-        </button>
     </div>
-</div>
 </div>{{-- end modals container --}}
 
 </div>{{-- end outer container --}}

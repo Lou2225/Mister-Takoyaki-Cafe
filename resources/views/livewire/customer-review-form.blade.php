@@ -109,7 +109,7 @@
                         </div>
                         @if($order->table_number)
                             <div class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 rounded-xl border border-amber-100 text-amber-700">
-                                <span class="text-[11px] font-black uppercase tracking-wide">Table {{ $order->table_number }}</span>
+                                <span class="text-[11px] font-black uppercase tracking-wide">Claim No. {{ $order->table_number }}</span>
                             </div>
                         @endif
                     @endif

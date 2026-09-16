@@ -37,7 +37,7 @@ class MenuManagement extends Component
         foreach ($this->optionGroups as $group) {
             if (strtolower($group['name']) === strtolower($template->name)) {
                 $this->dispatch('close-modal', name: 'import-template-library');
-                $this->dispatch('notify', type: 'error', message: "The '{$template->name}' template is already added to this product.");
+                $this->dispatch('notify', type: 'warning', message: "The '{$template->name}' template is already added to this product.");
                 return;
             }
         }
@@ -145,7 +145,7 @@ public function getOwnerLabel(string $owner): string
             ->first();
 
         if (!$template) {
-            $this->dispatch('notify', type: 'error', message: "No Library template named '{$groupData['name']}' found to sync from.");
+            $this->dispatch('notify', type: 'warning', message: "No Library template named '{$groupData['name']}' found to sync from.");
             return;
         }
 
@@ -773,7 +773,7 @@ public function getOwnerLabel(string $owner): string
         // Duplicate check
         foreach ($this->optionGroups as $group) {
             if (strtolower($group['name']) === strtolower($this->newGroupName)) {
-                $this->dispatch('notify', type: 'error', message: "An option group named '{$this->newGroupName}' already exists.");
+                $this->dispatch('notify', type: 'warning', message: "An option group named '{$this->newGroupName}' already exists.");
                 return;
             }
         }
@@ -911,7 +911,7 @@ public function getOwnerLabel(string $owner): string
         ], ['newIngredientQty.min' => 'Quantity must be at least 0.01.']);
 
                 if ($this->ownerBelongsToNoRecipeGroup($this->newIngredientOwner)) {
-            $this->dispatch('notify', type: 'error', message: 'This option belongs to a "No Recipe Required" group and cannot have ingredients.');
+            $this->dispatch('notify', type: 'warning', message: 'This option belongs to a "No Recipe Required" group and cannot have ingredients.');
             return;
         }
 
@@ -922,7 +922,7 @@ public function getOwnerLabel(string $owner): string
 
         foreach ($this->recipeIngredients as $ri) {
             if ($ri['id'] == $this->newIngredientId && $ri['owner'] == $owner) {
-                $this->dispatch('notify', type: 'error', message: 'Ingredient already added for this option.');
+                $this->dispatch('notify', type: 'warning', message: 'Ingredient already added for this option.');
                 return;
             }
         }

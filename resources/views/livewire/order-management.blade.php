@@ -1253,7 +1253,8 @@ window.printOrderReceipt = async function(orderId) {
 {{-- ══════════════════════════════════════════════
      TEAR-OFF CONFIRMATION MODAL (multi-slip printing, with auto-resume countdown)
 ══════════════════════════════════════════════ --}}
-<div x-data="{
+<div wire:ignore
+    x-data="typeof thermalTearOffModal === 'function' ? thermalTearOffModal() : {
         show: false,
         sectionType: '',
         secondsLeft: 0,
@@ -1261,37 +1262,45 @@ window.printOrderReceipt = async function(orderId) {
         get label() { return this.sectionType === 'barista' ? 'Barista Slip' : 'Kitchen Slip'; },
         startCountdown(timeoutMs) {
             this.secondsLeft = Math.ceil((timeoutMs || 15000) / 1000);
-            clearInterval(this.countdownTimer);
+            if (this.countdownTimer) clearInterval(this.countdownTimer);
             this.countdownTimer = setInterval(() => {
                 this.secondsLeft = Math.max(0, this.secondsLeft - 1);
-                if (this.secondsLeft <= 0) clearInterval(this.countdownTimer);
+                if (this.secondsLeft <= 0 && this.countdownTimer) {
+                    clearInterval(this.countdownTimer);
+                    this.countdownTimer = null;
+                }
             }, 1000);
+        },
+        init() {
+            const onPrintWaiting = (e) => {
+                this.sectionType = (e && e.detail && e.detail.sectionType) ? e.detail.sectionType : '';
+                this.startCountdown(e && e.detail ? e.detail.timeoutMs : 15000);
+                this.show = true;
+            };
+            const onPrintResumed = () => {
+                this.show = false;
+                if (this.countdownTimer) {
+                    clearInterval(this.countdownTimer);
+                    this.countdownTimer = null;
+                }
+            };
+            window.addEventListener('thermal-print-waiting', onPrintWaiting);
+            window.addEventListener('thermal-print-resumed', onPrintResumed);
         }
     }"
-    x-init="
-        window.addEventListener('thermal-print-waiting', (e) => {
-            sectionType = e.detail.sectionType;
-            startCountdown(e.detail.timeoutMs);
-            show = true;
-        });
-        window.addEventListener('thermal-print-resumed', () => {
-            show = false;
-            clearInterval(countdownTimer);
-        });
-    "
     x-show="show" x-cloak
     class="fixed inset-0 z-[9999] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4">
     <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center">
         <div class="w-14 h-14 mx-auto rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-500 mb-4">
             <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
         </div>
-        <h3 class="text-[16px] font-black text-gray-900 mb-1" x-text="label + ' Printed'"></h3>
+        <h3 class="text-[16px] font-black text-gray-900 mb-1" x-text="(typeof label !== 'undefined' ? label : (typeof sectionType !== 'undefined' && sectionType === 'barista' ? 'Barista Slip' : 'Kitchen Slip')) + ' Printed'"></h3>
         <p class="text-[13px] text-gray-500 mb-4">Tear off the slip, then tap Continue to print the next one.</p>
         <p class="text-[12px] font-bold text-amber-600 mb-6">
-            Auto-continuing in <span x-text="secondsLeft" class="font-mono"></span>s…
+            Auto-continuing in <span x-text="typeof secondsLeft !== 'undefined' ? secondsLeft : 0" class="font-mono"></span>s…
         </p>
         <button type="button"
-            @click="window.thermalBluetoothPrinter.confirmContinue()"
+            @click="window.thermalBluetoothPrinter && window.thermalBluetoothPrinter.confirmContinue()"
             class="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[14px] font-black transition-all active:scale-[0.98]">
             Continue Printing
         </button>

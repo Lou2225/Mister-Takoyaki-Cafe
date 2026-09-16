@@ -131,7 +131,7 @@ class PosReceiptController extends Controller
                 'delivery_notes'   => $order->delivery_notes ?? '',
                 'notes'            => $order->notes ?? '',
                 'items'            => $order->items->map($normalizeItem)->values()->all(),
-                'subtotal'         => number_format((float) ($order->total_amount + $order->discount_amount), 2, '.', ''),
+                'subtotal'         => number_format((float) ($order->items->sum('subtotal') ?: max(0, $order->total_amount - (float) $order->service_charge - (float) $order->delivery_fee + (float) $order->discount_amount)), 2, '.', ''),
                 'total'            => number_format((float) $order->total_amount, 2, '.', ''),
             ],
             'settings' => [

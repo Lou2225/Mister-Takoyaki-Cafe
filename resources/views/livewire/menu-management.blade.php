@@ -1993,7 +1993,7 @@
                         if (!group) return;
                         const template = (this.templates || []).find(t => (t.name || '').toLowerCase() === (group.name || '').toLowerCase());
                         if (!template) {
-                            this.$dispatch('notify', { type: 'error', message: "No Library template named '" + group.name + "' found to sync from." });
+                            this.$dispatch('notify', { type: 'warning', message: "No Library template named '" + group.name + "' found to sync from." });
                             return;
                         }
 
@@ -2114,7 +2114,7 @@
                         const exists = this.optionGroups.some(g => (g.name || '').toLowerCase() === (template.name || '').toLowerCase());
                         if (exists) {
                             this.$dispatch('close-modal', 'import-template-library');
-                            this.$dispatch('notify', { type: 'error', message: "The '" + template.name + "' template is already added to this product." });
+                            this.$dispatch('notify', { type: 'warning', message: "The '" + template.name + "' template is already added to this product." });
                             return;
                         }
 

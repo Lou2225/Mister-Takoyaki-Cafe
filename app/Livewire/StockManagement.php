@@ -398,7 +398,7 @@ public $filterCategoryId = '';
     {
         if (auth()->user()->isStaff()) return;
         if (!auth()->user()->isSuperAdmin()) {
-            $this->dispatch('notify', type: 'error', message: 'Unauthorized action.');
+            $this->dispatch('notify', type: 'warning', message: 'Access Restricted: You do not have permission to create ingredients.');
             return;
         }
         $this->resetIngredientForm();
@@ -410,7 +410,7 @@ public $filterCategoryId = '';
     {
         if (auth()->user()->isStaff()) return;
         if (!auth()->user()->isSuperAdmin()) {
-            $this->dispatch('notify', type: 'error', message: 'Unauthorized action.');
+            $this->dispatch('notify', type: 'warning', message: 'Access Restricted: You do not have permission to edit ingredients.');
             return;
         }
         $ing = Ingredient::with('unitConversions')->findOrFail($id);
@@ -601,7 +601,7 @@ public $filterCategoryId = '';
     public function validateBeforeSaveIngredient()
     {
         if (!auth()->user()->isSuperAdmin()) {
-            $this->dispatch('notify', type: 'error', message: 'Unauthorized action.');
+            $this->dispatch('notify', type: 'warning', message: 'Access Restricted: You do not have permission to save ingredient changes.');
             return;
         }
 
@@ -736,7 +736,7 @@ public $filterCategoryId = '';
     {
         if (auth()->user()->isStaff()) abort(403);
         if (!auth()->user()->isSuperAdmin()) {
-            $this->dispatch('notify', type: 'error', message: 'Unauthorized action.');
+            $this->dispatch('notify', type: 'warning', message: 'Access Restricted: You do not have permission to add categories.');
             return;
         }
 
@@ -761,7 +761,7 @@ public $filterCategoryId = '';
     {
         if (auth()->user()->isStaff()) return;
         if (!auth()->user()->isSuperAdmin()) {
-            $this->dispatch('notify', type: 'error', message: 'Unauthorized action.');
+            $this->dispatch('notify', type: 'warning', message: 'Access Restricted: You do not have permission to delete ingredients.');
             return;
         }
 

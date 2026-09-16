@@ -91,7 +91,7 @@
                 @php
                     $typeLabels = [
                         ''        => 'All Types',
-                        'stock'   => 'Inventory Alerts',
+                        'stock'   => 'Inventory & Stock Requests',
                         'expiry'  => 'Expiry Warnings',
                         'order'   => 'New Orders',
                         'review'  => 'Customer Reviews',
@@ -133,7 +133,7 @@
                     <tr wire:click="trace({{ $n->id }})" class="cursor-pointer hover:bg-slate-50/50 transition-colors {{ !$n->is_read ? 'bg-indigo-50/30' : '' }}">
                         <td class="py-3 px-4 whitespace-nowrap">
                             <div class="w-9 h-10 rounded-xl flex items-center justify-center {{ $n->is_read ? 'bg-gray-100 text-gray-400' : 'bg-white shadow-sm ring-1 ring-indigo-500/20 text-indigo-500' }}">
-                                @if($n->type === 'stock')
+                                @if($n->type === 'stock' || $n->type === 'stock_order')
                                     <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                                 @elseif($n->type === 'expiry')
                                     <svg class="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>

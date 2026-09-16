@@ -1,4 +1,23 @@
-<div>
+<div
+    x-data="{
+        tooltip: { show: false, text: '', top: 0, left: 0 },
+        showTip(el, text) {
+            if (sidebarOpen || isMobile) return;
+            const rect = el.getBoundingClientRect();
+            this.tooltip = {
+                show: true,
+                text: text,
+                top: Math.round(rect.top + (rect.height / 2)),
+                left: Math.round(rect.right + 10)
+            };
+        },
+        hideTip() {
+            this.tooltip.show = false;
+        }
+    }"
+    @scroll.window="hideTip()"
+    class="h-full flex-shrink-0"
+>
 <aside
     id="main-sidebar"
     x-ref="sidebar"
@@ -17,10 +36,12 @@
     @endphp
 
     <div
-        class="h-[65px] min-h-[65px] flex items-center border-b border-gray-200 transition-all duration-300 relative"
+        class="h-[65px] min-h-[65px] flex items-center border-b border-gray-200 transition-all duration-300 relative cursor-pointer"
         :class="sidebarOpen ? 'px-5' : 'px-0 justify-center'"
         x-data="{ logoUrl: @js($initialLogoUrl), bName: @js($initialBusinessName) }"
         @businessconfigupdated.window="logoUrl = $event.detail.logo_url; bName = $event.detail.business_name"
+        @mouseenter="showTip($el, bName || 'Mister Takoyaki')"
+        @mouseleave="hideTip()"
     >
         <div class="flex items-center gap-3.5 whitespace-nowrap">
             <template x-if="logoUrl">
@@ -54,6 +75,7 @@
 
     {{-- ── Navigation ── --}}
     <nav @click="if(isMobile && $event.target.closest('a')) sidebarOpen = false"
+        @scroll.passive="hideTip()"
         x-data="{
             hideOps: @js($this->effectiveHideOperationalModules),
             isSubBranch: @js($this->isSubBranch),
@@ -91,8 +113,11 @@
                 </h3>
 
                 <a href="{{ route('dashboard') }}" wire:navigate
+                    @mouseenter="showTip($el, 'Dashboard')"
+                    @mouseleave="hideTip()"
                     class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
-                        {{ request()->routeIs('dashboard') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
+                        {{ request()->routeIs('dashboard') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}"
+                    :class="sidebarOpen ? '' : 'justify-center'">
                     <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                             d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
@@ -103,8 +128,11 @@
 
                 <div x-show="!hideOps" x-transition.opacity x-cloak>
                     <a href="{{ route('pos.index') }}" wire:navigate
+                        @mouseenter="showTip($el, 'POS Terminal')"
+                        @mouseleave="hideTip()"
                         class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
-                            {{ request()->routeIs('pos.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
+                            {{ request()->routeIs('pos.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}"
+                        :class="sidebarOpen ? '' : 'justify-center'">
                         <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                 d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -114,8 +142,11 @@
                     </a>
 
                     <a href="{{ route('orders.index') }}" wire:navigate
+                        @mouseenter="showTip($el, 'Order Management')"
+                        @mouseleave="hideTip()"
                         class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
-                            {{ request()->routeIs('orders.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
+                            {{ request()->routeIs('orders.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}"
+                        :class="sidebarOpen ? '' : 'justify-center'">
                         <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                 d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
@@ -125,8 +156,11 @@
                     </a>
 
                     <a href="{{ route('kds.index') }}" wire:navigate
+                        @mouseenter="showTip($el, 'Kitchen Display')"
+                        @mouseleave="hideTip()"
                         class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
-                            {{ request()->routeIs('kds.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
+                            {{ request()->routeIs('kds.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}"
+                        :class="sidebarOpen ? '' : 'justify-center'">
                         <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                 d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -146,8 +180,11 @@
 
                 @if($user->role_id <= 2)
                     <a href="{{ route('menu.index') }}" wire:navigate
+                        @mouseenter="showTip($el, 'Menu Management')"
+                        @mouseleave="hideTip()"
                         class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
-                            {{ request()->routeIs('menu.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
+                            {{ request()->routeIs('menu.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}"
+                        :class="sidebarOpen ? '' : 'justify-center'">
                         <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h7" />
                         </svg>
@@ -157,8 +194,11 @@
 
                     @if($user->isSuperAdmin())
                         <a href="{{ route('categories.index') }}" wire:navigate
+                            @mouseenter="showTip($el, 'Categories Catalog')"
+                            @mouseleave="hideTip()"
                             class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
-                                {{ request()->routeIs('categories.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
+                                {{ request()->routeIs('categories.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}"
+                            :class="sidebarOpen ? '' : 'justify-center'">
                             <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                     d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
@@ -168,8 +208,11 @@
                         </a>
 
                         <a href="{{ route('library.index') }}" wire:navigate
+                            @mouseenter="showTip($el, 'Options Library')"
+                            @mouseleave="hideTip()"
                             class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
-                                {{ request()->routeIs('library.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
+                                {{ request()->routeIs('library.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}"
+                            :class="sidebarOpen ? '' : 'justify-center'">
                             <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                     d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18 18.247 18.477 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -192,9 +235,13 @@
                     @if($user->role_id <= 2)
                         {{-- Staff Manager+: full expandable section --}}
                         <div x-data="{ stockOpen: {{ $stockActive ? 'true' : 'false' }} }">
-                            <button type="button" @click="stockOpen = !stockOpen"
+                            <button type="button"
+                                @click="if(!sidebarOpen) { sidebarOpen = true; stockOpen = true; } else { stockOpen = !stockOpen; }"
+                                @mouseenter="showTip($el, 'Inventory Management')"
+                                @mouseleave="hideTip()"
                                 class="w-full flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
-                                    {{ $stockActive ? 'bg-[#F3F4F6] text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' }}">
+                                    {{ $stockActive ? 'bg-[#F3F4F6] text-gray-900' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900' }}"
+                                :class="sidebarOpen ? '' : 'justify-center'">
                                 <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                         d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -262,8 +309,11 @@
                     @else
                         {{-- Staff (role 3): plain link, no submenu --}}
                         <a href="{{ route('stock.index') }}" wire:navigate
+                            @mouseenter="showTip($el, 'Stock & Ingredients')"
+                            @mouseleave="hideTip()"
                             class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
-                                {{ $isStockPage ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
+                                {{ $isStockPage ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}"
+                            :class="sidebarOpen ? '' : 'justify-center'">
                             <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                     d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -283,8 +333,11 @@
                     Administration
                 </h3>
                     <a href="{{ route('branches.index') }}" wire:navigate
+                        @mouseenter="showTip($el, 'Branch Locations')"
+                        @mouseleave="hideTip()"
                         class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
-                            {{ request()->routeIs('branches.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
+                            {{ request()->routeIs('branches.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}"
+                        :class="sidebarOpen ? '' : 'justify-center'">
                         <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                 d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -294,21 +347,27 @@
                     </a>
 
                     <a href="{{ route('users.index') }}" wire:navigate
+                        @mouseenter="showTip($el, '{{ $user?->isSuperAdmin() ? 'User Management' : 'Staff Management' }}')"
+                        @mouseleave="hideTip()"
                         class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
-                            {{ request()->routeIs('users.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
+                            {{ request()->routeIs('users.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}"
+                        :class="sidebarOpen ? '' : 'justify-center'">
                         <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                 d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                         </svg>
                         <span class="transition-opacity duration-300 whitespace-nowrap"
                             :class="sidebarOpen ? 'opacity-100' : 'opacity-0 hidden'">
-                            {{ $user->isSuperAdmin() ? 'User Management' : 'Staff Management' }}
+                            {{ $user?->isSuperAdmin() ? 'User Management' : 'Staff Management' }}
                         </span>
                     </a>
 
                     <a href="{{ route('customers.index') }}" wire:navigate
+                        @mouseenter="showTip($el, 'Customer Feedbacks')"
+                        @mouseleave="hideTip()"
                         class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
-                            {{ request()->routeIs('customers.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
+                            {{ request()->routeIs('customers.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}"
+                        :class="sidebarOpen ? '' : 'justify-center'">
                         <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                 d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.54 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.784.57-1.838-.196-1.539-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
@@ -328,8 +387,11 @@
                     </h3>
 
                     <a href="{{ route('reports.index') }}" wire:navigate
+                        @mouseenter="showTip($el, 'Business Reports')"
+                        @mouseleave="hideTip()"
                         class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
-                            {{ request()->routeIs('reports.*') || request()->routeIs('intelligence.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
+                            {{ request()->routeIs('reports.*') || request()->routeIs('intelligence.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}"
+                        :class="sidebarOpen ? '' : 'justify-center'">
                         <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                 d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2-2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -339,8 +401,11 @@
                     </a>
 
                     <a href="{{ route('settings.index') }}" wire:navigate
+                        @mouseenter="showTip($el, 'System Administration')"
+                        @mouseleave="hideTip()"
                         class="flex items-center gap-3 px-3 py-1.5 mt-0.5 rounded-lg transition-colors
-                            {{ request()->routeIs('settings.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}">
+                            {{ request()->routeIs('settings.*') ? 'bg-[#F3F4F6] text-gray-900' : 'hover:bg-gray-50 hover:text-gray-900' }}"
+                        :class="sidebarOpen ? '' : 'justify-center'">
                         <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                                 d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -369,7 +434,10 @@
                 </p>
 
                 <a href="{{ route('profile.edit') }}" wire:navigate
-                    class="flex items-center gap-3 px-3 py-1.5 mt-6 rounded-lg transition-colors hover:bg-gray-50 hover:text-gray-900">
+                    @mouseenter="showTip($el, 'Account Settings')"
+                    @mouseleave="hideTip()"
+                    class="flex items-center gap-3 px-3 py-1.5 mt-6 rounded-lg transition-colors hover:bg-gray-50 hover:text-gray-900"
+                    :class="sidebarOpen ? '' : 'justify-center'">
                     <svg class="w-[18px] h-[18px] shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                             d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -382,4 +450,25 @@
         @endif
     </nav>
 </aside>
+
+{{-- Floating Tooltip when Sidebar is Collapsed --}}
+<div
+    x-show="!sidebarOpen && !isMobile && tooltip.show"
+    x-transition:enter="transition ease-out duration-150 transform"
+    x-transition:enter-start="opacity-0 translate-x-1"
+    x-transition:enter-end="opacity-100 translate-x-0"
+    x-transition:leave="transition ease-in duration-100 transform"
+    x-transition:leave-start="opacity-100 translate-x-0"
+    x-transition:leave-end="opacity-0 translate-x-1"
+    :style="`top: ${tooltip.top}px; left: ${tooltip.left}px;`"
+    class="fixed -translate-y-1/2 z-[99999] pointer-events-none select-none"
+    x-cloak
+>
+    <div class="relative flex items-center px-3 py-1.5 bg-gray-900 text-white text-[12px] font-medium rounded-lg border border-gray-700 shadow-2xl whitespace-nowrap leading-tight"
+        style="box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);">
+        <!-- Arrow pointer on the left -->
+        <div style="position: absolute; left: -4px; top: 50%; transform: translateY(-50%) rotate(45deg); width: 8px; height: 8px; background-color: #111827; border-left: 1px solid #374151; border-bottom: 1px solid #374151;" class="pointer-events-none"></div>
+        <span class="relative z-10 font-semibold text-white tracking-wide" x-text="tooltip.text"></span>
+    </div>
+</div>
 </div>

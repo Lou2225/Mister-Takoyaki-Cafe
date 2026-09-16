@@ -322,7 +322,7 @@ class ThermalPrinterService
         $content .= "Type: " . strtoupper($order->order_type) . "\n";
 
         if ($order->table_number) {
-            $content .= "Table: " . $order->table_number . "\n";
+            $content .= "Claim No: " . $order->table_number . "\n";
         }
 
         $content .= "\n" . str_repeat("-", $w) . "\n";

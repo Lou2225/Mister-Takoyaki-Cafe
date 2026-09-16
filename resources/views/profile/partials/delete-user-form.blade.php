@@ -19,6 +19,9 @@
             @csrf
             @method('delete')
 
+            {{-- Hidden username field for accessibility & password managers --}}
+            <input type="text" name="username" value="{{ auth()->user()?->email }}" autocomplete="username" class="hidden" style="display:none;" aria-hidden="true" tabindex="-1" readonly>
+
             <h2 class="text-lg font-medium text-gray-900">
                 {{ __('Are you sure you want to delete your account?') }}
             </h2>

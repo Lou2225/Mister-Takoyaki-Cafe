@@ -16,6 +16,7 @@ use App\Models\Notification;
 use App\Models\User;
 use App\Helpers\StockHelper;
 use App\Services\BranchContext;
+use App\Services\NotificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\StockOrderMail;
@@ -428,6 +429,13 @@ foreach ($sourceBatches as $sourceBatch) {
             ]);
 
         }
+        NotificationService::sendToBranch(
+            $order->requesting_branch_id,
+            'stock_order',
+            $title,
+            $message,
+            route('stock.orders', ['so_search' => $order->reference_no])
+        );
     }
 
     private function logMovement($branchId, $ingId, $type, $qty, $fromBranch, $ref, $remarks): void

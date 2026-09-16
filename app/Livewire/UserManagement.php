@@ -351,7 +351,7 @@ public function updatedLastName() {
             && ($order->user_id === $this->editUserId || $order->rider_id === $this->editUserId);
 
         if (!$belongsToLoadedProfile) {
-            $this->dispatch('notify', type: 'error', message: 'Unauthorized to view this order.');
+            $this->dispatch('notify', type: 'warning', message: 'Unauthorized to view this order.');
             return;
         }
 
@@ -605,7 +605,7 @@ public function updatedLastName() {
 
         if (auth()->user()->isAdmin()) {
             if ($user->role_id !== 3 || $user->branch_id !== auth()->user()->branch_id) {
-                $this->dispatch('notify', type: 'error', message: 'Unauthorized to modify this account.');
+                $this->dispatch('notify', type: 'warning', message: 'Unauthorized to modify this account.');
                 $this->dispatch('close-modal', name: 'confirm-save-user');
                 return;
             }
@@ -763,7 +763,7 @@ public function updatedLastName() {
         $user = User::findOrFail($userId);
 
         if (auth()->user()->isAdmin() && ($user->role_id !== 3 || $user->branch_id !== auth()->user()->branch_id)) {
-            $this->dispatch('notify', type: 'error', message: 'Unauthorized to change this account\'s status.');
+            $this->dispatch('notify', type: 'warning', message: 'Unauthorized to change this account\'s status.');
             return;
         }
 
@@ -786,7 +786,7 @@ public function updatedLastName() {
         // ID, letting an Admin permanently delete a Super Admin or another
         // branch's staff account.
         if (auth()->user()->isAdmin() && ($user->role_id !== 3 || $user->branch_id !== auth()->user()->branch_id)) {
-            $this->dispatch('notify', type: 'error', message: 'Unauthorized to delete this account.');
+            $this->dispatch('notify', type: 'warning', message: 'Unauthorized to delete this account.');
             return;
         }
 
@@ -813,7 +813,7 @@ public function updatedLastName() {
     {
         $user = User::find($id);
         if ($user && auth()->user()->isAdmin() && ($user->role_id !== 3 || $user->branch_id !== auth()->user()->branch_id)) {
-            $this->dispatch('notify', type: 'error', message: 'Unauthorized.');
+            $this->dispatch('notify', type: 'warning', message: 'Unauthorized: You do not have permission to delete this account.');
             return;
         }
 

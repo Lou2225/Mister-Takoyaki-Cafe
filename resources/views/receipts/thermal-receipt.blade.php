@@ -661,7 +661,7 @@
                         </div>
                         @if($order->table_number)
                             <div class="order-badge-container">
-                                <span class="order-badge">TABLE #{{ $order->table_number }}</span>
+                                <span class="order-badge">CLAIM #{{ $order->table_number }}</span>
                             </div>
                         @endif
                         @if($order->customer_phone)
@@ -743,7 +743,7 @@
                         </div>
                         @if($order->table_number)
                             <div class="order-badge-container">
-                                <span class="order-badge">TABLE #{{ $order->table_number }}</span>
+                                <span class="order-badge">CLAIM #{{ $order->table_number }}</span>
                             </div>
                         @endif
                         @if($order->customer_phone)
@@ -843,13 +843,13 @@
                             <div class="receipt-meta-row">
                                 <span>Customer: <strong>{{ $order->customer_name }}</strong></span>
                                 @if($order->table_number)
-                                    <span>Table: <strong>{{ $order->table_number }}</strong></span>
+                                    <span>Claim No: <strong>{{ $order->table_number }}</strong></span>
                                 @endif
                             </div>
                         @endif
                         @if($order->table_number && !$order->customer_name)
                             <div class="receipt-meta-row">
-                                <span>Table: <strong>{{ $order->table_number }}</strong></span>
+                                <span>Claim No: <strong>{{ $order->table_number }}</strong></span>
                             </div>
                         @endif
                         @if($order->customer_phone)

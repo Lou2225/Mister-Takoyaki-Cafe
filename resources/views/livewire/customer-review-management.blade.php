@@ -150,7 +150,7 @@
                                     <span>#{{ $review->order->reference_no }}</span>
                                 </div>
                                 @if($review->order->table_number)
-                                    <span class="text-[10px] font-bold text-slate-400 block mt-0.5">Tbl {{ $review->order->table_number }}</span>
+                                    <span class="text-[10px] font-bold text-slate-400 block mt-0.5">Claim #{{ $review->order->table_number }}</span>
                                 @endif
                             @else
                                 <span class="text-[11px] font-medium text-slate-400 italic">Direct QR</span>
@@ -274,7 +274,7 @@
                                     </span>
                                     @if($viewingReview->order->table_number)
                                         <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-100">
-                                            Table {{ $viewingReview->order->table_number }}
+                                            Claim No. {{ $viewingReview->order->table_number }}
                                         </span>
                                     @endif
                                 @else

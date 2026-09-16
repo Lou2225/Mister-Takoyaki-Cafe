@@ -55,10 +55,6 @@ class PosTerminal extends Component
     public array $paymentMethods = [];
 
     // ─── UI State ──────────────────────────────────────────────────────────
-    public ?string $editCartItemId = null;
-    public ?int $editCartItemProductId = null;
-    public $editCartItemQty = 1;
-    public string $editCartItemNotes = '';
     public array $branches = [];
     public string $gcashAccountName = '';
     public string $gcashAccountNumber = '';
@@ -68,23 +64,24 @@ class PosTerminal extends Component
 
     // ─── Options Modal ─────────────────────────────────────
     public bool $gcashVerified = false;
-    public array $gcashTransactionDetails = [];
     // PayMongo GCash payment state
     public ?string $gcashPaymentUrl = null;
     public ?string $gcashPaymentIntentId = null;
     public bool $gcashPolling = false;
     public bool $isManualGcash = false; // To distinguish verification types
+    public array $gcashTransactionDetails = [];
 
-public function updatedPaymentMethod(): void
-{
-    if ($this->gcashVerified && $this->paymentMethod !== 'GCash') {
-        $this->paymentMethod = 'GCash';
-        $this->dispatch('notify', type: 'warning', message: 'Verified GCash payment is locked to GCash.');
-        return;
+    #[Renderless]
+    public function updatedPaymentMethod(): void
+    {
+        if ($this->gcashVerified && $this->paymentMethod !== 'GCash') {
+            $this->paymentMethod = 'GCash';
+            $this->dispatch('notify', type: 'warning', message: 'Verified GCash payment is locked to GCash.');
+            return;
+        }
+
+        $this->resetGCashState();
     }
-
-    $this->resetGCashState();
-}
 
 /**
  * The Amount Tendered input can be cleared to an empty string by the
@@ -98,13 +95,23 @@ public function updatingAmountTendered($value)
     $this->amountTendered = is_numeric($value) ? (float) $value : 0;
 }
 
-public function updatedAmountTendered(): void
-{
-    $this->resetErrorBag('amountTendered');
-}
+    #[Renderless]
+    public function updatedAmountTendered(): void
+    {
+        $this->resetErrorBag('amountTendered');
+    }
+
+    #[Renderless]
+    public function updatedOrderType(): void
+    {
+    }
 
 protected $listeners = [
     'posSettingsUpdated' => 'handlePosSettingsUpdated',
+];
+
+protected $validationAttributes = [
+    'tableNumber' => 'claim number',
 ];
 
 /**
@@ -196,14 +203,18 @@ public function resetGCashState(): void
  * actually needed to open in the first place.
  */
 #[Renderless]
-public function openPaymentModal(): void
+public function openPaymentModal(?array $cartData = null): void
 {
     $this->resetErrorBag('gcashCancel');
     $this->resetErrorBag('amountTendered');
 
+    if ($cartData !== null) {
+        $this->cart = $cartData;
+    }
+
     if (empty($this->cart)) {
         $this->dispatch('close-modal', 'pos-payment');
-        $this->dispatch('notify', type: 'error', message: 'Cart is empty.');
+        $this->dispatch('notify', type: 'warning', message: 'Cart is empty.');
         return;
     }
 
@@ -213,16 +224,20 @@ public function openPaymentModal(): void
     if (!$stockValidation['available']) {
         $this->dispatch('close-modal', 'pos-payment');
         $this->dispatch('notify',
-            type: 'error',
+            type: 'warning',
             message: 'Insufficient stock: ' . $stockValidation['message']
         );
         return;
     }
 
+    if (empty($this->referenceNo)) {
+        $this->referenceNo = $this->generateReferenceNo();
+    }
+
     $this->amountTendered = $this->total;
+    $this->dispatch('reference-ready', referenceNo: $this->referenceNo);
 }
 
-// ─── Mount ─────────────────────────────────────────────────────────────
 // ─── Mount ─────────────────────────────────────────────────────────────
     public function mount(): void
     {
@@ -272,21 +287,21 @@ public function openPaymentModal(): void
         }
     }
 
-    public function updatedEditCartItemNotes()
+    #[Renderless]
+    public function updatedTableNumber(): void
     {
-        $this->validateFieldLive('editCartItemNotes', ['nullable', 'string', 'max:255', 'regex:' . ValidationHelper::REGEX_NAME_BASIC], ValidationHelper::commonMessages());
+        $this->validateOnly('tableNumber', [
+            'tableNumber' => ['nullable', 'string', 'max:2', 'regex:/^[0-9]*$/']
+        ], ValidationHelper::commonMessages(), [
+            'tableNumber' => 'claim number',
+        ]);
     }
 
-
-    public function updatedTableNumber()
-    {
-        $this->validateFieldLive('tableNumber', ['nullable', 'string', 'max:2', 'regex:/^[0-9]*$/'], ValidationHelper::commonMessages());
-    }
-
+    #[Renderless]
     public function toggleEditMode(): void
     {
         if (!$this->canEditLayout()) {
-            $this->dispatch('notify', type: 'error', message: 'Unauthorized to edit layout.');
+            $this->dispatch('notify', type: 'warning', message: 'Access Restricted: You do not have permission to edit the layout.');
             return;
         }
         $this->isEditMode = !$this->isEditMode;
@@ -301,6 +316,7 @@ public function openPaymentModal(): void
         return $roleId === 1 || $roleId === 2;
     }
 
+    #[Renderless]
     public function saveLayout(?array $orderedProductIds = null, ?array $orderedCategoryIds = null): void
     {
         if (!$this->canEditLayout()) return;
@@ -358,6 +374,7 @@ public function openPaymentModal(): void
     {
         $this->productsCache = null;
         $this->categoriesCache = null;
+        $this->dispatch('products-refreshed');
     }
     
     // ─── Computed: Products ────────────────────────────────────────────────
@@ -458,13 +475,33 @@ public function openPaymentModal(): void
         return $this->productsCache = $products;
     }
 
-    public function getDraftsProperty()
+    #[Computed]
+    public function drafts()
     {
         return Order::where('status', Order::STATUS_DRAFTED)
             ->where('branch_id', $this->branchId)
-            ->with(['items'])
+            ->with(['items.product', 'items.options.option', 'items.modifiers.modifier'])
             ->latest()
             ->get();
+    }
+
+    public function getDraftsProperty()
+    {
+        return $this->drafts();
+    }
+
+    #[Computed]
+    public function draftsData(): array
+    {
+        return $this->drafts->map(fn($d) => [
+            'id' => $d->id,
+            'reference_no' => $d->reference_no,
+            'table_number' => $d->table_number ?? '',
+            'notes' => $d->notes ?: ($d->table_number ? "Claim No: {$d->table_number}" : 'No Claim No'),
+            'items_count' => $d->items->count(),
+            'created_at_human' => $d->created_at->diffForHumans(),
+            'total_amount' => (float)$d->total_amount,
+        ])->values()->all();
     }
 
     // ─── Computed: Categories ──────────────────────────────────────────────
@@ -606,88 +643,60 @@ public function change(): float
 
     // ─── Cart Actions ──────────────────────────────────────────────────────
 
-#[Renderless]
-public function openEditItem(string $key, array $item): void
-{
-    $this->editCartItemId = $key;
-    $this->editCartItemProductId = (int) ($item['id'] ?? 0);
-    $this->editCartItemQty = $item['qty'] ?? 1;
-    $this->editCartItemNotes = $item['instructions'] ?? '';
-}
-
-       #[Renderless]
-    public function saveEditItem(bool $applyRegularDiscount = false, bool $applySeniorDiscount = false): void
-    {
-        $key = $this->editCartItemId;
-        if (!$key || !$this->editCartItemProductId) return;
-
-        // Guard against exceeding available stock without showing a duplicate toast
-        $product = Product::find($this->editCartItemProductId);
-        if ($product && $this->branchId) {
-            $maxQty = $product->getMaxAvailableQuantity((int)$this->branchId);
-            if ($this->editCartItemQty > $maxQty) {
-                $this->editCartItemQty = max(1, $maxQty);
-            }
-        }
-
-        $shouldRemove = $this->editCartItemQty <= 0;
-
-        // Only the fields that changed in this modal are sent back — never
-        // the whole cart. The client merges these into its existing item
-        // (preserving name/price/image/options/modifiers) and leaves every
-        // other item in the cart untouched.
-        $this->dispatch('cart-item-updated',
-            key: $key,
-            remove: $shouldRemove,
-            item: $shouldRemove ? null : [
-                'qty' => $this->editCartItemQty,
-                'instructions' => $this->editCartItemNotes,
-                'apply_regular_discount' => $applyRegularDiscount,
-                'apply_senior_discount' => $applySeniorDiscount,
-            ]
-        );
-
-        $this->closeEditItemModal();
-    }
-
-    public function closeEditItemModal(): void
-    {
-        $this->editCartItemId = null;
-        $this->editCartItemProductId = null;
-        $this->editCartItemQty = 1;
-        $this->editCartItemNotes = '';
-        $this->dispatch('close-modal', name: 'edit-cart-item');
-    }
-
     /**
      * @param bool $force Bypasses the verified-payment guard. Used internally
      *                     after an order has actually been placed/drafted,
      *                     where the cart legitimately needs to be emptied.
      */
     #[Renderless]
-    public function clearCart(bool $force = false): void
+    public function clearCart(bool $force = false, bool $notifyClient = true): void
     {
         if (!$force && $this->paymentMethod === 'GCash' && $this->gcashVerified) {
-            $this->dispatch('notify', type: 'error', message: 'This order has a verified GCash payment and cannot be cleared. Place the order, then void it in Order Management if you need to cancel it.');
+            $this->dispatch('notify', type: 'warning', message: 'This order has a verified GCash payment and cannot be cleared. Place the order, then void it in Order Management if you need to cancel it.');
             return;
         }
 
         $this->cart = [];
-        $this->referenceNo = '';
+        $this->tableNumber = '';
+        $this->amountTendered = 0;
+        $this->paymentReference = '';
+        $this->referenceNo = $this->generateReferenceNo();
+        $this->resetErrorBag();
         $this->resetGCashState();
-        $this->dispatch('cart-reset');
+        if ($notifyClient) {
+            $this->dispatch('cart-reset', referenceNo: $this->referenceNo);
+        } else {
+            $this->dispatch('reference-ready', referenceNo: $this->referenceNo);
+        }
     }
 
     // ─── Draft Order Management ────────────────────────────────────────────
-    public function saveDraft(): void
+    #[Renderless]
+    public function saveDraft(?array $cartData = null, ?string $tableNumber = null, ?string $orderType = null, ?string $paymentMethod = null): void
     {
+        if ($cartData !== null) {
+            $this->cart = $cartData;
+        }
+
+        if ($tableNumber !== null) {
+            $this->tableNumber = trim($tableNumber);
+        }
+
+        if ($orderType !== null && in_array($orderType, $this->orderTypes)) {
+            $this->orderType = $orderType;
+        }
+
+        if ($paymentMethod !== null && in_array($paymentMethod, $this->paymentMethods)) {
+            $this->paymentMethod = $paymentMethod;
+        }
+
         if (empty($this->cart)) {
             $this->dispatch('notify', type: 'warning', message: 'Cart is empty. Nothing to save.');
             return;
         }
 
         if (!$this->branchId) {
-            $this->dispatch('notify', type: 'error', message: 'No branch assigned.');
+            $this->dispatch('notify', type: 'warning', message: 'No operating branch assigned.');
             return;
         }
 
@@ -696,7 +705,7 @@ public function openEditItem(string $key, array $item): void
         }
 
         try {
-            DB::transaction(function() {
+            $draftOrder = DB::transaction(function() {
                 $this->cart = $this->buildVerifiedCart();
 
                 // Create a Draft Order
@@ -712,7 +721,7 @@ public function openEditItem(string $key, array $item): void
                     'order_type'      => $this->orderType,
                     'table_number'    => $this->tableNumber,
                     'status'          => Order::STATUS_DRAFTED,
-                    'notes'           => $this->tableNumber ? "Table: {$this->tableNumber}" : null,
+                    'notes'           => $this->tableNumber ? "Claim No: {$this->tableNumber}" : null,
                 ]);
 
                 // Create Order Items (without stock deduction)
@@ -753,12 +762,34 @@ public function openEditItem(string $key, array $item): void
                     }
                 }
 
-                $this->clearCart(force: true);
-                $this->dispatch('notify', 
-                    type: 'success',
-                    message: "Draft order #{$draftOrder->reference_no} saved successfully!"
-                );
+                return $draftOrder;
             });
+
+            $this->clearCart(force: true, notifyClient: false);
+            unset($this->drafts);
+            $draftsCount = $this->drafts->count();
+
+            $draftPayload = [
+                'id' => $draftOrder->id,
+                'reference_no' => $draftOrder->reference_no,
+                'table_number' => $draftOrder->table_number ?? '',
+                'notes' => $draftOrder->notes ?: ($draftOrder->table_number ? "Claim No: {$draftOrder->table_number}" : 'No Claim No'),
+                'items_count' => $draftOrder->items()->count(),
+                'created_at_human' => 'just now',
+                'total_amount' => (float)$draftOrder->total_amount,
+            ];
+
+            $this->dispatch('draft-saved', 
+                count: $draftsCount, 
+                draftId: $draftOrder->id,
+                referenceNo: $this->referenceNo,
+                savedDraftReferenceNo: $draftOrder->reference_no,
+                draft: $draftPayload
+            );
+            $this->dispatch('notify', 
+                type: 'success',
+                message: "Draft order #{$draftOrder->reference_no} saved successfully!"
+            );
         } catch (\Exception $e) {
             $this->dispatch('notify', 
                 type: 'error',
@@ -767,94 +798,96 @@ public function openEditItem(string $key, array $item): void
         }
     }
 
+    #[Renderless]
     public function loadDraft(int $draftOrderId): void
     {
         try {
-            $draft = Order::with(['items.product', 'items.options.option', 'items.modifiers.modifier'])
-                ->where('id', $draftOrderId)
-                ->where('status', Order::STATUS_DRAFTED)
-                ->firstOrFail();
+            $draft = DB::transaction(function() use ($draftOrderId) {
+                $draft = Order::with(['items.product', 'items.options.option', 'items.modifiers.modifier'])
+                    ->where('id', $draftOrderId)
+                    ->where('status', Order::STATUS_DRAFTED)
+                    ->firstOrFail();
 
-            // Check authorization
-            if (!auth()->user()->can('manageDraft', $draft)) {
-                $this->dispatch('notify', 
-                    type: 'error',
-                    message: 'Unauthorized to load this draft.'
-                );
-                return;
-            }
-
-            // Load draft data into POS
-            // Note: branchId is intentionally NOT overwritten here — drafts are
-            // already scoped to the cashier's current branch in getDraftsProperty(),
-            // and reassigning it forces an oversized re-render mid-modal.
-            $this->orderType = $draft->order_type;
-            $this->tableNumber = $draft->table_number;
-            $this->paymentMethod = $draft->payment_method;
-            $this->referenceNo = $draft->reference_no;
-
-            // Populate cart from order items
-            $this->cart = [];
-            foreach ($draft->items as $item) {
-                $product = $item->product;
-                if (!$product) {
-                    throw new \RuntimeException("Draft item {$item->id} references a missing product.");
+                // Check authorization
+                if (!auth()->user()->can('manageDraft', $draft)) {
+                    throw new \RuntimeException('Access Restricted: Unauthorized to load this draft.');
                 }
-                
-                $optionIds = $item->options->pluck('product_option_id')->sort()->toArray();
-                $modifierIds = $item->modifiers->pluck('modifier_id')->sort()->toArray();
-                // Create a unique key for the cart (consistent with confirmAdd).
-                // Prefixed with a letter so this key is never treated as a
-                // numeric array index by the client-side JS cart object.
 
-                $optKey = !empty($optionIds) ? '-' . implode(',', $optionIds) : '';
+                // Load draft data into POS
+                $this->orderType = $draft->order_type ?: ($this->orderTypes[0] ?? 'Dine-in');
+                $this->tableNumber = $draft->table_number ?? '';
+                $this->paymentMethod = $draft->payment_method ?: ($this->paymentMethods[0] ?? 'Cash');
+                $this->referenceNo = $draft->reference_no;
 
-                $modKey = !empty($modifierIds) ? '-' . implode(',', $modifierIds) : '';
+                // Populate cart from order items
+                $this->cart = [];
+                foreach ($draft->items as $item) {
+                    $product = $item->product;
+                    if (!$product) {
+                        throw new \RuntimeException("Draft item {$item->id} references a missing product.");
+                    }
+                    
+                    $optionIds = $item->options->pluck('product_option_id')->map(fn($id) => (int)$id)->sort()->values()->toArray();
+                    $modifierIds = $item->modifiers->pluck('modifier_id')->map(fn($id) => (int)$id)->sort()->values()->toArray();
 
-                $key = 'p' . $product->id . $optKey . $modKey;
+                    $optKey = !empty($optionIds) ? '-' . implode(',', $optionIds) : '';
+                    $modKey = !empty($modifierIds) ? '-' . implode(',', $modifierIds) : '';
+                    $key = 'p' . $product->id . $optKey . $modKey;
 
-                // Build options array for cart
-                $options = [];
-                foreach ($item->options as $itemOption) {
-                    $options[] = [
-                        'id' => $itemOption->product_option_id,
-                        'name' => $itemOption->option->name ?? 'Unknown',
-                        'price' => (float)$itemOption->price,
+                    // Build options array for cart
+                    $options = [];
+                    foreach ($item->options as $itemOption) {
+                        $options[] = [
+                            'id' => $itemOption->product_option_id,
+                            'name' => $itemOption->option->name ?? 'Unknown',
+                            'price' => (float)$itemOption->price,
+                        ];
+                    }
+
+                    // Build modifiers array for cart
+                    $modifiers = [];
+                    foreach ($item->modifiers as $itemModifier) {
+                        $modifiers[] = [
+                            'id' => $itemModifier->modifier_id,
+                            'name' => $itemModifier->modifier->name ?? 'Unknown',
+                            'price' => (float)$itemModifier->unit_price,
+                        ];
+                    }
+
+                    $this->cart[$key] = [
+                        'id'        => $product->id,
+                        'key'       => $key,
+                        'name'      => $product->name,
+                        'price'     => (float)$item->unit_price,
+                        'qty'       => $item->quantity,
+                        'image'     => $product->image_url ?? $product->image,
+                        'available' => true,
+                        'options'   => $options,
+                        'modifiers' => $modifiers,
+                        'instructions' => $item->special_instructions ?? '',
+                        'apply_regular_discount' => (bool) $item->apply_regular_discount,
+                        'apply_senior_discount' => (bool) $item->apply_senior_discount,
                     ];
                 }
 
-                // Build modifiers array for cart
-                $modifiers = [];
-                foreach ($item->modifiers as $itemModifier) {
-                    $modifiers[] = [
-                        'id' => $itemModifier->modifier_id,
-                        'name' => $itemModifier->modifier->name ?? 'Unknown',
-                        'price' => (float)$itemModifier->unit_price,
-                    ];
-                }
+                $draft->delete();
+                return $draft;
+            });
 
-                $this->cart[$key] = [
-                    'id'        => $product->id,
-                    'key'       => $key,
-                    'name'      => $product->name,
-                    'price'     => (float)$item->unit_price,
-                    'qty'       => $item->quantity,
-                    'image'     => $product->image,
-                    'available' => true,
-                    'options'   => $options,
-                    'modifiers' => $modifiers,
-                    'instructions' => $item->special_instructions ?? '',
-                    'apply_regular_discount' => (bool) $item->apply_regular_discount,
-                    'apply_senior_discount' => (bool) $item->apply_senior_discount,
-                ];
-            }
+            unset($this->drafts);
+            $draftsCount = $this->drafts->count();
 
-            $this->dispatch('cart-loaded', cart: $this->cart);
+            $this->dispatch('cart-loaded', 
+                cart: $this->cart,
+                orderType: $this->orderType,
+                tableNumber: $this->tableNumber,
+                paymentMethod: $this->paymentMethod,
+                referenceNo: $this->referenceNo,
+                draftsCount: $draftsCount,
+                loadedDraftId: $draftOrderId
+            );
 
             $this->dispatch('close-modal', name: 'pos-drafts-list');
-            
-            // Delete draft ONLY after successful load into memory
-            $draft->delete();
 
             $this->dispatch('notify', 
                 type: 'success',
@@ -868,6 +901,7 @@ public function openEditItem(string $key, array $item): void
         }
     }
 
+    #[Renderless]
     public function deleteDraft(int $draftOrderId): void
     {
         try {
@@ -878,14 +912,17 @@ public function openEditItem(string $key, array $item): void
             // Check authorization
             if (!auth()->user()->can('manageDraft', $draft)) {
                 $this->dispatch('notify', 
-                    type: 'error',
-                    message: 'Unauthorized to delete this draft.'
+                    type: 'warning',
+                    message: 'Access Restricted: Unauthorized to delete this draft.'
                 );
                 return;
             }
 
             $draft->delete();
+            unset($this->drafts);
+            $draftsCount = $this->drafts->count();
 
+            $this->dispatch('draft-deleted', draftId: $draftOrderId, count: $draftsCount);
             $this->dispatch('notify', 
                 type: 'success',
                 message: 'Draft deleted successfully.'
@@ -897,10 +934,14 @@ public function openEditItem(string $key, array $item): void
             );
         }
     }
+
+
+
+    #[Renderless]
     public function initiateGCashPayment(): void
     {
         if (empty($this->cart) || $this->total <= 0) {
-            $this->dispatch('notify', type: 'error', message: 'Cart is empty or total is invalid.');
+            $this->dispatch('notify', type: 'warning', message: 'Cart is empty or total is invalid.');
             return;
         }
 
@@ -934,6 +975,7 @@ public function openEditItem(string $key, array $item): void
      * Called by Alpine polling every 4 seconds while the GCash QR is displayed.
      * Checks PayMongo's API directly — works without a webhook (localhost-friendly).
      */
+    #[Renderless]
     public function pollGCashStatus(): void
     {
         if (!$this->gcashPaymentIntentId || $this->gcashVerified) {
@@ -965,11 +1007,14 @@ public function openEditItem(string $key, array $item): void
      * Manually verifies a static GCash payment.
      * Used when the cashier shows their own QR and checks their phone.
      */
-        #[Renderless]
+    #[Renderless]
     public function verifyStaticPayment(): void
     {
         $this->gcashVerified = true;
         $this->isManualGcash = true;
+        if (empty($this->paymentReference)) {
+            $this->paymentReference = 'GCASH-' . strtoupper(Str::random(8));
+        }
         $this->dispatch('notify', type: 'success', message: 'GCash payment manually verified!');
         $this->dispatch('gcash-verified');
     }
@@ -1176,12 +1221,34 @@ public function openEditItem(string $key, array $item): void
     }
 
         #[Renderless]
-    public function confirmPayment(?array $cartData = null): void
+    public function confirmPayment(
+        ?array $cartData = null,
+        ?float $amountTendered = null,
+        ?string $paymentMethod = null,
+        ?string $paymentReference = null,
+        ?string $tableNumber = null,
+        ?string $orderType = null
+    ): void
     {
         $this->resetErrorBag('gcashCancel');
 
         if ($cartData !== null) {
             $this->cart = $cartData;
+        }
+        if ($amountTendered !== null) {
+            $this->amountTendered = $amountTendered;
+        }
+        if ($paymentMethod !== null) {
+            $this->paymentMethod = $paymentMethod;
+        }
+        if ($paymentReference !== null) {
+            $this->paymentReference = $paymentReference;
+        }
+        if ($tableNumber !== null) {
+            $this->tableNumber = $tableNumber;
+        }
+        if ($orderType !== null) {
+            $this->orderType = $orderType;
         }
 
         if ($this->gcashVerified && $this->paymentMethod !== 'GCash') {
@@ -1191,12 +1258,12 @@ public function openEditItem(string $key, array $item): void
         }
 
         if (empty($this->cart)) {
-            $this->dispatch('notify', type: 'error', message: 'Cart is empty.');
+            $this->dispatch('notify', type: 'warning', message: 'Cart is empty.');
             return;
         }
 
         if (!$this->branchId) {
-            $this->dispatch('notify', type: 'error', message: 'No branch assigned.');
+            $this->dispatch('notify', type: 'warning', message: 'No operating branch assigned.');
             return;
         }
 
@@ -1209,12 +1276,12 @@ public function openEditItem(string $key, array $item): void
         $this->cart = $this->buildVerifiedCart();
 
         if (empty($this->cart)) {
-            $this->dispatch('notify', type: 'error', message: 'Cart is empty or contains invalid items.');
+            $this->dispatch('notify', type: 'warning', message: 'Cart is empty or contains invalid items.');
             return;
         }
 
         if (!in_array($this->paymentMethod, $this->paymentMethods, true)) {
-            $this->dispatch('notify', type: 'error', message: 'Invalid payment method.');
+            $this->dispatch('notify', type: 'warning', message: 'Invalid payment method.');
             return;
         }
 
@@ -1229,30 +1296,35 @@ public function openEditItem(string $key, array $item): void
                 $this->addError('gcashVerified', 'Please verify the payment first before placing an order.');
                 return;
             }
+            if (empty($this->paymentReference)) {
+                $this->paymentReference = 'GCASH-' . strtoupper(Str::random(8));
+            }
         } elseif ($this->paymentMethod !== 'Cash') {
             // Any custom payment method (added via Settings) has no built-in
             // verification flow — require a manually entered reference so it
             // can't be marked Paid with zero proof of payment.
-            if (empty(trim($this->paymentReference))) {
+            if (empty(trim((string)$this->paymentReference))) {
                 $this->addError('paymentReference', 'Enter a payment reference or confirmation number for this payment method.');
                 return;
             }
         }
 
         if (!in_array($this->orderType, $this->orderTypes, true)) {
-            $this->dispatch('notify', type: 'error', message: 'Invalid order type.');
+            $this->dispatch('notify', type: 'warning', message: 'Invalid order type.');
             return;
         }
 
         $this->validate([
             'tableNumber' => ['nullable', 'string', 'max:2', 'regex:/^[0-9]*$/']
-        ], ValidationHelper::commonMessages());
+        ], ValidationHelper::commonMessages(), [
+            'tableNumber' => 'claim number',
+        ]);
 
         // ──── STOCK VALIDATION ────────────────────────────────────────────────
         $stockValidation = $this->validateStockAvailability();
         if (!$stockValidation['available']) {
             $this->dispatch('notify', 
-                type: 'error',
+                type: 'warning',
                 message: 'Insufficient stock: ' . $stockValidation['message']
             );
             return;
@@ -1323,7 +1395,7 @@ public function openEditItem(string $key, array $item): void
                 }
 
                 // Deduct stock: Base + Options + Modifiers
-                $recipeQuery = Recipe::where('product_id', $productId);
+                $recipeQuery = Recipe::with('ingredient')->where('product_id', $productId);
                 
                 // Filter recipes for base, selected options, and selected modifiers
                 $recipeQuery->where(function($q) use ($optionIds, $modifierIds) {
@@ -1355,17 +1427,31 @@ public function openEditItem(string $key, array $item): void
                     );
 
                     if (!$result['success']) {
+                        $ingredientName = $recipe->ingredient->name ?? 'ingredient';
                         throw new \Exception(
-                            "Stock deduction failed for {$recipe->ingredient->name}: {$result['message']}"
+                            "Stock deduction failed for {$ingredientName}: {$result['message']}"
                         );
                     }
                 }
             }
 
+            // Fetch fresh unexpired stocks for branch so Alpine updates instantaneously
+            $updatedStocks = [];
+            if ($this->branchId) {
+                $ingredientIds = Product::where('is_active', true)
+                    ->with('recipes')
+                    ->get()
+                    ->flatMap(fn($p) => $p->recipes->pluck('ingredient_id'))
+                    ->unique()
+                    ->filter()
+                    ->values();
+                $updatedStocks = Product::getUnexpiredStocks((int)$this->branchId, $ingredientIds)->toArray();
+            }
+
             $this->clearCart(force: true);
             $this->dispatch('close-modal', 'pos-payment');
             $this->dispatch('cart-collapsed');
-            $this->dispatch('cart-reset');
+            $this->dispatch('stocks-updated', stocks: $updatedStocks);
             $this->dispatch('notify', type: 'success', message: "Order #{$order->reference_no} placed successfully!");
             
                         // 🖨️ AUTOMATIC RECEIPT PRINTING
@@ -1453,6 +1539,7 @@ public function openEditItem(string $key, array $item): void
             'taxAmount'           => $this->taxAmount,
             'change'              => $this->change,
             'stockData'           => $this->posStocks,
+            'draftsData'          => $this->draftsData,
         ])->layout('layouts.app', ['noPadding' => true]);
     }
 }

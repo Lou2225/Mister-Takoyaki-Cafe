@@ -29,6 +29,12 @@ class Order extends Model
             }
         });
 
+        static::created(function ($order) {
+            if ($order->payment_status === 'Paid') {
+                $order->recordFinancialTransaction();
+            }
+        });
+
         static::updated(function ($order) {
 
     // Trigger recording if payment status transitions to 'Paid'

@@ -30,7 +30,7 @@
             <div>
                 <x-input-label for="email" :value="__('Email Address')" class="text-[12px] font-semibold text-slate-900 uppercase tracking-[0.24em] mb-2" />
                 <x-text-input id="email" class="block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:bg-white focus:border-indigo-500 focus:ring-indigo-100 transition-all duration-200"
-                    type="email" wire:model="email" required autofocus autocomplete="username" placeholder="name@domain.com" />
+                    type="email" name="email" wire:model="email" required autofocus autocomplete="username" placeholder="name@domain.com" />
                 <x-input-error :messages="$errors->get('email')" class="mt-2" />
             </div>
 
@@ -43,6 +43,7 @@
                 <div class="relative">
                     <x-text-input id="password" class="block w-full px-4 py-3 bg-gray-50 border-gray-100 rounded-xl focus:bg-white focus:border-indigo-600 transition-all duration-200 pr-12"
                                     x-bind:type="show ? 'text' : 'password'"
+                                    name="password"
                                     wire:model="password"
                                     required autocomplete="current-password" placeholder="••••••••" />
 
