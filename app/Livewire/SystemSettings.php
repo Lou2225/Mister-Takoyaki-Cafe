@@ -315,72 +315,6 @@ class SystemSettings extends Component
         }
     }
 
-    public function updatedBusinessName()
-    {
-        $this->validateFieldLive('businessName', ['required', 'string', 'min:3', 'max:255', 'regex:' . ValidationHelper::REGEX_NAME_BASIC], ValidationHelper::commonMessages());
-    }
-
-    public function updatedBusinessEmail()
-    {
-        $this->validateFieldLive('businessEmail', ValidationHelper::rulesEmail(), ValidationHelper::commonMessages());
-    }
-
-    public function updatedBusinessPhone()
-    {
-        $this->validateFieldLive('businessPhone', ['nullable', 'string', 'regex:~^[0-9]{10}$~'], ['businessPhone.regex' => 'Enter 10-digit mobile number.']);
-    }
-
-    public function updatedAddrStreet() { $this->validateFieldLive('addr_street', ['nullable', 'string', 'max:255'], ValidationHelper::commonMessages()); }
-    public function updatedAddrBarangay() { $this->validateFieldLive('addr_barangay', ['nullable', 'string'], ValidationHelper::commonMessages()); }
-    public function updatedAddrCity() { $this->validateFieldLive('addr_city', ['nullable', 'string'], ValidationHelper::commonMessages()); }
-    public function updatedAddrProvince() { $this->validateFieldLive('addr_province', ['nullable', 'string'], ValidationHelper::commonMessages()); }
-    public function updatedAddrRegion() { $this->validateFieldLive('addr_region', ['nullable', 'string'], ValidationHelper::commonMessages()); }
-
-    public function updatedPosBusinessName()
-    {
-        $this->validateFieldLive('posBusinessName', ['required', 'string', 'max:255', 'regex:' . ValidationHelper::REGEX_NAME], ValidationHelper::commonMessages());
-    }
-
-    public function updatedGcashAccountNumber()
-    {
-        $this->validateFieldLive('gcashAccountNumber', ['nullable', 'string', 'regex:~^[0-9]{10}$~'], ['gcashAccountNumber.regex' => 'Enter 10-digit mobile number.']);
-    }
-
-    public function updatedLowStockThreshold()
-    {
-        $this->validateFieldLive('lowStockThreshold', ['required', 'integer', 'min:1', 'max:10000'], ValidationHelper::commonMessages());
-    }
-
-    public function updatedCriticalStockThreshold()
-    {
-        $this->validateFieldLive('criticalStockThreshold', ['required', 'integer', 'min:1', 'lt:lowStockThreshold'], ValidationHelper::commonMessages());
-    }
-
-    public function updatedExpiryAlertDays()
-    {
-        $this->validateFieldLive('expiryAlertDays', ['required', 'integer', 'min:1', 'max:365'], ValidationHelper::commonMessages());
-    }
-
-    public function updatedDiscountRate()
-    {
-        $this->validateFieldLive('discountRate', ['required', 'numeric', 'min:0', 'max:1'], ValidationHelper::commonMessages());
-    }
-
-    public function updatedSeniorDiscountRate()
-    {
-        $this->validateFieldLive('seniorDiscountRate', ['required', 'numeric', 'min:0', 'max:1'], ValidationHelper::commonMessages());
-    }
-
-    public function updatedServiceCharge()
-    {
-        $this->validateFieldLive('serviceCharge', ['required', 'numeric', 'min:0', 'max:1'], ValidationHelper::commonMessages());
-    }
-
-    public function updatedReviewFormTitle()
-    {
-        $this->validateFieldLive('reviewFormTitle', ['required', 'string', 'max:255'], ValidationHelper::commonMessages());
-    }
-
 
     /**
      * Magic method to handle all updating* methods that reset pagination.
@@ -508,16 +442,30 @@ class SystemSettings extends Component
         return $this->isSuperAdmin() || $isOperationsTab;
     }
 
-        private function normalizeCurrentTabData()
+    private function normalizeCurrentTabData()
     {
         if ($this->tab === 'general') {
             $this->businessName    = $this->normalizeString($this->businessName);
-            $this->businessEmail   = trim(strtolower($this->businessEmail));
+            $this->businessEmail   = trim(strtolower($this->businessEmail ?? ''));
             $this->businessPhone   = $this->normalizeMobileDisplay($this->businessPhone);
-            $this->businessTin     = trim($this->businessTin);
+            $this->businessTin     = trim($this->businessTin ?? '');
             $this->businessAddress = $this->normalizeString($this->businessAddress);
+            $this->addr_street     = trim($this->addr_street ?? '');
         } elseif ($this->tab === 'pos') {
+            $this->posBusinessName    = $this->normalizeString($this->posBusinessName);
+            $this->gcashAccountName   = trim($this->gcashAccountName ?? '');
             $this->gcashAccountNumber = $this->normalizeMobileDisplay($this->gcashAccountNumber);
+        } elseif ($this->tab === 'receipts') {
+            $this->receiptFooterMessage = trim($this->receiptFooterMessage ?? '');
+            $this->receiptReturnPolicy  = trim($this->receiptReturnPolicy ?? '');
+            $this->customerReceiptTitle = trim($this->customerReceiptTitle ?? '');
+            $this->kitchenSlipTitle     = trim($this->kitchenSlipTitle ?? '');
+            $this->kitchenSlipSubtitle  = trim($this->kitchenSlipSubtitle ?? '');
+            $this->baristaSlipTitle     = trim($this->baristaSlipTitle ?? '');
+            $this->baristaSlipSubtitle  = trim($this->baristaSlipSubtitle ?? '');
+        } elseif ($this->tab === 'reviews') {
+            $this->reviewFormTitle    = trim($this->reviewFormTitle ?? '');
+            $this->reviewFormSubtitle = trim($this->reviewFormSubtitle ?? '');
         }
     }
 

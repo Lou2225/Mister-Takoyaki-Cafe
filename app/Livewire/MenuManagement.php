@@ -928,10 +928,7 @@ public function getOwnerLabel(string $owner): string
                     ? tap(Product::findOrFail($this->editProductId), fn($p) => $p->update($data))
                     : Product::create($data);
 
-                // Ensure branch assignments are detached as it's now global
-                $product->branches()->detach();
-
-                                // Sync Option Groups & Options
+                // Sync Option Groups & Options
                 $optionIdMap = [];
                 $keepGroupIds = [];
                 $noRecipeOptionIds = [];

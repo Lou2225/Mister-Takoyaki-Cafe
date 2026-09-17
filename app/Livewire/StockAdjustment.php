@@ -521,15 +521,22 @@ class StockAdjustment extends Component
         }
 
         // 1. Determine New Stock & Batch Operations
-        if ($type === 'in' || $type === 'customer_return') {
-            $stock->stock_quantity += $baseQty;
-            StockBatch::create([
-                'ingredient_id' => $ingId,
-                'branch_id' => $branchId,
-                'batch_number' => $ref,
-                'current_quantity' => $baseQty,
-                'expiry_date' => empty($expiry) ? null : $expiry,
-            ]);
+if ($type === 'in' || $type === 'customer_return') {
+    $stock->stock_quantity += $baseQty;
+
+    $normalizedCost = ($cost !== null && $cost !== '')
+        ? (float) str_replace(',', '', $cost)
+        : (float) ($ingMaster->cost ?? 0);
+
+    StockBatch::create([
+        'ingredient_id'    => $ingId,
+        'branch_id'        => $branchId,
+        'batch_number'     => $ref,
+        'initial_quantity' => $baseQty,
+        'current_quantity' => $baseQty,
+        'expiry_date'      => empty($expiry) ? null : $expiry,
+        'unit_cost'        => $normalizedCost,
+    ]);
         } elseif (in_array($type, ['out', 'waste', 'waste_expired', 'return_to_supplier'])) {
             $result = \App\Services\StockDeductionService::deductByFEFO(
                 $branchId, $ingId, $baseQty, null, auth()->id(), $remarks, $type, $ref
@@ -546,16 +553,22 @@ class StockAdjustment extends Component
                 \App\Services\StockDeductionService::deductByFEFO(
                     $branchId, $ingId, abs($diff), null, auth()->id(), "Reconciliation Deficit", 'adjust', $ref
                 );
-            } elseif ($diff > 0) {
-                StockBatch::create([
-                    'ingredient_id' => $ingId,
-                    'branch_id' => $branchId,
-                    'batch_number' => $ref,
-                    'current_quantity' => $diff,
-                ]);
-                $stock->stock_quantity = $newStock;
-                $stock->save();
-            }
+} elseif ($diff > 0) {
+    $adjustmentCost = (float) ($ingMaster->cost ?? 0);
+
+    StockBatch::create([
+        'ingredient_id'    => $ingId,
+        'branch_id'        => $branchId,
+        'batch_number'     => $ref,
+        'initial_quantity' => $diff,
+        'current_quantity' => $diff,
+        'expiry_date'      => null,
+        'unit_cost'        => $adjustmentCost,
+    ]);
+
+    $stock->stock_quantity = $newStock;
+    $stock->save();
+}
         }
 
         // 2. Log Movement (If not handled by Service)
@@ -675,12 +688,11 @@ class StockAdjustment extends Component
             'out_count'   => StockMovement::whereIn('type', ['out', 'waste'])->whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])->where('branch_id', $this->selectedBranchId)->count(),
         ];
 
-        return view('livewire.stock-adjustment', [
-            'movements' => $movements,
-            'stats' => $stats,
-            'branches' => Branch::orderBy('branch_name')->get(),
-            'ingredients' => Ingredient::orderBy('name')->get(),
-            'ingredients' => Ingredient::with('unitConversions')->orderBy('name')->get(),
-        ])->layout('layouts.app');
+return view('livewire.stock-adjustment', [
+    'movements' => $movements,
+    'stats' => $stats,
+    'branches' => Branch::orderBy('branch_name')->get(),
+    'ingredients' => Ingredient::with('unitConversions')->orderBy('name')->get(),
+])->layout('layouts.app');
     }
 }

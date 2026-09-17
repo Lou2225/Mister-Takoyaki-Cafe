@@ -1018,7 +1018,7 @@
                         </div>
                     </div>
                     <h3 class="text-xl sm:text-2xl font-black text-emerald-600 tracking-tight leading-none">{{ number_format($this->activeCount) }}</h3>
-                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Available on POS/App</p>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Active on POS/App</p>
                 </div>
 
                 {{-- Hidden --}}
@@ -1030,7 +1030,7 @@
                         </div>
                     </div>
                     <h3 class="text-xl sm:text-2xl font-black text-rose-600 tracking-tight leading-none">{{ number_format($this->hiddenCount) }}</h3>
-                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Archived or inactive items</p>
+                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Hidden on POS/App</p>
                 </div>
 
                 {{-- Categories --}}
@@ -1154,7 +1154,7 @@
                 <x-data-table>
                     <x-slot name="header">
                         <th class="py-3 px-6 border-r border-slate-100/50 text-left text-[11px] font-bold text-slate-400 uppercase tracking-widest">Product Details</th>
-                        <th class="py-3 px-6 border-r border-slate-100/50 text-center text-[11px] font-bold text-slate-400 uppercase tracking-widest">Availability</th>
+                        <th class="py-3 px-6 border-r border-slate-100/50 text-center text-[11px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
                         <th class="py-3 px-6 border-r border-slate-100/50 text-right text-[11px] font-bold text-slate-400 uppercase tracking-widest">Price</th>
                         @if($this->isSuperAdmin())
                             <th class="py-3 px-6 text-right text-[11px] font-bold text-slate-400 uppercase tracking-widest">Actions</th>

@@ -91,25 +91,32 @@ class BranchApiController extends Controller
         $request->validate(['branch_id' => 'required|integer|exists:branches,id']);
         $branchId = (int) $request->branch_id;
 
-         // Global products (available everywhere) with aggregated reviews & ratings
-        $globalProducts = Product::with(['category', 'optionGroups.options', 'modifiers'])
+        // Products available at branch, respecting branch_product.is_active override
+        $query = Product::with(['category', 'optionGroups.options', 'modifiers'])
             ->withCount('reviews')
-            ->withAvg('reviews', 'rating')
-            ->where('is_active', 1)
-            ->where('scope', 'global')
-            ->get();
+            ->withAvg('reviews', 'rating');
 
-        // Branch-specific products
-        $branch = Branch::findOrFail($branchId);
-        $branchProducts = $branch->products()
-        ->with(['category', 'optionGroups.options', 'modifiers'])
-        ->withCount('reviews')
-        ->withAvg('reviews', 'rating')
-        ->where('products.is_active', 1)
-        ->get();
+        $query->where(function ($q) use ($branchId) {
+            $q->where('scope', 'global')
+                ->orWhereHas('branches', fn($bq) => $bq->where('branches.id', $branchId));
+        });
 
-        // Merge and ensure uniqueness
-        $allProducts = $globalProducts->merge($branchProducts)->unique('id');
+        $query->select('products.*');
+
+        $query->leftJoin('branch_product', function($join) use ($branchId) {
+            $join->on('products.id', '=', 'branch_product.product_id')
+                 ->where('branch_product.branch_id', '=', $branchId);
+        });
+
+        // Effective visibility: branch override if present, else fallback to global is_active
+        $query->where(function ($q) {
+            $q->where(function ($sub) {
+                $sub->whereNull('branch_product.is_active')
+                    ->where('products.is_active', true);
+            })->orWhere('branch_product.is_active', 1);
+        });
+
+        $allProducts = $query->get();
 
         $formatted = $allProducts->map(fn($p) => $this->formatProduct($p, $branchId))->values();
 

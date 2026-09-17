@@ -48,7 +48,6 @@ class BranchManagement extends Component
     public bool $status = true;
     public bool $is_main = false;
     public bool $confirmMainDesignation = false;
-    public bool $skipValidation = false;
     public ?int $deleteTargetId = null;
     public string $deleteTargetName = '';
     public string $pendingManagerName = '';
@@ -90,90 +89,25 @@ class BranchManagement extends Component
         }
     }
 
-    public function updatedBranchName(string $value)
+    public function generateBranchCode(?string $name): string
     {
-        if ($this->skipValidation) return;
-        $rules = [
-            'required', 'string', 'min:3', 'max:150',
-            'regex:' . ValidationHelper::REGEX_NAME,
-            Rule::unique('branches', 'branch_name')->ignore($this->branch_id),
-        ];
-        $this->validateFieldLive('branch_name', $rules, ValidationHelper::commonMessages());
-
-        // Auto-generate Branch Code logic for Mister Takoyaki Cafe
-        if ($this->mode === 'create' || empty($this->branch_code)) {
-            $cleaned = preg_replace('/[^A-Za-z0-9 ]/', '', $value);
-            $words = array_filter(explode(' ', strtoupper($cleaned)));
-            $code = 'MTC-';
-            
-            if (count($words) === 1) {
-                $code .= substr($words[0], 0, 4);
-            } else {
-                foreach ($words as $word) {
-                    $code .= substr($word, 0, 1);
-                }
-                // If only 2 words, add second letter of first word for better distinction
-                if (count($words) === 2 && isset($words[0][1])) {
-                    $code = 'MTC-' . $words[0][0] . $words[0][1] . $words[1][0];
-                }
-            }
-            $this->branch_code = $code;
+        if (empty($name)) {
+            return 'MTC-';
         }
-    }
+        $cleaned = preg_replace('/[^A-Za-z0-9 ]/', '', $name);
+        $words = array_filter(explode(' ', strtoupper($cleaned)));
+        $code = 'MTC-';
 
-    public function updatedBranchCode()
-    {
-        if ($this->skipValidation) return;
-        $rules = [
-            'required', 'string', 'max:50',
-            Rule::unique('branches', 'branch_code')->ignore($this->branch_id),
-        ];
-        $this->validateFieldLive('branch_code', $rules, ValidationHelper::commonMessages());
-    }
-
-    public function updatedPhone()
-    {
-        if ($this->skipValidation) return;
-        $this->validateFieldLive('phone', ['nullable', 'string', 'regex:~^[0-9]{10}$~'], ['phone.regex' => 'Enter 10-digit mobile number.']);
-    }
-
-    public function updatedEmail()
-    {
-        if ($this->skipValidation) return;
-        $rules = array_merge(ValidationHelper::rulesEmail(false), [
-            $this->branch_id ? Rule::unique('branches', 'email')->ignore($this->branch_id) : 'unique:branches,email'
-        ]);
-        $this->validateFieldLive('email', $rules, ValidationHelper::commonMessages());
-    }
-
-    public function updatedAddrStreet()
-    {
-        if ($this->skipValidation) return;
-        $this->validateFieldLive('addr_street', ['nullable', 'string', 'max:255'], ValidationHelper::commonMessages());
-    }
-
-    public function updatedAddrBarangay()
-    {
-        if ($this->skipValidation) return;
-        $this->validateFieldLive('addr_barangay', ['nullable', 'string'], ValidationHelper::commonMessages());
-    }
-
-    public function updatedAddrCity()
-    {
-        if ($this->skipValidation) return;
-        $this->validateFieldLive('addr_city', ['nullable', 'string'], ValidationHelper::commonMessages());
-    }
-
-    public function updatedAddrProvince()
-    {
-        if ($this->skipValidation) return;
-        $this->validateFieldLive('addr_province', ['nullable', 'string'], ValidationHelper::commonMessages());
-    }
-
-    public function updatedAddrRegion()
-    {
-        if ($this->skipValidation) return;
-        $this->validateFieldLive('addr_region', ['nullable', 'string'], ValidationHelper::commonMessages());
+        if (count($words) === 1) {
+            $code .= substr(reset($words), 0, 4);
+        } else if (count($words) === 2 && isset($words[0][1])) {
+            $code = 'MTC-' . $words[0][0] . $words[0][1] . $words[1][0];
+        } else {
+            foreach ($words as $word) {
+                $code .= substr($word, 0, 1);
+            }
+        }
+        return $code;
     }
 
     public function selectAllBranches()
@@ -222,7 +156,6 @@ class BranchManagement extends Component
     {
         if (!$this->isSuperAdmin()) return;
 
-        $this->skipValidation = true; // suppress hooks while populating
         $this->panel = 'form';
         $this->mode = 'edit';
         $branch = Branch::findOrFail($id);
@@ -249,7 +182,6 @@ class BranchManagement extends Component
         $this->addr_lat      = $addr['lat']       ?? null;
         $this->addr_lng      = $addr['lng']       ?? null;
 
-        $this->skipValidation = false;
         $this->resetValidation();
         $this->updateGlobalHeader('edit');
     }
@@ -390,6 +322,16 @@ class BranchManagement extends Component
 
     public function validateBeforeSaveBranch()
     {
+        $this->branch_name = $this->normalizeString($this->branch_name);
+        $this->branch_code = strtoupper(trim($this->branch_code ?? ''));
+        $this->email = trim($this->email ?? '');
+        $this->phone = trim($this->phone ?? '');
+        $this->addr_street = trim($this->addr_street ?? '');
+
+        if (empty($this->branch_code) && !empty($this->branch_name)) {
+            $this->branch_code = $this->generateBranchCode($this->branch_name);
+        }
+
         $rules = [
             'branch_name' => [
                 'required', 'string', 'min:3', 'max:150',
@@ -401,7 +343,7 @@ class BranchManagement extends Component
                 Rule::unique('branches', 'branch_code')->ignore($this->branch_id),
             ],
             'phone' => ['nullable', 'string', 'regex:~^[0-9]{10}$~'],
-                        'email' => array_merge(ValidationHelper::rulesEmail(false), [
+            'email' => array_merge(ValidationHelper::rulesEmail(false), [
                 $this->branch_id ? Rule::unique('branches', 'email')->ignore($this->branch_id) : 'unique:branches,email'
             ]),
             'user_id' => ['nullable', Rule::exists('users', 'id')->whereIn('role_id', [1, 2])->where('is_active', 1)],
@@ -420,6 +362,14 @@ class BranchManagement extends Component
     {
         if (!$this->isSuperAdmin()) return;
         $this->branch_name = $this->normalizeString($this->branch_name);
+        $this->branch_code = strtoupper(trim($this->branch_code ?? ''));
+        $this->email = trim($this->email ?? '');
+        $this->phone = trim($this->phone ?? '');
+        $this->addr_street = trim($this->addr_street ?? '');
+
+        if (empty($this->branch_code) && !empty($this->branch_name)) {
+            $this->branch_code = $this->generateBranchCode($this->branch_name);
+        }
 
         $this->validate([
             'branch_name' => [
@@ -432,9 +382,10 @@ class BranchManagement extends Component
                 Rule::unique('branches', 'branch_code'),
             ],
             'phone' => ['nullable', 'string', 'regex:~^[0-9]{10}$~'],
-                        'email' => array_merge(ValidationHelper::rulesEmail(false), ['unique:branches,email']),
+            'email' => array_merge(ValidationHelper::rulesEmail(false), ['unique:branches,email']),
             'user_id' => ['nullable', Rule::exists('users', 'id')->whereIn('role_id', [1, 2])->where('is_active', 1)],
             'status'  => ['boolean'],
+            'addr_street' => ['nullable', 'string', 'max:255'],
             'addr_barangay' => ['required', 'string'],
             'addr_city' => ['required', 'string'],
             'addr_province' => ['required', 'string'],
@@ -510,6 +461,14 @@ class BranchManagement extends Component
     {
         if (!$this->isSuperAdmin()) return;
         $this->branch_name = $this->normalizeString($this->branch_name);
+        $this->branch_code = strtoupper(trim($this->branch_code ?? ''));
+        $this->email = trim($this->email ?? '');
+        $this->phone = trim($this->phone ?? '');
+        $this->addr_street = trim($this->addr_street ?? '');
+
+        if (empty($this->branch_code) && !empty($this->branch_name)) {
+            $this->branch_code = $this->generateBranchCode($this->branch_name);
+        }
 
         $this->validate([
             'branch_name' => [
@@ -522,11 +481,12 @@ class BranchManagement extends Component
                 Rule::unique('branches', 'branch_code')->ignore($this->branch_id),
             ],
             'phone' => ['nullable', 'string', 'regex:~^[0-9]{10}$~'],
-                        'email' => array_merge(ValidationHelper::rulesEmail(false), [
+            'email' => array_merge(ValidationHelper::rulesEmail(false), [
                 Rule::unique('branches', 'email')->ignore($this->branch_id)
             ]),
             'user_id' => ['nullable', Rule::exists('users', 'id')->whereIn('role_id', [1, 2])->where('is_active', 1)],
             'status'  => ['boolean'],
+            'addr_street' => ['nullable', 'string', 'max:255'],
             'addr_barangay' => ['required', 'string'],
             'addr_city' => ['required', 'string'],
             'addr_province' => ['required', 'string'],

@@ -9,13 +9,15 @@ class StockBatch extends Model
 {
     use HasFactory;
 
-    protected $fillable = [
-        'ingredient_id',
-        'branch_id',
-        'batch_number',
-        'current_quantity',
-        'expiry_date'
-    ];
+protected $fillable = [
+    'ingredient_id',
+    'branch_id',
+    'batch_number',
+    'initial_quantity',
+    'current_quantity',
+    'expiry_date',
+    'unit_cost',
+];
 
     protected $casts = [
         'expiry_date' => 'date',

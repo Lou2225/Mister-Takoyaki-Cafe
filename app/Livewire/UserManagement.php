@@ -8,7 +8,6 @@ use App\Models\User;
 use App\Models\Role;
 use App\Models\Branch;
 use App\Models\Order;
-use App\Models\StockMovement;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use App\Traits\HandlesValidations;
@@ -29,9 +28,6 @@ class UserManagement extends Component
         'refreshTopbar' => '$refresh',
     ];
 
-    // ── Panel state is managed in Alpine via browser events ─────
-    // Livewire fires 'switch-panel' after data is ready.
-
     // ── Form fields ───────────────────────────────────────────────
     public $editUserId = null;
     public $firstName = '';
@@ -39,8 +35,6 @@ class UserManagement extends Component
     public $lastName = '';
     public $email = '';
     public $phone = '';
-    public $password = '';
-    public $passwordConfirm = '';
     public $formRoleId = '';
     public $formBranchId = '';
     public $position = '';
@@ -110,37 +104,6 @@ class UserManagement extends Component
         $this->resetPage();
     }
 
-    // ── Real-time validation hooks ───────────────────────────────
-    public function updatedFirstName() { 
-    $this->validateFieldLive('firstName', ValidationHelper::rulesName(), ValidationHelper::nameMessages()); 
-}
-public function updatedMiddleName() { 
-    $this->validateFieldLive('middleName', ValidationHelper::rulesOptionalName(), ValidationHelper::nameMessages()); 
-}
-public function updatedLastName() { 
-    $this->validateFieldLive('lastName', ValidationHelper::rulesName(), ValidationHelper::nameMessages()); 
-}
-
-    public function updatedEmail()
-    {
-        if ($this->skipValidation) return;
-        
-        // System users (all except role 4) share the same email uniqueness pool.
-        // In this component, we only manage system users.
-        $rules = array_merge(ValidationHelper::rulesEmail(), [
-            $this->editUserId 
-                ? Rule::unique('users', 'email')->whereNot('role_id', 4)->ignore($this->editUserId) 
-                : Rule::unique('users', 'email')->whereNot('role_id', 4)
-        ]);
-        $this->validateFieldLive('email', $rules, ValidationHelper::commonMessages());
-    }
-
-    public function updatedPhone()
-    {
-        if ($this->skipValidation) return;
-        $this->validateFieldLive('phone', ['nullable', 'string', 'regex:/^[0-9]{10}$/'], ['phone.regex' => 'Enter 10-digit mobile number.']);
-    }
-
     /**
      * Clear position if role is not staff
      */
@@ -149,32 +112,6 @@ public function updatedLastName() {
         if (!in_array($value, [3, 5])) {
             $this->position = '';
         }
-    }
-
-    public function updatedAddrStreet() { $this->validateFieldLive('addr_street', ['nullable', 'string', 'max:255'], ValidationHelper::commonMessages()); }
-    public function updatedAddrBarangay() { $this->validateFieldLive('addr_barangay', ['nullable', 'string'], ValidationHelper::commonMessages()); }
-    public function updatedAddrCity() { $this->validateFieldLive('addr_city', ['nullable', 'string'], ValidationHelper::commonMessages()); }
-    public function updatedAddrProvince() { $this->validateFieldLive('addr_province', ['nullable', 'string'], ValidationHelper::commonMessages()); }
-    public function updatedAddrRegion() { $this->validateFieldLive('addr_region', ['nullable', 'string'], ValidationHelper::commonMessages()); }
-
-    /**
-     * Set formRoleId and clear validation errors for this field.
-     * Called from the Account Type dropdown to ensure errors are cleared on selection.
-     */
-    public function setFormRoleId($roleId)
-    {
-        $this->formRoleId = $roleId;
-        // Clear validation errors for this specific field only, not the whole form
-        $this->resetValidation('formRoleId');
-    }
-
-    /**
-     * Set formBranchId and clear validation errors for this field.
-     */
-    public function setFormBranchId($branchId)
-    {
-        $this->formBranchId = $branchId;
-        $this->resetValidation('formBranchId');
     }
 
     // ── Show create form ──────────────────────────────────────────
@@ -226,8 +163,6 @@ public function updatedLastName() {
         $this->employeeId = $user->employee_id ?? '';
         $this->dateHired = $user->date_hired ?? '';
         $this->formIsActive = (bool) $user->is_active;
-        $this->password = '';
-        $this->passwordConfirm = '';
 
         // Load avatar display data
         $this->editUserAvatar = null;
@@ -424,6 +359,8 @@ public function updatedLastName() {
         $this->firstName  = ucwords($this->normalizeString($this->firstName));
         $this->middleName = ucwords($this->normalizeString($this->middleName));
         $this->lastName   = ucwords($this->normalizeString($this->lastName));
+        $this->email      = trim(strtolower($this->email));
+        $this->phone      = trim($this->phone);
         $this->position   = $this->normalizeString($this->position);
 
         $rules = [
@@ -857,8 +794,6 @@ public function updatedLastName() {
         $this->lastName = '';
         $this->email = '';
         $this->phone = '';
-        $this->password = '';
-        $this->passwordConfirm = '';
         
         if (auth()->check() && auth()->user()->isAdmin()) {
             $this->formRoleId = 3;

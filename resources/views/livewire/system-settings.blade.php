@@ -1,17 +1,12 @@
 <div class="space-y-6" x-data="systemSettingsData({ 
-
         tab: @entangle('tab').live,
-        addr_region: @entangle('addr_region').live,
-        addr_province: @entangle('addr_province').live,
-        addr_city: @entangle('addr_city').live,
-        addr_barangay: @entangle('addr_barangay').live,
-        receipt: {
-                            logo_enabled: @js($receiptLogoEnabled),
-                            footer: @js($receiptFooterMessage),
-            policy: @js($receiptReturnPolicy),
-            copies: @js($receiptCopies),
-            qr_url: @js($receiptQrUrl)
-        }
+        addr_region: @entangle('addr_region'),
+        addr_province: @entangle('addr_province'),
+        addr_city: @entangle('addr_city'),
+        addr_barangay: @entangle('addr_barangay'),
+        addr_street: @entangle('addr_street'),
+        addr_lat: @entangle('addr_lat'),
+        addr_lng: @entangle('addr_lng')
     })">
 
     <div class="flex flex-col lg:flex-row gap-6 lg:gap-10 min-h-[700px] w-full">
@@ -185,12 +180,12 @@
                         <div class="flex-grow grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
                             <div class="sm:col-span-2">
                                 <x-input-label for="businessName" value="Legal Entity Name *" />
-                                <x-text-input id="businessName" wire:model.blur="businessName" class="mt-1 block w-full h-10" placeholder="e.g. Acme Corp" inputFilter="name" :hasError="$errors->has('businessName')" />
+                                <x-text-input id="businessName" wire:model="businessName" class="mt-1 block w-full h-10" placeholder="e.g. Acme Corp" inputFilter="name" :hasError="$errors->has('businessName')" />
                                 <x-input-error :messages="$errors->get('businessName')" class="mt-1" />
                             </div>
                             <div>
                                 <x-input-label for="businessEmail" value="Primary Support Email *" />
-                                <x-text-input id="businessEmail" wire:model.blur="businessEmail" type="email" class="mt-1 block w-full h-10" placeholder="contact@example.com" inputFilter="email" :hasError="$errors->has('businessEmail')" />
+                                <x-text-input id="businessEmail" wire:model="businessEmail" type="email" class="mt-1 block w-full h-10" placeholder="contact@example.com" inputFilter="email" :hasError="$errors->has('businessEmail')" />
                                 <x-input-error :messages="$errors->get('businessEmail')" class="mt-1" />
                             </div>
                             <div>
@@ -199,7 +194,7 @@
                                     <div class="flex-shrink-0 inline-flex items-center px-3 h-10 rounded-l-lg border border-r-0 border-gray-200 bg-gray-50 text-gray-500 text-[13px] font-bold">
                                         +63
                                     </div>
-                                    <x-text-input id="businessPhone" wire:model.blur="businessPhone" type="text"
+                                    <x-text-input id="businessPhone" wire:model="businessPhone" type="text"
                                         class="block w-full rounded-l-none" placeholder="912 345 6789" autocomplete="tel"
                                         inputFilter="number" maxlength="10"
                                         @keydown="FormFilters.numberKeydown($event)" @paste="FormFilters.numberPaste($event)"
@@ -209,7 +204,7 @@
                             </div>
                             <div class="sm:col-span-2">
                                 <x-input-label for="businessTin" value="Registered TIN" />
-                                <x-text-input id="businessTin" wire:model.blur="businessTin" class="mt-1 block w-full h-10" placeholder="000-000-000-000" />
+                                <x-text-input id="businessTin" wire:model="businessTin" class="mt-1 block w-full h-10" placeholder="000-000-000-000" />
                                 <x-input-error :messages="$errors->get('businessTin')" class="mt-1" />
                             </div>
                         </div>
@@ -233,7 +228,7 @@
                             <div class="flex flex-col sm:flex-row gap-5">
                                                                 <div class="flex-1 w-full">
                                     <x-input-label value="Region" />
-                                    <div class="relative mt-1"
+                                    <div class="relative mt-1" wire:ignore
                                         x-data="{
                                             open: false,
                                             dropUp: false,
@@ -306,7 +301,7 @@
 
                                                                 <div class="flex-1 w-full">
                                     <x-input-label value="Province" />
-                                    <div class="relative mt-1"
+                                    <div class="relative mt-1" wire:ignore
                                         x-data="{
                                             open: false,
                                             dropUp: false,
@@ -384,7 +379,7 @@
                             <div class="flex flex-col sm:flex-row gap-5">
                                                                 <div class="flex-1 w-full">
                                     <x-input-label value="City / Municipality" />
-                                    <div class="relative mt-1"
+                                    <div class="relative mt-1" wire:ignore
                                         x-data="{
                                             open: false,
                                             dropUp: false,
@@ -459,7 +454,7 @@
 
                                                                 <div class="flex-1 w-full">
                                     <x-input-label value="Barangay" />
-                                    <div class="relative mt-1"
+                                    <div class="relative mt-1" wire:ignore
                                         x-data="{
                                             open: false,
                                             dropUp: false,
@@ -535,7 +530,7 @@
                             {{-- Row 3: Street --}}
                             <div>
                                 <x-input-label value="House # / Street / Subdivision" />
-                                <x-text-input wire:model.blur="addr_street" class="w-full mt-1 h-10" placeholder="e.g. Unit 123, Rosewood Ave, Phase 1" :hasError="$errors->has('addr_street')" />
+                                <x-text-input wire:model="addr_street" x-model="addr_street" class="w-full mt-1 h-10" placeholder="e.g. Unit 123, Rosewood Ave, Phase 1" :hasError="$errors->has('addr_street')" />
                                 <x-input-error :messages="$errors->get('addr_street')" class="mt-1" />
                             </div>
                         </div>
@@ -552,7 +547,27 @@
 
             {{-- Receipt Design --}}
             @if($this->isSuperAdmin())
-            <div x-show="tab === 'receipts'" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <div x-show="tab === 'receipts'" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="grid grid-cols-1 xl:grid-cols-3 gap-6"
+                x-data="{ 
+                    subtotal: 320.00, 
+                    vatRate: 0,
+                    currency: '₱',
+                    serviceCharge: 16.00,
+                    businessName: @entangle('businessName'),
+                    businessEmail: @entangle('businessEmail'),
+                    businessPhone: @entangle('businessPhone'),
+                    logoEnabled: @entangle('receiptLogoEnabled'),
+                    logoUrl: @js($businessLogo ? $businessLogo->temporaryUrl() : ($existingLogo ? Storage::url($existingLogo) : null)),
+                    footer: @entangle('receiptFooterMessage'),
+                    policy: @entangle('receiptReturnPolicy'),
+                    showFooter: @entangle('showReceiptFooter'),
+                    showQrCode: @entangle('showReceiptQrCode'),
+                    showTendered: @entangle('showReceiptTendered'),
+                    showChange: @entangle('showReceiptChange'),
+                    copies: @entangle('receiptCopies'),
+                    customerTitle: @entangle('customerReceiptTitle')
+                }"
+                @businessconfigupdated.window="logoUrl = $event.detail.logo_url; businessName = $event.detail.business_name">
                 <div class="xl:col-span-2 space-y-6">
                         <div class="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
                             <div class="flex items-center justify-between mb-6 border-b border-gray-50 pb-2">
@@ -564,29 +579,29 @@
                             <div class="space-y-4">
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <label class="flex items-center gap-3 p-3 bg-gray-50 border border-gray-100 rounded-xl cursor-pointer hover:bg-white transition-all shadow-sm">
-                                        <input type="checkbox" wire:model.live="receiptLogoEnabled" class="rounded border-gray-300 text-gray-900 shadow-sm focus:ring-gray-900 h-4 w-4">
+                                        <input type="checkbox" wire:model="receiptLogoEnabled" x-model="logoEnabled" class="rounded border-gray-300 text-gray-900 shadow-sm focus:ring-gray-900 h-4 w-4">
                                         <span class="text-[13px] font-semibold text-gray-800">Show Logo on Receipts</span>
                                     </label>
                                     <label class="flex items-center gap-3 p-3 bg-gray-50 border border-gray-100 rounded-xl cursor-pointer hover:bg-white transition-all shadow-sm">
-                                        <input type="checkbox" wire:model.live="showReceiptQrCode" class="rounded border-gray-300 text-gray-900 shadow-sm focus:ring-gray-900 h-4 w-4">
+                                        <input type="checkbox" wire:model="showReceiptQrCode" x-model="showQrCode" class="rounded border-gray-300 text-gray-900 shadow-sm focus:ring-gray-900 h-4 w-4">
                                         <span class="text-[13px] font-semibold text-gray-800">Show Receipt QR Code</span>
                                     </label>
                                 </div>
 
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <label class="flex items-center gap-3 p-3 bg-gray-50 border border-gray-100 rounded-xl cursor-pointer hover:bg-white transition-all shadow-sm">
-                                        <input type="checkbox" wire:model.live="showReceiptFooter" class="rounded border-gray-300 text-gray-900 shadow-sm focus:ring-gray-900 h-4 w-4">
+                                        <input type="checkbox" wire:model="showReceiptFooter" x-model="showFooter" class="rounded border-gray-300 text-gray-900 shadow-sm focus:ring-gray-900 h-4 w-4">
                                         <span class="text-[13px] font-semibold text-gray-800">Show Receipt Footer</span>
                                     </label>
                                     <label class="flex items-center gap-3 p-3 bg-gray-50 border border-gray-100 rounded-xl cursor-pointer hover:bg-white transition-all shadow-sm">
-                                        <input type="checkbox" wire:model.live="showReceiptTendered" class="rounded border-gray-300 text-gray-900 shadow-sm focus:ring-gray-900 h-4 w-4">
+                                        <input type="checkbox" wire:model="showReceiptTendered" x-model="showTendered" class="rounded border-gray-300 text-gray-900 shadow-sm focus:ring-gray-900 h-4 w-4">
                                         <span class="text-[13px] font-semibold text-gray-800">Show Tendered Amount</span>
                                     </label>
                                 </div>
 
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <label class="flex items-center gap-3 p-3 bg-gray-50 border border-gray-100 rounded-xl cursor-pointer hover:bg-white transition-all shadow-sm">
-                                        <input type="checkbox" wire:model.live="showReceiptChange" class="rounded border-gray-300 text-gray-900 shadow-sm focus:ring-gray-900 h-4 w-4">
+                                        <input type="checkbox" wire:model="showReceiptChange" x-model="showChange" class="rounded border-gray-300 text-gray-900 shadow-sm focus:ring-gray-900 h-4 w-4">
                                         <span class="text-[13px] font-semibold text-gray-800">Show Change</span>
                                     </label>
                                 </div>
@@ -595,16 +610,17 @@
                                                                         <div>
                                         <x-input-label for="receiptCopies" value="Print Copies (1–3)" />
                                         <div class="mt-1 flex items-center h-10 border border-gray-200 rounded-lg overflow-hidden shadow-sm bg-white">
-                                            <button type="button" wire:click="decrementReceiptCopies"
-                                                @if((int)$receiptCopies <= 1) disabled @endif
+                                            <button type="button" @click="copies = Math.max(1, (parseInt(copies) || 1) - 1)"
+                                                :disabled="copies <= 1"
                                                 class="w-10 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors border-r border-gray-200 shrink-0">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                                             </button>
                                             <input id="receiptCopies" type="number" readonly tabindex="-1"
+                                                x-model="copies"
                                                 wire:model="receiptCopies"
                                                 class="flex-1 w-full h-full text-center text-[13px] font-bold text-gray-900 border-0 focus:ring-0 bg-transparent cursor-default [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
-                                            <button type="button" wire:click="incrementReceiptCopies"
-                                                @if((int)$receiptCopies >= 3) disabled @endif
+                                            <button type="button" @click="copies = Math.min(3, (parseInt(copies) || 1) + 1)"
+                                                :disabled="copies >= 3"
                                                 class="w-10 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors border-l border-gray-200 shrink-0">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                                             </button>
@@ -613,14 +629,14 @@
                                     </div>
                                     <div>
                                         <x-input-label for="receiptQrUrl" value="Review QR URL" />
-                                        <x-text-input id="receiptQrUrl" wire:model.blur="receiptQrUrl" class="mt-1 block w-full h-10" placeholder="https://..." />
+                                        <x-text-input id="receiptQrUrl" wire:model="receiptQrUrl" class="mt-1 block w-full h-10" placeholder="https://..." />
                                         <x-input-error :messages="$errors->get('receiptQrUrl')" class="mt-1" />
                                     </div>
                                 </div>
 
                                 <div>
                                     <x-input-label for="customerReceiptTitle" value="Customer Receipt Title" />
-                                    <x-text-input id="customerReceiptTitle" wire:model.blur="customerReceiptTitle" class="mt-1 block w-full h-10" placeholder="Customer Receipt & Invoice" />
+                                    <x-text-input id="customerReceiptTitle" wire:model="customerReceiptTitle" x-model="customerTitle" class="mt-1 block w-full h-10" placeholder="Customer Receipt & Invoice" />
                                     <x-input-error :messages="$errors->get('customerReceiptTitle')" class="mt-1" />
                                 </div>
 
@@ -629,12 +645,12 @@
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div>
                                             <x-input-label for="kitchenSlipTitle" value="Kitchen Slip Title" />
-                                            <x-text-input id="kitchenSlipTitle" wire:model.blur="kitchenSlipTitle" class="mt-1 block w-full h-10" placeholder="🍳 KITCHEN SLIP" />
+                                            <x-text-input id="kitchenSlipTitle" wire:model="kitchenSlipTitle" class="mt-1 block w-full h-10" placeholder="🍳 KITCHEN SLIP" />
                                             <x-input-error :messages="$errors->get('kitchenSlipTitle')" class="mt-1" />
                                         </div>
                                         <div>
                                             <x-input-label for="kitchenSlipSubtitle" value="Kitchen Slip Subtitle" />
-                                            <x-text-input id="kitchenSlipSubtitle" wire:model.blur="kitchenSlipSubtitle" class="mt-1 block w-full h-10" placeholder="Food Preparation Order" />
+                                            <x-text-input id="kitchenSlipSubtitle" wire:model="kitchenSlipSubtitle" class="mt-1 block w-full h-10" placeholder="Food Preparation Order" />
                                             <x-input-error :messages="$errors->get('kitchenSlipSubtitle')" class="mt-1" />
                                         </div>
                                     </div>
@@ -642,12 +658,12 @@
                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div>
                                             <x-input-label for="baristaSlipTitle" value="Barista Slip Title" />
-                                            <x-text-input id="baristaSlipTitle" wire:model.blur="baristaSlipTitle" class="mt-1 block w-full h-10" placeholder="☕ BARISTA SLIP" />
+                                            <x-text-input id="baristaSlipTitle" wire:model="baristaSlipTitle" class="mt-1 block w-full h-10" placeholder="☕ BARISTA SLIP" />
                                             <x-input-error :messages="$errors->get('baristaSlipTitle')" class="mt-1" />
                                         </div>
                                         <div>
                                             <x-input-label for="baristaSlipSubtitle" value="Barista Slip Subtitle" />
-                                            <x-text-input id="baristaSlipSubtitle" wire:model.blur="baristaSlipSubtitle" class="mt-1 block w-full h-10" placeholder="Beverage Preparation Order" />
+                                            <x-text-input id="baristaSlipSubtitle" wire:model="baristaSlipSubtitle" class="mt-1 block w-full h-10" placeholder="Beverage Preparation Order" />
                                             <x-input-error :messages="$errors->get('baristaSlipSubtitle')" class="mt-1" />
                                         </div>
                                     </div>
@@ -656,13 +672,13 @@
                                 <div class="border-t border-gray-100 pt-4 mt-4 space-y-4">
                                     <div>
                                         <x-input-label for="receiptFooterMessage" value="Footer Greeting" />
-                                        <x-text-input id="receiptFooterMessage" wire:model.blur="receiptFooterMessage" class="mt-1 block w-full h-10" placeholder="Thank you for your visit!" />
+                                        <x-text-input id="receiptFooterMessage" wire:model="receiptFooterMessage" x-model="footer" class="mt-1 block w-full h-10" placeholder="Thank you for your visit!" />
                                         <x-input-error :messages="$errors->get('receiptFooterMessage')" class="mt-1" />
                                     </div>
 
                                     <div>
                                         <x-input-label for="receiptReturnPolicy" value="Terms & Policy" />
-                                        <x-text-input id="receiptReturnPolicy" wire:model.blur="receiptReturnPolicy" class="mt-1 block w-full h-10" placeholder="No return, no exchange." />
+                                        <x-text-input id="receiptReturnPolicy" wire:model="receiptReturnPolicy" x-model="policy" class="mt-1 block w-full h-10" placeholder="No return, no exchange." />
                                         <x-input-error :messages="$errors->get('receiptReturnPolicy')" class="mt-1" />
                                     </div>
                                 </div>
@@ -678,26 +694,7 @@
                     <div class="xl:col-span-1">
                         <div class="bg-gray-50 rounded-xl p-5 border border-gray-100 flex flex-col items-center">
                             <span class="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-4">Live Preview</span>
-                            <div class="w-full max-w-[240px] min-w-0 overflow-hidden bg-white shadow-md p-4 pt-6 pb-8 font-mono text-[10px] text-gray-800 relative receipt-paper border border-gray-100"
-                                 x-data="{ 
-                                     subtotal: 320.00, 
-                                     vatRate: 0,
-                                     currency: '₱',
-                                     serviceCharge: 16.00,
-                                     businessName: @entangle('businessName').live,
-                                     businessEmail: @entangle('businessEmail').live,
-                                     businessPhone: @entangle('businessPhone').live,
-                                     logoEnabled: @entangle('receiptLogoEnabled').live,
-                                     logoUrl: @js($businessLogo ? $businessLogo->temporaryUrl() : ($existingLogo ? Storage::url($existingLogo) : null)),
-                                                                          footer: @entangle('receiptFooterMessage').live,
-                                     policy: @entangle('receiptReturnPolicy').live,
-                                     showFooter: @entangle('showReceiptFooter').live,
-                                     showQrCode: @entangle('showReceiptQrCode').live,
-                                     showTendered: @entangle('showReceiptTendered').live,
-                                     showChange: @entangle('showReceiptChange').live,
-                                     customerTitle: @entangle('customerReceiptTitle').live
-                                 }"
-                                 @businessconfigupdated.window="logoUrl = $event.detail.logo_url; businessName = $event.detail.business_name">
+                            <div class="w-full max-w-[240px] min-w-0 overflow-hidden bg-white shadow-md p-4 pt-6 pb-8 font-mono text-[10px] text-gray-800 relative receipt-paper border border-gray-100">
                                 <div class="text-center mb-4">
                                     <div x-show="logoEnabled" class="mb-2 flex justify-center">
                                         <img x-show="logoUrl" :src="logoUrl" class="w-10 h-10 object-contain">
@@ -785,24 +782,24 @@
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
                         <div>
                             <x-input-label for="lowStockThreshold" value="Low Stock Warning" />
-                            <x-text-input id="lowStockThreshold" type="number" min="1" wire:model.blur="lowStockThreshold" class="mt-1 block w-full h-10" placeholder="e.g. 10" :hasError="$errors->has('lowStockThreshold')" />
+                            <x-text-input id="lowStockThreshold" type="number" min="1" wire:model="lowStockThreshold" class="mt-1 block w-full h-10" placeholder="e.g. 10" :hasError="$errors->has('lowStockThreshold')" />
                             <x-input-error :messages="$errors->get('lowStockThreshold')" class="mt-1" />
                         </div>
                         <div>
                             <x-input-label for="criticalStockThreshold" value="Emergency Level" />
-                            <x-text-input id="criticalStockThreshold" type="number" min="1" wire:model.blur="criticalStockThreshold" class="mt-1 block w-full h-10" placeholder="e.g. 5" />
+                            <x-text-input id="criticalStockThreshold" type="number" min="1" wire:model="criticalStockThreshold" class="mt-1 block w-full h-10" placeholder="e.g. 5" />
                             <x-input-error :messages="$errors->get('criticalStockThreshold')" class="mt-1" />
                             <p class="mt-2 text-[10px] text-gray-400 font-medium italic">Must be less than Low Stock Warning</p>
                         </div>
                         <div>
                             <x-input-label for="expiryAlertDays" value="Expiry Warning (Days)" />
-                            <x-text-input id="expiryAlertDays" type="number" min="1" max="365" wire:model.blur="expiryAlertDays" class="mt-1 block w-full h-10" placeholder="e.g. 7" />
+                            <x-text-input id="expiryAlertDays" type="number" min="1" max="365" wire:model="expiryAlertDays" class="mt-1 block w-full h-10" placeholder="e.g. 7" />
                             <x-input-error :messages="$errors->get('expiryAlertDays')" class="mt-1" />
                         </div>
                     </div>
                     <div class="mt-6">
                         <label class="flex items-center gap-3 cursor-pointer select-none group">
-                            <input type="checkbox" wire:model.live="autoReorderEnabled" class="rounded border-gray-300 text-gray-900 shadow-sm focus:ring-gray-900 h-4 w-4">
+                            <input type="checkbox" wire:model="autoReorderEnabled" class="rounded border-gray-300 text-gray-900 shadow-sm focus:ring-gray-900 h-4 w-4">
                             <div>
                                 <span class="block text-[13px] font-bold text-gray-800 group-hover:text-indigo-600 transition-colors">Auto-Notifications</span>
                                 <span class="block text-[11px] text-gray-500">Alert managers when stock is critical.</span>
@@ -826,13 +823,13 @@
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
                                     <x-input-label for="discountRate" value="Standard Discount" />
-                                    <x-text-input id="discountRate" type="number" step="0.01" min="0" max="1" wire:model.blur="discountRate" class="mt-1 block w-full h-10" placeholder="0.10" />
+                                    <x-text-input id="discountRate" type="number" step="0.01" min="0" max="1" wire:model="discountRate" class="mt-1 block w-full h-10" placeholder="0.10" />
                                     <x-input-error :messages="$errors->get('discountRate')" class="mt-1" />
                                     <p class="mt-1 text-[10px] text-gray-400 font-medium italic">Decimal format: 10% → 0.10</p>
                                 </div>
                                 <div>
                                     <x-input-label for="seniorDiscountRate" value="Senior/PWD Discount" />
-                                    <x-text-input id="seniorDiscountRate" type="number" step="0.01" min="0" max="1" wire:model.blur="seniorDiscountRate" class="mt-1 block w-full h-10" placeholder="0.10" />
+                                    <x-text-input id="seniorDiscountRate" type="number" step="0.01" min="0" max="1" wire:model="seniorDiscountRate" class="mt-1 block w-full h-10" placeholder="0.10" />
                                     <x-input-error :messages="$errors->get('seniorDiscountRate')" class="mt-1" />
                                     <p class="mt-1 text-[10px] text-gray-400 font-medium italic">Decimal format: 20% → 0.20</p>
                                 </div>
@@ -841,7 +838,7 @@
                             <div class="grid grid-cols-1 sm:grid-cols-1 gap-4">
                                 <div>
                                     <x-input-label for="serviceCharge" value="Service Charge Rate" />
-                                    <x-text-input id="serviceCharge" type="text" wire:model.blur="serviceCharge" class="mt-1 block w-full h-10" placeholder="0.00" x-on:input="restrictInput($event)" :hasError="$errors->has('serviceCharge')" />
+                                    <x-text-input id="serviceCharge" type="text" wire:model="serviceCharge" class="mt-1 block w-full h-10" placeholder="0.00" x-on:input="restrictInput($event)" :hasError="$errors->has('serviceCharge')" />
                                     <x-input-error :messages="$errors->get('serviceCharge')" class="mt-1" />
                                     <p class="mt-1 text-[10px] text-gray-400 font-medium italic">e.g. 0.05 for 5%</p>
                                 </div>
@@ -925,7 +922,7 @@
                                     <div class="flex-grow grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div>
                                             <x-input-label value="GCash Account Name" />
-                                            <x-text-input wire:model.blur="gcashAccountName" class="w-full mt-1 h-10" placeholder="e.g. Acme Corp" />
+                                            <x-text-input wire:model="gcashAccountName" class="w-full mt-1 h-10" placeholder="e.g. Acme Corp" />
                                             <x-input-error :messages="$errors->get('gcashAccountName')" class="mt-1" />
                                         </div>
                                         <div>
@@ -934,7 +931,7 @@
                                                 <div class="flex-shrink-0 inline-flex items-center px-3 h-10 rounded-l-lg border border-r-0 border-gray-200 bg-gray-50 text-gray-500 text-[13px] font-bold">
                                                     +63
                                                 </div>
-                                                <x-text-input wire:model.blur="gcashAccountNumber" type="text"
+                                                <x-text-input wire:model="gcashAccountNumber" type="text"
                                                     class="block w-full rounded-l-none" placeholder="912 345 6789" autocomplete="tel"
                                                     inputFilter="number" maxlength="10"
                                                     @keydown="FormFilters.numberKeydown($event)" @paste="FormFilters.numberPaste($event)"
@@ -959,9 +956,11 @@
             {{-- Customer Feedback --}}
 <div x-show="tab === 'reviews'" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="space-y-6"
     x-data="{
-        maxDevices: @entangle('reviewMaxDevicesPerReceipt').live,
-        expiryDays: @entangle('reviewExpiryDays').live,
-        cooldownMins: @entangle('reviewDeviceCooldownMinutes').live,
+        title: @entangle('reviewFormTitle'),
+        subtitle: @entangle('reviewFormSubtitle'),
+        maxDevices: @entangle('reviewMaxDevicesPerReceipt'),
+        expiryDays: @entangle('reviewExpiryDays'),
+        cooldownMins: @entangle('reviewDeviceCooldownMinutes'),
         bump(prop, delta, min, max) { this[prop] = Math.max(min, Math.min(max, (parseInt(this[prop]) || 0) + delta)); }
     }">                <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
                     <div class="xl:col-span-2 space-y-6">
@@ -971,12 +970,12 @@
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 pb-6 border-b border-gray-50">
                                 <div>
                                     <x-input-label for="reviewFormTitle" value="Feedback Header" />
-                                    <x-text-input id="reviewFormTitle" wire:model.live="reviewFormTitle" class="mt-1 block w-full h-10" placeholder="How was your experience?" />
+                                    <x-text-input id="reviewFormTitle" wire:model="reviewFormTitle" x-model="title" class="mt-1 block w-full h-10" placeholder="How was your experience?" />
                                     <x-input-error :messages="$errors->get('reviewFormTitle')" class="mt-1" />
                                 </div>
                                 <div>
                                     <x-input-label for="reviewFormSubtitle" value="Sub-header / Thank You" />
-                                    <x-text-input id="reviewFormSubtitle" wire:model.live="reviewFormSubtitle" class="mt-1 block w-full h-10" placeholder="Thank you for your feedback!" />
+                                    <x-text-input id="reviewFormSubtitle" wire:model="reviewFormSubtitle" x-model="subtitle" class="mt-1 block w-full h-10" placeholder="Thank you for your feedback!" />
                                     <x-input-error :messages="$errors->get('reviewFormSubtitle')" class="mt-1" />
                                 </div>
                             </div>
@@ -1021,7 +1020,6 @@
                                             <span class="inline-block text-[10px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">1 – 30 days</span>
                                         </div>
                                         <div class="mt-1 flex items-center h-10 border border-gray-200 rounded-lg overflow-hidden shadow-sm bg-white">
-                                                <button type="button" wire:click="decrementReviewExpiryDays"
                                             <button type="button" @click="bump('expiryDays', -1, 1, 30)"
                                                 :disabled="expiryDays <= 1"
                                                 class="w-10 h-full flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white transition-colors border-r border-gray-200 shrink-0">
@@ -1079,7 +1077,7 @@
                                             <div class="flex items-start gap-4">
                                                 <div class="flex-grow space-y-2">
                                                     <x-input-label value="Question Prompt" />
-                                                    <x-text-input wire:model.live="reviewQuestions.{{ $index }}.text" class="block w-full h-10 bg-white" placeholder="e.g. Rate our service quality" />
+                                                    <x-text-input wire:model="reviewQuestions.{{ $index }}.text" class="block w-full h-10 bg-white" placeholder="e.g. Rate our service quality" />
                                                 </div>
                                                 <button wire:click="removeReviewQuestion({{ $index }})" class="mt-8 text-gray-400 hover:text-rose-500 transition-colors">
                                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -1160,7 +1158,7 @@
                                                 </div>
                                                 <div class="flex items-center pt-6">
                                                     <label class="flex items-center gap-3 cursor-pointer group">
-                                                        <input type="checkbox" wire:model.live="reviewQuestions.{{ $index }}.required" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500 h-4 w-4">
+                                                        <input type="checkbox" wire:model="reviewQuestions.{{ $index }}.required" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500 h-4 w-4">
                                                         <span class="text-[12px] font-bold text-gray-600 group-hover:text-indigo-600 transition-colors">Required Field</span>
                                                     </label>
                                                 </div>
@@ -1187,8 +1185,8 @@
                             
                             <div class="bg-white rounded-xl p-5 text-gray-900 space-y-4 shadow-xl border border-gray-100">
                                 <div class="text-center">
-                                    <h4 class="text-[15px] font-black tracking-tight leading-tight">{{ $reviewFormTitle ?: 'How was your experience?' }}</h4>
-                                    <p class="text-[11px] text-gray-500 mt-1 font-medium">{{ $reviewFormSubtitle ?: 'Thank you for your feedback!' }}</p>
+                                    <h4 class="text-[15px] font-black tracking-tight leading-tight" x-text="title || 'How was your experience?'"></h4>
+                                    <p class="text-[11px] text-gray-500 mt-1 font-medium" x-text="subtitle || 'Thank you for your feedback!'"></p>
                                 </div>
 
                                 <div class="space-y-5 py-2 overflow-y-auto pr-1 custom-scrollbar-slate" style="max-height: 340px;">
@@ -1753,8 +1751,8 @@
                             const lat = parseFloat(data[0].lat);
                             const lng = parseFloat(data[0].lon);
                             
-                            this.$wire.set('addr_lat', lat);
-                            this.$wire.set('addr_lng', lng);
+                            this.addr_lat = lat;
+                            this.addr_lng = lng;
                             
                             if (this.map) {
                                 let zoom = 11;
@@ -1859,9 +1857,8 @@
                             const container = document.getElementById('userMap');
                             if (!container) return;
                             this.map.invalidateSize(); 
-                            let component = Livewire.find('{{ $this->getId() }}');
-                            let lat = component.addr_lat;
-                            let lng = component.addr_lng;
+                            let lat = this.addr_lat;
+                            let lng = this.addr_lng;
                             if (lat && lng) {
                                 this.map.setView([lat, lng], 16);
                                 if (this.marker) this.marker.setLatLng([lat, lng]);
@@ -1873,9 +1870,8 @@
                         const container = document.getElementById('userMap');
                         if (!container) return;
 
-                        let component = Livewire.find('{{ $this->getId() }}');
-                        let lat = component.addr_lat;
-                        let lng = component.addr_lng;
+                        let lat = this.addr_lat;
+                        let lng = this.addr_lng;
                         let startLat = lat || 14.2189;
                         let startLng = lng || 121.1672;
                         let startZoom = lat ? 15 : 11;
@@ -1883,7 +1879,7 @@
                         const lagunaBounds = L.latLngBounds([13.9, 120.9], [14.5, 121.6]);
                         
                         const street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                            maxZoom: 19,
+                             maxZoom: 19,
                             minZoom: 10,
                             attribution: '© OpenStreetMap'
                         });
@@ -1909,8 +1905,8 @@
                             if (this.marker) this.marker.setLatLng(e.latlng);
                             else this.marker = L.marker(e.latlng, { icon: this.getCustomPinIcon() }).addTo(this.map);
                             
-                            Livewire.find('{{ $this->getId() }}').set('addr_lat', lat);
-                            Livewire.find('{{ $this->getId() }}').set('addr_lng', lng);
+                            this.addr_lat = lat;
+                            this.addr_lng = lng;
                             
                             try {
                                 const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&countrycodes=ph`);
@@ -1919,7 +1915,7 @@
                                     let st = data.address.road || data.address.pedestrian || '';
                                     let num = data.address.house_number || '';
                                     let fst = (num + ' ' + st).trim();
-                                    if(fst) Livewire.find('{{ $this->getId() }}').set('addr_street', fst);
+                                    if (fst) this.addr_street = fst;
                                     
                                     await this.autoMatchLocation(data.address);
                                 }
@@ -1968,6 +1964,7 @@
                 },
 
                 init() {
+                    this.loadRegions();
                     this.initializeExistingAddress();
                 }
             }));

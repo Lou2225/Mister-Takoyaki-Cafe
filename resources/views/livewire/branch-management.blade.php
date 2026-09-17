@@ -1,23 +1,52 @@
 <div
-    x-data="branchManagementData($wire, @js($panel), @js($view))"
+    x-data="branchManagementData($wire, @js($panel), @js($view), @js($managers->map(fn($m) => ['id' => (string)$m->id, 'name' => trim($m->first_name . ' ' . $m->last_name)])))"
     x-on:refresh-global-map.window="latestBranches = ($event.detail.branches || $event.detail[0]?.branches) || latestBranches; updateGlobalBranches(latestBranches)"
     @trigger-edit-branch.window="$wire.showEdit($event.detail.id)"
     class="relative">
 
     <script>
-        function branchManagementData($wire, initialPanel, initialView) {
+        function branchManagementData($wire, initialPanel, initialView, managersList = []) {
             return {
                 ...slidingTabs({ view: initialView || 'table' }, 'view'),
                 panel: $wire.entangle('panel').live,
                 mode: $wire.entangle('mode').live,
                 view: initialView || 'table',
-                status: @entangle('status').live,
+                status: @entangle('status'),
+                branch_name: @entangle('branch_name'),
+                branch_code: @entangle('branch_code'),
+                user_id: @entangle('user_id'),
                 addr_lat: @entangle('addr_lat'),
                 addr_lng: @entangle('addr_lng'),
                 addr_region: @entangle('addr_region'),
                 addr_province: @entangle('addr_province'),
                 addr_city: @entangle('addr_city'),
                 addr_barangay: @entangle('addr_barangay'),
+                addr_street: @entangle('addr_street'),
+                managersList: managersList,
+
+                get assignedManagerLabel() {
+                    if (!this.user_id) return 'None / Unassigned';
+                    const m = this.managersList.find(x => String(x.id) === String(this.user_id));
+                    return m ? m.name : 'None / Unassigned';
+                },
+
+                onBranchNameInput(val) {
+                    if (this.mode === 'create' || !this.branch_code) {
+                        const cleaned = (val || '').replace(/[^A-Za-z0-9 ]/g, '');
+                        const words = cleaned.toUpperCase().split(' ').filter(Boolean);
+                        let code = 'MTC-';
+                        if (words.length === 1) {
+                            code += words[0].substring(0, 4);
+                        } else if (words.length > 1) {
+                            if (words.length === 2 && words[0].length > 1) {
+                                code = 'MTC-' + words[0][0] + words[0][1] + words[1][0];
+                            } else {
+                                words.forEach(w => { code += w[0]; });
+                            }
+                        }
+                        this.branch_code = code;
+                    }
+                },
 
                 // Live copy of branch pin data, kept in sync by every
                 // refresh-global-map dispatch (save/update/delete/set-main) —
@@ -384,7 +413,7 @@
                                     let st = data.address.road || data.address.pedestrian || '';
                                     let num = data.address.house_number || '';
                                     let fst = (num + ' ' + st).trim();
-                                    if(fst) this.$wire.set('addr_street', fst);
+                                    if(fst) this.addr_street = fst;
                                     
                                     await this.autoMatchLocation(data.address);
                                 }
@@ -551,25 +580,25 @@
                 },
 
                 init() {
+                    this.loadRegions();
                     this.initializeExistingAddress();
-                    this.$watch('mode', (val) => {
-        if (val === 'create') {
-            this.loc.province.items = [];
-            this.loc.city.items     = [];
-            this.loc.barangay.items = [];
-            this.loc.noProvince     = false;
-        } else if (val === 'edit') {
-            // Every edit can target a different branch, so the cascade
-            // lists must be reloaded for that branch's saved address —
-            // they don't refresh automatically just because addr_region/
-            // addr_province/etc changed via the wire entangle.
-            this.loc.province.items = [];
-            this.loc.city.items     = [];
-            this.loc.barangay.items = [];
-            this.loc.noProvince     = false;
-            this.initializeExistingAddress();
-        }
-    });
+                    this.$watch('mode', async (val) => {
+                        if (val === 'create') {
+                            this.loc.province.items = [];
+                            this.loc.city.items     = [];
+                            this.loc.barangay.items = [];
+                            this.loc.noProvince     = false;
+                            await this.loadRegions();
+                        } else if (val === 'edit') {
+                            this.loc.province.items = [];
+                            this.loc.city.items     = [];
+                            this.loc.barangay.items = [];
+                            this.loc.noProvince     = false;
+                            this.$nextTick(async () => {
+                                await this.initializeExistingAddress();
+                            });
+                        }
+                    });
                     this.$watch('panel', (val) => {
                         // The map picker only lives inside its modal and is
                         // initialized when that modal is explicitly opened
@@ -616,16 +645,17 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <x-input-label for="f_branch_name" value="Branch Name *" />
-                                <x-text-input id="f_branch_name" name="branch_name" wire:model.blur="branch_name" type="text" 
+                                <x-text-input id="f_branch_name" name="branch_name" wire:model="branch_name" x-model="branch_name" type="text" 
                                     class="mt-1 block w-full" placeholder="e.g. {{ \App\Services\ConfigurationService::getBusinessName() }} - Makati" 
                                     inputFilter="name" maxlength="150"
                                     @keydown="FormFilters.nameKeydown($event)" @paste="FormFilters.namePaste($event)"
+                                    @input="onBranchNameInput($event.target.value)"
                                     hasError="{{ $errors->has('branch_name') }}" />
                                 <x-input-error :messages="$errors->get('branch_name')" class="mt-1" />
                             </div>
                             <div>
                                 <x-input-label for="f_branch_code" value="Branch Code *" />
-                                <x-text-input id="f_branch_code" name="branch_code" wire:model.blur="branch_code" type="text" 
+                                <x-text-input id="f_branch_code" name="branch_code" wire:model="branch_code" x-model="branch_code" type="text" 
                                     class="mt-1 block w-full uppercase" placeholder="e.g. MAKATI-01" 
                                     maxlength="50"
                                     hasError="{{ $errors->has('branch_code') }}" />
@@ -637,7 +667,7 @@
                                     <div class="flex-shrink-0 inline-flex items-center px-3 h-10 rounded-l-lg border border-r-0 border-gray-200 bg-gray-50 text-gray-500 text-[13px] font-bold">
                                         +63
                                     </div>
-                                    <x-text-input id="f_phone" name="phone" wire:model.blur="phone" type="text"
+                                    <x-text-input id="f_phone" name="phone" wire:model="phone" type="text"
                                         class="block w-full rounded-l-none" placeholder="912 345 6789" autocomplete="tel"
                                         inputFilter="number" maxlength="10"
                                         @keydown="FormFilters.numberKeydown($event)" @paste="FormFilters.numberPaste($event)"
@@ -647,7 +677,7 @@
                             </div>
                             <div>
                                 <x-input-label for="f_email" value="Email Address" />
-                                <x-text-input id="f_email" name="email" wire:model.blur="email" type="email" 
+                                <x-text-input id="f_email" name="email" wire:model="email" type="email" 
                                     class="mt-1 block w-full" placeholder="e.g. makati@mistertakoyaki.com" 
                                     autocomplete="email" inputFilter="email" maxlength="255"
                                     @keydown="FormFilters.emailKeydown($event)" @paste="FormFilters.emailPaste($event)"
@@ -676,6 +706,7 @@
                                                                 <div class="flex-1 w-full">
                                     <x-input-label value="Region *" />
                                     <div class="relative mt-1"
+                                        wire:ignore
                                         x-data="{
                                             open: false,
                                             dropUp: false,
@@ -749,6 +780,7 @@
                                                                 <div class="flex-1 w-full">
                                     <x-input-label value="Province *" />
                                     <div class="relative mt-1"
+                                        wire:ignore
                                         x-data="{
                                             open: false,
                                             dropUp: false,
@@ -827,6 +859,7 @@
                                                                 <div class="flex-1 w-full">
                                     <x-input-label value="City / Municipality *" />
                                     <div class="relative mt-1"
+                                        wire:ignore
                                         x-data="{
                                             open: false,
                                             dropUp: false,
@@ -902,6 +935,7 @@
                                                                 <div class="flex-1 w-full">
                                     <x-input-label value="Barangay *" />
                                     <div class="relative mt-1"
+                                        wire:ignore
                                         x-data="{
                                             open: false,
                                             dropUp: false,
@@ -977,7 +1011,7 @@
                             {{-- Row 3: Street --}}
                             <div>
                                 <x-input-label value="Street / House No. / Landmark" />
-                                <x-text-input wire:model.blur="addr_street" class="w-full mt-1 h-10" placeholder="e.g. Unit 123, Rosewood Ave, Phase 1" hasError="{{ $errors->has('addr_street') }}" />
+                                <x-text-input wire:model="addr_street" x-model="addr_street" class="w-full mt-1 h-10" placeholder="e.g. Unit 123, Rosewood Ave, Phase 1" hasError="{{ $errors->has('addr_street') }}" />
                                 <x-input-error :messages="$errors->get('addr_street')" class="mt-1" />
                             </div>
                         </div>
@@ -993,14 +1027,14 @@
                             <x-dropdown align="left" width="full" containerClasses="block w-full mt-1">
                                 <x-slot name="trigger">
                                     <button type="button" class="flex items-center justify-between w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] shadow-sm hover:border-indigo-300 transition-all h-10">
-                                        <span class="truncate font-medium">{{ $this->assignedManagerLabel }}</span>
+                                        <span class="truncate font-medium" x-text="assignedManagerLabel">{{ $this->assignedManagerLabel }}</span>
                                         <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                     </button>
                                 </x-slot>
                                 <x-slot name="content" class="max-h-60 overflow-y-auto">
-                                    <x-dropdown-link href="#" wire:click.prevent="$set('user_id', '')">None / Unassigned</x-dropdown-link>
+                                    <x-dropdown-link href="#" @click.prevent="user_id = null; dropdownOpen = false">None / Unassigned</x-dropdown-link>
                                     @foreach($managers as $m)
-                                        <x-dropdown-link href="#" wire:click.prevent="$set('user_id', {{ $m->id }})">
+                                        <x-dropdown-link href="#" @click.prevent="user_id = {{ $m->id }}; dropdownOpen = false">
                                             {{ $m->first_name }} {{ $m->last_name }}
                                         </x-dropdown-link>
                                     @endforeach
@@ -1012,7 +1046,7 @@
                         <div class="mt-6 pt-6 border-t border-slate-100">
                             <h3 class="text-[12px] font-bold text-slate-800 uppercase tracking-widest mb-4">Operational Status</h3>
                             <label for="f_status" class="flex items-center gap-3 cursor-pointer select-none">
-                                <input type="checkbox" id="f_status" name="status" wire:model.blur="status"
+                                <input type="checkbox" id="f_status" name="status" wire:model="status" x-model="status"
                                     class="rounded border-gray-300 text-gray-900 shadow-sm focus:ring-indigo-600 h-4 w-4">
                                 <div>
                                     <span class="block text-[13px] font-semibold text-gray-800">Active Node</span>

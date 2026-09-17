@@ -1,16 +1,7 @@
 <div
-    x-data="userManagementData($wire, @js($panel), @js($mode), @js($view))"
-    @send-email-bg.window="$wire.sendUserEmail($event.detail.userId, $event.detail.password)"
+    x-data="userManagementData($wire, @js($panel), @js($mode), @js($view), @js($roles->pluck('name', 'id')), @js($branches->pluck('branch_name', 'id')))"
     @trigger-edit.window="$wire.showEdit($event.detail.id, $event.detail.mode || 'edit')"
-    @trigger-set-formrole.window="$wire.setFormRoleId($event.detail)"
-    @trigger-set-formbranch.window="$wire.setFormBranchId($event.detail)"
-    @trigger-set-position.window="$wire.set('position', $event.detail)"
     class="relative">
-
-
-
-
-
 
     <div class="relative min-h-[600px]">
         {{-- ════════════════ PANEL 2 — FORM (CREATE/EDIT) ════════════════ --}}
@@ -38,7 +29,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div>
                                 <x-input-label for="f_first_name" value="First Name *" />
-                                <x-text-input id="f_first_name" name="first_name" wire:model.blur="firstName"
+                                <x-text-input id="f_first_name" name="first_name" wire:model="firstName"
                                     type="text" class="mt-1 block w-full" placeholder="Juan"
                                     autocomplete="given-name" inputFilter="nameStrict" maxlength="100"
                                     @keydown="FormFilters.nameStrictKeydown($event)" @paste="FormFilters.nameStrictPaste($event)"
@@ -47,7 +38,7 @@
                             </div>
                             <div>
                                 <x-input-label for="f_middle_name" value="Middle Name" />
-                                <x-text-input id="f_middle_name" name="middle_name" wire:model.blur="middleName"
+                                <x-text-input id="f_middle_name" name="middle_name" wire:model="middleName"
                                     type="text" class="mt-1 block w-full" placeholder="Dela"
                                     autocomplete="additional-name" inputFilter="nameStrict" maxlength="100"
                                     @keydown="FormFilters.nameStrictKeydown($event)" @paste="FormFilters.nameStrictPaste($event)"
@@ -56,7 +47,7 @@
                             </div>
                             <div>
                                 <x-input-label for="f_last_name" value="Last Name *" />
-                                <x-text-input id="f_last_name" name="last_name" wire:model.blur="lastName" type="text"
+                                <x-text-input id="f_last_name" name="last_name" wire:model="lastName" type="text"
                                     class="mt-1 block w-full" placeholder="Cruz" autocomplete="family-name" 
                                     inputFilter="nameStrict" maxlength="100"
                                     @keydown="FormFilters.nameStrictKeydown($event)" @paste="FormFilters.nameStrictPaste($event)"
@@ -67,7 +58,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                             <div>
                                 <x-input-label for="f_email" value="Email Address *" />
-                                <x-text-input id="f_email" name="email" wire:model.blur="email" type="email"
+                                <x-text-input id="f_email" name="email" wire:model="email" type="email"
                                     class="mt-1 block w-full" placeholder="juan.cruz@company.com"
                                     autocomplete="email" inputFilter="email" maxlength="255"
                                     @keydown="FormFilters.emailKeydown($event)" @paste="FormFilters.emailPaste($event)"
@@ -80,7 +71,7 @@
                                     <div class="flex-shrink-0 inline-flex items-center px-3 h-10 rounded-l-lg border border-r-0 border-gray-200 bg-gray-50 text-gray-500 text-[13px] font-bold">
                                         +63
                                     </div>
-                                    <x-text-input id="f_phone" name="phone" wire:model.blur="phone" type="text"
+                                    <x-text-input id="f_phone" name="phone" wire:model="phone" type="text"
                                         class="block w-full rounded-l-none" placeholder="912 345 6789" autocomplete="tel"
                                         inputFilter="number" maxlength="10"
                                         @keydown="FormFilters.numberKeydown($event)" @paste="FormFilters.numberPaste($event)"
@@ -108,14 +99,14 @@
                                     </div>
                                 </div>
                             </div>
-                            <div x-show="$wire.formRoleId == 3" x-cloak>
-    <x-input-label for="f_position">Staff Role <span class="text-red-500">*</span></x-input-label>
+                            <div x-show="formRoleId == 3" x-cloak>
+                                <x-input-label for="f_position">Staff Role <span class="text-red-500">*</span></x-input-label>
                                 <div wire:key="role-dropdown-container">
                                     <x-dropdown align="left" width="full" containerClasses="block w-full">
                                         <x-slot name="trigger">
                                             <button id="f_position" type="button" 
                                                 class="mt-1 flex items-center justify-between w-full px-3 py-2 bg-white border rounded-lg text-[13px] text-gray-700 shadow-sm hover:border-gray-300 focus:outline-none transition-all h-10 {{ $errors->has('position') ? 'border-red-400 bg-red-50/30' : 'border-gray-200' }}">
-                                                <span>{{ $position ?: 'Select role...' }}</span>
+                                                <span x-text="position || 'Select role...'">{{ $position ?: 'Select role...' }}</span>
                                                 <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                                                 </svg>
@@ -123,20 +114,22 @@
                                         </x-slot>
                                         <x-slot name="content" class="max-h-60 overflow-y-auto">
                                             @forelse($availablePositions as $pos)
-    <x-dropdown-link href="#" @click.prevent="dropdownOpen = false; $dispatch('trigger-set-position', '{{ $pos }}')">
-        {{ $pos }}
-    </x-dropdown-link>
-@empty
+                                                <x-dropdown-link href="#" @click.prevent="position = '{{ $pos }}'; dropdownOpen = false;">
+                                                    {{ $pos }}
+                                                </x-dropdown-link>
+                                            @empty
                                                 <div class="px-4 py-2 text-[12px] text-gray-400 italic font-medium">No roles configured...</div>
                                             @endforelse
                                         </x-slot>
                                     </x-dropdown>
-                                    <x-input-error :messages="$errors->get('position')" class="mt-1" />
+                                    <div x-show="!position">
+                                        <x-input-error :messages="$errors->get('position')" class="mt-1" />
+                                    </div>
                                 </div>
                             </div>
                             <div>
                                 <x-input-label for="f_date_hired" value="Date Joined" />
-                                <x-text-input id="f_date_hired" name="date_hired" wire:model.blur="dateHired"
+                                <x-text-input id="f_date_hired" name="date_hired" wire:model="dateHired"
                                     type="date" class="mt-1 block w-full" inputFilter="date"
                                     @keydown="FormFilters.dateKeydown($event)" @paste="FormFilters.datePaste($event)"
                                     :hasError="$errors->has('dateHired')" />
@@ -163,7 +156,7 @@
                             <div class="flex flex-col sm:flex-row gap-5">
                                                                <div class="flex-1 w-full">
                                     <x-input-label value="Region" />
-                                    <div class="relative mt-1"
+                                    <div class="relative mt-1" wire:ignore
                                         x-data="{
                                             open: false,
                                             dropUp: false,
@@ -236,7 +229,7 @@
 
                                     <div class="flex-1 w-full">
                                     <x-input-label value="Province" />
-                                    <div class="relative mt-1"
+                                    <div class="relative mt-1" wire:ignore
                                         x-data="{
                                             open: false,
                                             dropUp: false,
@@ -314,7 +307,7 @@
                             <div class="flex flex-col sm:flex-row gap-5">
                                                                 <div class="flex-1 w-full">
                                     <x-input-label value="City / Municipality *" />
-                                    <div class="relative mt-1"
+                                    <div class="relative mt-1" wire:ignore
                                         x-data="{
                                             open: false,
                                             dropUp: false,
@@ -389,7 +382,7 @@
 
                                                                 <div class="flex-1 w-full">
                                     <x-input-label value="Barangay *" />
-                                    <div class="relative mt-1"
+                                    <div class="relative mt-1" wire:ignore
                                         x-data="{
                                             open: false,
                                             dropUp: false,
@@ -465,7 +458,7 @@
                             {{-- Row 3: Street --}}
                             <div>
                                 <x-input-label value="House # / Street / Subdivision" />
-                                <x-text-input wire:model.blur="addr_street" class="w-full mt-1 h-10" placeholder="e.g. Unit 123, Rosewood Ave, Phase 1" :hasError="$errors->has('addr_street')" />
+                                <x-text-input wire:model="addr_street" x-model="addr_street" class="w-full mt-1 h-10" placeholder="e.g. Unit 123, Rosewood Ave, Phase 1" :hasError="$errors->has('addr_street')" />
                                 <x-input-error :messages="$errors->get('addr_street')" class="mt-1" />
                             </div>
                         </div>
@@ -483,7 +476,7 @@
                                     <x-slot name="trigger">
                                         <button id="f_role" type="button"
                                             class="mt-1 flex items-center justify-between w-full px-3 py-2 bg-white border rounded-lg text-[13px] text-gray-700 shadow-sm hover:border-gray-300 focus:outline-none transition-all h-10 {{ $errors->has('formRoleId') ? 'border-red-400 bg-red-50/30' : 'border-gray-200' }}">
-                                            <span>{{ $formRoleId ? $roles->firstWhere('id', $formRoleId)?->name : 'Select account type...' }}</span>
+                                            <span x-text="rolesMap[formRoleId] ? (rolesMap[formRoleId].charAt(0).toUpperCase() + rolesMap[formRoleId].slice(1)) : 'Select account type...'">{{ $formRoleId ? ucfirst($roles->firstWhere('id', $formRoleId)?->name) : 'Select account type...' }}</span>
                                             <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor"
                                                 viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -493,15 +486,17 @@
                                     </x-slot>
                                     <x-slot name="content">
                                         @forelse($roles as $r)
-    <x-dropdown-link href="#" @click.prevent="dropdownOpen = false; $dispatch('trigger-set-formrole', '{{ $r->id }}')">
-        {{ ucfirst($r->name) }}
-    </x-dropdown-link>
-@empty
+                                            <x-dropdown-link href="#" @click.prevent="formRoleId = '{{ $r->id }}'; if (formRoleId != 3) position = ''; dropdownOpen = false;">
+                                                {{ ucfirst($r->name) }}
+                                            </x-dropdown-link>
+                                        @empty
                                             <div class="px-4 py-2 text-[12px] text-gray-400 italic font-medium">No roles available...</div>
                                         @endforelse
                                     </x-slot>
                                 </x-dropdown>
-                                <x-input-error :messages="$errors->get('formRoleId')" class="mt-1" />
+                                <div x-show="!formRoleId">
+                                    <x-input-error :messages="$errors->get('formRoleId')" class="mt-1" />
+                                </div>
                             </div>
                             <div>
                                 <x-input-label for="f_branch_id" value="Work Location *" />
@@ -509,7 +504,7 @@
                                     <x-slot name="trigger">
                                         <button id="f_branch_id" type="button"
                                             class="mt-1 flex items-center justify-between w-full px-3 py-2 bg-white border rounded-lg text-[13px] text-gray-700 shadow-sm hover:border-gray-300 focus:outline-none transition-all h-10 {{ $errors->has('formBranchId') ? 'border-red-400 bg-red-50/30' : 'border-gray-200' }}">
-                                            <span>{{ $formBranchId ? ($branches->firstWhere('id', $formBranchId)?->branch_name ?? 'Select work location...') : 'Select work location...' }}</span>
+                                            <span x-text="branchesMap[formBranchId] || 'Select work location...'">{{ $formBranchId ? ($branches->firstWhere('id', $formBranchId)?->branch_name ?? 'Select work location...') : 'Select work location...' }}</span>
                                             <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor"
                                                 viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -519,15 +514,17 @@
                                     </x-slot>
                                     <x-slot name="content" class="max-h-60 overflow-y-auto">
                                         @forelse($branches as $branch)
-    <x-dropdown-link href="#" @click.prevent="dropdownOpen = false; $dispatch('trigger-set-formbranch', '{{ $branch->id }}')">
-        {{ $branch->branch_name }}
-    </x-dropdown-link>
-@empty
+                                            <x-dropdown-link href="#" @click.prevent="formBranchId = '{{ $branch->id }}'; dropdownOpen = false;">
+                                                {{ $branch->branch_name }}
+                                            </x-dropdown-link>
+                                        @empty
                                             <div class="px-4 py-2 text-[12px] text-gray-400 italic font-medium">No branches defined...</div>
                                         @endforelse
                                     </x-slot>
                                 </x-dropdown>
-                                <x-input-error :messages="$errors->get('formBranchId')" class="mt-1" />
+                                <div x-show="!formBranchId">
+                                    <x-input-error :messages="$errors->get('formBranchId')" class="mt-1" />
+                                </div>
                             </div>
                         @else
                             <div class="space-y-3">
@@ -553,7 +550,7 @@
                     <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
                         <h2 class="text-[13px] font-semibold text-gray-700 uppercase tracking-wider mb-4">Account Status</h2>
                         <label for="f_is_active" class="flex items-center gap-3 cursor-pointer select-none">
-                            <input type="checkbox" id="f_is_active" name="is_active" wire:model.blur="formIsActive"
+                            <input type="checkbox" id="f_is_active" name="is_active" wire:model="formIsActive"
                                 class="rounded border-gray-300 text-gray-900 shadow-sm focus:ring-gray-900 h-4 w-4">
                             <div>
                                 <span class="block text-[13px] font-semibold text-gray-800">Active Access</span>
@@ -1494,13 +1491,11 @@
         const registerUserData = () => {
             if (!window.Alpine) return;
             if (Alpine.data('userManagementData')) return;
-            Alpine.data('userManagementData', ($wire, initialPanel, initialMode, initialView) => ({
+            Alpine.data('userManagementData', ($wire, initialPanel, initialMode, initialView, rolesMap, branchesMap) => ({
                 ...slidingTabs(@js($historyTab), 'historyTab', 'historyTabList'),
-                panel: $wire.entangle('panel').live,
-                mode: $wire.entangle('mode').live,
+                panel: $wire.entangle('panel'),
+                mode: $wire.entangle('mode'),
                 tableView: initialView || 'table',
-                deleteTargetId: null,
-                deleteTargetName: '',
 
                 // ── View Profile preload state ───────────────────────────
                 // The skeleton shows once per account, the first time that
@@ -1511,13 +1506,21 @@
                 viewProfileLoading: false,
                 viewProfileWarmedIds: new Set(),
 
-                // ── Entangled Form State ─────────────────────────────────
-                addr_region: @entangle('addr_region'),
-                addr_province: @entangle('addr_province'),
-                addr_city: @entangle('addr_city'),
-                addr_barangay: @entangle('addr_barangay'),
-                addr_lat: @entangle('addr_lat'),
-                addr_lng: @entangle('addr_lng'),
+                // ── Entangled Form State (0ms deferred sync) ─────────────
+                editUserId: $wire.entangle('editUserId'),
+                formRoleId: $wire.entangle('formRoleId'),
+                formBranchId: $wire.entangle('formBranchId'),
+                position: $wire.entangle('position'),
+                addr_street: $wire.entangle('addr_street'),
+                addr_region: $wire.entangle('addr_region'),
+                addr_province: $wire.entangle('addr_province'),
+                addr_city: $wire.entangle('addr_city'),
+                addr_barangay: $wire.entangle('addr_barangay'),
+                addr_lat: $wire.entangle('addr_lat'),
+                addr_lng: $wire.entangle('addr_lng'),
+
+                rolesMap: rolesMap || {},
+                branchesMap: branchesMap || {},
 
                 // ── Location state ───────────────────────────────────────
                 loc: {
@@ -1670,7 +1673,6 @@
                     }));
                 },
 
-                // ── Cascade handlers ─────────────────────────────────────
                 // ── Cascade handlers ─────────────────────────────────────
                 async selectRegion(region, fromMap = false) {
                     this.addr_region = region.name;
@@ -1929,7 +1931,7 @@
                                     let st = data.address.road || data.address.pedestrian || '';
                                     let num = data.address.house_number || '';
                                     let fst = (num + ' ' + st).trim();
-                                    if(fst) this.$wire.set('addr_street', fst);
+                                    if(fst) this.addr_street = fst;
                                     
                                     await this.autoMatchLocation(data.address);
                                 }
@@ -1983,25 +1985,35 @@
                 },
 
                 init() {
+                    this.loadRegions();
                     this.initializeExistingAddress();
+                    this.$watch('editUserId', (val) => {
+                        if (val && (this.mode === 'edit' || this.mode === 'view')) {
+                            this.loc.province.items = [];
+                            this.loc.city.items     = [];
+                            this.loc.barangay.items = [];
+                            this.loc.noProvince     = false;
+                            this.initializeExistingAddress();
+                        }
+                    });
                     this.$watch('mode', (val) => {
-        if (val === 'create') {
-            this.loc.province.items = [];
-            this.loc.city.items     = [];
-            this.loc.barangay.items = [];
-            this.loc.noProvince     = false;
-        } else if (val === 'edit' || val === 'view') {
-            // Every edit/view can target a different user, so the cascade
-            // lists must be reloaded for that user's saved address — they
-            // don't refresh automatically just because addr_region/
-            // addr_province/etc changed via the wire entangle.
-            this.loc.province.items = [];
-            this.loc.city.items     = [];
-            this.loc.barangay.items = [];
-            this.loc.noProvince     = false;
-            this.initializeExistingAddress();
-        }
-    });
+                        if (val === 'create') {
+                            this.loc.province.items = [];
+                            this.loc.city.items     = [];
+                            this.loc.barangay.items = [];
+                            this.loc.noProvince     = false;
+                        } else if (val === 'edit' || val === 'view') {
+                            // Every edit/view can target a different user, so the cascade
+                            // lists must be reloaded for that user's saved address — they
+                            // don't refresh automatically just because addr_region/
+                            // addr_province/etc changed via the wire entangle.
+                            this.loc.province.items = [];
+                            this.loc.city.items     = [];
+                            this.loc.barangay.items = [];
+                            this.loc.noProvince     = false;
+                            this.initializeExistingAddress();
+                        }
+                    });
                     this.$watch('panel', (val) => {
                         // The map picker only lives inside its modal and is
                         // initialized when that modal is explicitly opened
