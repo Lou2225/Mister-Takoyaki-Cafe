@@ -7,11 +7,6 @@
     $roleTheme = $user?->getRoleTheme() ?? [];
     $roleClass = 'role-' . strtolower($roleTheme['primary'] ?? 'guest');
 
-    // Topbar data
-    $branch = \App\Models\Branch::find(\App\Services\BranchContext::getActiveBranchId() ?: ($user?->branch_id));
-
-    $contextLabel = $user->isSuperAdmin() ? 'Global Context' : 'Assigned Branch';
-    $contextValue = $branch?->branch_name ?? ($user->isSuperAdmin() ? 'General Headquarters' : 'No Branch Assigned');
 
     $iconColor = match ((int) $user->role_id) {
         1       => 'text-indigo-500',
@@ -65,8 +60,20 @@
 
     {{-- Alpine Components --}}
     <script src="{{ asset('js/alpine-components.js') }}" data-navigate-once></script>
-    {{-- Leaflet Overrides --}}
+
+    {{-- Navigation Concurrency & Abort Guard --}}
+    <script src="{{ asset('js/navigation-guard.js') }}?v={{ filemtime(public_path('js/navigation-guard.js')) }}" data-navigate-once></script>
+    {{-- Leaflet Overrides & Livewire Progress Bar --}}
     <style>
+        :root {
+            --livewire-progress-bar-color: #e11d48;
+        }
+        #nprogress .bar {
+            height: 2.5px !important;
+            background: linear-gradient(90deg, #e11d48, #f43f5e, #fb7185) !important;
+            box-shadow: 0 0 10px rgba(225, 29, 72, 0.7) !important;
+            z-index: 9999999 !important;
+        }
         .leaflet-pane,
         .leaflet-top,
         .leaflet-bottom { z-index: 10 !important; }
@@ -79,6 +86,41 @@
 </head>
 
 <body class="font-sans antialiased text-gray-900 bg-gray-100 transition-colors duration-300 {{ $roleClass }}">
+
+{{-- Global Floating Island Offline Alert (Direct child of body to guarantee no clipping) --}}
+<div class="fixed top-4 inset-x-0 z-[9999] flex justify-center pointer-events-none px-4" style="z-index: 999999 !important;">
+    <div
+        x-data="{
+            offline: !navigator.onLine,
+            init() {
+                window.addEventListener('online', () => this.offline = false);
+                window.addEventListener('offline', () => this.offline = true);
+                window.addEventListener('network-status', (e) => {
+                    this.offline = (e.detail.status === 'offline');
+                });
+            }
+        }"
+        x-show="offline"
+        x-cloak
+        x-transition:enter="transition ease-out duration-300 transform"
+        x-transition:enter-start="-translate-y-10 opacity-0 scale-95"
+        x-transition:enter-end="translate-y-0 opacity-100 scale-100"
+        x-transition:leave="transition ease-in duration-200 transform"
+        x-transition:leave-start="translate-y-0 opacity-100 scale-100"
+        x-transition:leave-end="-translate-y-10 opacity-0 scale-95"
+        class="pointer-events-auto flex items-center gap-3 px-5 py-2.5 rounded-full text-white shadow-2xl select-none"
+        style="background-color: #e11d48 !important; color: #ffffff !important; border: 1.5px solid #fb7185 !important; box-shadow: 0 20px 30px -10px rgba(225, 29, 72, 0.6), 0 10px 15px -3px rgba(0, 0, 0, 0.3) !important;"
+    >
+        <span class="relative flex h-2.5 w-2.5 shrink-0">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-200 opacity-80"></span>
+            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
+        </span>
+        <svg class="w-4 h-4 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 4.243a9 9 0 01-2.828-6.364m0 0L3 3m6.364 6.364a5 5 0 01-1.414 3.536m0 0l2.828 2.828" />
+        </svg>
+        <span class="text-xs font-bold tracking-wide">No Internet Connection. Actions will not save.</span>
+    </div>
+</div>
 
 <div
     x-data="{
@@ -121,28 +163,7 @@
     {{-- ═══════════════════════ MAIN AREA ═══════════════════════ --}}
     <div class="flex-1 flex flex-col h-full bg-[#F9FAFB] overflow-hidden transition-colors duration-300">
 
-    {{-- Global Offline Alert Banner --}}
-    <div x-data="{ online: navigator.onLine }"
-        x-init="
-            window.addEventListener('online', () => online = true);
-            window.addEventListener('offline', () => online = false);
-        "
-        x-show="!online"
-        x-cloak
-        x-transition:enter="transition ease-out duration-300"
-        x-transition:enter-start="-translate-y-full opacity-0"
-        x-transition:enter-end="translate-y-0 opacity-100"
-        x-transition:leave="transition ease-in duration-200"
-        x-transition:leave-start="translate-y-0 opacity-100"
-        x-transition:leave-end="-translate-y-full opacity-0"
-        class="bg-rose-600 text-white text-[12px] font-semibold px-4 py-2 text-center flex items-center justify-center gap-2 sticky top-0 z-[120] shadow-md">
-        <svg class="w-4 h-4 animate-pulse shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 4.243a9 9 0 01-2.828-6.364m0 0L3 3m6.364 6.364a5 5 0 01-1.414 3.536m0 0l2.828 2.828" />
-        </svg>
-        <span>No internet connection detected. System changes will not save until connectivity is restored.</span>
-    </div>
-
-<header id="top-bar" class="bg-white border-b border-gray-200 sticky top-0 z-[100] flex items-center justify-between px-3 sm:px-6 h-[58px] sm:h-[65px] min-h-[58px] sm:min-h-[65px]">
+    <header id="top-bar" class="bg-white border-b border-gray-200 sticky top-0 z-[100] flex items-center justify-between px-3 sm:px-6 h-[58px] sm:h-[65px] min-h-[58px] sm:min-h-[65px]">
     <div class="flex items-center gap-4">
         {{-- Hamburger Menu for toggling sidebar --}}
         <button @click="sidebarOpen = !sidebarOpen"
@@ -164,7 +185,7 @@
 
     <div class="flex items-center gap-1 sm:gap-3">
         {{-- Clock --}}
-        <div x-data="{ 
+        <div wire:ignore wire:key="topbar-clock" x-data="{ 
                 time: '',
                 date: '',
                 _int: null,
@@ -190,119 +211,234 @@
             <div class="h-8 w-[1px] bg-gray-100 hidden xl:block"></div>
         </div>
 
-        {{-- Real-Time Internet Latency Monitor --}}
-        <div x-data="{
+        {{-- Professional 4-Bar Signal Telemetry Widget (Matches Clock Line Height) --}}
+        <div wire:ignore wire:key="topbar-telemetry-widget" x-data="{
                 ping: null,
-                status: 'checking', // 'online', 'fair', 'slow', 'offline'
-                timer: null,
-                async checkPing() {
-                    if (!navigator.onLine) {
+                bars: 4, // 0 to 4
+                status: 'online', // 'online', 'fair', 'slow', 'offline'
+                popoverOpen: false,
+                networkType: 'WiFi/LAN',
+                downlink: null,
+                isChecking: false,
+
+                get activeBarFill() {
+                    if (this.status === 'offline') return '#E5E7EB';
+                    if (this.ping === null) return '#D1D5DB';
+                    if (this.bars >= 3) return '#10B981'; // emerald-500
+                    if (this.bars === 2) return '#F59E0B'; // amber-500
+                    return '#F97316'; // orange-500
+                },
+
+                get textClass() {
+                    if (this.status === 'offline') return 'text-rose-600';
+                    if (this.ping === null) return 'text-gray-400';
+                    if (this.bars >= 3) return 'text-gray-900';
+                    if (this.bars === 2) return 'text-amber-600';
+                    return 'text-orange-600';
+                },
+
+                get subTextClass() {
+                    if (this.status === 'offline') return 'text-rose-500';
+                    if (this.ping === null) return 'text-gray-300';
+                    if (this.bars >= 3) return 'text-gray-400';
+                    if (this.bars === 2) return 'text-amber-500';
+                    return 'text-orange-500';
+                },
+
+                calculateBars(ms) {
+                    if (ms === null || !navigator.onLine) {
+                        this.bars = 0;
                         this.status = 'offline';
-                        this.ping = null;
+                        window.dispatchEvent(new CustomEvent('network-status', { detail: { status: 'offline' } }));
                         return;
                     }
-                    const start = performance.now();
-                    try {
-                        const response = await fetch('{{ route('ping') }}', {
-                            method: 'GET',
-                            cache: 'no-store',
-                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                        });
-                        if (!response.ok) throw new Error('Failed');
-                        const duration = Math.round(performance.now() - start);
-                        this.ping = duration;
-                        if (duration < 200) {
-                            this.status = 'online';
-                        } else if (duration < 500) {
-                            this.status = 'fair';
-                        } else {
-                            this.status = 'slow';
+                    if (ms < 150) {
+                        this.bars = 4;
+                        this.status = 'online';
+                    } else if (ms < 300) {
+                        this.bars = 3;
+                        this.status = 'online';
+                    } else if (ms < 500) {
+                        this.bars = 2;
+                        this.status = 'fair';
+                    } else {
+                        this.bars = 1;
+                        this.status = 'slow';
+                    }
+                    window.dispatchEvent(new CustomEvent('network-status', { detail: { status: this.status } }));
+                },
+
+                detectNetworkType() {
+                    const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                    if (conn) {
+                        if (conn.effectiveType) {
+                            this.networkType = conn.effectiveType.toUpperCase();
                         }
-                    } catch (e) {
-                        this.status = 'offline';
-                        this.ping = null;
+                        if (conn.downlink) {
+                            this.downlink = conn.downlink + ' Mbps';
+                        }
                     }
                 },
+
+                async checkPing() {
+                    if (this.isChecking) return;
+                    if (!navigator.onLine) {
+                        this.ping = null;
+                        this.calculateBars(null);
+                        return;
+                    }
+
+                    this.isChecking = true;
+                    const start = performance.now();
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 2500);
+                        const pingUrl = (window.location.origin || '') + '/ping.txt?t=' + Date.now();
+                        const response = await fetch(pingUrl, {
+                            method: 'GET',
+                            cache: 'no-store',
+                            signal: controller.signal
+                        });
+                        clearTimeout(timeoutId);
+                        if (!response.ok) throw new Error('Ping failed');
+                        const duration = Math.max(4, Math.round(performance.now() - start));
+                        this.ping = duration;
+                        this.calculateBars(duration);
+                    } catch (e) {
+                        if (!navigator.onLine) {
+                            this.ping = null;
+                            this.calculateBars(null);
+                        }
+                    } finally {
+                        this.isChecking = false;
+                    }
+                },
+
                 init() {
+                    this.detectNetworkType();
                     this.checkPing();
-                    this.timer = setInterval(() => {
-                        if (!document.hidden) {
+
+                    // Ensure only ONE global timer ever runs across page navigations
+                    if (window.__mtcPingInterval) {
+                        clearInterval(window.__mtcPingInterval);
+                        window.__mtcPingInterval = null;
+                    }
+
+                    window.__mtcPingInterval = setInterval(() => {
+                        if (!document.hidden && navigator.onLine) {
                             this.checkPing();
                         }
-                    }, 10000);
+                    }, 8000);
 
+                    // Recheck on reconnect or tab focus
                     window.addEventListener('online', () => this.checkPing());
                     window.addEventListener('offline', () => {
-                        this.status = 'offline';
                         this.ping = null;
+                        this.calculateBars(null);
                     });
                     document.addEventListener('visibilitychange', () => {
-                        if (!document.hidden) this.checkPing();
+                        if (!document.hidden && navigator.onLine) this.checkPing();
                     });
 
-                    // Hook into Livewire requests to measure real transaction roundtrips
-                    const hookLivewire = () => {
-                        if (window.Livewire) {
-                            let reqStart = 0;
-                            window.Livewire.hook('request', ({ succeed, fail }) => {
-                                reqStart = performance.now();
-                                succeed(() => {
-                                    const reqDuration = Math.round(performance.now() - reqStart);
-                                    if (reqDuration > 400) {
-                                        this.ping = reqDuration;
-                                        this.status = reqDuration >= 1000 ? 'slow' : 'fair';
-                                    }
-                                });
-                                fail(() => {
-                                    if (!navigator.onLine) {
-                                        this.status = 'offline';
-                                        this.ping = null;
-                                    }
-                                });
-                            });
-                        }
-                    };
+                },
 
-                    if (window.Livewire) {
-                        hookLivewire();
-                    } else {
-                        document.addEventListener('livewire:init', hookLivewire, { once: true });
+                destroy() {
+                    if (window.__mtcPingInterval) {
+                        clearInterval(window.__mtcPingInterval);
+                        window.__mtcPingInterval = null;
                     }
                 }
             }"
-            class="flex items-center mr-1"
+            @click.outside="popoverOpen = false"
+            class="relative flex items-center gap-2 mr-2"
         >
-            <div class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[11px] font-semibold tabular-nums select-none transition-colors duration-200"
-                :class="{
-                    'bg-emerald-50 text-emerald-700 border-emerald-200/80': status === 'online',
-                    'bg-amber-50 text-amber-700 border-amber-200/80': status === 'fair',
-                    'bg-orange-50 text-orange-700 border-orange-200/80': status === 'slow',
-                    'bg-rose-50 text-rose-700 border-rose-200/80': status === 'offline',
-                    'bg-gray-50 text-gray-500 border-gray-200': status === 'checking'
-                }"
-                :title="status === 'offline' ? 'No internet connection' : `Server roundtrip: ${ping} ms (${status === 'online' ? 'Fast' : (status === 'fair' ? 'Moderate' : 'High Latency')})`"
+            {{-- Telemetry Button: Bars on the LEFT, Number & MS on the RIGHT (aligned left) --}}
+            <button
+                type="button"
+                @click="popoverOpen = !popoverOpen"
+                class="flex items-center gap-1.5 focus:outline-none transition-transform hover:scale-105 cursor-pointer select-none group"
+                :title="status === 'offline' ? 'Offline - No Connection' : `Latency: ${ping}ms (${status.toUpperCase()})`"
             >
-                {{-- Dot indicator with ping wave --}}
-                <span class="relative flex h-2 w-2 shrink-0">
-                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
-                        :class="{
-                            'bg-emerald-400': status === 'online',
-                            'bg-amber-400': status === 'fair',
-                            'bg-orange-400': status === 'slow',
-                            'bg-rose-400': status === 'offline',
-                            'bg-gray-400': status === 'checking'
-                        }"></span>
-                    <span class="relative inline-flex rounded-full h-2 w-2"
-                        :class="{
-                            'bg-emerald-500': status === 'online',
-                            'bg-amber-500': status === 'fair',
-                            'bg-orange-500': status === 'slow',
-                            'bg-rose-500': status === 'offline',
-                            'bg-gray-400': status === 'checking'
-                        }"></span>
-                </span>
+                {{-- Left: 4 Ascending Signal Bars matching the exact vertical height of the clock (26px) --}}
+                <svg class="w-[18px] h-[26px] shrink-0" viewBox="0 0 18 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    {{-- Bar 1 (Lowest) --}}
+                    <rect x="0.5" y="17" width="3.2" height="7" rx="1"
+                        :fill="bars >= 1 ? activeBarFill : '#E5E7EB'" class="transition-colors duration-200" />
+                    {{-- Bar 2 --}}
+                    <rect x="5" y="12" width="3.2" height="12" rx="1"
+                        :fill="bars >= 2 ? activeBarFill : '#E5E7EB'" class="transition-colors duration-200" />
+                    {{-- Bar 3 --}}
+                    <rect x="9.5" y="6" width="3.2" height="18" rx="1"
+                        :fill="bars >= 3 ? activeBarFill : '#E5E7EB'" class="transition-colors duration-200" />
+                    {{-- Bar 4 (Highest, 24px) --}}
+                    <rect x="14" y="0" width="3.2" height="24" rx="1"
+                        :fill="bars >= 4 ? activeBarFill : '#E5E7EB'" class="transition-colors duration-200" />
+                </svg>
 
-                <span x-text="status === 'offline' ? 'Offline' : (ping !== null ? ping + ' ms' : '...')"></span>
+                {{-- Right: Text column (Number on top, MS on bottom, aligned LEFT) --}}
+                <div class="text-left whitespace-nowrap">
+                    <p class="text-[13px] font-black leading-none tabular-nums tracking-tight"
+                       :class="textClass"
+                       x-text="status === 'offline' ? '---' : (ping !== null ? ping : '---')"></p>
+                    <p class="text-[10px] font-bold uppercase tracking-widest mt-1.5 leading-none"
+                       :class="subTextClass"
+                       x-text="status === 'offline' ? 'OFFLINE' : 'MS'"></p>
+                </div>
+            </button>
+
+            {{-- Divider matching the clock divider --}}
+            <div class="h-8 w-[1px] bg-gray-100 hidden sm:block"></div>
+
+            {{-- Popover Card --}}
+            <div
+                x-show="popoverOpen"
+                x-cloak
+                x-transition:enter="transition ease-out duration-150 transform"
+                x-transition:enter-start="opacity-0 scale-95 -translate-y-1"
+                x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                x-transition:leave="transition ease-in duration-100 transform"
+                x-transition:leave-start="opacity-100 scale-100 translate-y-0"
+                x-transition:leave-end="opacity-0 scale-95 -translate-y-1"
+                class="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-100 rounded-xl shadow-[0_10px_35px_rgba(0,0,0,0.08)] p-3 z-[110] text-gray-700 select-none"
+            >
+                <div class="flex items-center justify-between pb-2 border-b border-gray-100">
+                    <span class="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Network Health</span>
+                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                        :class="{
+                            'bg-emerald-100 text-emerald-800': status === 'online',
+                            'bg-amber-100 text-amber-800': status === 'fair',
+                            'bg-orange-100 text-orange-800': status === 'slow',
+                            'bg-rose-100 text-rose-800': status === 'offline'
+                        }"
+                        x-text="status === 'online' ? 'Optimal' : (status === 'fair' ? 'Moderate' : (status === 'slow' ? 'High Latency' : 'Disconnected'))"
+                    ></span>
+                </div>
+                
+                <div class="space-y-1.5 pt-2 text-[11px]">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-500">Roundtrip Latency:</span>
+                        <span class="font-bold tabular-nums" x-text="ping ? ping + ' ms' : 'N/A'"></span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-500">Connection Speed:</span>
+                        <span class="font-bold" x-text="networkType"></span>
+                    </div>
+                    <div class="flex justify-between items-center" x-show="downlink">
+                        <span class="text-gray-500">Est. Bandwidth:</span>
+                        <span class="font-bold tabular-nums" x-text="downlink"></span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-500">Signal Strength:</span>
+                        <span class="font-bold" :class="activeBarFill === '#10B981' ? 'text-emerald-600' : 'text-amber-600'" x-text="bars + ' / 4 Bars'"></span>
+                    </div>
+                </div>
+
+                <div class="mt-2.5 pt-2 border-t border-gray-100 text-[10px] text-gray-400">
+                    <span x-show="status === 'online'">⚡ Network speed is optimal. Actions save instantly.</span>
+                    <span x-show="status === 'fair'">⏱️ Normal response time.</span>
+                    <span x-show="status === 'slow'">⚠️ High network delay. Requests may take longer.</span>
+                    <span x-show="status === 'offline'">🔴 Internet dropped. Reconnecting...</span>
+                </div>
             </div>
         </div>
 

@@ -44,20 +44,6 @@ if (!window.__mtcResizeListenerAttached) {
  * ──────────────────────────────────────────────────────────
  */
 
-// Scroll to error
-if (!window.__mtcScrollErrorListenerAttached) {
-    window.__mtcScrollErrorListenerAttached = true;
-    window.addEventListener('scroll-to-error', () => {
-    setTimeout(() => {
-        const errorEl = document.querySelector('p.text-sm.text-red-600:not(:empty), .text-red-500:not(:empty)');
-        if (errorEl) {
-            const container = document.querySelector('main.overflow-y-auto') || document.documentElement;
-            const top = errorEl.getBoundingClientRect().top - (container.getBoundingClientRect().top || 0) + container.scrollTop - 120;
-            container.scrollTo({ top, behavior: 'smooth' });
-        }
-    }, 150);
-    });
-}
 
 // Print Page
 if (!window.__mtcPrintPageListenerAttached) {
@@ -149,67 +135,6 @@ if (!window.__thermalPrintListenerAttached) {
     });
 }
 
-// Thermal Tear-off Modal component
-if (!window.thermalTearOffModal) {
-    window.thermalTearOffModal = function() {
-        return {
-            show: false,
-            sectionType: '',
-            secondsLeft: 0,
-            countdownTimer: null,
-            get label() {
-                return this.sectionType === 'barista' ? 'Barista Slip' : 'Kitchen Slip';
-            },
-            startCountdown(timeoutMs) {
-                this.secondsLeft = Math.ceil((timeoutMs || 15000) / 1000);
-                this.secondsLeft = Math.ceil((timeoutMs || 5000) / 1000);
-                if (this.countdownTimer) clearInterval(this.countdownTimer);
-                this.countdownTimer = setInterval(() => {
-                    this.secondsLeft = Math.max(0, this.secondsLeft - 1);
-                    if (this.secondsLeft <= 0 && this.countdownTimer) {
-                        clearInterval(this.countdownTimer);
-                        this.countdownTimer = null;
-                    }
-                }, 1000);
-            },
-            init() {
-                const onPrintWaiting = (e) => {
-                    this.sectionType = (e && e.detail && e.detail.sectionType) ? e.detail.sectionType : '';
-                    this.startCountdown(e && e.detail ? e.detail.timeoutMs : 15000);
-                    this.startCountdown(e && e.detail && e.detail.timeoutMs ? e.detail.timeoutMs : 5000);
-                    this.show = true;
-                };
-                const onPrintResumed = () => {
-                    this.show = false;
-                    if (this.countdownTimer) {
-                        clearInterval(this.countdownTimer);
-                        this.countdownTimer = null;
-                    }
-                };
-                window.addEventListener('thermal-print-waiting', onPrintWaiting);
-                window.addEventListener('thermal-print-resumed', onPrintResumed);
-                if (typeof this.$cleanup === 'function') {
-                    this.$cleanup(() => {
-                        window.removeEventListener('thermal-print-waiting', onPrintWaiting);
-                        window.removeEventListener('thermal-print-resumed', onPrintResumed);
-                        if (this.countdownTimer) {
-                            clearInterval(this.countdownTimer);
-                            this.countdownTimer = null;
-                        }
-                    });
-                }
-            }
-        };
-    };
-
-    const registerTearOff = () => {
-        if (window.Alpine) {
-            window.Alpine.data('thermalTearOffModal', () => window.thermalTearOffModal());
-        }
-    };
-    document.addEventListener('alpine:init', registerTearOff);
-    registerTearOff();
-}
 
 
 

@@ -109,7 +109,7 @@
         isSavingLayout: false,
         isSubmitting: false,
         cartExpanded: false,
-        isEditMode: @entangle('isEditMode').live,
+        isEditMode: @entangle('isEditMode'),
         cart: @js($cart),
         currentReferenceNo: @js($referenceNo),
         tableNumber: @entangle('tableNumber'),
@@ -149,7 +149,7 @@
         get cartLocked() {
             return this.paymentMethod === 'GCash' && this.gcashVerified;
         },
-        productsData: @js($productData ?? []),
+        productsData: {},
         _isResettingCart: false,
         cartUsageCacheKey: '',
         cartUsageCache: {},
@@ -166,6 +166,7 @@
         selectedOptions: {},
         selectedModifierIds: [],
         pendingDeleteKey: null,
+        pendingDeleteItemName: '',
         resetCartIfEmpty(forceServerSync = true) {
             if (this._isResettingCart) return;
             if (Object.keys(this.cart).length === 0) {
@@ -193,12 +194,15 @@
                 return;
             }
             const targetKey = key || this.pendingDeleteKey;
+            this.$dispatch('close-modal', 'confirm-delete-item');
+            setTimeout(() => {
+                this.pendingDeleteKey = null;
+                this.pendingDeleteItemName = '';
+            }, 250);
             if (targetKey && this.cart[targetKey]) {
                 delete this.cart[targetKey];
                 this.cart = { ...this.cart };
             }
-            this.pendingDeleteKey = null;
-            this.$dispatch('close-modal', 'confirm-delete-item');
             if (Object.keys(this.cart).length === 0) {
                 this.resetCartIfEmpty(true);
             }
@@ -671,10 +675,20 @@
             }
             this.cart = { ...this.cart };
 
-            this.editingItem = null;
-            this.editingKey = null;
-            this.editingProduct = null;
             this.$dispatch('close-modal', 'edit-cart-item');
+            setTimeout(() => {
+                this.editingItem = null;
+                this.editingKey = null;
+                this.editingProduct = null;
+            }, 250);
+        },
+        closeEditOrder() {
+            this.$dispatch('close-modal', 'edit-cart-item');
+            setTimeout(() => {
+                this.editingItem = null;
+                this.editingKey = null;
+                this.editingProduct = null;
+            }, 250);
         },
         optimisticAddToCart(pid, selectedOptionsObj = {}, selectedModifierIds = []) {
             const product = this.productsData[pid];
@@ -872,20 +886,14 @@
             // whenever the POS component is initialized again.
             window.__posSyncProducts = syncProducts;
             window.__posWire = this.$wire;
-            const refreshCurrentPos = () => {
-                if (!document.getElementById('pos-terminal-root')) return;
-                const refreshResult = window.__posWire?.refreshPosData?.();
-                Promise.resolve(refreshResult).then(() => window.__posSyncProducts?.());
-            };
 
             if (!window.__posNavigatedListenerAttached) {
                 window.__posNavigatedListenerAttached = true;
-                document.addEventListener('livewire:navigated', refreshCurrentPos);
-
                 // Browser back/forward can restore this page from bfcache
-                // without firing livewire:navigated.
                 window.addEventListener('pageshow', (event) => {
-                    if (event.persisted) refreshCurrentPos();
+                    if (event.persisted) {
+                        window.__posSyncProducts?.();
+                    }
                 });
             }
             
@@ -910,8 +918,7 @@
             $dispatch('notify', { type: 'warning', message: 'This payment is already verified — you must Place the Order to complete it.' });
         }
     "
->
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+    <script src="{{ asset('js/Sortable.min.js') }}" data-navigate-once></script>
     <script id="hidden-products-data" type="application/json">@json($productData)</script>
 
         <script>
@@ -1011,13 +1018,14 @@
             {{-- Category Tabs — horizontally scrollable, no wrap --}}
             <div 
                 id="category-sortable-tabs"
+                wire:ignore
                 class="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-1 min-w-0"
                 x-init="$dispatch('pos-category-sortable-init')"
             >
 
                 {{-- All Tab --}}
-                {{-- All Tab --}}
                 <button type="button" 
+                    wire:key="pos-tab-all"
                     @click="selectCategory(null)"
                     id="pos_tab_all" 
                     class="pos-category-tab inline-flex items-center justify-center px-4 py-2 border rounded-md font-semibold text-xs uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-offset-2 transition ease-in-out duration-150 gap-1.5 whitespace-nowrap shrink-0"
@@ -1028,6 +1036,7 @@
 
                 @foreach($categories as $cat)
                     <button type="button" 
+                        wire:key="pos-tab-cat-{{ $cat->id }}"
                         @click="selectCategory({{ $cat->id }})"
                         id="pos_tab_cat_{{ $cat->id }}" 
                         class="pos-category-tab inline-flex items-center justify-center px-4 py-2 border rounded-md font-semibold text-xs uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-offset-2 transition ease-in-out duration-150 gap-1.5 whitespace-nowrap shrink-0"
@@ -1161,6 +1170,7 @@
                 @endphp
                 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"
                     id="product-sortable-grid"
+                    wire:ignore
                     wire:key="pos-grid-static"
                     x-init="setupProductSortable()">
                     @foreach($products as $product)
@@ -1356,7 +1366,7 @@
             <span class="absolute top-1 right-1 w-1.5 h-1.5 bg-amber-500 rounded-full border border-white"></span>
         </template>
     </button>
-    <button @click="!cartLocked && (pendingDeleteKey = key, $dispatch('open-modal', 'confirm-delete-item'))" class="p-1.5 text-red-500 hover:text-red-700 transition-all rounded-lg hover:bg-red-50 disabled:opacity-40" :disabled="cartLocked">        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+    <button @click="!cartLocked && (pendingDeleteKey = key, pendingDeleteItemName = cart[key]?.name || 'this item', $dispatch('open-modal', 'confirm-delete-item'))" class="p-1.5 text-red-500 hover:text-red-700 transition-all rounded-lg hover:bg-red-50 disabled:opacity-40" :disabled="cartLocked">        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
     </button>
 </div>
                                     </div>
@@ -1617,13 +1627,13 @@
                         </div>
 
                         <div class="flex gap-3 pt-2 border-t border-gray-100">
-                            <x-secondary-button type="button" @click="$dispatch('close-modal', 'pos-options'); localProduct = null" class="flex-1 justify-center">
+                            <x-secondary-button type="button" @click="$dispatch('close-modal', 'pos-options'); setTimeout(() => localProduct = null, 250)" class="flex-1 justify-center">
                                 Cancel
                             </x-secondary-button>
                             <x-primary-button type="button"
                                 x-bind:disabled="!canAddToOrder(localProduct)"
                                 x-bind:class="!canAddToOrder(localProduct) ? 'opacity-50 cursor-not-allowed' : ''"
-                                @click="canAddToOrder(localProduct) && (optimisticAddToCart(localProduct.id, selectedOptions, selectedModifierIds), $dispatch('close-modal', 'pos-options'), localProduct = null)"
+                                @click="canAddToOrder(localProduct) && (optimisticAddToCart(localProduct.id, selectedOptions, selectedModifierIds), $dispatch('close-modal', 'pos-options'), setTimeout(() => localProduct = null, 250))"
                                 class="flex-1 justify-center">
                                 Add to Order
                             </x-primary-button>
@@ -2020,7 +2030,7 @@
                     <p class="text-[12px] text-gray-500" x-text="editingItem?.name"></p>
                 </div>
             </div>
-            <button type="button" @click="editingItem = null; editingKey = null; editingProduct = null; $dispatch('close-modal', 'edit-cart-item')" class="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-all">
+            <button type="button" @click="closeEditOrder()" class="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-all">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>
@@ -2221,7 +2231,7 @@
 
                     <div class="grid grid-cols-2 gap-3">
                         <button type="button"
-                            @click="editingItem = null; editingKey = null; editingProduct = null; $dispatch('close-modal', 'edit-cart-item')"
+                            @click="closeEditOrder()"
                             class="w-full py-3 rounded-2xl text-[13px] font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 transition-all">
                             Discard
                         </button>
@@ -2239,10 +2249,6 @@
         </div>
     </div>
     </template>
-    <div x-show="!editingItem" class="p-8 text-center">
-        <p class="text-[14px] text-gray-500 mb-4">No item selected for editing.</p>
-        <x-secondary-button @click="$dispatch('close-modal', 'edit-cart-item')" class="justify-center">Close</x-secondary-button>
-    </div>
 </x-modal>
     {{-- ══════════════════════════════════════════════
          CONFIRM DELETE ITEM MODAL
@@ -2259,13 +2265,13 @@
                 <div>
                     <h3 class="text-[15px] font-bold text-gray-900 leading-tight">Remove Item</h3>
                     <p class="mt-1 text-[13px] text-gray-500 leading-relaxed">
-                        Remove <span class="font-bold text-gray-800" x-text="cart[pendingDeleteKey]?.name || 'this item'"></span> from the order?
+                        Remove <span class="font-bold text-gray-800" x-text="pendingDeleteItemName || cart[pendingDeleteKey]?.name || 'this item'"></span> from the order?
                     </p>
                 </div>
             </div>
 
             <div class="flex items-center justify-end gap-2 mt-6">
-                <x-secondary-button @click="pendingDeleteKey = null; $dispatch('close-modal', 'confirm-delete-item')" class="h-10">Cancel</x-secondary-button>
+                <x-secondary-button @click="$dispatch('close-modal', 'confirm-delete-item'); setTimeout(() => { pendingDeleteKey = null; pendingDeleteItemName = ''; }, 250)" class="h-10">Cancel</x-secondary-button>
                 <button type="button"
                     @click="removeItem(pendingDeleteKey)"
                     class="h-10 px-4 inline-flex items-center justify-center rounded-lg bg-red-600 hover:bg-red-700 text-white text-[13px] font-bold transition-colors">

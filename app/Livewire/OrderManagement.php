@@ -278,18 +278,37 @@ class OrderManagement extends Component
         return $query->orderBy('created_at', 'desc');
     }
 
+    private array $tabCountCache = [];
+
+    private function getTabCount(string $tab): int
+    {
+        if (!isset($this->tabCountCache[$tab])) {
+            $this->tabCountCache[$tab] = $this->buildOrdersQuery($tab)->count();
+        }
+        return $this->tabCountCache[$tab];
+    }
+
     public function getAppOrdersProperty()
     {
+        if ($this->sourceFilter !== 'App') {
+            return new \Illuminate\Pagination\LengthAwarePaginator([], $this->getTabCount('App'), $this->perPage, 1, ['pageName' => 'app_page']);
+        }
         return $this->buildOrdersQuery('App')->paginate($this->perPage, ['*'], 'app_page');
     }
 
     public function getPosOrdersProperty()
     {
+        if ($this->sourceFilter !== 'POS') {
+            return new \Illuminate\Pagination\LengthAwarePaginator([], $this->getTabCount('POS'), $this->perPage, 1, ['pageName' => 'pos_page']);
+        }
         return $this->buildOrdersQuery('POS')->paginate($this->perPage, ['*'], 'pos_page');
     }
 
     public function getHistoryOrdersProperty()
     {
+        if ($this->sourceFilter !== 'History') {
+            return new \Illuminate\Pagination\LengthAwarePaginator([], $this->getTabCount('History'), $this->perPage, 1, ['pageName' => 'history_page']);
+        }
         return $this->buildOrdersQuery('History')->paginate($this->perPage, ['*'], 'history_page');
     }
 

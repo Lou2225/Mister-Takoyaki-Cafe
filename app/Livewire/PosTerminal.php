@@ -355,6 +355,7 @@ public function openPaymentModal(?array $cartData = null): void
         $this->isEditMode = false;
     }
 
+    #[Renderless]
     public function reorderCategories(array $orderedIds): void
     {
         if (!$this->canEditLayout()) return;
@@ -370,6 +371,7 @@ public function openPaymentModal(?array $cartData = null): void
         });
     }
 
+    #[Renderless]
     public function refreshPosData(): void
     {
         $this->productsCache = null;

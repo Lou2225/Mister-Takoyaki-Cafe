@@ -185,8 +185,16 @@
 
     window.addEventListener('scroll-to-error', () => {
         setTimeout(() => {
-            const err = document.querySelector('.text-red-500, .text-red-600, [aria-invalid="true"], .border-red-500');
-            if (err) err.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 100);
+            const err = document.querySelector('p.text-sm.text-red-600:not(:empty), .text-red-500:not(:empty), [aria-invalid="true"], .border-red-500');
+            if (err) {
+                const container = document.querySelector('main.overflow-y-auto') || document.documentElement;
+                const top = err.getBoundingClientRect().top - (container.getBoundingClientRect().top || 0) + container.scrollTop - 120;
+                if (typeof container.scrollTo === 'function') {
+                    container.scrollTo({ top, behavior: 'smooth' });
+                } else {
+                    err.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        }, 120);
     });
 })();
