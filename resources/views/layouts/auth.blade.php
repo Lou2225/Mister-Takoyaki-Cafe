@@ -82,6 +82,14 @@
                 animation: authSlideRight 0.7s cubic-bezier(0.65, 0, 0.35, 1) forwards;
                 animation-delay: 0.05s;
             }
+        /* Match navigation progress bar to the rest of the app (red, not Livewire blue) */
+        :root { --livewire-progress-bar-color: #e11d48; }
+        #nprogress .bar {
+            height: 2.5px !important;
+            background: linear-gradient(90deg, #e11d48, #f43f5e, #fb7185) !important;
+            box-shadow: 0 0 10px rgba(225, 29, 72, 0.7) !important;
+            z-index: 9999999 !important;
+        }
         </style>
     </head>
                 <body x-data="{ splitting: false }" x-on:auth-split.window="splitting = true" class="font-sans text-gray-900 antialiased bg-indigo-950 overflow-x-hidden overflow-y-auto min-h-screen flex items-center justify-center p-4 sm:p-8 relative">
