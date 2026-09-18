@@ -121,6 +121,27 @@
     {{-- ═══════════════════════ MAIN AREA ═══════════════════════ --}}
     <div class="flex-1 flex flex-col h-full bg-[#F9FAFB] overflow-hidden transition-colors duration-300">
 
+    {{-- Global Offline Alert Banner --}}
+    <div x-data="{ online: navigator.onLine }"
+        x-init="
+            window.addEventListener('online', () => online = true);
+            window.addEventListener('offline', () => online = false);
+        "
+        x-show="!online"
+        x-cloak
+        x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="-translate-y-full opacity-0"
+        x-transition:enter-end="translate-y-0 opacity-100"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="translate-y-0 opacity-100"
+        x-transition:leave-end="-translate-y-full opacity-0"
+        class="bg-rose-600 text-white text-[12px] font-semibold px-4 py-2 text-center flex items-center justify-center gap-2 sticky top-0 z-[120] shadow-md">
+        <svg class="w-4 h-4 animate-pulse shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 4.243a9 9 0 01-2.828-6.364m0 0L3 3m6.364 6.364a5 5 0 01-1.414 3.536m0 0l2.828 2.828" />
+        </svg>
+        <span>No internet connection detected. System changes will not save until connectivity is restored.</span>
+    </div>
+
 <header id="top-bar" class="bg-white border-b border-gray-200 sticky top-0 z-[100] flex items-center justify-between px-3 sm:px-6 h-[58px] sm:h-[65px] min-h-[58px] sm:min-h-[65px]">
     <div class="flex items-center gap-4">
         {{-- Hamburger Menu for toggling sidebar --}}
@@ -167,6 +188,122 @@
                 <p x-text="date" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1.5"></p>
             </div>
             <div class="h-8 w-[1px] bg-gray-100 hidden xl:block"></div>
+        </div>
+
+        {{-- Real-Time Internet Latency Monitor --}}
+        <div x-data="{
+                ping: null,
+                status: 'checking', // 'online', 'fair', 'slow', 'offline'
+                timer: null,
+                async checkPing() {
+                    if (!navigator.onLine) {
+                        this.status = 'offline';
+                        this.ping = null;
+                        return;
+                    }
+                    const start = performance.now();
+                    try {
+                        const response = await fetch('{{ route('ping') }}', {
+                            method: 'GET',
+                            cache: 'no-store',
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                        });
+                        if (!response.ok) throw new Error('Failed');
+                        const duration = Math.round(performance.now() - start);
+                        this.ping = duration;
+                        if (duration < 200) {
+                            this.status = 'online';
+                        } else if (duration < 500) {
+                            this.status = 'fair';
+                        } else {
+                            this.status = 'slow';
+                        }
+                    } catch (e) {
+                        this.status = 'offline';
+                        this.ping = null;
+                    }
+                },
+                init() {
+                    this.checkPing();
+                    this.timer = setInterval(() => {
+                        if (!document.hidden) {
+                            this.checkPing();
+                        }
+                    }, 10000);
+
+                    window.addEventListener('online', () => this.checkPing());
+                    window.addEventListener('offline', () => {
+                        this.status = 'offline';
+                        this.ping = null;
+                    });
+                    document.addEventListener('visibilitychange', () => {
+                        if (!document.hidden) this.checkPing();
+                    });
+
+                    // Hook into Livewire requests to measure real transaction roundtrips
+                    const hookLivewire = () => {
+                        if (window.Livewire) {
+                            let reqStart = 0;
+                            window.Livewire.hook('request', ({ succeed, fail }) => {
+                                reqStart = performance.now();
+                                succeed(() => {
+                                    const reqDuration = Math.round(performance.now() - reqStart);
+                                    if (reqDuration > 400) {
+                                        this.ping = reqDuration;
+                                        this.status = reqDuration >= 1000 ? 'slow' : 'fair';
+                                    }
+                                });
+                                fail(() => {
+                                    if (!navigator.onLine) {
+                                        this.status = 'offline';
+                                        this.ping = null;
+                                    }
+                                });
+                            });
+                        }
+                    };
+
+                    if (window.Livewire) {
+                        hookLivewire();
+                    } else {
+                        document.addEventListener('livewire:init', hookLivewire, { once: true });
+                    }
+                }
+            }"
+            class="flex items-center mr-1"
+        >
+            <div class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[11px] font-semibold tabular-nums select-none transition-colors duration-200"
+                :class="{
+                    'bg-emerald-50 text-emerald-700 border-emerald-200/80': status === 'online',
+                    'bg-amber-50 text-amber-700 border-amber-200/80': status === 'fair',
+                    'bg-orange-50 text-orange-700 border-orange-200/80': status === 'slow',
+                    'bg-rose-50 text-rose-700 border-rose-200/80': status === 'offline',
+                    'bg-gray-50 text-gray-500 border-gray-200': status === 'checking'
+                }"
+                :title="status === 'offline' ? 'No internet connection' : `Server roundtrip: ${ping} ms (${status === 'online' ? 'Fast' : (status === 'fair' ? 'Moderate' : 'High Latency')})`"
+            >
+                {{-- Dot indicator with ping wave --}}
+                <span class="relative flex h-2 w-2 shrink-0">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                        :class="{
+                            'bg-emerald-400': status === 'online',
+                            'bg-amber-400': status === 'fair',
+                            'bg-orange-400': status === 'slow',
+                            'bg-rose-400': status === 'offline',
+                            'bg-gray-400': status === 'checking'
+                        }"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2"
+                        :class="{
+                            'bg-emerald-500': status === 'online',
+                            'bg-amber-500': status === 'fair',
+                            'bg-orange-500': status === 'slow',
+                            'bg-rose-500': status === 'offline',
+                            'bg-gray-400': status === 'checking'
+                        }"></span>
+                </span>
+
+                <span x-text="status === 'offline' ? 'Offline' : (ping !== null ? ping + ' ms' : '...')"></span>
+            </div>
         </div>
 
         @livewire('topbar-notifications')

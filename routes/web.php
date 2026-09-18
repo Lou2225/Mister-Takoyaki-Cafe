@@ -20,6 +20,11 @@ Route::get('/', function () {
 
 Route::get('/review/{branch?}', \App\Livewire\CustomerReviewForm::class)->name('customer.review');
 
+// Ultra-lightweight endpoint to measure client roundtrip latency (ms) and internet connectivity
+Route::get('/ping', function () {
+    return response('', 204)->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+})->name('ping');
+
 Route::middleware('auth')->group(function () {
     // Basic account access
     Route::get('/profile', \App\Livewire\ProfileSettings::class)->name('profile.edit');
