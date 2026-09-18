@@ -422,17 +422,23 @@ class BusinessIntelligence extends Component
 
         $branchId = $this->selectedBranchId === 'all' ? null : $this->selectedBranchId;
 
-        // 1. Single eager-loaded query for all orders in range
-        $orders = Order::whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
+        // 1. Select only required order columns for analytical calculations
+        $orders = Order::select([
+                'id',
+                'branch_id',
+                'created_at',
+                'status',
+                'total_amount',
+                'delivery_fee',
+                'discount_amount',
+                'refunded_amount',
+                'payment_method',
+                'order_type',
+            ])
+            ->whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
             ->when($this->startDate, fn($q) => $q->where('created_at', '>=', Carbon::parse($this->startDate)->startOfDay()))
             ->when($this->endDate, fn($q) => $q->where('created_at', '<=', Carbon::parse($this->endDate)->endOfDay()))
             ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
-            ->with([
-                'items.product.recipes.ingredient',
-                'items.options.option.recipes.ingredient',
-                'items.modifiers.modifier.recipes.ingredient',
-                'branch',
-            ])
             ->get();
 
         $completedOrders = $orders->where('status', Order::STATUS_COMPLETED);
@@ -440,7 +446,7 @@ class BusinessIntelligence extends Component
         $start = $this->startDate ? Carbon::parse($this->startDate)->startOfDay() : ($orders->min('created_at') ? Carbon::parse($orders->min('created_at'))->startOfDay() : Carbon::now()->startOfDay());
         $end = $this->endDate ? Carbon::parse($this->endDate)->endOfDay() : ($orders->max('created_at') ? Carbon::parse($orders->max('created_at'))->endOfDay() : Carbon::now()->endOfDay());
 
-                // 2. Sales Metrics
+        // 2. Sales Metrics
         // Use ALL orders in range (Completed + Refunded + Partially Refunded) as the
         // revenue base — a partially refunded order still earned real money on the
         // portion the customer kept, and a fully refunded order should net to ₱0
@@ -457,15 +463,12 @@ class BusinessIntelligence extends Component
         // 3. Delegate heavy sub-calculations to focused helpers
         $totalCogs   = $this->computeCogs($completedOrders, $branchId);
         
-        // 4. Calculate Waste Cost from stock movements
-        $wasteCost = StockMovement::whereIn('type', ['waste', 'waste_expired', 'out', 'return_to_supplier'])
+        // 4. Calculate Waste Cost from stock movements in database
+        $wasteCost = (float) StockMovement::whereIn('type', ['waste', 'waste_expired', 'out', 'return_to_supplier'])
             ->when($this->startDate, fn($q) => $q->where('created_at', '>=', Carbon::parse($this->startDate)->startOfDay()))
             ->when($this->endDate, fn($q) => $q->where('created_at', '<=', Carbon::parse($this->endDate)->endOfDay()))
             ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
-            ->get()
-            ->sum(function($movement) {
-                return abs($movement->quantity) * ($movement->unit_cost ?? 0);
-            });
+            ->sum(DB::raw('ABS(quantity) * COALESCE(unit_cost, 0)'));
 
         $grossProfit = $netSales - $totalCogs - $wasteCost;
         $trendData   = $this->buildTrendData($completedOrders, $start, $end);
@@ -495,46 +498,28 @@ class BusinessIntelligence extends Component
 
     /**
      * Calculate total Cost of Goods Sold for a set of completed orders.
-     * Uses a tiered pricing strategy: Branch Standard Cost → Latest Purchase Price → Global Ingredient Cost.
+     * Uses optimized SQL aggregation on products.cost and product_options.cost.
      */
     private function computeCogs(Collection $completedOrders, ?string $branchId): float
     {
-                $standardCosts = $this->buildBranchCostMap(null, $branchId);
-        $purchasePrices = $this->buildPurchasePriceMap(null, $branchId);
-        $fallback = $this->buildGlobalCostMap();
-
-        $total = 0.0;
-        foreach ($completedOrders as $order) {
-            $bid = $order->branch_id;
-            $resolve = fn($ingId) =>
-                $standardCosts[$bid][$ingId] ?? $purchasePrices[$bid][$ingId] ?? $fallback[$ingId] ?? 0;
-
-            foreach ($order->items as $item) {
-                $cost = 0.0;
-                if ($item->product) {
-                    foreach ($item->product->recipes->where('product_option_id', null)->where('modifier_id', null) as $r) {
-                        $cost += $r->quantity * $resolve($r->ingredient_id);
-                    }
-                }
-                foreach ($item->options as $opt) {
-                    if ($opt->option) {
-                        foreach ($opt->option->recipes as $r) {
-                            $cost += $r->quantity * $resolve($r->ingredient_id);
-                        }
-                    }
-                }
-                foreach ($item->modifiers as $mod) {
-                    if ($mod->modifier) {
-                        foreach ($mod->modifier->recipes as $r) {
-                            $cost += $r->quantity * $resolve($r->ingredient_id);
-                        }
-                    }
-                }
-                $total += $cost * $item->quantity;
-            }
+        if ($completedOrders->isEmpty()) {
+            return 0.0;
         }
 
-        return $total;
+        $orderIds = $completedOrders->pluck('id');
+
+        $baseCogs = (float) DB::table('order_items')
+            ->join('products', 'order_items.product_id', '=', 'products.id')
+            ->whereIn('order_items.order_id', $orderIds)
+            ->sum(DB::raw('order_items.quantity * COALESCE(products.cost, 0)'));
+
+        $optionCogs = (float) DB::table('order_item_options')
+            ->join('order_items', 'order_item_options.order_item_id', '=', 'order_items.id')
+            ->join('product_options', 'order_item_options.product_option_id', '=', 'product_options.id')
+            ->whereIn('order_items.order_id', $orderIds)
+            ->sum(DB::raw('order_items.quantity * COALESCE(product_options.cost, 0)'));
+
+        return $baseCogs + $optionCogs;
     }
 
     /**
