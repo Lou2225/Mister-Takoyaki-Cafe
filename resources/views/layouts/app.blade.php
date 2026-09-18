@@ -314,23 +314,48 @@
                     }
                 },
 
+                observeRealTraffic() {
+                    if (!('PerformanceObserver' in window)) return;
+
+                    const obs = new PerformanceObserver((list) => {
+                        for (const entry of list.getEntries()) {
+                            if (entry.initiatorType !== 'fetch' && entry.initiatorType !== 'xmlhttprequest') continue;
+                            if (!navigator.onLine) continue;
+
+                            const duration = Math.max(1, Math.round(entry.duration));
+                            this.ping = duration;
+                            this.calculateBars(duration);
+                        }
+                    });
+
+                    obs.observe({ type: 'resource', buffered: true });
+                    window.__mtcTrafficObserver = obs;
+                },
+
                 init() {
                     this.detectNetworkType();
-                    this.checkPing();
+                    this.observeRealTraffic();
 
-                    // Ensure only ONE global timer ever runs across page navigations
+                    const isReInit = !!window.__mtcPingInterval;
                     if (window.__mtcPingInterval) {
                         clearInterval(window.__mtcPingInterval);
                         window.__mtcPingInterval = null;
+                    }
+
+                    if (!isReInit) {
+                        this.checkPing();
                     }
 
                     window.__mtcPingInterval = setInterval(() => {
                         if (!document.hidden && navigator.onLine) {
                             this.checkPing();
                         }
-                    }, 8000);
+                    }, 5000);
 
-                    // Recheck on reconnect or tab focus
+                    document.addEventListener('livewire:navigated', () => {
+                        if (navigator.onLine) this.checkPing();
+                    });
+
                     window.addEventListener('online', () => this.checkPing());
                     window.addEventListener('offline', () => {
                         this.ping = null;
@@ -346,6 +371,10 @@
                     if (window.__mtcPingInterval) {
                         clearInterval(window.__mtcPingInterval);
                         window.__mtcPingInterval = null;
+                    }
+                    if (window.__mtcTrafficObserver) {
+                        window.__mtcTrafficObserver.disconnect();
+                        window.__mtcTrafficObserver = null;
                     }
                 }
             }"
