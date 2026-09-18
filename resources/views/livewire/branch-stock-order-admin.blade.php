@@ -204,7 +204,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="py-12"><x-empty-state title="Inbox Zero!" description="All stock requests have been processed." icon="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></td></tr>
+                    <tr><td colspan="6" class="py-12 text-center"><x-empty-state title="Inbox Zero!" description="All stock requests have been processed." icon="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></td></tr>
                 @endforelse
             </x-data-table>
             <x-pagination :paginator="$inboxOrders" keyPrefix="inbox" />
@@ -242,7 +242,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="4" class="py-12"><x-empty-state title="No Active Transfers" description="Transfers will appear here once approved." icon="M13 10V3L4 14h7v7l9-11h-7z" /></td></tr>
+                    <tr><td colspan="4" class="py-12 text-center"><x-empty-state title="No Active Transfers" description="Transfers will appear here once approved." icon="M13 10V3L4 14h7v7l9-11h-7z" /></td></tr>
                 @endforelse
             </x-data-table>
             <x-pagination :paginator="$activeOrders" keyPrefix="active" />
@@ -284,7 +284,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="py-12"><x-empty-state title="History Clear" description="Your fulfillment history will be logged here." icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></td></tr>
+                    <tr><td colspan="6" class="py-12 text-center"><x-empty-state title="History Clear" description="Your fulfillment history will be logged here." icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></td></tr>
                 @endforelse
             </x-data-table>
             <x-pagination :paginator="$historyOrders" keyPrefix="history" />

@@ -119,7 +119,6 @@
                 <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-orange-100/20 via-transparent to-transparent"></div>
                 
                 <div class="relative z-10 flex items-center gap-2">
-                     <x-application-logo class="w-8 h-8 fill-current text-white" />
                      <span class="text-[16px] font-extrabold tracking-tight text-white uppercase">{{ \App\Services\ConfigurationService::getBusinessName() }}</span>
                 </div>
 

@@ -1,5 +1,5 @@
 <div 
-    x-data="typeof window.menuManagement === 'function' ? window.menuManagement($wire, @js($templatesData), @js($allCategories)) : { activeTab: $wire.entangle('activeTab').live, panel: $wire.entangle('panel').live, mode: $wire.entangle('mode').live }"
+    x-data="typeof window.menuManagement === 'function' ? window.menuManagement($wire, @js($templatesData), @js($allCategories), @js($products->map(fn($p) => ['id' => $p->id, 'name' => $p->name]))) : { activeTab: $wire.entangle('activeTab').live, panel: $wire.entangle('panel').live, mode: $wire.entangle('mode').live }"
     x-on:switch-panel.window="panel = $event.detail.panel"
     x-on:templates-updated.window="templates = $event.detail.templates"
     class="relative min-h-full flex flex-col p-2 md:p-4"
@@ -15,15 +15,16 @@
          x-transition:enter-start="opacity-0 translate-y-4" 
          x-transition:enter-end="opacity-100 translate-y-0" 
          x-cloak 
+         wire:ignore.self
          class="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-gray-200">
-        
+
         <div class="px-4 py-4 md:px-6 md:py-5 shrink-0 border-b border-gray-100 bg-slate-50/30">
             <div class="flex items-center justify-between">
                 <div>
                     <h2 class="text-[17px] font-black text-gray-900 tracking-tight" x-text="mode === 'edit' ? 'Update Product' : 'Add New Product'"></h2>
                     <p class="text-[12px] text-gray-500 font-medium truncate max-w-[200px] sm:max-w-none" x-text="mode === 'edit' ? 'Configure product details and pricing' : 'Add a new item to the menu'"></p>
                 </div>
-                <x-secondary-button @click="panel = 'list'; mode = 'list'; $wire.discardDraft();" class="h-10 text-[11px] font-black uppercase tracking-widest">
+                <x-secondary-button @click="goToList()" class="h-10 text-[11px] font-black uppercase tracking-widest">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
                     <span class="hidden sm:inline">Back to Products</span>
                     <span class="sm:hidden">Back</span>
@@ -33,7 +34,65 @@
 
         <div class="p-4 md:p-6">
 
-        <form @submit.prevent class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {{-- ════════════════ EDIT PRODUCT — SKELETON PRELOAD (matching User Management View Profile) ════════════════ --}}
+        <div x-show="mode === 'edit' && editProductLoading" x-cloak class="animate-pulse">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 space-y-6">
+                    {{-- Skeleton Tabs --}}
+                    <div class="flex items-center gap-3 border-b border-slate-100 pb-3 mb-4">
+                        <div class="h-8 w-28 bg-slate-200 rounded-xl"></div>
+                        <div class="h-8 w-24 bg-slate-100 rounded-xl"></div>
+                        <div class="h-8 w-24 bg-slate-100 rounded-xl"></div>
+                        <div class="h-8 w-28 bg-slate-100 rounded-xl"></div>
+                    </div>
+                    {{-- Skeleton Form Card --}}
+                    <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-sm min-h-[400px] space-y-6">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <div class="space-y-2">
+                                <div class="h-4 bg-slate-200 rounded w-1/3"></div>
+                                <div class="h-11 bg-slate-100 rounded-xl"></div>
+                            </div>
+                            <div class="space-y-2">
+                                <div class="h-4 bg-slate-200 rounded w-1/4"></div>
+                                <div class="h-11 bg-slate-100 rounded-xl"></div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <div class="space-y-2">
+                                <div class="h-4 bg-slate-200 rounded w-1/3"></div>
+                                <div class="h-11 bg-slate-100 rounded-xl"></div>
+                            </div>
+                            <div class="space-y-2">
+                                <div class="h-4 bg-slate-200 rounded w-1/4"></div>
+                                <div class="flex items-center gap-4 mt-3">
+                                    <div class="h-5 w-20 bg-slate-100 rounded-lg"></div>
+                                    <div class="h-5 w-20 bg-slate-100 rounded-lg"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="h-4 bg-slate-200 rounded w-1/4"></div>
+                            <div class="h-32 bg-slate-100 rounded-xl"></div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Skeleton Right Column (Media & Actions) --}}
+                <div class="space-y-6 lg:pt-[52px]">
+                    <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-sm space-y-3">
+                        <div class="h-3.5 bg-slate-200 rounded w-1/3 mb-3"></div>
+                        <div class="w-full aspect-square rounded-2xl bg-slate-100"></div>
+                    </div>
+                    <div class="hidden lg:block bg-white border border-slate-200/60 rounded-2xl p-6 shadow-sm space-y-3">
+                        <div class="h-12 bg-slate-200 rounded-xl"></div>
+                        <div class="h-11 bg-slate-100 rounded-xl"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Real Form Content --}}
+        <form x-show="mode !== 'edit' || !editProductLoading" x-cloak @submit.prevent class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div class="lg:col-span-2 space-y-6">
                 {{-- Unified Form Tabs --}}
                 <div class="mb-4 -mx-4 px-4 overflow-x-auto custom-scrollbar no-scrollbar scroll-smooth">
@@ -72,6 +131,7 @@
                                 <x-input-label value="Category" />
                                 <div class="flex gap-2 mt-1.5">
                                     <div class="flex-1 relative"
+                                        wire:ignore.self
                                         x-data="{
                                             open: false,
                                             dropUp: false,
@@ -862,10 +922,10 @@
                 {{-- Summary & Actions (Hidden on mobile as we use the sticky footer) --}}
                 <div class="hidden lg:block bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
                     <div class="space-y-3">
-                        <x-primary-button type="button" @click="syncToWire()" wire:click="validateBeforeSave" class="w-full justify-center h-12 text-[12px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">
+                        <x-primary-button type="button" @click="attemptSave()" class="w-full justify-center h-12 text-[12px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">
                             <span x-text="mode === 'edit' ? 'Update Catalog' : 'Register Product'"></span>
                         </x-primary-button>
-                        <x-secondary-button @click="panel = 'list'; mode = 'list'; $wire.discardDraft();" class="w-full justify-center h-11 text-[12px] font-black uppercase tracking-widest border-slate-200 text-slate-500">
+                        <x-secondary-button @click="goToList()" class="w-full justify-center h-11 text-[12px] font-black uppercase tracking-widest border-slate-200 text-slate-500">
                             Discard Draft
                         </x-secondary-button>
                     </div>
@@ -886,12 +946,12 @@
     </div>
 
     {{-- Mobile Sticky Action Bar --}}
-    <div x-show="panel === 'form'" class="lg:hidden shrink-0 p-4 bg-white border-t border-slate-100 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-30">
+    <div x-show="panel === 'form' && (mode !== 'edit' || !editProductLoading)" class="lg:hidden shrink-0 p-4 bg-white border-t border-slate-100 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-30">
         <div class="flex flex-col gap-2">
-            <x-primary-button type="button" @click="syncToWire()" wire:click="validateBeforeSave" class="w-full justify-center h-12 text-[12px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">
+            <x-primary-button type="button" @click="attemptSave()" class="w-full justify-center h-12 text-[12px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">
                 <span x-text="mode === 'edit' ? 'Update Catalog' : 'Register Product'"></span>
             </x-primary-button>
-            <x-secondary-button @click="panel = 'list'; mode = 'list'; $wire.discardDraft();" class="w-full justify-center h-11 text-[11px] font-black uppercase tracking-widest border-slate-100 text-slate-400">
+            <x-secondary-button @click="goToList()" class="w-full justify-center h-11 text-[11px] font-black uppercase tracking-widest border-slate-100 text-slate-400">
                 Discard Draft
             </x-secondary-button>
         </div>
@@ -975,8 +1035,9 @@
          x-transition:enter-start="opacity-0 translate-y-4" 
          x-transition:enter-end="opacity-100 translate-y-0" 
          x-cloak 
+         wire:ignore.self
          class="flex-1 flex flex-col bg-white rounded-2xl shadow-sm border border-gray-200">
-        
+
         <div class="px-4 py-4 md:px-6 md:py-5 shrink-0 border-b border-gray-100 bg-slate-50/30">
             <div class="flex items-center justify-between">
                 <div>
@@ -1193,7 +1254,7 @@
                                 @if($this->isSuperAdmin())
                                     <td class="py-4 px-6 text-right whitespace-nowrap">
                                         <div class="flex items-center justify-end gap-1">
-                                            <x-secondary-button wire:click="showEdit({{ $product->id }})" class="h-8 px-3 text-[11px] font-bold bg-white hover:bg-slate-50 border-slate-200 shadow-none">
+                                        <x-secondary-button @click="openEditProduct({{ $product->id }})" class="h-8 px-3 text-[11px] font-bold bg-white hover:bg-slate-50 border-slate-200 shadow-none">
                                                 Edit Product
                                             </x-secondary-button>
                                         </div>
@@ -1313,7 +1374,7 @@
                  x-cloak>
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     @forelse($products as $product)
-                        <div wire:key="prod-card-{{ $product->id }}" x-show="isItemVisible({{ $product->id }})" x-cloak class="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm hover:shadow-md transition-all group/card relative {{ $this->isSuperAdmin() ? 'cursor-pointer' : '' }}" @if($this->isSuperAdmin()) wire:click="showEdit({{ $product->id }})" @endif>
+                        <div wire:key="prod-card-{{ $product->id }}" x-show="isItemVisible({{ $product->id }})" x-cloak class="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm hover:shadow-md transition-all group/card relative {{ $this->isSuperAdmin() ? 'cursor-pointer' : '' }}" @if($this->isSuperAdmin()) @click="openEditProduct({{ $product->id }})" @endif>
                             <div class="aspect-[4/3] rounded-xl bg-slate-50 border border-slate-100 overflow-hidden mb-4 relative shadow-inner">
                                 @if($product->image && Storage::disk('public')->exists($product->image))
                                     <img src="{{ Storage::url($product->image) }}" class="w-full h-full object-cover transition-transform duration-500 group-hover/card:scale-110" onerror="this.onerror=null;this.src='{{ asset('images/placeholder-product.png') }}';">
@@ -1335,7 +1396,7 @@
                                 </div>
                                 <div class="shrink-0 flex items-center gap-1">
                                     @if($this->isSuperAdmin())
-                                        <button type="button" wire:click.stop="showEdit({{ $product->id }})" class="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="Edit Product">
+                                        <button type="button" @click.stop="openEditProduct({{ $product->id }})" class="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="Edit Product">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                         </button>
                                     @endif
@@ -1449,7 +1510,10 @@
     {{-- Modals --}}
     <x-modal name="confirm-save-product" maxWidth="sm" focusable wire:key="modal-confirm-save">
         <div class="h-1 w-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-t-lg"></div>
-        <div class="p-6">
+        <div class="p-6" 
+             x-data="{ saving: false }" 
+             @open-modal.window="if ($event.detail === 'confirm-save-product' || $event.detail?.name === 'confirm-save-product') saving = false"
+             @notify.window="if ($event.detail?.type === 'success' || $event.detail?.[0]?.type === 'success') { $dispatch('close-modal', 'confirm-save-product'); saving = false; }">
             <div class="flex items-start gap-4 mb-4">
                 <div class="flex-shrink-0 w-10 h-10 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center">
                     <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M5 13l4 4L19 7" /></svg>
@@ -1461,12 +1525,20 @@
             </div>
             
             <div class="flex items-center justify-end gap-2 mt-6">
-                <x-secondary-button @click="$dispatch('close-modal', 'confirm-save-product')" class="h-10">Cancel</x-secondary-button>
-                <x-primary-button 
-                    wire:click="saveProduct" 
-                    @click="syncToWire(); $dispatch('close-modal', 'confirm-save-product')" 
-                    class="h-10">
-                    Confirm & Save
+                <x-secondary-button @click="$dispatch('close-modal', 'confirm-save-product'); saving = false" class="h-10">Cancel</x-secondary-button>
+                <x-primary-button
+                    type="button"
+                    x-bind:disabled="saving"
+                    @click="saving = true; syncToWire(); $wire.saveProduct().then(() => { $dispatch('close-modal', 'confirm-save-product'); saving = false; }).catch(() => { saving = false; })"
+                    class="h-10 min-w-[150px] flex justify-center">
+                    <span x-show="!saving">Confirm & Save</span>
+                    <span x-show="saving" x-cloak>
+                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Saving...
+                    </span>
                 </x-primary-button>
             </div>
         </div>
@@ -1673,7 +1745,7 @@
 
     <script>
         (function() {
-            window.menuManagement = function($wire, initialTemplates = [], initialCategories = []) {
+            window.menuManagement = function($wire, initialTemplates = [], initialCategories = [], initialProducts = []) {
                 return {
                     activeTab: $wire.entangle('activeTab').live,
                     panel: $wire.entangle('panel').live,
@@ -1727,6 +1799,18 @@
                                 $wire.set('recipeIngredients', this.recipeIngredients, false);
                             }
                         }
+                    },
+                    attemptSave() {
+                        this.syncToWire();
+                        const nameMissing  = !$wire.name || !$wire.name.trim();
+                        const priceMissing = !$wire.price;
+                        const hasErrors    = this.serverErrors && Object.keys(this.serverErrors).length > 0;
+
+                        if (nameMissing || priceMissing || hasErrors) {
+                            $wire.validateBeforeSave();
+                            return;
+                        }
+                        this.$dispatch('open-modal', 'confirm-save-product');
                     },
                     getGroupKey(group, idx) {
                         if (!group) return 'g_' + idx;
@@ -2205,11 +2289,29 @@
                         this.$dispatch('notify', { type: 'success', message: msg });
                     },
 
+                    editProductLoading: false,
+
+                    openEditProduct(id) {
+                        this.panel = 'form';
+                        this.mode = 'edit';
+                        this.editProductLoading = true;
+                        $wire.showEdit(id).finally(() => {
+                            this.editProductLoading = false;
+                        });
+                    },
+
+                    goToList(method = 'discardDraft') {
+                        this.panel = 'list';
+                        this.mode = 'list';
+                        this.editProductLoading = false;
+                        $wire[method]();
+                    },
+
                     // Client-side search and pagination
                     searchQuery: '',
                     currentPage: 1,
                     perPage: 5,
-                    productsList: [],
+                    productsList: Array.isArray(initialProducts) ? initialProducts : [],
 
                     get filteredProductIds() {
                         const query = this.searchQuery.toLowerCase().trim();
@@ -2235,6 +2337,9 @@
                         return this.paginatedProductIds.includes(id);
                     },
                     updateProductsList(newList) {
+                        if (!Array.isArray(newList) || newList.length === 0) {
+                            return;
+                        }
                         const oldIds = this.productsList.map(p => p.id).join(',');
                         const newIds = newList.map(p => p.id).join(',');
                         if (oldIds !== newIds) {
@@ -2252,6 +2357,14 @@
                             if (value === 'form') {
                                 setTimeout(() => this.updateIndicator('activeTab'), 50);
                                 setTimeout(() => this.updateIndicator('activeTab'), 300);
+                            }
+                        });
+
+                        // Re-sync sliding tabs when edit skeleton finishes loading
+                        this.$watch('editProductLoading', loading => {
+                            if (!loading && this.panel === 'form') {
+                                setTimeout(() => this.updateIndicator('activeTab'), 50);
+                                setTimeout(() => this.updateIndicator('activeTab'), 200);
                             }
                         });
 

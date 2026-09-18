@@ -498,7 +498,7 @@
                                     @php $qtyErrClass = $errors->has('newItemQty') ? 'border-red-400 bg-red-50/30' : ''; @endphp
                                     <input 
                                         type="text"
-                                        wire:model.live="newItemQty"
+                                        wire:model.blur="newItemQty"
                                         x-bind:class="{ 'border-red-400 bg-red-50/30': formErrors.newItemQty }"
                                         class="w-full h-11 pr-14 text-[13px] font-black border focus:ring-1 focus:ring-indigo-500/30 rounded-lg shadow-sm placeholder-gray-400 transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:outline-none {{ $qtyErrClass }} {{ $qtyErrClass ? 'focus:border-red-400' : 'border-gray-200 focus:border-indigo-500' }}"
                                         placeholder="0.00"
@@ -586,8 +586,7 @@
                             <div class="animate-fadeIn">
                                 <x-input-label value="Procurement Cost" />
                                 <div class="mt-1.5">
-                                    <x-text-input wire:model.live="newItemCost" class="h-11 text-[13px] font-bold w-full" placeholder="Cost (₱)" x-on:input="restrictInput($event, 'price')" />
-                                </div>
+                                    <x-text-input wire:model.blur="newItemCost" class="h-11 text-[13px] font-bold w-full" placeholder="Cost (₱)" x-on:input="restrictInput($event, 'price')" />                                </div>
                                 @if($newItemQty > 0 && $newItemCost > 0)
                                     <div class="mt-2 p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between">
                                         <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Value</span>
@@ -688,7 +687,10 @@
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {{-- Left: Audit Table --}}
                 <div class="lg:col-span-2 space-y-6">
-                    <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]" x-data="{ bulkSearch: '' }">
+                                        <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]"
+                        wire:ignore
+                        wire:key="bulk-table-{{ $selectedBranchId }}-{{ $bulkVersion }}"
+                        x-data="reconcileTable(@js($bulkAdjustments))">
                         <div class="flex items-center justify-between mb-4">
                             <h2 class="text-[13px] font-semibold text-gray-700 uppercase tracking-wider">Physical Count Entry</h2>
                             <x-search-bar x-model="bulkSearch" placeholder="Filter items..." width="w-full md:w-64" class="h-10" />
@@ -705,31 +707,31 @@
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-50">
-                                    @foreach($bulkAdjustments as $id => $item)
-                                        <tr class="hover:bg-slate-50/50 transition-colors" 
-                                            x-show="!bulkSearch || @js(strtolower($item['name'])).includes(bulkSearch.toLowerCase())">
+                                    <template x-for="(item, id) in items" :key="id">
+                                        <tr class="hover:bg-slate-50/50 transition-colors"
+                                            x-show="!bulkSearch || item.name.toLowerCase().includes(bulkSearch.toLowerCase())">
                                             <td class="py-3 px-4">
-                                                <span class="text-[13px] font-bold text-slate-900">{{ $item['name'] }}</span>
+                                                <span class="text-[13px] font-bold text-slate-900" x-text="item.name"></span>
                                             </td>
                                             <td class="py-3 px-4 text-right">
-                                                <span class="text-[12px] font-bold text-slate-500">
-                                                    {{ \App\Helpers\StockHelper::formatForDisplay($item['current'], $item['unit']) }}
-                                                </span>
+                                                <span class="text-[12px] font-bold text-slate-500" x-text="formatQty(item.current, item.unit)"></span>
                                             </td>
                                             <td class="py-3 px-4">
-                                                <x-text-input wire:model.live="bulkAdjustments.{{ $id }}.actual" class="h-9 text-center font-black" placeholder="--" x-on:input="restrictInput($event, 'price')" />
+                                                <input type="text"
+                                                    x-model="item.actual"
+                                                    @input="restrictInput($event, 'price'); updateVariance(id)"
+                                                    placeholder="--"
+                                                    class="w-full h-9 text-center font-black border border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500/30 focus:border-indigo-500" />
                                             </td>
                                             <td class="py-3 px-4 text-right">
-                                                @if($item['actual'] !== '')
-                                                    <span class="text-[12px] font-bold {{ $item['variance'] < 0 ? 'text-rose-600' : ($item['variance'] > 0 ? 'text-emerald-600' : 'text-slate-400') }}">
-                                                        {{ $item['variance'] > 0 ? '+' : '' }}{{ \App\Helpers\StockHelper::formatForDisplay($item['variance'], $item['unit']) }}
-                                                    </span>
-                                                @else
-                                                    <span class="text-[11px] text-slate-300 italic">—</span>
-                                                @endif
+                                                <span x-show="item.actual !== ''"
+                                                    class="text-[12px] font-bold"
+                                                    :class="item.variance < 0 ? 'text-rose-600' : (item.variance > 0 ? 'text-emerald-600' : 'text-slate-400')"
+                                                    x-text="(item.variance > 0 ? '+' : '') + formatQty(item.variance, item.unit)"></span>
+                                                <span x-show="item.actual === ''" class="text-[11px] text-slate-300 italic">—</span>
                                             </td>
                                         </tr>
-                                    @endforeach
+                                    </template>
                                 </tbody>
                             </table>
                         </div>
@@ -738,7 +740,10 @@
 
                 {{-- Right: Summary & Action --}}
                 <div class="space-y-6">
-                    <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
+                    <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]"
+                        wire:ignore
+                        wire:key="bulk-summary-{{ $selectedBranchId }}-{{ $bulkVersion }}"
+                        x-data="{}">
                         <h2 class="text-[13px] font-semibold text-gray-700 uppercase tracking-wider mb-4">Stock Reconciliation Summary</h2>
                         <div class="space-y-4">
                             <div class="flex items-center justify-between py-2 border-b border-slate-100">
@@ -747,25 +752,18 @@
                             </div>
                             <div class="flex items-center justify-between py-2 border-b border-slate-100">
                                 <span class="text-[12px] text-slate-500 font-bold">Variances Detected</span>
-                                <span class="text-[13px] font-bold text-rose-600 bg-rose-50 px-2.5 py-0.5 rounded-lg border border-rose-100">{{ count(array_filter($bulkAdjustments, fn($i) => $i['variance'] != 0 && $i['actual'] !== '')) }} Items</span>
+                                <span class="text-[13px] font-bold text-rose-600 bg-rose-50 px-2.5 py-0.5 rounded-lg border border-rose-100" x-text="$store.reconcile.variancesDetected() + ' Items'"></span>
                             </div>
                             <div class="pt-2">
                                 <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Est. Cost Impact</span>
-                                @php
-                                    $netImpact = collect($bulkAdjustments)->filter(fn($i) => $i['actual'] !== '')->sum(fn($i) => $i['variance'] * $i['avg_cost']);
-                                @endphp
                                 <div class="p-4 bg-slate-50 border border-slate-100 rounded-2xl mt-2 flex items-center justify-between transition-all hover:scale-[1.02]">
                                     <div class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 shadow-sm">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                     </div>
                                     <div class="text-right">
-                                        <span @class([
-                                            'text-[18px] font-black tracking-tight',
-                                            'text-rose-600' => $netImpact < 0,
-                                            'text-emerald-600' => $netImpact >= 0,
-                                        ])>
-                                            {{ $netImpact < 0 ? '-' : '+' }}₱{{ number_format(abs($netImpact), 2) }}
-                                        </span>
+                                        <span class="text-[18px] font-black tracking-tight"
+                                            :class="$store.reconcile.netImpact() < 0 ? 'text-rose-600' : 'text-emerald-600'"
+                                            x-text="(($store.reconcile.netImpact() < 0) ? '-' : '+') + '₱' + Math.abs($store.reconcile.netImpact()).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})"></span>
                                         <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Net Valuation Impact</p>
                                     </div>
                                 </div>
@@ -775,7 +773,9 @@
 
                     <div class="flex flex-col gap-3">
                         <div>
-                            <x-primary-button wire:click="confirmReconcile" class="w-full justify-center h-12 text-[12px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">
+                            <x-primary-button
+                                x-on:click="$wire.syncBulkFromClient($store.reconcile.actualsPayload()).then(() => $wire.confirmReconcile())"
+                                class="w-full justify-center h-12 text-[12px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">
                                 Apply Corrections
                             </x-primary-button>
                             <x-input-error :messages="$errors->get('bulkAdjustments')" class="mt-2 text-center" />
@@ -995,7 +995,52 @@
                     </button>
                 </div>
             </div>
-        @endif
+         @endif
     </x-side-panel>
+
+    @push('scripts')
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.store('reconcile', {
+                items: {},
+                setItems(items) { this.items = items; },
+                variancesDetected() {
+                    return Object.values(this.items).filter(i => i.actual !== '' && Number(i.variance) !== 0).length;
+                },
+                netImpact() {
+                    return Object.values(this.items)
+                        .filter(i => i.actual !== '')
+                        .reduce((sum, i) => sum + (Number(i.variance) * Number(i.avg_cost)), 0);
+                },
+                actualsPayload() {
+                    const out = {};
+                    Object.entries(this.items).forEach(([id, i]) => {
+                        if (i.actual !== '') out[id] = i.actual;
+                    });
+                    return out;
+                }
+            });
+        });
+
+        function reconcileTable(initialItems) {
+            return {
+                items: initialItems,
+                bulkSearch: '',
+                init() {
+                    Alpine.store('reconcile').setItems(this.items);
+                },
+                updateVariance(id) {
+                    const item = this.items[id];
+                    const actual = item.actual === '' ? null : parseFloat(item.actual);
+                    item.variance = actual === null ? 0 : actual - item.current;
+                    Alpine.store('reconcile').setItems(this.items);
+                },
+                formatQty(val, unit) {
+                    return Number(val).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ' + unit;
+                }
+            };
+        }
+    </script>
+    @endpush
 
 </div>

@@ -13,8 +13,10 @@ use App\Models\IngredientCost;
 use App\Models\Recipe;
 use App\Models\StockBatch;
 use App\Models\StockMovement;
+use App\Models\DailyBranchSummary;
 use App\Models\User;
 use App\Services\ConfigurationService;
+use App\Services\DashboardRollupService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -542,75 +544,103 @@ if ($refunds > 0) {
     /**
      * Consolidate Financial Intelligence
      * Fetches orders once and calculates Revenue, AOV, COGS, and Profit.
+     *
+     * HYBRID MODE: Uses pre-aggregated daily_branch_summaries for all past days
+     * and live indexed SQL for today, avoiding PHP-loop COGS scans on historical
+     * data. Falls back to the full PHP-loop scan only when rollup data does not
+     * yet exist for the selected range (before the first backfill has run).
      */
     private function getFinancialIntelligence(): array
-{
-    return $this->cachedDashboardSegment('financial-intelligence', 5, function () {
-        $branchId = $this->selectedBranchId;
-        $orders = $this->fetchFinancialOrders($branchId); // Completed + Refunded + Partially Refunded
-        $completedOrders = $orders->where('status', Order::STATUS_COMPLETED);
+    {
+        return $this->cachedDashboardSegment('financial-intelligence', 5, function () {
+            $branchId = $this->selectedBranchId;
 
-                $branchCosts = $this->buildBranchCostMap($branchId);
+            // ── Hybrid path ──────────────────────────────────────────────────
+            // Check whether the rollup table has at least one completed row for
+            // the relevant branch+date range. If yes, use the fast service.
+            // If no rows at all exist (pre-backfill), fall through to legacy scan.
+            $effectiveBranchId = $this->isSuperAdmin
+                ? $branchId
+                : auth()->user()?->branch_id;
 
-        $purchaseCosts = $this->fetchPurchasePrices($branchId);
-        $globalCosts = Ingredient::pluck('cost', 'id');
+            $hasRollup = DailyBranchSummary::query()
+                ->forBranch($effectiveBranchId)
+                ->pastDaysOnly()
+                ->when($this->startDate, fn($q) => $q->where('summary_date', '>=', $this->startDate))
+                ->when($this->endDate,   fn($q) => $q->where('summary_date', '<=', $this->endDate))
+                ->where('is_partial', false)
+                ->exists();
 
-        // Revenue base = ALL orders in range (matches BusinessIntelligence)
-        $totalCollected = $orders->sum('total_amount');
-        $deliveryFees   = $orders->sum('delivery_fee');
-        $totalDiscounts = $orders->sum('discount_amount');
-        $refunds        = $orders->sum('refunded_amount');
-        $netSales       = $totalCollected - $deliveryFees - $refunds;
-        $grossSales     = $netSales + $totalDiscounts;
-
-        // Order count + COGS come from fully-completed, unrefunded orders only
-        $orderCount = $completedOrders->count();
-        $totalCogs  = 0;
-
-        $productCostMap = [];
-        $optionCostMap = [];
-        $modifierCostMap = [];
-
-        foreach ($completedOrders as $order) {
-            $bid = $order->branch_id;
-            foreach ($order->items as $item) {
-                $itemCost = $this->calculateItemCogs($item, $branchCosts, $globalCosts, $purchaseCosts, $productCostMap, $optionCostMap, $modifierCostMap, $bid);
-                $totalCogs += ($itemCost * $item->quantity);
+            if ($hasRollup) {
+                return app(DashboardRollupService::class)->getFinancialIntelligence(
+                    branchId:       $branchId,
+                    startDate:      $this->startDate ?: null,
+                    endDate:        $this->endDate   ?: null,
+                    isSuperAdmin:   $this->isSuperAdmin,
+                    userBranchId:   auth()->user()?->branch_id,
+                );
             }
-        }
 
-        $start = $this->startDate ? Carbon::parse($this->startDate)->startOfDay() : null;
-        $end = $this->endDate ? Carbon::parse($this->endDate)->endOfDay() : null;
+            // ── Legacy full-scan fallback ────────────────────────────────────
+            // Used on first deploy before dashboard:rollup --backfill has run.
+            $orders = $this->fetchFinancialOrders($branchId);
+            $completedOrders = $orders->where('status', Order::STATUS_COMPLETED);
 
-        $wasteCost = StockMovement::whereIn('type', ['waste', 'waste_expired', 'out', 'return_to_supplier'])
-            ->when($start, fn($q) => $q->where('created_at', '>=', $start))
-            ->when($end, fn($q) => $q->where('created_at', '<=', $end))
-            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
-            ->get()
-            ->sum(fn($movement) => abs($movement->quantity) * ($movement->unit_cost ?? 0));
+            $branchCosts   = $this->buildBranchCostMap($branchId);
+            $purchaseCosts = $this->fetchPurchasePrices($branchId);
+            $globalCosts   = Ingredient::pluck('cost', 'id');
 
-        $aov = $orderCount > 0 ? ($completedOrders->sum('total_amount') / $orderCount) : 0;
+            $totalCollected = $orders->sum('total_amount');
+            $deliveryFees   = $orders->sum('delivery_fee');
+            $totalDiscounts = $orders->sum('discount_amount');
+            $refunds        = $orders->sum('refunded_amount');
+            $netSales       = $totalCollected - $deliveryFees - $refunds;
+            $grossSales     = $netSales + $totalDiscounts;
+            $orderCount     = $completedOrders->count();
+            $totalCogs      = 0;
 
-        // Gross Profit = Net Sales - COGS - Waste (matches BusinessIntelligence)
-        $grossProfit = $netSales - $totalCogs - $wasteCost;
-        $margin = $netSales > 0 ? ($grossProfit / $netSales) * 100 : 0;
+            $productCostMap  = [];
+            $optionCostMap   = [];
+            $modifierCostMap = [];
 
-        return [
-            'revenue' => $totalCollected,
-            'net_sales' => $netSales,
-            'gross_sales' => $grossSales,
-            'delivery_fees' => $deliveryFees,
-            'total_discounts' => $totalDiscounts,
-            'refunds' => $refunds,
-            'order_count' => $orderCount,
-            'aov' => $aov,
-            'total_cogs' => $totalCogs,
-            'waste_cost' => $wasteCost,
-            'gross_profit' => $grossProfit,
-            'profit_margin_pct' => round($margin, 2),
-        ];
-    });
-}
+            foreach ($completedOrders as $order) {
+                $bid = $order->branch_id;
+                foreach ($order->items as $item) {
+                    $itemCost = $this->calculateItemCogs($item, $branchCosts, $globalCosts, $purchaseCosts, $productCostMap, $optionCostMap, $modifierCostMap, $bid);
+                    $totalCogs += ($itemCost * $item->quantity);
+                }
+            }
+
+            $start = $this->startDate ? Carbon::parse($this->startDate)->startOfDay() : null;
+            $end   = $this->endDate   ? Carbon::parse($this->endDate)->endOfDay()     : null;
+
+            $wasteCost = StockMovement::whereIn('type', ['waste', 'waste_expired', 'out', 'return_to_supplier'])
+                ->when($start, fn($q) => $q->where('created_at', '>=', $start))
+                ->when($end,   fn($q) => $q->where('created_at', '<=', $end))
+                ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+                ->get()
+                ->sum(fn($movement) => abs($movement->quantity) * ($movement->unit_cost ?? 0));
+
+            $aov         = $orderCount > 0 ? ($completedOrders->sum('total_amount') / $orderCount) : 0;
+            $grossProfit = $netSales - $totalCogs - $wasteCost;
+            $margin      = $netSales > 0 ? ($grossProfit / $netSales) * 100 : 0;
+
+            return [
+                'revenue'           => $totalCollected,
+                'net_sales'         => $netSales,
+                'gross_sales'       => $grossSales,
+                'delivery_fees'     => $deliveryFees,
+                'total_discounts'   => $totalDiscounts,
+                'refunds'           => $refunds,
+                'order_count'       => $orderCount,
+                'aov'               => $aov,
+                'total_cogs'        => $totalCogs,
+                'waste_cost'        => $wasteCost,
+                'gross_profit'      => $grossProfit,
+                'profit_margin_pct' => round($margin, 2),
+            ];
+        });
+    }
 
         private function fetchPurchasePrices(?int $branchId): Collection
     {

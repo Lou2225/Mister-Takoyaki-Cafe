@@ -42,6 +42,7 @@ class StockAdjustment extends Component
     public $mainBranchId = '';
     public $rows = []; // Queue: [ingredient_id, ingredient_name, type, quantity, unit, cost, expiry]
     public $bulkAdjustments = []; 
+    public $bulkVersion = 0;
     public $globalReference = '';
     public $globalRemarks = '';
     public $viewingReferenceId;
@@ -322,6 +323,7 @@ class StockAdjustment extends Component
     {
         if (empty($this->selectedBranchId)) return;
 
+        $this->bulkVersion++;
         $this->globalReference = '';
         $this->bulkAdjustments = [];
         $ingredients = Ingredient::orderBy('name')->get();
@@ -445,6 +447,38 @@ class StockAdjustment extends Component
         $this->validateBeforeModal([], [], 'confirm-bulk-save');
     }
 
+    public function bumpBulkVersion()
+    {
+        // no-op hook; kept so blade can key off a version bump if you ever
+        // want to force-remount the ignored table without changing branch
+    }
+
+    /**
+     * Receives the client-computed reconcile payload in one shot (called
+     * once, on "Apply Corrections" — never per keystroke) and re-derives
+     * variance server-side against the authoritative current stock, so a
+     * stale client snapshot can never silently apply the wrong delta.
+     */
+    public function syncBulkFromClient(array $payload)
+    {
+        $stocks = BranchIngredientStock::where('branch_id', $this->selectedBranchId)
+            ->pluck('stock_quantity', 'ingredient_id');
+
+        foreach ($payload as $id => $actual) {
+            if (!isset($this->bulkAdjustments[$id])) continue;
+            if ($actual === '' || $actual === null) continue;
+
+            $current = (float) ($stocks[$id] ?? 0);
+            $this->bulkAdjustments[$id]['current'] = $current;
+            $this->bulkAdjustments[$id]['actual'] = (float) $actual;
+            $this->bulkAdjustments[$id]['variance'] = (float) $actual - $current;
+        }
+
+        if (empty($this->globalReference)) {
+            $this->generateReference();
+        }
+    }
+
     public function commitReconcile()
     {
         if (empty($this->globalReference)) {
@@ -553,6 +587,7 @@ if ($type === 'in' || $type === 'customer_return') {
                 \App\Services\StockDeductionService::deductByFEFO(
                     $branchId, $ingId, abs($diff), null, auth()->id(), "Reconciliation Deficit", 'adjust', $ref
                 );
+                return; // service already updated stock + logged the movement — don't let the fallthrough below re-save stale $stock or double-log
 } elseif ($diff > 0) {
     $adjustmentCost = (float) ($ingMaster->cost ?? 0);
 
