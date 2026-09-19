@@ -17,7 +17,7 @@
 <div
     x-data="{
         activeTab: $wire.entangle('activeTab').live,
-        ...(typeof window.slidingTabs === 'function' ? window.slidingTabs(@entangle('activeTab').live, 'activeTab') : {}),
+        ...(typeof window.slidingTabs === 'function' ? window.slidingTabs({ activeTab: $wire.entangle('activeTab').live }, 'activeTab') : {}),
                 _timerInterval: null,
         delayThreshold: @js($delayThresholdMinutes),
         updateTimers() {

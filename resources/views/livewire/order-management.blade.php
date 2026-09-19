@@ -8,8 +8,9 @@
 
 <div 
     x-data="{
-        ...slidingTabs(@entangle('sourceFilter').live, 'sourceFilter'),
-                selectedOrderId: @entangle('selectedOrderId').live,
+        sourceFilter: $wire.entangle('sourceFilter').live,
+        selectedOrderId: $wire.entangle('selectedOrderId').live,
+        ...(typeof window.slidingTabs === 'function' ? window.slidingTabs({ sourceFilter: $wire.entangle('sourceFilter').live }, 'sourceFilter') : {}),
         deliveryMapUrl: '',
         deliveryMapExternalUrl: '',
         openDeliveryLocation(lat, lng) {
@@ -337,17 +338,17 @@
             <div class="w-full relative">
                 {{-- App Orders Tab Content --}}
                 <div x-show="sourceFilter === 'App'" class="w-full">
-                    @include('livewire.order-list-table', ['orders' => $appOrders])
+                    @include('livewire.order-list-table', ['orders' => $appOrders, 'tabName' => 'app'])
                 </div>
 
                 {{-- POS Orders Tab Content --}}
                 <div x-show="sourceFilter === 'POS'" class="w-full" x-cloak>
-                    @include('livewire.order-list-table', ['orders' => $posOrders])
+                    @include('livewire.order-list-table', ['orders' => $posOrders, 'tabName' => 'pos'])
                 </div>
 
                 {{-- History Orders Tab Content --}}
                 <div x-show="sourceFilter === 'History'" class="w-full" x-cloak>
-                    @include('livewire.order-list-table', ['orders' => $historyOrders])
+                    @include('livewire.order-list-table', ['orders' => $historyOrders, 'tabName' => 'history'])
                 </div>
             </div>
 
@@ -359,8 +360,8 @@
                 @endphp
                 <div class="flex flex-col h-full bg-white relative"
                     x-data="{ 
-                        ...slidingTabs('summary', 'activeTab'), 
-                        activeTab: 'summary' 
+                        activeTab: 'summary',
+                        ...(typeof window.slidingTabs === 'function' ? window.slidingTabs('summary', 'activeTab') : {})
                     }">
                     {{-- Premium Header --}}
                     <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/40">

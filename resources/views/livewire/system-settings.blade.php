@@ -1506,6 +1506,23 @@
                                                         </p>
                                                     </div>
 
+                                                    <div class="p-2.5 bg-blue-50/90 border border-blue-200/80 rounded-xl space-y-1 text-[11px] text-blue-950">
+                                                        <p class="font-bold flex items-center gap-1.5 text-blue-900">
+                                                            <svg class="w-3.5 h-3.5 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                            <span>Browser or Windows SmartScreen prompt?</span>
+                                                        </p>
+                                                        <p class="text-[10px] text-blue-800 leading-snug">
+                                                            Because this is an in-house tool without an expensive commercial code signature:
+                                                        </p>
+                                                        <ul class="text-[10px] text-blue-800 space-y-0.5 pl-1">
+                                                            <li>&bull; <strong>Chrome / Edge:</strong> Click &bull;&bull;&bull; or arrow &rarr; <span class="font-bold text-blue-950">Keep</span> &rarr; <span class="font-bold text-blue-950">Keep anyway</span>.</li>
+                                                            <li>&bull; <strong>Windows ("Windows protected your PC"):</strong> Click <span class="font-bold text-blue-950">More info</span> &rarr; <span class="font-bold text-blue-950">Run anyway</span>.</li>
+                                                        </ul>
+                                                        <p class="text-[10px] pt-1 text-blue-900 border-t border-blue-100">
+                                                            Prefer manual inspection? <a href="{{ route('downloads.print-bridge', ['format' => 'zip']) }}" class="underline font-bold text-blue-700 hover:text-blue-900">Download .ZIP</a> and run <code class="bg-blue-100 text-blue-900 px-1 py-0.2 rounded font-mono font-bold">install.bat</code> directly.
+                                                        </p>
+                                                    </div>
+
                                                     <div class="flex items-center justify-between gap-2 p-2.5 bg-gray-50 rounded-xl border border-gray-200/70">
                                                         <div class="flex items-center gap-2">
                                                             <span class="relative flex h-2.5 w-2.5">
@@ -2438,6 +2455,16 @@
                 if (this.bridgeOnline) {
                     await this.loadPrinters();
                     this.wiredConnected = !!(this.savedPrinter && this.bridgeOnline);
+                }
+                const cleanUpPoll = () => {
+                    if (this.assistantPollInterval) {
+                        clearInterval(this.assistantPollInterval);
+                        this.assistantPollInterval = null;
+                    }
+                };
+                document.addEventListener('livewire:navigating', cleanUpPoll);
+                if (this.$el) {
+                    this.$el.addEventListener('alpine:destroy', cleanUpPoll);
                 }
                 window.addEventListener('thermal-wired-disconnected', () => { this.wiredConnected = false; this.savedPrinter = null; });
             },

@@ -19,7 +19,7 @@
         </x-slot>
  
         @forelse($orders as $order)
-            <tr wire:key="order-row-{{ $order->id }}" 
+            <tr wire:key="{{ ($tabName ?? 'order') . '-row-' . $order->id }}" 
                 class="hover:bg-slate-50/50 transition-colors cursor-pointer" 
                 wire:click="openOrderDetail({{ $order->id }})">
                 <td class="py-3 px-4 whitespace-nowrap">

@@ -1159,6 +1159,131 @@
         };
     };
 
+    window.registerReconcileStore = function() {
+        if (!window.Alpine) return;
+        if (!window.Alpine.store('reconcile')) {
+            window.Alpine.store('reconcile', {
+                items: {},
+                setItems(items) { this.items = items || {}; },
+                variancesDetected() {
+                    if (!this.items) return 0;
+                    return Object.values(this.items).filter(i => i && i.actual !== '' && Number(i.variance) !== 0).length;
+                },
+                netImpact() {
+                    if (!this.items) return 0;
+                    return Object.values(this.items)
+                        .filter(i => i && i.actual !== '')
+                        .reduce((sum, i) => sum + (Number(i.variance || 0) * Number(i.avg_cost || 0)), 0);
+                },
+                actualsPayload() {
+                    const out = {};
+                    if (!this.items) return out;
+                    Object.entries(this.items).forEach(([id, i]) => {
+                        if (i && i.actual !== '') out[id] = i.actual;
+                    });
+                    return out;
+                }
+            });
+        }
+        if (typeof window.Alpine.data === 'function') {
+            window.Alpine.data('reconcileTable', (initialItems) => window.reconcileTable(initialItems));
+        }
+    };
+
+    window.reconcileTable = function(initialItems) {
+        return {
+            items: initialItems || {},
+            bulkSearch: '',
+            init() {
+                if (typeof window.registerReconcileStore === 'function') {
+                    window.registerReconcileStore();
+                }
+                if (window.Alpine && window.Alpine.store('reconcile')) {
+                    window.Alpine.store('reconcile').setItems(this.items);
+                }
+            },
+            updateVariance(id) {
+                if (!this.items || !this.items[id]) return;
+                const item = this.items[id];
+                const actual = (item.actual === '' || item.actual === null || item.actual === undefined) ? null : parseFloat(item.actual);
+                item.variance = (actual === null || isNaN(actual)) ? 0 : actual - (item.current || 0);
+                if (window.Alpine && window.Alpine.store('reconcile')) {
+                    window.Alpine.store('reconcile').setItems(this.items);
+                }
+            },
+            formatQty(val, unit) {
+                return Number(val || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ' + (unit || '');
+            }
+        };
+    };
+
+    window.stockAdjustment = function($wire) {
+        return {
+            panel: $wire.entangle('panel').live,
+            init() {}
+        };
+    };
+
+    window.adjustmentMovementForm = function($wire, ingredientsList) {
+        return {
+            isOpen: false,
+            dropUp: false,
+            search: '',
+            selectedId: $wire.entangle('newItemId').live,
+            qty: $wire.entangle('newItemQty').live,
+            formErrors: {},
+            ingredients: ingredientsList || [],
+            get selectedItem() {
+                if (!this.selectedId) return null;
+                return this.ingredients.find(i => Number(i.id) === Number(this.selectedId)) || null;
+            },
+            get filteredItems() {
+                if (!this.search || !this.search.trim()) return this.ingredients;
+                const q = this.search.toLowerCase().trim();
+                return this.ingredients.filter(i => (i.name || '').toLowerCase().includes(q));
+            },
+            openDropdown() {
+                this.checkFlip();
+                this.isOpen = true;
+                this.search = '';
+            },
+            closeDropdown() {
+                this.isOpen = false;
+                this.search = '';
+            },
+            checkFlip() {
+                if (!this.$refs.comboboxContainer) return;
+                const rect = this.$refs.comboboxContainer.getBoundingClientRect();
+                const spaceBelow = window.innerHeight - rect.bottom;
+                this.dropUp = spaceBelow < 250 && rect.top > 250;
+            },
+            select(id) {
+                this.selectedId = id;
+                this.search = '';
+                this.isOpen = false;
+                delete this.formErrors.newItemId;
+            },
+            clear() {
+                this.selectedId = '';
+                this.search = '';
+                this.isOpen = false;
+                delete this.formErrors.newItemId;
+            },
+            validateAndAdd() {
+                this.formErrors = {};
+                if (!this.selectedId) {
+                    this.formErrors.newItemId = 'Select an ingredient.';
+                }
+                if (!this.qty || parseFloat(this.qty) <= 0) {
+                    this.formErrors.newItemQty = 'Quantity is required.';
+                }
+                if (Object.keys(this.formErrors).length === 0) {
+                    $wire.addToQueue();
+                }
+            }
+        };
+    };
+
     const registerAlpineFactories = () => {
         if (!window.Alpine) return;
 
@@ -1169,6 +1294,12 @@
         window.Alpine.data('stockManagement', ($wire) => window.stockManagement($wire));
         window.Alpine.data('branchStockOrdering', ($wire, config) => window.branchStockOrdering($wire, config));
         window.Alpine.data('thermalTearOffModal', () => window.thermalTearOffModal());
+        window.Alpine.data('stockAdjustment', ($wire) => window.stockAdjustment($wire));
+        window.Alpine.data('adjustmentMovementForm', ($wire, ingredientsList) => window.adjustmentMovementForm($wire, ingredientsList));
+
+        if (typeof window.registerReconcileStore === 'function') {
+            window.registerReconcileStore();
+        }
     };
 
     document.addEventListener('alpine:init', registerAlpineFactories);

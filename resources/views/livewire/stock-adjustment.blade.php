@@ -1,8 +1,76 @@
 <div
-    x-data="{ 
-        panel: $wire.$entangle('panel', true)
-    }"
+    x-data="typeof window.stockAdjustment === 'function' ? window.stockAdjustment($wire) : { panel: $wire.entangle('panel').live }"
+    wire:key="stock-adjustment-main-container"
     class="relative overflow-hidden">
+
+    <script>
+        window.stockAdjustment = function($wire) {
+            return {
+                panel: $wire.entangle('panel').live,
+                init() {}
+            };
+        };
+
+        window.adjustmentMovementForm = function($wire, ingredientsList) {
+            return {
+                isOpen: false,
+                dropUp: false,
+                search: '',
+                selectedId: $wire.entangle('newItemId').live,
+                qty: $wire.entangle('newItemQty').live,
+                formErrors: {},
+                ingredients: ingredientsList || [],
+                get selectedItem() {
+                    if (!this.selectedId) return null;
+                    return this.ingredients.find(i => Number(i.id) === Number(this.selectedId)) || null;
+                },
+                get filteredItems() {
+                    if (!this.search || !this.search.trim()) return this.ingredients;
+                    const q = this.search.toLowerCase().trim();
+                    return this.ingredients.filter(i => (i.name || '').toLowerCase().includes(q));
+                },
+                openDropdown() {
+                    this.checkFlip();
+                    this.isOpen = true;
+                    this.search = '';
+                },
+                closeDropdown() {
+                    this.isOpen = false;
+                    this.search = '';
+                },
+                checkFlip() {
+                    if (!this.$refs.comboboxContainer) return;
+                    const rect = this.$refs.comboboxContainer.getBoundingClientRect();
+                    const spaceBelow = window.innerHeight - rect.bottom;
+                    this.dropUp = spaceBelow < 250 && rect.top > 250;
+                },
+                select(id) {
+                    this.selectedId = id;
+                    this.search = '';
+                    this.isOpen = false;
+                    delete this.formErrors.newItemId;
+                },
+                clear() {
+                    this.selectedId = '';
+                    this.search = '';
+                    this.isOpen = false;
+                    delete this.formErrors.newItemId;
+                },
+                validateAndAdd() {
+                    this.formErrors = {};
+                    if (!this.selectedId) {
+                        this.formErrors.newItemId = 'Select an ingredient.';
+                    }
+                    if (!this.qty || parseFloat(this.qty) <= 0) {
+                        this.formErrors.newItemQty = 'Quantity is required.';
+                    }
+                    if (Object.keys(this.formErrors).length === 0) {
+                        $wire.addToQueue();
+                    }
+                }
+            };
+        };
+    </script>
 
     <div class="relative min-h-[600px]">
 
@@ -345,63 +413,8 @@
                     
                     {{-- Add Movement Form (Matching Menu Items "Add Component") --}}
                     <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] space-y-4"
-                        x-data="{
-                            open: false,
-                            dropUp: false,
-                            search: '',
-                            selectedId: @entangle('newItemId').live,
-                            qty: @entangle('newItemQty').live,
-                            formErrors: {},
-                            ingredients: {{ Js::from($ingredients->map(fn($i) => ['id' => $i->id, 'name' => $i->name, 'unit' => $i->unit])) }},
-                            get selectedItem() {
-                                if (!this.selectedId) return null;
-                                return this.ingredients.find(i => Number(i.id) === Number(this.selectedId)) || null;
-                            },
-                            get filteredItems() {
-                                if (!this.search.trim()) return this.ingredients;
-                                const q = this.search.toLowerCase().trim();
-                                return this.ingredients.filter(i => (i.name || '').toLowerCase().includes(q));
-                            },
-                            openDropdown() {
-                                this.checkFlip();
-                                this.open = true;
-                                this.search = '';
-                            },
-                            closeDropdown() {
-                                this.open = false;
-                                this.search = '';
-                            },
-                            checkFlip() {
-                                if (!this.$refs.comboboxContainer) return;
-                                const rect = this.$refs.comboboxContainer.getBoundingClientRect();
-                                const spaceBelow = window.innerHeight - rect.bottom;
-                                this.dropUp = spaceBelow < 250 && rect.top > 250;
-                            },
-                            select(id) {
-                                this.selectedId = id;
-                                this.search = '';
-                                this.open = false;
-                                delete this.formErrors.newItemId;
-                            },
-                            clear() {
-                                this.selectedId = '';
-                                this.search = '';
-                                this.open = false;
-                                delete this.formErrors.newItemId;
-                            },
-                            validateAndAdd() {
-                                this.formErrors = {};
-                                if (!this.selectedId) {
-                                    this.formErrors.newItemId = 'Select an ingredient.';
-                                }
-                                if (!this.qty || parseFloat(this.qty) <= 0) {
-                                    this.formErrors.newItemQty = 'Quantity is required.';
-                                }
-                                if (Object.keys(this.formErrors).length === 0) {
-                                    $wire.addToQueue();
-                                }
-                            }
-                        }">
+                        wire:key="adjustment-movement-form"
+                        x-data="window.adjustmentMovementForm($wire, @js($ingredients->map(fn($i) => ['id' => $i->id, 'name' => $i->name, 'unit' => $i->unit])))">
                         <h2 class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1 flex items-center gap-2">
                             <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
                             Add Movement
@@ -423,15 +436,15 @@
 
                                     <input 
                                         type="text"
-                                        :value="open ? search : (selectedItem ? selectedItem.name : '')"
-                                        @input="search = $event.target.value; open = true; delete formErrors.newItemId"
+                                        :value="isOpen ? search : (selectedItem ? selectedItem.name : '')"
+                                        @input="search = $event.target.value; isOpen = true; delete formErrors.newItemId"
                                         @focus="openDropdown()"
                                         @click="openDropdown()"
                                         :placeholder="selectedItem ? selectedItem.name : 'Search or select ingredient...'"
                                         class="w-full pl-10 pr-10 py-2 bg-white border border-slate-200 rounded-xl text-[13px] text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all h-11"
                                         :class="{
-                                            'font-bold text-indigo-700 bg-indigo-50/20 border-indigo-200': selectedItem && !open,
-                                            'text-slate-800': !selectedItem || open,
+                                            'font-bold text-indigo-700 bg-indigo-50/20 border-indigo-200': selectedItem && !isOpen,
+                                            'text-slate-800': !selectedItem || isOpen,
                                             '!border-red-400 focus:!border-red-400 focus:!ring-red-300 !bg-red-50/30': (formErrors.newItemId || @js($errors->has('newItemId')))
                                         }"
                                         autocomplete="off"
@@ -453,7 +466,7 @@
                                 </div>
 
                                 {{-- Dropdown Results Menu with auto-flip --}}
-                                <div x-show="open" x-cloak
+                                <div x-show="isOpen" x-cloak
                                     x-transition:enter="transition ease-out duration-100"
                                     x-transition:enter-start="opacity-0 scale-95"
                                     x-transition:enter-end="opacity-100 scale-100"
@@ -752,7 +765,7 @@
                             </div>
                             <div class="flex items-center justify-between py-2 border-b border-slate-100">
                                 <span class="text-[12px] text-slate-500 font-bold">Variances Detected</span>
-                                <span class="text-[13px] font-bold text-rose-600 bg-rose-50 px-2.5 py-0.5 rounded-lg border border-rose-100" x-text="$store.reconcile.variancesDetected() + ' Items'"></span>
+                                <span class="text-[13px] font-bold text-rose-600 bg-rose-50 px-2.5 py-0.5 rounded-lg border border-rose-100" x-text="($store.reconcile?.variancesDetected ? $store.reconcile.variancesDetected() : 0) + ' Items'"></span>
                             </div>
                             <div class="pt-2">
                                 <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Est. Cost Impact</span>
@@ -762,8 +775,8 @@
                                     </div>
                                     <div class="text-right">
                                         <span class="text-[18px] font-black tracking-tight"
-                                            :class="$store.reconcile.netImpact() < 0 ? 'text-rose-600' : 'text-emerald-600'"
-                                            x-text="(($store.reconcile.netImpact() < 0) ? '-' : '+') + '₱' + Math.abs($store.reconcile.netImpact()).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})"></span>
+                                            :class="($store.reconcile?.netImpact ? $store.reconcile.netImpact() : 0) < 0 ? 'text-rose-600' : 'text-emerald-600'"
+                                            x-text="((($store.reconcile?.netImpact ? $store.reconcile.netImpact() : 0) < 0) ? '-' : '+') + '₱' + Math.abs($store.reconcile?.netImpact ? $store.reconcile.netImpact() : 0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})"></span>
                                         <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Net Valuation Impact</p>
                                     </div>
                                 </div>
@@ -774,7 +787,7 @@
                     <div class="flex flex-col gap-3">
                         <div>
                             <x-primary-button
-                                x-on:click="$wire.syncBulkFromClient($store.reconcile.actualsPayload()).then(() => $wire.confirmReconcile())"
+                                x-on:click="$wire.syncBulkFromClient($store.reconcile?.actualsPayload ? $store.reconcile.actualsPayload() : {}).then(() => $wire.confirmReconcile())"
                                 class="w-full justify-center h-12 text-[12px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">
                                 Apply Corrections
                             </x-primary-button>
@@ -998,49 +1011,43 @@
          @endif
     </x-side-panel>
 
-    @push('scripts')
+    @script
     <script>
-        document.addEventListener('alpine:init', () => {
-            Alpine.store('reconcile', {
-                items: {},
-                setItems(items) { this.items = items; },
-                variancesDetected() {
-                    return Object.values(this.items).filter(i => i.actual !== '' && Number(i.variance) !== 0).length;
-                },
-                netImpact() {
-                    return Object.values(this.items)
-                        .filter(i => i.actual !== '')
-                        .reduce((sum, i) => sum + (Number(i.variance) * Number(i.avg_cost)), 0);
-                },
-                actualsPayload() {
-                    const out = {};
-                    Object.entries(this.items).forEach(([id, i]) => {
-                        if (i.actual !== '') out[id] = i.actual;
-                    });
-                    return out;
-                }
-            });
-        });
+        if (typeof window.registerReconcileStore === 'function') {
+            window.registerReconcileStore();
+        }
 
-        function reconcileTable(initialItems) {
+        window.reconcileTable = window.reconcileTable || function(initialItems) {
             return {
-                items: initialItems,
+                items: initialItems || {},
                 bulkSearch: '',
                 init() {
-                    Alpine.store('reconcile').setItems(this.items);
+                    if (typeof window.registerReconcileStore === 'function') {
+                        window.registerReconcileStore();
+                    }
+                    if (window.Alpine && window.Alpine.store('reconcile')) {
+                        window.Alpine.store('reconcile').setItems(this.items);
+                    }
                 },
                 updateVariance(id) {
+                    if (!this.items || !this.items[id]) return;
                     const item = this.items[id];
-                    const actual = item.actual === '' ? null : parseFloat(item.actual);
-                    item.variance = actual === null ? 0 : actual - item.current;
-                    Alpine.store('reconcile').setItems(this.items);
+                    const actual = (item.actual === '' || item.actual === null || item.actual === undefined) ? null : parseFloat(item.actual);
+                    item.variance = (actual === null || isNaN(actual)) ? 0 : actual - (item.current || 0);
+                    if (window.Alpine && window.Alpine.store('reconcile')) {
+                        window.Alpine.store('reconcile').setItems(this.items);
+                    }
                 },
                 formatQty(val, unit) {
-                    return Number(val).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ' + unit;
+                    return Number(val || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ' + (unit || '');
                 }
             };
+        };
+
+        function reconcileTable(initialItems) {
+            return window.reconcileTable(initialItems);
         }
     </script>
-    @endpush
+    @endscript
 
 </div>

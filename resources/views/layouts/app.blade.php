@@ -56,10 +56,10 @@
     @vite(['resources/js/app.js'])
 
     {{-- Form validation --}}
-    <script src="{{ asset('js/form-validation.js') }}" defer data-navigate-once></script>
+    <script src="{{ asset('js/form-validation.js') }}?v={{ filemtime(public_path('js/form-validation.js')) }}" defer data-navigate-once></script>
 
     {{-- Alpine Components --}}
-    <script src="{{ asset('js/alpine-components.js') }}" data-navigate-once></script>
+    <script src="{{ asset('js/alpine-components.js') }}?v={{ filemtime(public_path('js/alpine-components.js')) }}" data-navigate-once></script>
 
     {{-- Navigation Concurrency & Abort Guard --}}
     <script src="{{ asset('js/navigation-guard.js') }}?v={{ filemtime(public_path('js/navigation-guard.js')) }}" data-navigate-once></script>
