@@ -53,9 +53,15 @@ if (!window.__mtcPrintPageListenerAttached) {
     });
 }
 
-import thermalBluetoothPrinter from './thermal-bluetooth';
+import thermalBluetoothPrinter, { thermalWiredPrinter, getConnectedThermalPrinter } from './thermal-bluetooth';
 window.thermalBluetoothPrinter = thermalBluetoothPrinter;
+window.thermalWiredPrinter = thermalWiredPrinter;
+window.getConnectedThermalPrinter = getConnectedThermalPrinter;
 window.dispatchEvent(new CustomEvent('thermal-bt-client-ready'));
+
+document.addEventListener('livewire:navigated', () => {
+    window.dispatchEvent(new CustomEvent('thermal-printer-status-changed'));
+});
 
 // Bluetooth pairing must happen from a real user click (browser security
 // requirement) — trigger this from a "Connect Printer" button in Settings.
@@ -81,7 +87,7 @@ if (!window.__thermalPrintListenerAttached) {
 
     if (!orderId) return;
 
-    // Prefer the browser-side Bluetooth printer when one is connected
+    // ── 1. Bluetooth printer (browser-paired) ─────────────────────────────
     const btConnected = window.thermalBluetoothPrinter && window.thermalBluetoothPrinter.characteristic;
 
     if (btConnected) {
@@ -104,11 +110,35 @@ if (!window.__thermalPrintListenerAttached) {
             }));
             return;
         } catch (error) {
-            console.error('❌ Bluetooth print failed, falling back to popup:', error.message);
+            console.error('❌ Bluetooth print failed, trying wired:', error.message);
         }
     }
 
-    // Fallback: Open browser print window
+    // ── 2. Wired printer (Print Bridge + Windows Print Spooler) ───────────
+    const wiredReady = window.thermalWiredPrinter?.printerName;
+
+    if (wiredReady) {
+        if (window.pendingThermalReceiptWindow && !window.pendingThermalReceiptWindow.closed) {
+            try { window.pendingThermalReceiptWindow.close(); } catch (_) {}
+            window.pendingThermalReceiptWindow = null;
+        }
+
+        try {
+            const res = await fetch(`/pos/orders/${orderId}/receipt-data`);
+            if (!res.ok) throw new Error('Could not load receipt data.');
+            const data = await res.json();
+            await window.thermalWiredPrinter.printReceipt(data.order, data.settings, data.receipts || []);
+            console.log('✅ Receipt printed via Wired bridge', { orderId, receiptType });
+            window.dispatchEvent(new CustomEvent('notify', {
+                detail: { type: 'success', message: 'Receipt printed via wired printer.' }
+            }));
+            return;
+        } catch (error) {
+            console.error('❌ Wired print failed, falling back to popup:', error.message);
+        }
+    }
+
+    // ── 3. Popup fallback (browser print dialog) ──────────────────────────
     try {
         const receiptUrl = `/receipts/${orderId}/thermal?autoprint=1`;
         const pendingWindow = window.pendingThermalReceiptWindow;
@@ -134,6 +164,7 @@ if (!window.__thermalPrintListenerAttached) {
     }
     });
 }
+
 
 
 

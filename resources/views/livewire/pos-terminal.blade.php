@@ -966,20 +966,25 @@
             console.log('📋 POS Terminal: Print event triggered', { order_id, receipt_type });
 
             try {
-                // 1. If Web Bluetooth thermal printer is connected, print directly over Bluetooth
-                if (window.thermalBluetoothPrinter && window.thermalBluetoothPrinter.characteristic) {
-                    console.log('📋 POS Terminal: Bluetooth printer connected, fetching receipt data...');
+                // 1. If any thermal printer (Bluetooth or Wired) is available, print directly
+                const activePrinter = window.getConnectedThermalPrinter ? window.getConnectedThermalPrinter() : (
+                    (window.thermalBluetoothPrinter?.characteristic) ? { type: 'bluetooth', instance: window.thermalBluetoothPrinter } :
+                    (window.thermalWiredPrinter?.printerName) ? { type: 'wired', instance: window.thermalWiredPrinter } : null
+                );
+
+                if (activePrinter) {
+                    console.log(`📋 POS Terminal: ${activePrinter.type} printer connected, fetching receipt data...`);
                     const res = await fetch(`/pos/orders/${order_id}/receipt-data`);
                     if (!res.ok) throw new Error('Could not load receipt data.');
                     const data = await res.json();
-                    await window.thermalBluetoothPrinter.printReceipt(data.order, data.settings, data.receipts || []);
+                    await activePrinter.instance.printReceipt(data.order, data.settings, data.receipts || []);
                     window.dispatchEvent(new CustomEvent('notify', {
-                        detail: { type: 'success', message: 'Receipt printed via Bluetooth.' }
+                        detail: { type: 'success', message: `Receipt printed via ${activePrinter.type === 'bluetooth' ? 'Bluetooth' : 'wired printer'}.` }
                     }));
                     return;
                 }
 
-                // 2. If Bluetooth is not connected, open and print the thermal-receipt.blade template
+                // 2. If no thermal printer is connected, open and print the thermal-receipt.blade template
                 const receiptUrl = `/receipts/${order_id}/thermal?autoprint=1`;
                 const pendingWindow = window.pendingThermalReceiptWindow;
                 const printWindow = pendingWindow && !pendingWindow.closed
@@ -1081,34 +1086,58 @@
                     </span>
                 </button>
 
-                {{-- Bluetooth Thermal Printer connect/status --}}
-                                <div x-data="{
-                        connected: !!(window.thermalBluetoothPrinter && window.thermalBluetoothPrinter.characteristic),
+                {{-- Unified Thermal Printer connect/status (Bluetooth or Wired) --}}
+                <div x-data="{
+                        printer: null,
                         connecting: false,
-                        supported: 'bluetooth' in navigator,
-                        printerName: localStorage.getItem('thermal_printer_name') || ''
+                        refreshStatus() {
+                            this.printer = window.getConnectedThermalPrinter ? window.getConnectedThermalPrinter() : (
+                                (window.thermalBluetoothPrinter?.characteristic) ? { type: 'bluetooth', name: localStorage.getItem('thermal_printer_name') || 'Bluetooth Printer' } :
+                                (localStorage.getItem('thermal_printer_wired_name')) ? { type: 'wired', name: localStorage.getItem('thermal_printer_wired_name') } : null
+                            );
+                        }
                     }"
                     x-init="
-                        const onBtDisconnected = () => { connected = false; };
-                        window.addEventListener('thermal-bt-disconnected', onBtDisconnected);
-                        $el.addEventListener('alpine:destroy', () => window.removeEventListener('thermal-bt-disconnected', onBtDisconnected));
+                        refreshStatus();
+                        const onPrinterChanged = () => refreshStatus();
+                        window.addEventListener('thermal-bt-connected', onPrinterChanged);
+                        window.addEventListener('thermal-bt-disconnected', onPrinterChanged);
+                        window.addEventListener('thermal-wired-disconnected', onPrinterChanged);
+                        window.addEventListener('thermal-printer-status-changed', onPrinterChanged);
+                        window.addEventListener('focus', onPrinterChanged);
+                        $el.addEventListener('alpine:destroy', () => {
+                            window.removeEventListener('thermal-bt-connected', onPrinterChanged);
+                            window.removeEventListener('thermal-bt-disconnected', onPrinterChanged);
+                            window.removeEventListener('thermal-wired-disconnected', onPrinterChanged);
+                            window.removeEventListener('thermal-printer-status-changed', onPrinterChanged);
+                            window.removeEventListener('focus', onPrinterChanged);
+                        });
                     "
                     class="shrink-0">
                     <button type="button"
-                        :disabled="!supported || connecting"
-                        :title="!supported ? 'Bluetooth printing needs Chrome/Edge (not supported in this browser)' : (connected ? ('Connected: ' + printerName) : 'Connect Bluetooth Printer')"
+                        :disabled="connecting"
+                        :title="printer ? (printer.type === 'wired' ? ('Wired Thermal Printer: ' + printer.name) : ('Bluetooth Thermal Printer: ' + printer.name)) : 'Connect Bluetooth Printer / Configure in Settings'"
                         @click="
-                            connecting = true;
-                            window.thermalBluetoothPrinter.connect()
-                                .then(name => { connected = true; printerName = name; $dispatch('notify', { type: 'success', message: 'Connected to ' + name }); })
-                                .catch(err => { $dispatch('notify', { type: 'error', message: err.message }); })
-                                .finally(() => connecting = false);
+                            if (printer && printer.type === 'wired') {
+                                $dispatch('notify', { type: 'info', message: 'Wired Printer active: ' + printer.name });
+                            } else {
+                                connecting = true;
+                                window.thermalBluetoothPrinter.connect()
+                                    .then(name => { refreshStatus(); $dispatch('notify', { type: 'success', message: 'Connected to ' + name }); })
+                                    .catch(err => { $dispatch('notify', { type: 'error', message: err.message }); })
+                                    .finally(() => connecting = false);
+                            }
                         "
                         class="relative p-2 rounded-lg transition-all border flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
-                        :class="connected ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'">
-                        <svg x-show="!connecting" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6.5 6.5l11 11L12 23V1l5.5 5.5-11 11" /></svg>
+                        :class="printer ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'">
+                        <template x-if="printer && printer.type === 'wired'">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                        </template>
+                        <template x-if="!printer || printer.type === 'bluetooth'">
+                            <svg x-show="!connecting" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6.5 6.5l11 11L12 23V1l5.5 5.5-11 11" /></svg>
+                        </template>
                         <svg x-show="connecting" x-cloak class="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        <span x-show="connected" class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white"></span>
+                        <span x-show="printer" class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white"></span>
                     </button>
                 </div>
 
@@ -1975,7 +2004,7 @@
     <span x-text="cartLocked ? 'Locked' : 'Cancel'"></span>
 </x-secondary-button>
             <x-primary-button type="button"
-@click.capture="if (!isSubmitting && !amountTenderedError && !window.thermalBluetoothPrinter?.characteristic) window.prepareThermalReceiptWindow?.()"
+@click.capture="if (!isSubmitting && !amountTenderedError && !window.getConnectedThermalPrinter?.()) window.prepareThermalReceiptWindow?.()"
 @click.prevent="
     if (isSubmitting || amountTenderedError) return;
     isSubmitting = true;
@@ -2496,7 +2525,7 @@
                 Auto-continuing in <span x-text="typeof secondsLeft !== 'undefined' ? secondsLeft : 0" class="font-mono"></span>s…
             </p>
             <button type="button"
-                @click="window.thermalBluetoothPrinter && window.thermalBluetoothPrinter.confirmContinue()"
+                @click="(window.getConnectedThermalPrinter?.()?.instance || window.thermalBluetoothPrinter)?.confirmContinue()"
                 class="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[14px] font-black transition-all active:scale-[0.98]">
                 Continue Printing
             </button>

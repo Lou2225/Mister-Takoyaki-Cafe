@@ -1,0 +1,11 @@
+{
+  "name": "mtc-print-bridge",
+  "version": "2.0.0",
+  "description": "MTC Print Bridge — sends ESC/POS receipts to Windows printers via PowerShell",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {}
+}
+

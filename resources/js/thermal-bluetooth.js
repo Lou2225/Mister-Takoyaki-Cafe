@@ -589,10 +589,8 @@ async function imageToRasterBytes(dataUri, maxWidth = 192) {
     });
 }
 
-class ThermalBluetoothPrinter {
+class ThermalPrinterBase {
     constructor() {
-        this.device = null;
-        this.characteristic = null;
         this.isPrinting = false;
         // Restore width preference or default to 32 chars (58mm)
         const savedWidth = localStorage.getItem('pos_receipt_width_pref') || '58mm';
@@ -650,29 +648,9 @@ class ThermalBluetoothPrinter {
         }
     }
 
-    isSupported() { return 'bluetooth' in navigator; }
-
-    async connect() {
-        if (!this.isSupported()) throw new Error('Web Bluetooth not supported.');
-        this.device = await navigator.bluetooth.requestDevice({
-            filters: [{ services: [PRINTER_SERVICE_UUID] }],
-            optionalServices: [PRINTER_SERVICE_UUID],
-        });
-        this.device.addEventListener('gattserverdisconnected', () => {
-            this.characteristic = null;
-            this.isPrinting = false;
-            window.dispatchEvent(new CustomEvent('thermal-bt-disconnected'));
-        });
-        const server = await this.device.gatt.connect();
-        const svc = await server.getPrimaryService(PRINTER_SERVICE_UUID);
-        this.characteristic = await svc.getCharacteristic(PRINTER_CHARACTERISTIC_UUID);
-        localStorage.setItem('thermal_printer_name', this.device.name || 'Unknown');
-        return this.device.name;
-    }
-
-    async disconnect() {
-        if (this.device?.gatt?.connected) this.device.gatt.disconnect();
-    }
+    isSupported() { throw new Error('Not implemented'); }
+    async connect() { throw new Error('Not implemented'); }
+    async disconnect() { throw new Error('Not implemented'); }
 
     /** Mirrors the server-side "Test Printer Connection" button for Bluetooth. */
     async printTestPage() {
@@ -696,15 +674,7 @@ class ThermalBluetoothPrinter {
         this.charsPerLine = mm === 80 || mm === '80mm' ? 42 : 32; 
     }
 
-    async write(bytes) {
-        if (!this.characteristic) throw new Error('Printer not connected.');
-        const chunk = 120; // 120 bytes per BLE write for maximum compatibility
-        const data = new Uint8Array(bytes);
-        for (let i = 0; i < data.length; i += chunk) {
-            await this.characteristic.writeValueWithoutResponse(data.slice(i, i + chunk));
-            await new Promise(r => setTimeout(r, 25));
-        }
-    }
+    async write(bytes) { throw new Error('Not implemented'); }
 
     // ── Layout helpers ──────────────────────────────────────────────────
 
@@ -999,6 +969,190 @@ class ThermalBluetoothPrinter {
     }
 }
 
+class ThermalBluetoothPrinter extends ThermalPrinterBase {
+    constructor() {
+        super();
+        this.device = null;
+        this.characteristic = null;
+    }
+
+    isSupported() { return 'bluetooth' in navigator; }
+
+    async connect() {
+        if (!this.isSupported()) throw new Error('Web Bluetooth not supported.');
+        this.device = await navigator.bluetooth.requestDevice({
+            filters: [{ services: [PRINTER_SERVICE_UUID] }],
+            optionalServices: [PRINTER_SERVICE_UUID],
+        });
+        this.device.addEventListener('gattserverdisconnected', () => {
+            this.characteristic = null;
+            this.isPrinting = false;
+            window.dispatchEvent(new CustomEvent('thermal-bt-disconnected'));
+        });
+        const server = await this.device.gatt.connect();
+        const svc = await server.getPrimaryService(PRINTER_SERVICE_UUID);
+        this.characteristic = await svc.getCharacteristic(PRINTER_CHARACTERISTIC_UUID);
+        localStorage.setItem('thermal_printer_name', this.device.name || 'Unknown');
+        return this.device.name;
+    }
+
+    async disconnect() {
+        if (this.device?.gatt?.connected) this.device.gatt.disconnect();
+    }
+
+    async write(bytes) {
+        if (!this.characteristic) throw new Error('Printer not connected.');
+        const chunk = 120;
+        const data = new Uint8Array(bytes);
+        for (let i = 0; i < data.length; i += chunk) {
+            await this.characteristic.writeValueWithoutResponse(data.slice(i, i + chunk));
+            await new Promise(r => setTimeout(r, 25));
+        }
+    }
+}
+
+/**
+ * ThermalWiredPrinter — sends ESC/POS bytes to a Windows-registered printer
+ * via the MTC Print Bridge (tiny local Node.js server on port 9100).
+ *
+ * Zero browser APIs required — works in Chrome, Edge, and the Electron shell.
+ * The bridge uses PowerShell's winspool.drv to send raw bytes to the printer.
+ */
+class ThermalWiredPrinter extends ThermalPrinterBase {
+    static BRIDGE = 'http://127.0.0.1:9100';
+
+    constructor() {
+        super();
+        // Printer name chosen by the user — persisted in localStorage
+        this.printerName = localStorage.getItem('thermal_printer_wired_name') || null;
+    }
+
+    isSupported() { return true; } // No browser API needed
+
+    /** Check whether the Print Bridge is reachable. */
+    async isBridgeOnline() {
+        try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 3000);
+            const res = await fetch(`${ThermalWiredPrinter.BRIDGE}/ping`, { signal: controller.signal });
+            clearTimeout(timer);
+            return res.ok;
+        } catch (_) { return false; }
+    }
+
+    /**
+     * Fetch the list of Windows-registered printers from the bridge.
+     * Returns an array of printer name strings.
+     */
+    async listPrinters() {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 5000);
+        try {
+            const res = await fetch(`${ThermalWiredPrinter.BRIDGE}/printers`, { signal: controller.signal });
+            clearTimeout(timer);
+            if (!res.ok) throw new Error('Could not load printer list from Print Bridge.');
+            return res.json(); // string[]
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+
+    /**
+     * "Connect" = confirm the bridge is online and a printer name is stored.
+     * Pass `printerName` directly (from a settings dropdown) to save the choice.
+     */
+    async connect(printerName) {
+        if (!(await this.isBridgeOnline())) {
+            throw new Error('Print Bridge is not running. Download and run install.bat first.');
+        }
+        if (!printerName) throw new Error('No printer selected.');
+        this.printerName = printerName;
+        localStorage.setItem('thermal_printer_wired_name', printerName);
+        window.dispatchEvent(new CustomEvent('thermal-printer-status-changed'));
+        return printerName;
+    }
+
+    async disconnect() {
+        this.printerName = null;
+        localStorage.removeItem('thermal_printer_wired_name');
+        window.dispatchEvent(new CustomEvent('thermal-wired-disconnected'));
+        window.dispatchEvent(new CustomEvent('thermal-printer-status-changed'));
+    }
+
+    /** Send raw ESC/POS byte array to the bridge → Windows spooler → printer. */
+    async write(bytes) {
+        if (!this.printerName) throw new Error('No wired printer selected.');
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 20000);
+        try {
+            const base64 = btoa(String.fromCharCode(...new Uint8Array(bytes)));
+            const res = await fetch(`${ThermalWiredPrinter.BRIDGE}/print`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ printerName: this.printerName, escposBase64: base64 }),
+                signal: controller.signal,
+            });
+            clearTimeout(timer);
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || `Print Bridge returned HTTP ${res.status}.`);
+            }
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+
+    /** Override printTestPage — no characteristic check needed for wired. */
+    async printTestPage() {
+        if (!this.printerName) throw new Error('No wired printer selected.');
+        let bytes = [];
+        const push = arr => { bytes = bytes.concat(arr); };
+        const ln   = str => push(textToBytes((str || '') + '\r\n'));
+        push(CMD.init());
+        push(CMD.alignCenter());
+        push(CMD.boldOn());
+        ln('PRINTER TEST');
+        push(CMD.boldOff());
+        ln('Connection successful!');
+        ln(this.printerName);
+        ln(new Date().toLocaleString());
+        push(CMD.feed(3));
+        push(CMD.cut());
+        await this.write(bytes);
+    }
+}
+
 const thermalBluetoothPrinter = new ThermalBluetoothPrinter();
+const thermalWiredPrinter      = new ThermalWiredPrinter();
 window.thermalBluetoothPrinter = thermalBluetoothPrinter;
+window.thermalWiredPrinter     = thermalWiredPrinter;
+
+/**
+ * Unified helper to get currently active/available thermal printer.
+ * Prioritizes active Bluetooth connection, then configured Wired printer.
+ */
+function getConnectedThermalPrinter() {
+    if (window.thermalBluetoothPrinter && window.thermalBluetoothPrinter.characteristic) {
+        return {
+            type: 'bluetooth',
+            name: window.thermalBluetoothPrinter.device?.name || localStorage.getItem('thermal_printer_name') || 'Bluetooth Printer',
+            instance: window.thermalBluetoothPrinter
+        };
+    }
+    const wiredName = window.thermalWiredPrinter?.printerName || localStorage.getItem('thermal_printer_wired_name');
+    if (wiredName) {
+        return {
+            type: 'wired',
+            name: wiredName,
+            instance: window.thermalWiredPrinter
+        };
+    }
+    return null;
+}
+
+window.getConnectedThermalPrinter = getConnectedThermalPrinter;
+
 export default thermalBluetoothPrinter;
+export { thermalWiredPrinter, getConnectedThermalPrinter };
+
+

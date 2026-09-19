@@ -1229,123 +1229,374 @@
                         </div>
 
                         @if($printerEnabled)
-                        <div>
+                        <div x-data="{
+                            activeType: '{{ $printerType ?? 'bluetooth' }}',
+                            setType(type) {
+                                this.activeType = type;
+                                if (window.Livewire) {
+                                    $wire.set('printerType', type, false);
+                                }
+                            }
+                        }">
                             <label class="block text-[12px] font-semibold text-gray-700 mb-3">Add a device</label>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <label class="relative flex items-center gap-3 p-3 border rounded-lg cursor-pointer {{ $printerType === 'bluetooth' ? 'border-gray-900 bg-gray-50' : 'border-gray-200 hover:border-gray-300' }}">
-                                    <input type="radio" wire:model.live="printerType" value="bluetooth" class="text-gray-900">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+                                <label @click="setType('bluetooth')"
+                                    class="relative flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors"
+                                    :class="activeType === 'bluetooth' ? 'border-gray-900 bg-gray-50 font-bold' : 'border-gray-200 hover:border-gray-300'">
+                                    <input type="radio" name="printer_type_choice" value="bluetooth" :checked="activeType === 'bluetooth'" class="text-gray-900">
                                     <div>
                                         <p class="text-[12px] font-semibold text-gray-900">Bluetooth</p>
-                                        <p class="text-[11px] text-gray-500">Pair this POS terminal with a printer</p>
+                                        <p class="text-[11px] text-gray-500">Pair this POS terminal with a wireless printer</p>
                                     </div>
                                 </label>
-                                <label class="flex items-center gap-3 p-3 border rounded-lg {{ $printerType === 'wired' ? 'border-gray-900 bg-gray-50' : 'border-gray-200 hover:border-gray-300' }}">
-                                    <input type="radio" wire:model.live="printerType" value="wired" class="text-gray-900">
+                                <label @click="setType('wired')"
+                                    class="flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition-colors"
+                                    :class="activeType === 'wired' ? 'border-gray-900 bg-gray-50 font-bold' : 'border-gray-200 hover:border-gray-300'">
+                                    <input type="radio" name="printer_type_choice" value="wired" :checked="activeType === 'wired'" class="text-gray-900">
                                     <div>
                                         <p class="text-[12px] font-semibold text-gray-900">Wired</p>
                                         <p class="text-[11px] text-gray-500">USB printer connected to this Windows PC</p>
                                     </div>
                                 </label>
                             </div>
-                        </div>
 
-                        @if($printerType === 'wired')
-                        <div>
-                            <div class="flex items-center justify-between mb-3">
-                                <label class="block text-[12px] font-semibold text-gray-700">Available wired printers</label>
-                                <button type="button" wire:click="refreshAvailablePrinters" wire:loading.attr="disabled" wire:target="refreshAvailablePrinters" class="text-[11px] font-semibold text-blue-600 hover:text-blue-700 px-2 py-1 rounded hover:bg-blue-50 disabled:opacity-50">
-                                    <span wire:loading.remove wire:target="refreshAvailablePrinters">Refresh</span>
-                                    <span wire:loading wire:target="refreshAvailablePrinters">Checking...</span>
-                                </button>
-                            </div>
-                            @if(!empty($availablePrinters))
-                                <div class="space-y-2">
-                                    @foreach($availablePrinters as $printer)
-                                        <button type="button" wire:click="$set('printerName', '{{ addslashes($printer) }}')" class="w-full flex items-center justify-between text-left px-3 py-2 text-[12px] border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all {{ $printerName === $printer ? 'border-gray-900 bg-gray-50' : '' }}">
-                                            <span>{{ $printer }}</span>
-                                            @if($printerName === $printer)
-                                                <svg class="w-4 h-4 text-gray-900 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                            @endif
-                                        </button>
-                                    @endforeach
-                                </div>
-                                                        @else
-                                <p class="text-[12px] text-gray-500 italic">No wired printer was detected on this Windows PC.</p>
-                            @endif
-                        </div>
-                        @error('printerName') <p class="text-red-600 text-[11px] mt-1">{{ $message }}</p> @enderror
-                        @endif
-
-                        @if($printerType === 'bluetooth')
-                        <div x-data="btPrinterCard()" x-init="init()">
-                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                                <p class="text-[11px] text-blue-900 leading-relaxed">
-                                    <strong>Per-device pairing:</strong> this only pairs the printer with <em>this browser, on this device</em>. Repeat "Add Device" on every POS terminal that needs to print.
-                                </p>
-                            </div>
-
-                            <label class="block text-[12px] font-semibold text-gray-700 mb-3">This Device's Paired Printer</label>
-
-                            <template x-if="!btSupported">
-                                <div class="p-3 bg-rose-50 border border-rose-200 rounded-lg text-[11px] text-rose-700 mb-3">
-                                    Web Bluetooth isn't supported in this browser. Use Chrome or Edge on Windows or Android.
-                                </div>
-                            </template>
-
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <template x-if="deviceName">
-                                    <div class="flex flex-col items-center text-center gap-2 p-5 border rounded-xl" :class="btConnected ? 'border-emerald-300 bg-emerald-50' : 'border-gray-200 bg-white'">
-                                        <div class="w-12 h-12 rounded-full flex items-center justify-center" :class="btConnected ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-400'">
-                                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                            {{-- Wired Panel (0ms instant toggle) --}}
+                            <div x-show="activeType === 'wired'" x-cloak class="w-full min-w-0">
+                                <div x-data="wiredPrinterCard()" x-init="init()" class="w-full min-w-0">
+                                    {{-- Print Bridge Status & Download Banner --}}
+                                    <template x-if="bridgeOnline">
+                                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-emerald-50/80 border border-emerald-200 rounded-xl mb-6 shadow-2xs">
+                                            <div class="flex items-center gap-3 min-w-0">
+                                                <div class="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0 text-emerald-600">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                </div>
+                                                <div class="min-w-0">
+                                                    <p class="text-[12px] font-bold text-emerald-950 flex items-center gap-2 flex-wrap">
+                                                        <span>Print Bridge Running</span>
+                                                        <span class="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">Port 9100</span>
+                                                    </p>
+                                                    <p class="text-[11px] text-emerald-700 truncate">Background helper active and ready for POS printing</p>
+                                                </div>
+                                            </div>
+                                            <button type="button" @click="startSetup()" :disabled="isDownloading"
+                                                class="shrink-0 inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 hover:text-emerald-950 underline self-end sm:self-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                                                <svg class="w-3.5 h-3.5" :class="isDownloading ? 'animate-bounce' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                                <span x-text="isDownloading ? 'Downloading...' : 'Re-download installer (.exe)'"></span>
+                                            </button>
                                         </div>
-                                        <p class="text-[13px] font-bold text-gray-900" x-text="deviceName"></p>
-                                        <p class="text-[11px]" :class="btConnected ? 'text-emerald-600' : 'text-gray-400'" x-text="btStatusLabel"></p>
-                                        <div class="flex flex-wrap justify-center gap-2 mt-1">
-                                            <button type="button" @click="btConnected ? btDisconnect() : btAddDevice()" :disabled="btBusy || !btSupported"
-                                                class="px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors disabled:opacity-50"
-                                                :class="btConnected ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-gray-800'">
-                                                <span x-show="!btBusy" x-text="btConnected ? 'Disconnect' : 'Connect'"></span>
-                                                <span x-show="btBusy">Working…</span>
+                                    </template>
+
+                                    <template x-if="!bridgeOnline">
+                                        <div class="bg-gradient-to-br from-amber-50 to-orange-50/40 border border-amber-200 rounded-2xl p-5 mb-6 shadow-xs">
+                                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-amber-200/60">
+                                                <div class="flex items-center gap-3">
+                                                    <div class="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                                                    </div>
+                                                    <div>
+                                                        <h3 class="text-[13px] font-bold text-amber-950">Print Bridge Required on this PC</h3>
+                                                        <p class="text-[11px] text-amber-800">Allows your browser to send direct ESC/POS receipt data to your USB thermal printer.</p>
+                                                    </div>
+                                                </div>
+                                                <div class="flex flex-col sm:flex-row sm:items-center gap-2.5 shrink-0">
+                                                    <button type="button" @click="startSetup()" :disabled="isDownloading"
+                                                        class="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-[12px] font-bold rounded-xl shadow-xs hover:shadow-md transition-all disabled:opacity-60 disabled:cursor-not-allowed">
+                                                        <svg class="w-4 h-4" :class="isDownloading ? 'animate-spin' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                                        </svg>
+                                                        <span x-text="isDownloading ? 'Downloading...' : '1-Click Setup (.exe)'"></span>
+                                                    </button>
+                                                    <a href="{{ route('downloads.print-bridge', ['format' => 'zip']) }}"
+                                                       class="text-center text-[11px] text-amber-900/80 hover:text-amber-950 underline px-1 py-1">
+                                                        or download .ZIP
+                                                    </a>
+                                                </div>
+                                            </div>
+                                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4">
+                                                <div class="flex items-start gap-2 text-[11px] text-amber-900">
+                                                    <span class="w-5 h-5 rounded-full bg-amber-200 text-amber-900 font-bold flex items-center justify-center shrink-0 text-[10px]">1</span>
+                                                    <span>Click <strong>1-Click Setup</strong> — installer downloads automatically.</span>
+                                                </div>
+                                                <div class="flex items-start gap-2 text-[11px] text-amber-900">
+                                                    <span class="w-5 h-5 rounded-full bg-amber-200 text-amber-900 font-bold flex items-center justify-center shrink-0 text-[10px]">2</span>
+                                                    <span>Click the file in your browser to run (no terminal, no unzipping).</span>
+                                                </div>
+                                                <div class="flex items-start gap-2 text-[11px] text-amber-900">
+                                                    <span class="w-5 h-5 rounded-full bg-amber-200 text-amber-900 font-bold flex items-center justify-center shrink-0 text-[10px]">3</span>
+                                                    <span>Starts silently in background & auto-launches on every boot!</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    {{-- Windows Settings Style: Printers & Scanners List --}}
+                                    <div class="space-y-3">
+                                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
+                                            <div>
+                                                <h3 class="text-[13px] font-bold text-gray-900">Windows Printers</h3>
+                                                <p class="text-[11px] text-gray-500">Printers detected on this computer via Windows Print Spooler</p>
+                                            </div>
+                                            <button type="button" @click="loadPrinters()" :disabled="wiredBusy"
+                                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-[11px] font-bold shadow-2xs transition-all disabled:opacity-50 self-start sm:self-auto"
+                                                :title="bridgeOnline ? 'Refresh printer list' : 'Check if bridge is running'">
+                                                <svg class="w-3.5 h-3.5" :class="wiredBusy ? 'animate-spin' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                                                <span x-text="wiredBusy ? 'Checking...' : (bridgeOnline ? 'Refresh List' : 'Check Bridge')"></span>
                                             </button>
-                                            <button type="button" @click="btTestPrint()" :disabled="btBusy || !btConnected" class="px-3 py-1.5 rounded-lg text-[11px] font-bold text-blue-600 hover:bg-blue-50 disabled:opacity-30 disabled:cursor-not-allowed">
-                                                Test Print
-                                            </button>
-                                            <button type="button" @click="btForget()" :disabled="btBusy" class="px-3 py-1.5 rounded-lg text-[11px] font-bold text-rose-600 hover:bg-rose-50 disabled:opacity-50">
-                                                Remove
-                                            </button>
+                                        </div>
+
+                                        {{-- Windows 11 style Printer Cards list --}}
+                                        <div class="divide-y border border-gray-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+                                            <template x-for="p in printers" :key="p.name">
+                                                <div class="p-3.5 sm:p-4 transition-colors hover:bg-gray-50/70"
+                                                     :class="isCurrentPrinter(p) ? 'bg-emerald-50/30' : ''">
+                                                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                                        <div class="flex items-start gap-3 min-w-0 flex-1">
+                                                            {{-- Icon --}}
+                                                            <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
+                                                                 :class="isCurrentPrinter(p) ? 'bg-emerald-100 text-emerald-700' : (p.isOnline ? 'bg-gray-100 text-gray-700' : 'bg-gray-100 text-gray-400')">
+                                                                <template x-if="p.isVirtual">
+                                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                                                </template>
+                                                                <template x-if="!p.isVirtual">
+                                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                                                                </template>
+                                                            </div>
+                                                            
+                                                            {{-- Name and Meta --}}
+                                                            <div class="min-w-0 flex-1">
+                                                                <div class="flex items-center gap-2 flex-wrap">
+                                                                    <span class="text-[13px] font-bold text-gray-900 truncate" x-text="p.name"></span>
+                                                                    <template x-if="isCurrentPrinter(p)">
+                                                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                                                            Active POS Printer
+                                                                        </span>
+                                                                    </template>
+                                                                    <template x-if="p.isThermalCandidate && !isCurrentPrinter(p)">
+                                                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                                                                            Thermal Receipt
+                                                                        </span>
+                                                                    </template>
+                                                                </div>
+
+                                                                {{-- Status Line with dot --}}
+                                                                <div class="flex items-center gap-2 mt-1 text-[11px] flex-wrap">
+                                                                    <div class="flex items-center gap-1.5">
+                                                                        <span class="w-2 h-2 rounded-full shrink-0"
+                                                                              :class="p.isOnline ? 'bg-emerald-500 ring-2 ring-emerald-100' : 'bg-gray-300'"></span>
+                                                                        <span :class="p.isOnline ? 'text-emerald-700 font-semibold' : 'text-gray-500'"
+                                                                              x-text="p.isOnline ? 'Ready' : 'Offline / Unplugged'"></span>
+                                                                    </div>
+                                                                    <span class="text-gray-300">•</span>
+                                                                    <span class="text-gray-500 font-mono text-[10px]" x-text="p.port ? p.port : 'Port: default'"></span>
+                                                                    <template x-if="p.isVirtual">
+                                                                        <span class="text-blue-600 text-[10px]">(Virtual Document)</span>
+                                                                    </template>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {{-- Actions Right --}}
+                                                        <div class="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                                                            <template x-if="isCurrentPrinter(p)">
+                                                                <div class="flex items-center gap-2">
+                                                                    <button type="button" @click="wiredTestPrint()" :disabled="wiredBusy"
+                                                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-50">
+                                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                                                                        <span x-show="!wiredBusy">Test Print</span>
+                                                                        <span x-show="wiredBusy">Printing…</span>
+                                                                    </button>
+                                                                    <button type="button" @click="wiredForget()" :disabled="wiredBusy"
+                                                                        class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold text-rose-600 hover:bg-rose-50 transition-colors disabled:opacity-50">
+                                                                        Disconnect
+                                                                    </button>
+                                                                </div>
+                                                            </template>
+                                                            <template x-if="!isCurrentPrinter(p)">
+                                                                <button type="button" @click="selectAndSavePrinter(p.name)" :disabled="wiredBusy"
+                                                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all border shadow-2xs"
+                                                                    :class="p.isOnline ? 'bg-gray-900 hover:bg-gray-800 text-white border-transparent' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'">
+                                                                    <span x-text="p.isOnline ? 'Select Printer' : 'Select (Offline)'"></span>
+                                                                </button>
+                                                            </template>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </template>
+
+                                            <template x-if="bridgeOnline && printers.length === 0">
+                                                <div class="p-8 text-center text-gray-500 text-[12px]">
+                                                    No printers found. Make sure your USB printer is connected and turned on, then click Refresh.
+                                                </div>
+                                            </template>
                                         </div>
                                     </div>
-                                </template>
 
-                                <button type="button" @click="btAddDevice()" :disabled="btBusy || !btSupported"
-                                    class="flex flex-col items-center justify-center gap-2 p-5 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 hover:border-blue-300 hover:text-blue-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4" /></svg>
-                                    <span class="text-[11px] font-bold uppercase tracking-wide" x-text="btBusy ? 'Scanning…' : 'Add Device'"></span>
-                                </button>
+                                    <template x-if="wiredError">
+                                        <p class="mt-3 text-[11px] text-rose-600 font-medium" x-text="wiredError"></p>
+                                    </template>
+
+                                    {{-- Bottom-Right Floating Installation Assistant Widget --}}
+                                    <div x-show="installAssistantOpen"
+                                         x-transition:enter="transition ease-out duration-300 transform"
+                                         x-transition:enter-start="opacity-0 translate-y-6 scale-95"
+                                         x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                                         x-transition:leave="transition ease-in duration-200 transform"
+                                         x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                                         x-transition:leave-end="opacity-0 translate-y-6 scale-95"
+                                         class="fixed bottom-5 right-5 z-50 w-[380px] max-w-[calc(100vw-2.5rem)] bg-white rounded-2xl shadow-2xl border border-gray-200/90 overflow-hidden"
+                                         x-cloak>
+                                        
+                                        {{-- Assistant Header --}}
+                                        <div class="px-4 py-3 border-b flex items-center justify-between transition-colors"
+                                             :class="installStage === 'success' ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-gray-900 text-white border-gray-800'">
+                                            <div class="flex items-center gap-2.5">
+                                                <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                                                     :class="installStage === 'success' ? 'bg-emerald-500/40 text-white' : 'bg-white/10 text-rose-400'">
+                                                    <template x-if="installStage === 'success'">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                                    </template>
+                                                    <template x-if="installStage !== 'success'">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                                                    </template>
+                                                </div>
+                                                <div>
+                                                    <h4 class="text-[12px] font-bold tracking-tight" x-text="installStage === 'success' ? 'Bridge Connected!' : 'Print Bridge Setup'"></h4>
+                                                    <p class="text-[10px] opacity-80" x-text="installStage === 'success' ? 'Ready for POS Printing' : 'Automatic Windows Helper'"></p>
+                                                </div>
+                                            </div>
+                                            <button type="button" @click="closeAssistant()" class="p-1 rounded-lg hover:bg-white/20 text-white/80 hover:text-white transition-colors" title="Dismiss">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                            </button>
+                                        </div>
+
+                                        {{-- Assistant Body --}}
+                                        <div class="p-4 space-y-3.5">
+                                            {{-- Stage: Downloading --}}
+                                            <template x-if="installStage === 'downloading'">
+                                                <div class="space-y-2.5">
+                                                    <div class="flex items-center gap-3">
+                                                        <div class="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                                                            <svg class="w-4 h-4 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                                        </div>
+                                                        <div class="min-w-0">
+                                                            <p class="text-[12px] font-bold text-gray-900">Downloading installer...</p>
+                                                            <p class="text-[10px] text-gray-500">MTC-PrintBridge-Setup.exe (69 KB)</p>
+                                                        </div>
+                                                    </div>
+                                                    <div class="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                                                        <div class="bg-rose-600 h-1.5 rounded-full animate-pulse w-3/4"></div>
+                                                    </div>
+                                                </div>
+                                            </template>
+
+                                            {{-- Stage: Waiting for click --}}
+                                            <template x-if="installStage === 'waiting'">
+                                                <div class="space-y-3">
+                                                    <div class="p-3 bg-amber-50/80 border border-amber-200/80 rounded-xl space-y-1.5">
+                                                        <div class="flex items-center gap-2 text-amber-900 font-bold text-[12px]">
+                                                            <span class="w-5 h-5 rounded-full bg-amber-200 text-amber-900 flex items-center justify-center text-[10px] shrink-0">1</span>
+                                                            <span>Click downloaded file in browser</span>
+                                                        </div>
+                                                        <p class="text-[11px] text-amber-800/90 pl-7 leading-snug">
+                                                            Look at your browser bar (top-right <span class="font-bold">⭳</span> or bottom-left) and click <code class="bg-amber-100 text-amber-900 px-1 py-0.5 rounded font-mono text-[10px] font-bold">MTC-PrintBridge-Setup.exe</code>.
+                                                        </p>
+                                                        <p class="text-[10px] text-emerald-800 pl-7 flex items-center gap-1 font-medium">
+                                                            <svg class="w-3 h-3 shrink-0 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                            <span>Zero unzipping &bull; Runs silently in background</span>
+                                                        </p>
+                                                    </div>
+
+                                                    <div class="flex items-center justify-between gap-2 p-2.5 bg-gray-50 rounded-xl border border-gray-200/70">
+                                                        <div class="flex items-center gap-2">
+                                                            <span class="relative flex h-2.5 w-2.5">
+                                                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                                                            </span>
+                                                            <span class="text-[11px] font-medium text-gray-700">Waiting for Print Bridge...</span>
+                                                        </div>
+                                                        <span class="text-[10px] font-mono text-gray-400">Port 9100</span>
+                                                    </div>
+                                                </div>
+                                            </template>
+
+                                            {{-- Stage: Success --}}
+                                            <template x-if="installStage === 'success'">
+                                                <div class="space-y-2.5">
+                                                    <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 space-y-1">
+                                                        <p class="text-[12px] font-bold flex items-center gap-1.5">
+                                                            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                                            <span>Print Bridge Active & Connected!</span>
+                                                        </p>
+                                                        <p class="text-[11px] text-emerald-800 leading-snug">
+                                                            Registered to start automatically on Windows boot. Thermal printers are detected and ready.
+                                                        </p>
+                                                    </div>
+                                                    <button type="button" @click="closeAssistant()"
+                                                            class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[11px] font-bold transition-all shadow-xs">
+                                                        Got it, close
+                                                    </button>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
-                            <template x-if="btError">
-                                <p class="mt-3 text-[11px] text-rose-600 font-medium" x-text="btError"></p>
-                            </template>
-                        </div>
-                        @endif
+                            {{-- Bluetooth Panel (0ms instant toggle) --}}
+                            <div x-show="activeType === 'bluetooth'" x-cloak>
+                                <div x-data="btPrinterCard()" x-init="init()">
+                                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                                        <p class="text-[11px] text-blue-900 leading-relaxed">
+                                            <strong>Per-device pairing:</strong> this pairs the printer with <em>this browser, on this device</em>. Repeat "Add Device" on every POS terminal that needs to print.
+                                        </p>
+                                    </div>
 
-                        @if($printerType !== 'bluetooth')
-                        {{-- Test Printer --}}
-                        <div class="flex gap-3">
-                            <button type="button" wire:click="testPrinterConnection"
-                                    @if($printerType === 'wired' && !$windowsPrintingAvailable) disabled @endif
-                                    class="flex-1 bg-amber-500 hover:bg-amber-600 text-white text-[12px] font-semibold py-2.5 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                                🧪 Test Printer Connection
-                            </button>
-                        </div>
+                                    <label class="block text-[12px] font-semibold text-gray-700 mb-3">This Device's Paired Printer</label>
 
-                        <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                            <p class="text-[11px] text-amber-900">
-                                <strong>Note:</strong> After configuring your printer, click "Test Printer Connection" to verify it's working correctly. A test receipt will be printed.
-                            </p>
+                                    <template x-if="!btSupported">
+                                        <div class="p-3 bg-rose-50 border border-rose-200 rounded-lg text-[11px] text-rose-700 mb-3">
+                                            Web Bluetooth isn't supported in this browser. Use Chrome or Edge on Windows or Android.
+                                        </div>
+                                    </template>
+
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <template x-if="deviceName">
+                                            <div class="flex flex-col items-center text-center gap-2 p-5 border rounded-xl" :class="btConnected ? 'border-emerald-300 bg-emerald-50' : 'border-gray-200 bg-white'">
+                                                <div class="w-12 h-12 rounded-full flex items-center justify-center" :class="btConnected ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-400'">
+                                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                                                </div>
+                                                <p class="text-[13px] font-bold text-gray-900" x-text="deviceName"></p>
+                                                <p class="text-[11px]" :class="btConnected ? 'text-emerald-600' : 'text-gray-400'" x-text="btStatusLabel"></p>
+                                                <div class="flex flex-wrap justify-center gap-2 mt-1">
+                                                    <button type="button" @click="btConnected ? btDisconnect() : btAddDevice()" :disabled="btBusy || !btSupported"
+                                                        class="px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors disabled:opacity-50"
+                                                        :class="btConnected ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-gray-900 text-white hover:bg-gray-800'">
+                                                        <span x-show="!btBusy" x-text="btConnected ? 'Disconnect' : 'Connect'"></span>
+                                                        <span x-show="btBusy">Working…</span>
+                                                    </button>
+                                                    <button type="button" @click="btTestPrint()" :disabled="btBusy || !btConnected" class="px-3 py-1.5 rounded-lg text-[11px] font-bold text-blue-600 hover:bg-blue-50 disabled:opacity-30 disabled:cursor-not-allowed">
+                                                        Test Print
+                                                    </button>
+                                                    <button type="button" @click="btForget()" :disabled="btBusy" class="px-3 py-1.5 rounded-lg text-[11px] font-bold text-rose-600 hover:bg-rose-50 disabled:opacity-50">
+                                                        Remove
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </template>
+
+                                        <button type="button" @click="btAddDevice()" :disabled="btBusy || !btSupported"
+                                            class="flex flex-col items-center justify-center gap-2 p-5 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 hover:border-blue-300 hover:text-blue-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                                            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4" /></svg>
+                                            <span class="text-[11px] font-bold uppercase tracking-wide" x-text="btBusy ? 'Scanning…' : 'Add Device'"></span>
+                                        </button>
+                                    </div>
+
+                                    <template x-if="btError">
+                                        <p class="mt-3 text-[11px] text-rose-600 font-medium" x-text="btError"></p>
+                                    </template>
+                                </div>
+                            </div>
                         </div>
-                        @endif
                         @endif
                     </div>
 
@@ -2050,5 +2301,263 @@
         else document.addEventListener('alpine:init', registerBtPrinterCard);
     })();
     </script>
-</div>
 
+    <script>
+    (function() {
+        const registerWiredPrinterCard = () => { if (Alpine.data('wiredPrinterCard')) return; Alpine.data('wiredPrinterCard', () => ({
+            bridgeOnline: false,
+            wiredConnected: false,
+            wiredBusy: false,
+            wiredError: null,
+            printers: [],
+            selectedPrinter: '',
+            savedPrinter: null,
+            installAssistantOpen: false,
+            installStage: 'idle',
+            isDownloading: false,
+            assistantPollInterval: null,
+            startSetup() {
+                // Guard: Prevent spamming duplicate downloads
+                if (this.isDownloading) return;
+                this.isDownloading = true;
+
+                this.installAssistantOpen = true;
+                this.installStage = 'downloading';
+                this.wiredError = null;
+
+                // Stop any previous polling timer immediately
+                if (this.assistantPollInterval) {
+                    clearInterval(this.assistantPollInterval);
+                    this.assistantPollInterval = null;
+                }
+
+                // Trigger browser download of MTC-PrintBridge-Setup.exe directly
+                const link = document.createElement('a');
+                link.href = '{{ route('downloads.print-bridge', ['format' => 'exe']) }}';
+                link.setAttribute('download', 'MTC-PrintBridge-Setup.exe');
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                // Release download lock after 3.5s cooldown
+                setTimeout(() => {
+                    this.isDownloading = false;
+                }, 3500);
+
+                setTimeout(() => {
+                    if (this.installAssistantOpen) {
+                        this.installStage = 'waiting';
+                        this.pollForBridge();
+                    }
+                }, 1200);
+            },
+            pollForBridge() {
+                if (this.assistantPollInterval) {
+                    clearInterval(this.assistantPollInterval);
+                    this.assistantPollInterval = null;
+                }
+                const start = Date.now();
+                this.assistantPollInterval = setInterval(async () => {
+                    // Automatically stop after 2 minutes or when drawer is dismissed
+                    if (!this.installAssistantOpen || Date.now() - start > 120000) {
+                        clearInterval(this.assistantPollInterval);
+                        this.assistantPollInterval = null;
+                        return;
+                    }
+                    try {
+                        const ctrl = new AbortController();
+                        const t = setTimeout(() => ctrl.abort(), 1200);
+                        const res = await fetch('http://127.0.0.1:9100/ping', { signal: ctrl.signal });
+                        clearTimeout(t);
+                        if (res.ok) {
+                            clearInterval(this.assistantPollInterval);
+                            this.assistantPollInterval = null;
+                            this.bridgeOnline = true;
+                            this.installStage = 'success';
+                            await this.loadPrinters();
+                            this.wiredConnected = !!(this.savedPrinter && this.bridgeOnline);
+                            window.dispatchEvent(new CustomEvent('notify', {
+                                detail: { type: 'success', message: 'Print Bridge connected successfully!' }
+                            }));
+                            setTimeout(() => {
+                                this.installAssistantOpen = false;
+                            }, 4500);
+                        }
+                    } catch (e) {
+                        // Bridge is not running yet (normal before installer execution)
+                    }
+                }, 1800);
+            },
+            closeAssistant() {
+                this.installAssistantOpen = false;
+                if (this.assistantPollInterval) {
+                    clearInterval(this.assistantPollInterval);
+                    this.assistantPollInterval = null;
+                }
+            },
+            isCurrentPrinter(p) {
+                const name = p.name || p;
+                return name && name === this.savedPrinter;
+            },
+            async selectAndSavePrinter(name) {
+                if (!name) return;
+                this.wiredBusy = true; this.wiredError = null;
+                try {
+                    if (!window.thermalWiredPrinter) throw new Error('Wired printer service is still loading.');
+                    await window.thermalWiredPrinter.connect(name);
+                    this.savedPrinter = name;
+                    this.selectedPrinter = name;
+                    this.wiredConnected = true;
+                    window.dispatchEvent(new CustomEvent('notify', {
+                        detail: { type: 'success', message: 'Set active printer to: ' + name }
+                    }));
+                } catch (e) {
+                    this.wiredError = e?.message || 'Could not select printer.';
+                    window.dispatchEvent(new CustomEvent('notify', {
+                        detail: { type: 'error', message: this.wiredError }
+                    }));
+                } finally { this.wiredBusy = false; }
+            },
+            get selectedObj() {
+                const target = this.savedPrinter || this.selectedPrinter;
+                return this.printers.find(p => (p.name || p) === target) || null;
+            },
+            async init() {
+                this.savedPrinter = localStorage.getItem('thermal_printer_wired_name');
+                this.selectedPrinter = this.savedPrinter || '';
+                // Check bridge liveness silently
+                try {
+                    const ctrl = new AbortController();
+                    const t = setTimeout(() => ctrl.abort(), 2000);
+                    const res = await fetch('http://127.0.0.1:9100/ping', { signal: ctrl.signal });
+                    clearTimeout(t);
+                    this.bridgeOnline = res.ok;
+                } catch (e) {
+                    this.bridgeOnline = false;
+                }
+                if (this.bridgeOnline) {
+                    await this.loadPrinters();
+                    this.wiredConnected = !!(this.savedPrinter && this.bridgeOnline);
+                }
+                window.addEventListener('thermal-wired-disconnected', () => { this.wiredConnected = false; this.savedPrinter = null; });
+            },
+            async loadPrinters() {
+                this.wiredBusy = true;
+                this.wiredError = null;
+                try {
+                    // Guard: Check /ping first before querying printers
+                    const pingCtrl = new AbortController();
+                    const pingT = setTimeout(() => pingCtrl.abort(), 1500);
+                    const pingRes = await fetch('http://127.0.0.1:9100/ping', { signal: pingCtrl.signal }).catch(() => null);
+                    clearTimeout(pingT);
+
+                    if (!pingRes || !pingRes.ok) {
+                        this.bridgeOnline = false;
+                        this.printers = [];
+                        this.wiredConnected = false;
+                        window.dispatchEvent(new CustomEvent('notify', {
+                            detail: { type: 'warning', message: 'Print Bridge is not running. Please click 1-Click Setup above.' }
+                        }));
+                        return;
+                    }
+
+                    this.bridgeOnline = true;
+                    const ctrl = new AbortController();
+                    const t = setTimeout(() => ctrl.abort(), 4000);
+                    const res = await fetch('http://127.0.0.1:9100/printers', { signal: ctrl.signal });
+                    clearTimeout(t);
+                    if (res.ok) {
+                        this.printers = await res.json();
+                        this.wiredConnected = !!(this.savedPrinter && this.bridgeOnline);
+                    }
+                } catch (e) {
+                    this.printers = [];
+                } finally {
+                    this.wiredBusy = false;
+                }
+            },
+            formatPrinterLabel(p) {
+                if (typeof p === 'string') return p;
+                let label = p.name;
+                const badges = [];
+                if (p.port) badges.push(p.port);
+                if (p.isUsb) badges.push('USB');
+                if (p.isThermalCandidate) badges.push('Recommended');
+                if (p.isOffline) badges.push('Offline');
+                if (badges.length > 0) label += ` [${badges.join(' • ')}]`;
+                return label;
+            },
+            getPrinterStatusLabel() {
+                if (!this.bridgeOnline) return 'Bridge offline (Helper not running)';
+                const obj = this.selectedObj;
+                if (!obj) return this.savedPrinter ? 'Configured & Ready' : '';
+                if (obj.isOffline) return 'Offline in Windows (Check USB cable or power switch)';
+                if (obj.isVirtual) return 'Ready (Virtual Document Writer)';
+                if (obj.isUsb) return 'Connected & Ready (USB Port: ' + (obj.port || 'USB') + ')';
+                return 'Ready (Port: ' + (obj.port || 'Default') + ')';
+            },
+            getPrinterStatusColor() {
+                if (!this.bridgeOnline) return 'text-rose-600';
+                const obj = this.selectedObj;
+                if (obj?.isOffline) return 'text-amber-600 font-bold';
+                if (obj?.isVirtual) return 'text-blue-600';
+                return 'text-emerald-600 font-bold';
+            },
+            getPrinterCardClass() {
+                if (!this.bridgeOnline) return 'border-rose-200 bg-rose-50/40';
+                const obj = this.selectedObj;
+                if (obj?.isOffline) return 'border-amber-200 bg-amber-50/40';
+                return 'border-emerald-300 bg-emerald-50/60';
+            },
+            getPrinterIconClass() {
+                if (!this.bridgeOnline) return 'bg-rose-100 text-rose-600';
+                const obj = this.selectedObj;
+                if (obj?.isOffline) return 'bg-amber-100 text-amber-600';
+                return 'bg-emerald-100 text-emerald-600';
+            },
+            async wiredConnect() {
+                this.wiredBusy = true; this.wiredError = null;
+                try {
+                    if (!window.thermalWiredPrinter) throw new Error('Wired printer service is still loading. Please try again.');
+                    await window.thermalWiredPrinter.connect(this.selectedPrinter);
+                    this.savedPrinter = this.selectedPrinter;
+                    this.wiredConnected = true;
+                    window.dispatchEvent(new CustomEvent('notify', {
+                        detail: { type: 'success', message: 'Printer saved: ' + this.savedPrinter }
+                    }));
+                } catch (e) {
+                    this.wiredError = e?.message || 'Could not save printer selection.';
+                    window.dispatchEvent(new CustomEvent('notify', {
+                        detail: { type: 'error', message: this.wiredError }
+                    }));
+                } finally { this.wiredBusy = false; }
+            },
+            async wiredTestPrint() {
+                this.wiredBusy = true; this.wiredError = null;
+                try {
+                    await window.thermalWiredPrinter.printTestPage();
+                    window.dispatchEvent(new CustomEvent('notify', {
+                        detail: { type: 'success', message: 'Test receipt sent to ' + this.savedPrinter + '!' }
+                    }));
+                } catch (e) {
+                    this.wiredError = e?.message || 'Test print failed.';
+                    window.dispatchEvent(new CustomEvent('notify', {
+                        detail: { type: 'error', message: 'Test print failed: ' + (e?.message || 'Unknown error') }
+                    }));
+                } finally { this.wiredBusy = false; }
+            },
+            wiredForget() {
+                if (window.thermalWiredPrinter) window.thermalWiredPrinter.disconnect();
+                localStorage.removeItem('thermal_printer_wired_name');
+                this.savedPrinter = null; this.wiredConnected = false; this.wiredError = null; this.selectedPrinter = '';
+                window.dispatchEvent(new CustomEvent('notify', {
+                    detail: { type: 'info', message: 'Wired printer removed.' }
+                }));
+            },
+        })); };
+        if (window.Alpine) registerWiredPrinterCard();
+        else document.addEventListener('alpine:init', registerWiredPrinterCard);
+    })();
+    </script>
+
+</div>

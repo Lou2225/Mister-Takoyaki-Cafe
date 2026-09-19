@@ -20,4 +20,5 @@ COM4
 dist/
 /build/
 *.exe
+!public/downloads/*.exe
 *.apk

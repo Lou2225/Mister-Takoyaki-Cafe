@@ -67,13 +67,18 @@
             if (!order_id) return;
 
             try {
-                if (window.thermalBluetoothPrinter && window.thermalBluetoothPrinter.characteristic) {
+                const activePrinter = window.getConnectedThermalPrinter ? window.getConnectedThermalPrinter() : (
+                    (window.thermalBluetoothPrinter?.characteristic) ? { type: 'bluetooth', instance: window.thermalBluetoothPrinter } :
+                    (window.thermalWiredPrinter?.printerName) ? { type: 'wired', instance: window.thermalWiredPrinter } : null
+                );
+
+                if (activePrinter) {
                     const res = await fetch(`/pos/orders/${order_id}/receipt-data`);
                     if (!res.ok) throw new Error('Could not load receipt data.');
                     const data = await res.json();
-                    await window.thermalBluetoothPrinter.printReceipt(data.order, data.settings, data.receipts || []);
+                    await activePrinter.instance.printReceipt(data.order, data.settings, data.receipts || []);
                     window.dispatchEvent(new CustomEvent('notify', {
-                        detail: { type: 'success', message: 'Receipt printed via Bluetooth.' }
+                        detail: { type: 'success', message: `Receipt printed via ${activePrinter.type === 'bluetooth' ? 'Bluetooth' : 'wired printer'}.` }
                     }));
                     return;
                 }
@@ -689,7 +694,7 @@
                         {{-- 1. App Specific Progress Actions --}}
                         @if($order->source === 'App')
                             @if($order->status === 'Pending')
-                                <x-primary-button @click.capture="if (!window.thermalBluetoothPrinter?.characteristic) window.prepareThermalReceiptWindow?.()" wire:click="acceptOrder({{ $order->id }})" class="col-span-1 h-10 justify-center">
+                                <x-primary-button @click.capture="if (!window.getConnectedThermalPrinter?.()) window.prepareThermalReceiptWindow?.()" wire:click="acceptOrder({{ $order->id }})" class="col-span-1 h-10 justify-center">
                                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                     Accept
                                 </x-primary-button>
@@ -1191,8 +1196,13 @@
 @script
 <script>
 window.printOrderReceipt = async function(orderId) {
-    // Try Bluetooth first — same check used for Accept Order's auto-print.
-    if (window.thermalBluetoothPrinter && window.thermalBluetoothPrinter.characteristic) {
+    // Try connected thermal printer (Bluetooth or Wired) first
+    const activePrinter = window.getConnectedThermalPrinter ? window.getConnectedThermalPrinter() : (
+        (window.thermalBluetoothPrinter?.characteristic) ? { type: 'bluetooth', instance: window.thermalBluetoothPrinter } :
+        (window.thermalWiredPrinter?.printerName) ? { type: 'wired', instance: window.thermalWiredPrinter } : null
+    );
+
+    if (activePrinter) {
         try {
             const res = await fetch(`/pos/orders/${orderId}/receipt-data`);
             if (!res.ok) throw new Error('Could not load receipt data.');
@@ -1208,15 +1218,15 @@ window.printOrderReceipt = async function(orderId) {
                 ? customerOnly
                 : [{ type: 'customer', title: data.settings?.business_name || 'Receipt', items: data.order?.items || [] }];
 
-            await window.thermalBluetoothPrinter.printReceipt(data.order, data.settings, receiptsToPrint);
+            await activePrinter.instance.printReceipt(data.order, data.settings, receiptsToPrint);
             window.dispatchEvent(new CustomEvent('notify', {
-                detail: { type: 'success', message: 'Receipt printed via Bluetooth.' }
+                detail: { type: 'success', message: `Receipt printed via ${activePrinter.type === 'bluetooth' ? 'Bluetooth' : 'wired printer'}.` }
             }));
             return;
         } catch (err) {
-            console.error('Bluetooth print failed, falling back to browser print:', err);
+            console.error('Thermal print failed, falling back to browser print:', err);
             window.dispatchEvent(new CustomEvent('notify', {
-                detail: { type: 'error', message: 'Bluetooth print failed, using browser print instead.' }
+                detail: { type: 'error', message: 'Thermal print failed, using browser print instead.' }
             }));
             // fall through to the browser/iframe print below
         }
@@ -1302,7 +1312,7 @@ window.printOrderReceipt = async function(orderId) {
             Auto-continuing in <span x-text="typeof secondsLeft !== 'undefined' ? secondsLeft : 0" class="font-mono"></span>s…
         </p>
         <button type="button"
-            @click="window.thermalBluetoothPrinter && window.thermalBluetoothPrinter.confirmContinue()"
+            @click="(window.getConnectedThermalPrinter?.()?.instance || window.thermalBluetoothPrinter)?.confirmContinue()"
             class="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-[14px] font-black transition-all active:scale-[0.98]">
             Continue Printing
         </button>
