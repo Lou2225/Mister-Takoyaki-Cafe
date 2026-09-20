@@ -3,33 +3,6 @@
         submitting: false,
         preloadingDashboard: false,
         init() {
-            let onReady = null;
-            const originalFetch = window.fetch;
-
-            // Hook fetch to detect the instant the dashboard response is received
-            window.fetch = function(...args) {
-                const result = originalFetch.apply(this, args);
-                try {
-                    const url = typeof args[0] === 'string' ? args[0] : (args[0]?.url || '');
-                    if (url.includes('/dashboard')) {
-                        result.then(() => {
-                            if (onReady) {
-                                const cb = onReady;
-                                onReady = null;
-                                cb();
-                            }
-                        }).catch(() => {
-                            if (onReady) {
-                                const cb = onReady;
-                                onReady = null;
-                                cb();
-                            }
-                        });
-                    }
-                } catch (_) {}
-                return result;
-            };
-
             // If Livewire finishes and credentials failed (validation error), reset submitting
             const hookCommit = () => {
                 if (window.Livewire && typeof window.Livewire.hook === 'function') {
@@ -50,62 +23,12 @@
             } else {
                 document.addEventListener('livewire:initialized', hookCommit);
             }
-
-            window.addEventListener('login-success', (e) => {
-                const dashboardUrl = e.detail.url;
-                this.preloadingDashboard = true;
-
-                let transitioned = false;
-                const triggerSplitAndNavigate = () => {
-                    if (transitioned) return;
-                    transitioned = true;
-
-                    // 1. Dispatch auth-split to trigger the smooth 0.75s slide
-                    window.dispatchEvent(new CustomEvent('auth-split'));
-
-                    // 2. Navigate as the soft fade reaches peak opacity (~700ms)
-                    setTimeout(() => {
-                        if (window.Alpine && typeof window.Alpine.navigate === 'function') {
-                            window.Alpine.navigate(dashboardUrl);
-                        } else if (window.Livewire && typeof window.Livewire.navigate === 'function') {
-                            window.Livewire.navigate(dashboardUrl);
-                        } else {
-                            window.location.href = dashboardUrl;
-                        }
-                    }, 700);
-                };
-
-                // Safety timeout: max 3.5s so it never permanently hangs if network stalls
-                const safetyTimeout = setTimeout(triggerSplitAndNavigate, 3500);
-
-                onReady = () => {
-                    clearTimeout(safetyTimeout);
-                    triggerSplitAndNavigate();
-                };
-
-                // Prime Livewire's native prefetch cache
-                const link = document.getElementById('preload-dashboard-link');
-                if (link) {
-                    link.dispatchEvent(new MouseEvent('mouseenter'));
-                }
-
-                // If hover prefetch hasn't initiated within 250ms, start direct preload
-                setTimeout(() => {
-                    if (!transitioned && onReady) {
-                        fetch(dashboardUrl, {
-                            headers: { 'X-Livewire-Navigate': '' },
-                            credentials: 'same-origin'
-                        });
-                    }
-                }, 250);
-            });
         }
     }"
     @switchtologin.window="view = 'login'"
+    @login-success.window="submitting = true; preloadingDashboard = true; window.mtcLoginCurtain ? window.mtcLoginCurtain.run($event.detail.url) : window.Livewire.navigate($event.detail.url)"
+    @login-transition-failed.window="submitting = false; preloadingDashboard = false"
     class="relative w-full">
-
-    <!-- Hidden link to prime Livewire's native prefetch cache -->
-    <a id="preload-dashboard-link" href="{{ route('dashboard') }}" wire:navigate style="position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; overflow: hidden;" aria-hidden="true"></a>
 
     <!-- ======================= -->
     <!--      LOGIN VIEW         -->

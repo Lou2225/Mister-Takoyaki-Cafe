@@ -20,6 +20,10 @@
 
         <!-- Scripts -->
         @vite(['resources/js/app.js'])
+
+        {{-- Must be byte-identical to the tag in app.blade.php so Livewire treats it as already loaded --}}
+        <script src="{{ asset('js/navigation-guard.js') }}?v={{ filemtime(public_path('js/navigation-guard.js')) }}" data-navigate-once></script>
+
         @livewireStyles
 
         <style>
@@ -159,7 +163,7 @@
         }
         </style>
     </head>
-                <body x-data="{ splitting: false }" x-on:auth-split.window="splitting = true" class="font-sans text-gray-900 antialiased bg-stone-950 overflow-x-hidden overflow-y-auto min-h-screen flex items-center justify-center p-4 sm:p-8 relative">
+                <body x-data="{ splitting: false }" x-on:auth-split.window="splitting = true" x-on:login-transition-failed.window="splitting = false" class="font-sans text-gray-900 antialiased bg-stone-950 overflow-x-hidden overflow-y-auto min-h-screen flex items-center justify-center p-4 sm:p-8 relative">
         
         <!-- Full-page Takoyaki Background Image -->
         <div class="fixed inset-0 z-0 pointer-events-none overflow-hidden">

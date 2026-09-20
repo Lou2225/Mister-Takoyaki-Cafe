@@ -1,6 +1,7 @@
 import '../css/app.css';
 import './bootstrap';
 import ApexCharts from 'apexcharts';
+import './login-curtain';
 
 window.ApexCharts = ApexCharts;
 
