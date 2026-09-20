@@ -1262,8 +1262,7 @@
 
                             {{-- Wired Panel (0ms instant toggle) --}}
                             <div x-show="activeType === 'wired'" x-cloak class="w-full min-w-0">
-                                <div x-data="wiredPrinterCard()" x-init="init()" class="w-full min-w-0">
-                                    {{-- Print Bridge Status & Download Banner --}}
+<div x-data="wiredPrinterCard()" x-effect="if (tab === 'printer' && activeType === 'wired') startBridgeCheck()" class="w-full min-w-0">                                    {{-- Print Bridge Status & Download Banner --}}
                                     <template x-if="bridgeOnline">
                                         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-emerald-50/80 border border-emerald-200 rounded-xl mb-6 shadow-2xs">
                                             <div class="flex items-center gap-3 min-w-0">
@@ -1561,7 +1560,7 @@
 
                             {{-- Bluetooth Panel (0ms instant toggle) --}}
                             <div x-show="activeType === 'bluetooth'" x-cloak>
-                                <div x-data="btPrinterCard()" x-init="init()">
+                                <div x-data="btPrinterCard()">
                                     <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                                         <p class="text-[11px] text-blue-900 leading-relaxed">
                                             <strong>Per-device pairing:</strong> this pairs the printer with <em>this browser, on this device</em>. Repeat "Add Device" on every POS terminal that needs to print.
@@ -2439,9 +2438,14 @@
                 const target = this.savedPrinter || this.selectedPrinter;
                 return this.printers.find(p => (p.name || p) === target) || null;
             },
-            async init() {
+            bridgeChecked: false,
+            init() {
                 this.savedPrinter = localStorage.getItem('thermal_printer_wired_name');
                 this.selectedPrinter = this.savedPrinter || '';
+            },
+            async startBridgeCheck() {
+                if (this.bridgeChecked) return;
+                this.bridgeChecked = true;
                 // Check bridge liveness silently
                 try {
                     const ctrl = new AbortController();
