@@ -1,18 +1,17 @@
 <div
-    x-data="typeof window.stockAdjustment === 'function' ? window.stockAdjustment($wire) : { panel: $wire.entangle('panel').live }"
+    x-data="stockAdjustmentPanel($wire)"
+    wire:ignore.self
     wire:key="stock-adjustment-main-container"
     class="relative overflow-hidden">
 
+    @script
     <script>
-        window.stockAdjustment = function($wire) {
-            return {
-                panel: $wire.entangle('panel').live,
-                init() {}
-            };
-        };
+        Alpine.data('stockAdjustmentPanel', ($wire) => ({
+                        panel: $wire.entangle('panel').live,
+            init() {}
+        }));
 
-        window.adjustmentMovementForm = function($wire, ingredientsList) {
-            return {
+        Alpine.data('adjustmentMovementForm', ($wire, ingredientsList) => ({
                 isOpen: false,
                 dropUp: false,
                 search: '',
@@ -68,15 +67,14 @@
                         $wire.addToQueue();
                     }
                 }
-            };
-        };
+            }));
     </script>
+    @endscript
 
     <div class="relative min-h-[600px]">
 
         {{-- ════════════════ PANEL 1 — ADJUSTMENT LIST ════════════════ --}}
-        <div x-show="panel === 'list'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="px-1">
-
+<div x-show="panel === 'list'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak wire:ignore.self class="px-1">
             <div class="mb-5 flex items-center justify-between gap-3">
                 <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Stock Adjustment</h2>
                 
@@ -289,8 +287,7 @@
         </div>{{-- end panel 1 --}}
 
         {{-- ════════════════ PANEL 2 — ADJUSTMENT FORM (Matching Menu Items Layout) ════════════════ --}}
-        <div x-show="panel === 'adjust'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="px-1">
-            <div class="mb-5 flex items-center justify-between">
+<div x-show="panel === 'adjust'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak wire:ignore.self class="px-1">            <div class="mb-5 flex items-center justify-between">
                 <div>
                     <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Stock Adjustment</h2>
                     <p class="text-[12px] text-gray-500 font-medium">Record manual stock corrections and movements</p>
@@ -414,8 +411,7 @@
                     {{-- Add Movement Form (Matching Menu Items "Add Component") --}}
                     <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] space-y-4"
                         wire:key="adjustment-movement-form"
-                        x-data="window.adjustmentMovementForm($wire, @js($ingredients->map(fn($i) => ['id' => $i->id, 'name' => $i->name, 'unit' => $i->unit])))">
-                        <h2 class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1 flex items-center gap-2">
+x-data="adjustmentMovementForm($wire, @js($ingredients->map(fn($i) => ['id' => $i->id, 'name' => $i->name, 'unit' => $i->unit])))">                        <h2 class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1 flex items-center gap-2">
                             <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
                             Add Movement
                         </h2>
@@ -683,8 +679,7 @@
         </div>{{-- end panel 2 --}}
 
         {{-- ════════════════ PANEL 3 — STOCK RECONCILE (Matching Bulk Edit UI) ════════════════ --}}
-        <div x-show="panel === 'bulk'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="px-1">
-            <div class="mb-5 flex items-center justify-between">
+<div x-show="panel === 'bulk'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak wire:ignore.self class="px-1">            <div class="mb-5 flex items-center justify-between">
                 <div>
                     <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Stock Reconcile</h2>
                     <p class="text-[12px] text-gray-500 font-medium">Reconcile physical counts for <span class="text-indigo-600 font-bold uppercase">{{ $branches->firstWhere('id', $selectedBranchId)->branch_name ?? 'N/A' }}</span></p>
@@ -797,6 +792,7 @@
                             Discard Audit
                         </x-secondary-button>
                     </div>
+                </div>
             </div>
         </div>{{-- end panel 3 --}}
     </div>
@@ -1011,15 +1007,14 @@
          @endif
     </x-side-panel>
 
-    @script
+     @script
     <script>
         if (typeof window.registerReconcileStore === 'function') {
             window.registerReconcileStore();
         }
 
-        window.reconcileTable = window.reconcileTable || function(initialItems) {
-            return {
-                items: initialItems || {},
+        Alpine.data('reconcileTable', (initialItems) => ({
+            items: initialItems || {},
                 bulkSearch: '',
                 init() {
                     if (typeof window.registerReconcileStore === 'function') {
@@ -1041,12 +1036,7 @@
                 formatQty(val, unit) {
                     return Number(val || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ' + (unit || '');
                 }
-            };
-        };
-
-        function reconcileTable(initialItems) {
-            return window.reconcileTable(initialItems);
-        }
+            }));
     </script>
     @endscript
 

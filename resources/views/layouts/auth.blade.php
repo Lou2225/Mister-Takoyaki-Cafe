@@ -23,25 +23,7 @@
         @livewireStyles
 
         <style>
-            .auth-bubbles {
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                overflow: hidden;
-                z-index: 0;
-            }
-            .bubble {
-                position: absolute;
-                border-radius: 50%;
-                background: rgba(255, 255, 255, 0.05); /* very subtle for dark background */
-                animation: float 20s infinite ease-in-out;
-            }
-            @keyframes float {
-                0%, 100% { transform: translateY(0) translateX(0); }
-                50% { transform: translateY(-20px) translateX(20px); }
-            }
+
             
             /* Custom blurred glow behind the container */
             .container-glow {
@@ -59,68 +41,145 @@
             }
             .animate-form-enter { animation: fadeSlideForm 0.3s cubic-bezier(0.4, 0, 0.2, 1) both; }
 
-                        /* Split panels via @keyframes instead of transitions — the whole
-               timeline (position AND opacity) is baked into one declarative
-               rule per element, so there's nothing left to race or get
-               silently overridden. Each panel stays fully opaque while it
-               visibly slides (0%–65%), then fades only in the last stretch
-               once it's mostly off-canvas (65%–100%). */
+            /* Split panels slide cleanly off-canvas to left and right */
             @keyframes authSlideLeft {
-                0%   { transform: translateX(0);        opacity: 1; }
-                65%  { transform: translateX(-115%);    opacity: 1; }
-                100% { transform: translateX(-115%);    opacity: 0; }
+                0% {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+                60% {
+                    opacity: 1;
+                }
+                100% {
+                    transform: translateX(calc(-50vw - 320px));
+                    opacity: 0;
+                }
             }
             @keyframes authSlideRight {
-                0%   { transform: translateX(0);        opacity: 1; }
-                65%  { transform: translateX(115%);     opacity: 1; }
-                100% { transform: translateX(115%);     opacity: 0; }
+                0% {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+                60% {
+                    opacity: 1;
+                }
+                100% {
+                    transform: translateX(calc(50vw + 320px));
+                    opacity: 0;
+                }
             }
             .auth-anim-left {
-                animation: authSlideLeft 0.7s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+                animation: authSlideLeft 0.75s cubic-bezier(0.6, 0.05, 0.2, 1) forwards !important;
             }
             .auth-anim-right {
-                animation: authSlideRight 0.7s cubic-bezier(0.65, 0, 0.35, 1) forwards;
-                animation-delay: 0.05s;
+                animation: authSlideRight 0.75s cubic-bezier(0.6, 0.05, 0.2, 1) forwards !important;
             }
-        /* Match navigation progress bar to the rest of the app (red, not Livewire blue) */
-        :root { --livewire-progress-bar-color: #e11d48; }
-        #nprogress .bar {
-            height: 2.5px !important;
-            background: linear-gradient(90deg, #e11d48, #f43f5e, #fb7185) !important;
-            box-shadow: 0 0 10px rgba(225, 29, 72, 0.7) !important;
-            z-index: 9999999 !important;
+
+            /* Container & Panel Geometry (Eliminates all border lines and unifies the two halves into one card) */
+            .auth-card-container {
+                position: relative;
+                width: 100%;
+                max-width: 1000px;
+                min-height: 560px;
+                display: flex;
+                flex-direction: column;
+                z-index: 10;
+                background: transparent !important;
+                border: none !important;
+                outline: none !important;
+                box-shadow: none !important;
+            }
+            @media (min-width: 768px) {
+                .auth-card-container {
+                    flex-direction: row;
+                    height: 600px;
+                }
+            }
+
+            .auth-panel-left {
+                width: 100%;
+                border-radius: 24px;
+                overflow: hidden;
+                border: none !important;
+                outline: none !important;
+                box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            }
+            @media (min-width: 768px) {
+                .auth-panel-left {
+                    width: 50%;
+                    border-top-right-radius: 0 !important;
+                    border-bottom-right-radius: 0 !important;
+                    border-top-left-radius: 24px !important;
+                    border-bottom-left-radius: 24px !important;
+                }
+            }
+
+            .auth-panel-right {
+                width: 100%;
+                background-color: #ffffff;
+                border-radius: 24px;
+                overflow: hidden;
+                border: none !important;
+                outline: none !important;
+                box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            }
+            @media (min-width: 768px) {
+                .auth-panel-right {
+                    width: 50%;
+                    border-top-left-radius: 0 !important;
+                    border-bottom-left-radius: 0 !important;
+                    border-top-right-radius: 24px !important;
+                    border-bottom-right-radius: 24px !important;
+                }
+            }
+
+            /* Full-screen catch overlay: softly fades to solid dark before swapping to dashboard */
+            .auth-catch-overlay {
+                position: fixed;
+                inset: 0;
+                background-color: #0c0a09;
+                z-index: 50;
+                pointer-events: none;
+                opacity: 0;
+                transition: opacity 0.3s ease-out;
+            }
+            .auth-catch-overlay.is-active {
+                opacity: 1;
+                transition-delay: 0.45s;
+            }
+
+        /* Completely suppress NProgress bar on auth — the button spinner already indicates loading */
+        #nprogress,
+        #nprogress .bar,
+        .nprogress-custom-parent #nprogress {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
         }
         </style>
     </head>
-                <body x-data="{ splitting: false }" x-on:auth-split.window="splitting = true" class="font-sans text-gray-900 antialiased bg-indigo-950 overflow-x-hidden overflow-y-auto min-h-screen flex items-center justify-center p-4 sm:p-8 relative">
+                <body x-data="{ splitting: false }" x-on:auth-split.window="splitting = true" class="font-sans text-gray-900 antialiased bg-stone-950 overflow-x-hidden overflow-y-auto min-h-screen flex items-center justify-center p-4 sm:p-8 relative">
         
-        <!-- Full-page Bubble Background -->
-        <div class="auth-bubbles pointer-events-none fixed inset-0">
-            <div class="bubble w-64 h-64 -top-20 -left-20" style="animation-delay: 0s;"></div>
-            <div class="bubble w-96 h-96 top-1/4 -right-32" style="animation-delay: -5s; background: rgba(255, 255, 255, 0.02);"></div>
-            <div class="bubble w-48 h-48 bottom-10 left-1/4" style="animation-delay: -2s;"></div>
-            <div class="bubble w-80 h-80 top-1/2 -left-40" style="animation-delay: -10s; background: rgba(255, 255, 255, 0.03);"></div>
+        <!-- Full-page Takoyaki Background Image -->
+        <div class="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+            <img src="{{ asset('images/login-bg.jpg') }}" alt="{{ \App\Services\ConfigurationService::getBusinessName() }}" class="w-full h-full object-cover object-center transform transition-transform duration-1000 ease-out" :class="splitting ? 'scale-100' : 'scale-105'" />
+            <!-- Softens and clears blur when columns split so the photo is fully visible -->
+            <div class="absolute inset-0 transition-all duration-700 ease-out" :class="splitting ? 'bg-black/30 backdrop-blur-none' : 'bg-stone-950/65 backdrop-blur-[2px]'"></div>
+            <div class="absolute inset-0 bg-gradient-to-t from-stone-950/80 via-transparent to-stone-950/60 transition-opacity duration-700" :class="splitting ? 'opacity-30' : 'opacity-100'"></div>
         </div>
 
-                       <!-- Full-screen catch overlay: fades to solid after the panels split,
-             so the swap to the dashboard happens underneath a solid color
-             instead of a hard visual cut. -->
-        <div x-data="{ visible: false }"
-             x-on:auth-split.window="visible = true"
-             class="fixed inset-0 bg-indigo-950 z-20 pointer-events-none transition-opacity duration-500 delay-700 ease-out"
-             :class="visible ? 'opacity-100' : 'opacity-0'">
-        </div>
-                <!-- Centered Glass/Shadow Container — stays fully visible and doesn't
-             fade itself; only its two child panels animate (slide apart), so
-             the split is actually visible before the overlay fades everything
-             out afterward. -->
-                                <div class="relative w-full max-w-[1000px] h-auto min-h-[560px] sm:h-[600px] my-4 sm:my-0 rounded-3xl bg-white overflow-hidden flex flex-col md:flex-row z-10 shadow-[0_0_50px_rgba(0,0,0,0.3)] border border-white/10">
+        <!-- Full-screen catch overlay: softly fades to solid dark before swapping to dashboard -->
+        <div class="auth-catch-overlay" :class="splitting ? 'is-active' : ''"></div>
+
+        <!-- Centered Container — zero borders, transparent background, seamless unified card -->
+        <div class="auth-card-container my-4 sm:my-0">
             
-            <div class="container-glow bg-white/20"></div>
+            <div class="container-glow bg-amber-500/10 transition-opacity duration-500" :class="splitting ? 'opacity-0' : 'opacity-100'"></div>
 
-                       <!-- Left Side: Marketing Cover -->
+            <!-- Left Side: Marketing Cover -->
             <div :class="splitting ? 'auth-anim-left' : ''"
-                 class="hidden md:flex md:w-1/2 relative overflow-hidden flex-col justify-between p-10 group bg-indigo-600">
+                 class="auth-panel-left hidden md:flex relative flex-col justify-between p-10 group bg-stone-900">
                 <img src="{{ asset('images/mtc-logo-only.png') }}" alt="{{ \App\Services\ConfigurationService::getBusinessName() }}" class="absolute inset-0 w-full h-full object-cover" />
                 <!-- Overlay for readability -->
                 <div class="absolute inset-0 bg-black/45"></div>
@@ -135,13 +194,13 @@
                 </div>
             </div>
 
-                            <!-- Right Side: Form -->
+            <!-- Right Side: Form -->
             <div :class="splitting ? 'auth-anim-right' : ''"
-                 class="w-full md:w-1/2 flex flex-col p-6 sm:p-10 lg:p-12 relative bg-white h-full overflow-y-auto no-scrollbar">
+                 class="auth-panel-right flex flex-col p-6 sm:p-10 lg:p-12 relative h-full overflow-y-auto no-scrollbar">
                 <div class="flex-1 flex flex-col justify-center max-w-[380px] mx-auto w-full animate-form-enter">
                     <!-- Mobile only logo -->
                     <div class="flex items-center gap-2 mb-8 md:hidden justify-center hover:opacity-80 transition-opacity">
-                         <x-application-logo class="w-8 h-8 fill-current text-indigo-600" />
+                         <x-application-logo class="w-8 h-8 fill-current text-amber-600" />
                          <span class="text-xl font-extrabold tracking-tight text-gray-900 uppercase">{{ \App\Services\ConfigurationService::getBusinessName() }}</span>
                     </div>
                     

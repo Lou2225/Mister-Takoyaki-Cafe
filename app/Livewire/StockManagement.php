@@ -34,7 +34,8 @@ public $filterStatus = ''; // 'low', 'critical', 'healthy'
 public $filterCategoryId = '';
 
     // ── Panel Context ─────────────────────────────────────────────
-    public $panel = 'list'; // Alpine listens to this via event
+        public $panel = 'list';
+    public $mode = 'list';
 
     // ── Form: Global Ingredient (Create/Edit) ─────────────────────
     public $editIngredientId = null;
@@ -66,7 +67,6 @@ public $filterCategoryId = '';
     public $wasteTargetUnit = '';
 
     protected $queryString = [
-        'panel'            => ['except' => 'list'],
         'selectedBranchId' => ['except' => '', 'as' => 'st_branch'],
     ];
 
@@ -401,9 +401,10 @@ public $filterCategoryId = '';
             $this->dispatch('notify', type: 'warning', message: 'Access Restricted: You do not have permission to create ingredients.');
             return;
         }
+        $this->panel = 'form';
+        $this->mode = 'create';
         $this->resetIngredientForm();
         $this->updateGlobalHeader('create');
-        $this->dispatch('switch-panel', panel: 'form', mode: 'create');
     }
 
     public function showEdit($id)
@@ -457,8 +458,9 @@ public $filterCategoryId = '';
         }
         
         $this->resetValidation();
+        $this->panel = 'form';
+        $this->mode = 'edit';
         $this->updateGlobalHeader('edit');
-        $this->dispatch('switch-panel', panel: 'form', mode: 'edit');
     }
 
     // ── Packaging Conversion Rows Management ─────────────────────
@@ -590,10 +592,10 @@ public $filterCategoryId = '';
 
     public function backToList()
     {
+        $this->panel = 'list';
+        $this->mode = 'list';
         $this->resetIngredientForm();
         $this->updateGlobalHeader('list');
-        $this->dispatch('switch-panel', panel: 'list', mode: 'list');
-        $this->resetPage();
     }
 
 

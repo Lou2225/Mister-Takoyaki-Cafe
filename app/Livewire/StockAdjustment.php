@@ -71,7 +71,6 @@ class StockAdjustment extends Component
     public $newItemSelectedUnit = ''; // user-selected unit (may be base or bulk packaging)
 
     protected $queryString = [
-        'panel' => ['except' => 'list'],
         'search' => ['except' => ''],
         'selectedBranchId' => ['except' => ''],
         'startDate' => ['except' => '', 'as' => 'adj_start'],
@@ -313,6 +312,7 @@ class StockAdjustment extends Component
     public function backToList()
     {
         $this->panel = 'list';
+        $this->bulkAdjustments = [];
         $this->reset(['rows', 'globalReference', 'globalRemarks', 'newItemId', 'newItemQty', 'newItemCost', 'newItemExpiry', 'newItemUnit', 'newItemSelectedUnit']);
         $this->newItemType = ((string)$this->selectedBranchId === (string)$this->mainBranchId) ? 'in' : 'waste';
     }

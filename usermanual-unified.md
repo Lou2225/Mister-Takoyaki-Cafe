@@ -351,6 +351,15 @@ The desktop interface incorporates an adaptive, collapsible left navigation side
   - Role-Scoped Accessibility: Automatically filters available navigation destinations based on the active user's role (Cashier, Branch Admin, Super Admin) and operating branch status.
 
 
+2.4 Real-Time Network Heartbeat & Global Floating Island Offline Alert
+----------------------------------------------------------------------
+
+To guarantee operational continuity during volatile retail internet conditions:
+  - Client Latency Heartbeat (/ping): The application pings an ultra-lightweight, cache-exempt 204 No-Content endpoint (`/ping`) to measure real-time client roundtrip latency (ms) and verify upstream server responsiveness.
+  - Global Floating Island Offline Alert: In the event of network dropouts or packet loss, an animated crimson pill alert ("You are currently offline") dynamically descends from the top viewport using Alpine.js and zero layout shift. It continuously monitors browser online/offline events and automatically dismisses once server communication is restored.
+
+
+
 ------------------------------------------------------------------------
 
 
@@ -629,13 +638,19 @@ Tapping the pencil/edit icon on any cart row opens the Two-Column Item Customiza
     This guarantee prevents cashflow leaks where digital funds are received but orders are discarded. If cancellation is necessary, the cashier must complete the order and perform an authorized Void in Order Management.
 
 
-7.7 Thermal Receipt Printing & Multi-Slip Separation Alert
-----------------------------------------------------------
+7.7 Thermal Receipt Printing, MTC Print Bridge & Station Slips
+----------------------------------------------------------------
 
-  - Direct Web Bluetooth ESC/POS Integration: Pairs directly to Bluetooth 58mm/80mm thermal printers via Google Chrome or Microsoft Edge without opening standard browser print dialogs.
-  - Multi-Slip Separation Alert: When printing multiple slips (Customer Receipt, Kitchen Order Slip, Barista Slip), the system displays an on-screen prompt: "Please tear off slip 1 of 2", featuring an automated 15-second countdown timer to prevent paper jams.
-  - Multi-Slip Separation Alert: When printing multiple slips (Customer Receipt, Kitchen Order Slip, Barista Slip), the system displays an on-screen prompt: "Please tear off slip 1 of 2", featuring an automated 5-second countdown timer to prevent paper jams.
+  - Dual Hardware Connectivity Architecture:
+    - Direct Web Bluetooth ESC/POS: Pairs directly to Bluetooth 58mm/80mm thermal printers via Google Chrome or Microsoft Edge with zero external driver installation.
+    - Wired USB Printing via MTC Print Bridge: Integrates with the local MTC Print Bridge service (Port 9100) to spool ESC/POS raw byte streams directly through the Windows Print Spooler (`winspool.drv`), enabling rock-solid wired USB thermal receipt printing.
+  - Multi-Slip Station Separation: When configured, the POS automatically prints segregated slips based on category station routing:
+    - Customer Receipt: Complete itemized ledger, payment breakdown, and encrypted review QR code.
+    - Kitchen Order Slip: Filtered strictly for food and takoyaki production line items with item notes.
+    - Barista Order Slip: Segregated beverage tickets for the drink bar station.
+  - Paper Jam Prevention Alert: During multi-slip print jobs, an on-screen prompt guides cashiers: "Please tear off slip X of Y", backed by an automated 5-second countdown timer.
   - Receipt Review QR Code Binding: Customer receipts print an aligned, high-contrast QR code linked directly to the store feedback portal (/review/{branch}?order_ref=...). The QR code is cryptographically bound to the specific transaction, ensuring legitimate customer reviews.
+
 
 
 7.8 Menu and Category Layout Customization (Sort Persistence)
@@ -1530,7 +1545,8 @@ Branch Administrators have scoped access to configure store-specific settings un
   - Receipt Customization: Configure local store telephone numbers, exact street address notes, and promotional receipt footer messages.
   - Inventory Alert Thresholds: Adjust local low-stock threshold levels and 7-day expiry warning windows.
   - POS Configuration: Upload the branch's official static GCash QR code image and specify the merchant account name.
-  - Thermal Printer Setup: Pair local Web Bluetooth ESC/POS receipt printers and execute diagnostic test prints.
+  - Thermal Printer Setup: Configure Web Bluetooth ESC/POS wireless pairing or install the MTC Print Bridge v2.0 (Windows desktop service on Port 9100) for wired USB printer communication with Windows Print Spooler (`winspool.drv`), complete with 1-click executable download (`/downloads/print-bridge`) and diagnostic test prints.
+
 
 
 ------------------------------------------------------------------------
@@ -2035,13 +2051,16 @@ Access via System Settings (/settings):
   - Hide Operational Modules Toggle: Hides branch-specific operational modules (POS, Orders, KDS) from the sidebar for executive-only workflows.
 
 
-31.8 Tab 7  -  Thermal Printer (Web Bluetooth Direct Pairing, Hardware Diagnostics)
+31.8 Tab 7  -  Thermal Printer (Web Bluetooth & Wired MTC Print Bridge v2.0)
 -----------------------------------------------------------------------------------
 
-  - Master Printing Toggle: Enable or disable thermal printing.
-  - Protocol Selection: Web Bluetooth ESC/POS (Chrome/Edge direct) or Wired/USB/Serial.
-  - Auto-Cut Paper: Transmits ESC/POS paper cutting commands after each ticket.
-  - Diagnostic Test Print: Transmits a standardized hardware diagnostic voucher to verify printer communication.
+  - Master Printing Toggle: Enable or disable thermal receipt printing across the POS terminal.
+  - Dual Hardware Mode Architecture:
+    - Bluetooth Mode: Connects directly via Web Bluetooth API (Google Chrome / Microsoft Edge) to wireless 58mm/80mm thermal printers with zero host drivers.
+    - Wired Mode: Connects to USB thermal printers via the local MTC Print Bridge v2.0 microservice (Port 9100). Includes 1-click Windows installer download (`MTC-PrintBridge-Setup.exe` or `.zip`), automatic boot startup, and real-time Windows Print Spooler (`winspool.drv`) printer detection.
+  - Auto-Cut Paper: Transmits ESC/POS paper cutting commands after each customer or kitchen slip.
+  - Hardware Diagnostics & Test Print: Transmits a standardized formatting test ticket to verify connection, raster bit rendering, and paper feed mechanics.
+
 
 
 31.9 Tab 8  -  Consolidated Audit Logs (Orders, Stock, Users)

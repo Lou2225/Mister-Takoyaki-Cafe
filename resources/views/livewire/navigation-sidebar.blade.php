@@ -300,7 +300,7 @@
                                     <span class="flex-1 whitespace-nowrap">Branch Requests</span>
                                     @if($this->pending_orders_count > 0)
                                         <span class="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-amber-500 text-[9px] font-black text-white shadow-lg shadow-amber-200/40 animate-pulse">
-                                            {{ $this->pending_orders_count }}
+                                             {{ $this->pending_orders_count }}
                                         </span>
                                     @endif
                                 </a>

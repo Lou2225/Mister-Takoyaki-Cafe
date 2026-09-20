@@ -63,6 +63,9 @@
 
     {{-- Navigation Concurrency & Abort Guard --}}
     <script src="{{ asset('js/navigation-guard.js') }}?v={{ filemtime(public_path('js/navigation-guard.js')) }}" data-navigate-once></script>
+
+    {{-- SortableJS (for POS Terminal & Ordering drag-and-drop) --}}
+    <script src="{{ asset('js/Sortable.min.js') }}" data-navigate-once></script>
     {{-- Leaflet Overrides & Livewire Progress Bar --}}
     <style>
         :root {
@@ -556,7 +559,9 @@
     </div>
 </div>
 
+@persist('toast-container')
 <x-toast />
+@endpersist
 
 {{-- Global helper scripts that must be available before Livewire/Alpine initialize. --}}
 @stack('beforeLivewireScripts')

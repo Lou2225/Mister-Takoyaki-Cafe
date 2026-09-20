@@ -219,6 +219,10 @@
         return;
     }
     this.categorySortableTimeout = setTimeout(() => {
+        if (typeof Sortable === 'undefined') {
+            this.setupCategorySortable();
+            return;
+        }
         const el = document.getElementById('category-sortable-tabs');
         if (!el || this.categorySortable) return;
         this.categorySortable = Sortable.create(el, {
@@ -249,6 +253,10 @@
         return;
     }
     this.productSortableTimeout = setTimeout(() => {
+        if (typeof Sortable === 'undefined') {
+            this.setupProductSortable();
+            return;
+        }
         const el = document.getElementById('product-sortable-grid');
         if (!el) return;
         this.productSortable = Sortable.create(el, {

@@ -7,11 +7,12 @@
 @endphp
 
 <div
-    x-data="typeof window.stockManagement === 'function' ? window.stockManagement($wire) : { panel: 'list', mode: 'list', formErrors: {}, formSubmitted: false }"
+    x-data="stockManagementForm($wire)"
     x-on:switch-panel.window="panel = $event.detail.panel; if($event.detail.mode) mode = $event.detail.mode"
-    @trigger-edit-ingredient.window="$wire.showEdit($event.detail.id)"
+    @trigger-edit-ingredient.window="showEdit($event.detail.id)"
+    wire:ignore.self
     wire:key="stock-management-main-container"
-    class="relative">
+    class="relative min-h-full">
 
     {{-- Hidden reactive updaters: OUTSIDE wire:ignore so Livewire can update them --}}
     @php
@@ -43,8 +44,8 @@
         {{-- wire:ignore wraps only the list/expiry panels, NOT the form --}}
     <div class="relative min-h-[600px]" wire:init="triggerExpiryAlerts">
 
-        {{-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• DYNAMIC HEADER â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• --}}
-        <div x-show="(panel === 'list' || panel === 'expiry')" x-cloak class="px-1">
+        {{-- ═══════════════ DYNAMIC HEADER ═══════════════ --}}      
+<div x-show="(panel === 'list' || panel === 'expiry')" x-cloak wire:ignore.self class="px-1">
             <div class="mb-5 flex items-center justify-between">
                 <div>
                     <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Inventory Overview</h2>
@@ -53,8 +54,7 @@
                 <div class="flex items-center gap-3">
                     <x-report-dropdown module="Stock Report" />
                     @if(!$this->isStaff() && $this->isSuperAdmin())
-                        <x-primary-button type="button" @click="showCreate()" class="h-10 !px-3 sm:!px-4">
-                            <svg class="w-4 h-4 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+<x-primary-button type="button" @click="showCreate()" class="h-10 !px-3 sm:!px-4">
                             <span class="hidden sm:inline">Add Ingredient</span>
                         </x-primary-button>
                     @endif
@@ -88,8 +88,7 @@
         </div>
 
         {{-- ═══════════════ PANEL 1 – LIST ═══════════════ --}}
-        <div x-show="panel === 'list'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="px-1">
-
+<div x-show="panel === 'list'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak wire:ignore.self class="px-1">
             {{-- KPI Dashboard (User Management Aesthetic) --}}
             {{-- KPI Dashboard (Compact Glassmorphic Theme) --}}
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
@@ -255,7 +254,7 @@
     </div>
 </div>
 
-            {{-- â”€â”€ Unified Catalog Table â”€â”€ --}}
+                        {{-- ── Unified Catalog Table ── --}}
             <div class="relative min-h-[400px]">
                 <x-data-table>
                     <x-slot name="header">
@@ -332,8 +331,7 @@
                                 <td class="py-4 px-6 text-right whitespace-nowrap">
                                     <div class="flex items-center justify-end gap-2">
                                         @if($this->isSuperAdmin())
-                                            <x-secondary-button type="button" @click="showEdit({{ $ing->id }})" class="h-8 px-3 text-[11px] font-bold bg-white hover:bg-slate-50 border-slate-200">
-                                                Edit
+<x-secondary-button type="button" @click="showEdit({{ $ing->id }})" class="h-8 px-3 text-[11px] font-bold bg-white hover:bg-slate-50 border-slate-200">                                                Edit
                                             </x-secondary-button>
                                         @endif
                                         
@@ -452,14 +450,13 @@
 
         </div>{{-- end panel 1 --}}
 
-        {{-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• PANEL 4 — FORM (CREATE/EDIT) â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• --}}
-        <div x-show="panel === 'form'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="px-1">
-            <div class="mb-5 flex items-center justify-between">
+        {{-- ═══════════════ PANEL 4 — FORM (CREATE/EDIT) ═══════════════ --}}
+<div x-show="panel === 'form'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak wire:ignore.self class="px-1">            <div class="mb-5 flex items-center justify-between">
                 <div>
                     <h2 class="text-[17px] font-bold text-gray-900 tracking-tight" x-text="mode === 'edit' ? 'Update Ingredient' : 'Add New Ingredient'"></h2>
                     <p class="text-[12px] text-gray-500 font-medium" x-text="mode === 'edit' ? 'Ingredient specifications and availability' : 'New ingredient catalog entry'"></p>
                 </div>
-                <x-secondary-button type="button" @click="backToList()" class="h-10">
+<x-secondary-button type="button" @click="backToList()" class="h-10">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
                     Back to List
                 </x-secondary-button>
@@ -631,9 +628,11 @@
                                                     </svg>
                                                 </div>
 
-                                                <input 
-                                                    type="text"
-                                                    :value="open ? search : (selectedItem ? selectedItem.name : 'Uncategorized')"
+        <input 
+            type="text"
+            name="ingredient_category_search"
+            id="ingredient_category_search"
+            :value="open ? search : (selectedItem ? selectedItem.name : 'Uncategorized')"
                                                     @input="search = $event.target.value; open = true"
                                                     @focus="openDropdown()"
                                                     @click="openDropdown()"
@@ -1174,8 +1173,7 @@
                         <x-primary-button type="button" @click="saveIngredient()" class="w-full justify-center h-12 text-[12px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">
                             <span x-text="mode === 'edit' ? 'Update Catalog' : 'Add to Catalog'"></span>
                         </x-primary-button>
-                        <x-secondary-button @click="backToList()" class="w-full justify-center h-11 text-[12px] font-black uppercase tracking-widest border-slate-200 text-slate-500">
-                            Discard Draft
+<x-secondary-button @click="backToList()" class="w-full justify-center h-11 text-[12px] font-black uppercase tracking-widest border-slate-200 text-slate-500">                            Discard Draft
                         </x-secondary-button>
                     </div>
 
@@ -1265,8 +1263,8 @@
         </div>
     </x-modal>
 
-    {{-- â”€â”€ Save Ingredient Confirmation Modal â”€â”€ --}}
-    <x-modal name="confirm-save-ingredient" maxWidth="sm" focusable>
+    {{-- ── Save Ingredient Confirmation Modal ── --}}
+        <x-modal name="confirm-save-ingredient" maxWidth="sm" focusable>
         <div class="h-1 w-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-t-lg"></div>
         <div class="p-6">
             <div class="flex items-start gap-4 mb-4">
@@ -1290,8 +1288,8 @@
         </div>
     </x-modal>
 
-    {{-- â”€â”€ Permanent Deletion Confirmation Modal â”€â”€ --}}
-    <x-modal name="confirm-delete-ingredient" maxWidth="sm" focusable>
+    {{-- ── Permanent Deletion Confirmation Modal ── --}}
+        <x-modal name="confirm-delete-ingredient" maxWidth="sm" focusable>
         <div class="h-1 w-full bg-gradient-to-r from-red-400 to-rose-500 rounded-t-lg"></div>
         <div class="p-6">
             <div class="flex items-start gap-4 mb-4">
@@ -1318,8 +1316,8 @@
         </div>
     </x-modal>
 
-    {{-- â”€â”€ Batch Disposal Confirmation Modal â”€â”€ --}}
-    <x-modal name="confirm-waste-batch" maxWidth="sm" focusable>
+    {{-- ── Batch Disposal Confirmation Modal ── --}}
+        <x-modal name="confirm-waste-batch" maxWidth="sm" focusable>
         <div class="h-1 w-full bg-gradient-to-r from-amber-400 to-orange-500 rounded-t-lg"></div>
         <div class="p-6">
             <div class="flex items-start gap-4 mb-4">
@@ -1347,12 +1345,12 @@
         </div>
     </x-modal>
 
-    {{-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• PANEL — EXPIRY TRACKING â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• --}}
-    <div x-show="panel === 'expiry'"
+    {{-- ═══════════════ PANEL — EXPIRY TRACKING ═══════════════ --}}
+        <div x-show="panel === 'expiry'"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0 translate-y-4"
          x-transition:enter-end="opacity-100 translate-y-0"
-         x-cloak class="px-1">
+         x-cloak wire:ignore.self class="px-1">
 
         {{-- Expiry System Metrics (Compact Glassmorphic Theme) --}}
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
@@ -1475,8 +1473,8 @@
             </div>
         </div>
 
-        {{-- Batch Intelligence Table â”€â”€ --}}
-        <div class="relative min-h-[400px]">
+        {{-- Batch Intelligence Table ── --}}
+                <div class="relative min-h-[400px]">
             <x-data-table>
                 <x-slot name="header">
                     <th class="py-3 px-6 border-r border-slate-100/50 text-left text-[11px] font-black text-slate-500 uppercase tracking-widest">Ingredient Batch</th>
@@ -1649,17 +1647,17 @@
         </div>
     </div>
 
+    @script
     <script>
-        (function() {
-            window.stockManagement = function($wire) {
-                const tabState = (typeof slidingTabsLogic === 'function') 
-                    ? slidingTabsLogic($wire.entangle('panel').live, 'panel')
-                    : ((typeof window.slidingTabs === 'function') ? window.slidingTabs($wire.entangle('panel').live, 'panel') : { init() {} });
-                    
-                return {
+        Alpine.data('stockManagementForm', ($wire) => {
+            const tabState = (typeof slidingTabsLogic === 'function')
+                ? slidingTabsLogic($wire.entangle('panel'), 'panel')
+                : ((typeof window.slidingTabs === 'function') ? window.slidingTabs($wire.entangle('panel'), 'panel') : { init() {} });
+
+            return {
                     ...tabState,
                     panel: $wire.entangle('panel').live,
-                    mode: 'list',
+                                        mode: $wire.entangle('mode').live,
                     editIngredientId: $wire.entangle('editIngredientId'),
                     ingredientName: $wire.entangle('ingredientName'),
                     ingredientCategoryId: $wire.entangle('ingredientCategoryId'),
@@ -1676,6 +1674,7 @@
 
                     formErrors: {},
                     formSubmitted: false,
+                    isNavigating: false,
 
                     // Client-side search and pagination
                     stockSearch: '',
@@ -1721,9 +1720,11 @@
                     isIngredientVisible(id) {
                         return this.paginatedIngredientIds.includes(id);
                     },
-                    updateIngredientsList(newList) {
-                        this.ingredientsList = newList || [];
-                    },
+updateIngredientsList(newList) {
+    if (!Array.isArray(newList)) return;
+    if (JSON.stringify(this.ingredientsList) === JSON.stringify(newList)) return;
+    this.ingredientsList = newList;
+},
 
                     get filteredBatchIds() {
                         const query = (this.expirySearchText || '').toLowerCase().trim();
@@ -1753,23 +1754,19 @@
                     isBatchVisible(id) {
                         return this.paginatedBatchIds.includes(id);
                     },
-                    updateBatchesList(newList) {
-                        this.batchesList = newList || [];
-                    },
+updateBatchesList(newList) {
+    if (!Array.isArray(newList)) return;
+    if (JSON.stringify(this.batchesList) === JSON.stringify(newList)) return;
+    this.batchesList = newList;
+},
 
                     isLoadingData: false,
 
-                    // ── Instant 0ms Actions ──
+                    // ── Instant Actions (same pattern as Menu Management) ──
                     showCreate() {
                         this.panel = 'form';
                         this.mode = 'create';
-                        this.editIngredientId = null;
                         this.isLoadingData = false;
-                        this.ingredientName = '';
-                        this.ingredientCategoryId = '';
-                        this.ingredientUnit = 'pcs';
-                        this.ingredientMinStock = '';
-                        this.conversionRows = [];
                         this.formErrors = {};
                         this.formSubmitted = false;
                         this.$wire.showCreate();
@@ -1777,16 +1774,12 @@
                     showEdit(id) {
                         this.panel = 'form';
                         this.mode = 'edit';
-                        this.editIngredientId = id;
                         this.isLoadingData = true;
                         this.formErrors = {};
                         this.formSubmitted = false;
-                        const p = this.$wire.showEdit(id);
-                        if (p && typeof p.then === 'function') {
-                            p.then(() => { this.isLoadingData = false; }).catch(() => { this.isLoadingData = false; });
-                        } else {
-                            setTimeout(() => { this.isLoadingData = false; }, 300);
-                        }
+                        this.$wire.showEdit(id).finally(() => {
+                            this.isLoadingData = false;
+                        });
                     },
                     backToList() {
                         this.panel = 'list';
@@ -2021,8 +2014,8 @@
                             this.formSubmitted = false;
                         });
                     }
-                };
             };
-        })();
+        });
     </script>
+    @endscript
 </div>

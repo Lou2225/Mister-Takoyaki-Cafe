@@ -28,8 +28,7 @@
     }"
         class="relative overflow-hidden">
 
-    @script
-<script>
+    <script>
     // Shared with pos-terminal.blade.php — both pages need this listener
     // so an order can be auto-printed from either module, using whichever
     // printer is currently paired via window.thermalBluetoothPrinter.
@@ -112,7 +111,6 @@
         });
         }
     </script>
-@endscript
 
     <div class="relative min-h-[600px]">
 
@@ -1194,7 +1192,6 @@
     </div>
 </x-modal>
 
-@script
 <script>
 window.printOrderReceipt = async function(orderId) {
     // Try connected thermal printer (Bluetooth or Wired) first
@@ -1259,7 +1256,6 @@ window.printOrderReceipt = async function(orderId) {
     }));
 }
 </script>
-@endscript
 
 {{-- ══════════════════════════════════════════════
      TEAR-OFF CONFIRMATION MODAL (multi-slip printing, with auto-resume countdown)
