@@ -49,8 +49,7 @@
             <p class="text-[13px] sm:text-[14px] text-slate-500 font-medium">Enter your credentials to access your administrative workspace.</p>
         </div>
 
-        <form wire:submit="login" @submit="submitting = true" class="space-y-5 sm:space-y-6">
-
+<form wire:submit="login" @submit="submitting = true; window.mtcLoginCurtain && window.mtcLoginCurtain.unlockAudio()" class="space-y-5 sm:space-y-6">
             <!-- Email Address -->
             <div>
                 <x-input-label for="email" :value="__('Email Address')" class="text-[12px] font-semibold text-slate-900 uppercase tracking-[0.24em] mb-2" />

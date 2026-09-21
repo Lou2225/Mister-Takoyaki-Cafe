@@ -165,16 +165,24 @@
     </head>
                 <body x-data="{ splitting: false }" x-on:auth-split.window="splitting = true" x-on:login-transition-failed.window="splitting = false" class="font-sans text-gray-900 antialiased bg-stone-950 overflow-x-hidden overflow-y-auto min-h-screen flex items-center justify-center p-4 sm:p-8 relative">
         
-        <!-- Full-page Takoyaki Background Image -->
+        <!-- Full-page Takoyaki Background (clean photo; the logo is its own layer above) -->
         <div class="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-            <img src="{{ asset('images/login-bg.jpg') }}" alt="{{ \App\Services\ConfigurationService::getBusinessName() }}" class="w-full h-full object-cover object-center transform transition-transform duration-1000 ease-out" :class="splitting ? 'scale-100' : 'scale-105'" />
+            <!-- Photo, sized exactly like object-cover so the logo can be pinned to it -->
+            <div class="absolute inset-0 transform transition-transform duration-1000 ease-out" :class="splitting ? 'scale-100' : 'scale-105'">
+                <div class="absolute left-1/2 top-1/2" style="width: max(100vw, calc(100vh * 1369 / 768)); aspect-ratio: 1369 / 768; transform: translate(-50%, -50%);">
+                    <img src="{{ asset('images/login-bg-clean.jpg') }}" alt="{{ \App\Services\ConfigurationService::getBusinessName() }}" class="absolute inset-0 w-full h-full" />
+                </div>
+            </div>
             <!-- Softens and clears blur when columns split so the photo is fully visible -->
             <div class="absolute inset-0 transition-all duration-700 ease-out" :class="splitting ? 'bg-black/30 backdrop-blur-none' : 'bg-stone-950/65 backdrop-blur-[2px]'"></div>
             <div class="absolute inset-0 bg-gradient-to-t from-stone-950/80 via-transparent to-stone-950/60 transition-opacity duration-700" :class="splitting ? 'opacity-30' : 'opacity-100'"></div>
-        </div>
 
-        <!-- Full-screen catch overlay: softly fades to solid dark before swapping to dashboard -->
-        <div class="auth-catch-overlay" :class="splitting ? 'is-active' : ''"></div>
+            <!-- Logo layer: hidden until the columns split, same spot as the original badge -->
+            <div class="absolute left-1/2 top-1/2" style="width: max(100vw, calc(100vh * 1369 / 768)); aspect-ratio: 1369 / 768; transform: translate(-50%, -50%);">
+                <img id="auth-logo" src="{{ asset('images/mtc-logo-badge.png') }}" alt=""
+                     style="position: absolute; left: 50.40%; top: 50.65%; width: 38.86%; height: auto; opacity: 0; transform: translate(-50%, -50%); will-change: transform, opacity;" />
+            </div>
+        </div>
 
         <!-- Centered Container — zero borders, transparent background, seamless unified card -->
         <div class="auth-card-container my-4 sm:my-0">
