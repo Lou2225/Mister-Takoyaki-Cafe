@@ -830,7 +830,7 @@
                         @endif
                     </div>
 
-                    {{-- Order Details --}}
+                    {{-- Order Details (Transaction Meta) --}}
                     <div class="receipt-meta">
                         <div class="receipt-meta-row">
                             <span class="font-bold">Order #: {{ $order->reference_no }}</span>
@@ -839,27 +839,20 @@
                             <span>Date: {{ $order->created_at->format('d/m/y H:i') }}</span>
                             <span class="font-bold uppercase">{{ $order->order_type }}</span>
                         </div>
-                        @if($order->customer_name)
-                            <div class="receipt-meta-row">
-                                <span>Customer: <strong>{{ $order->customer_name }}</strong></span>
-                                @if($order->table_number)
-                                    <span>Claim No: <strong>{{ $order->table_number }}</strong></span>
-                                @endif
-                            </div>
-                        @endif
-                        @if($order->table_number && !$order->customer_name)
-                            <div class="receipt-meta-row">
-                                <span>Claim No: <strong>{{ $order->table_number }}</strong></span>
-                            </div>
-                        @endif
-                        @if($order->customer_phone)
-                            <div class="receipt-meta-row">
-                                <span>Phone: {{ $order->customer_phone }}</span>
-                            </div>
-                        @endif
+                        @if($order->payment_method)
                         <div class="receipt-meta-row">
-                            <span>Payment: <strong>{{ $order->payment_method ?? 'Cash' }}</strong></span>
+                            <span>Payment: <strong>{{ $order->payment_method }}</strong></span>
                         </div>
+                        @endif
+                        {{-- Cashier Name & Account ID --}}
+                        @if($order->user)
+                        <div class="receipt-meta-row">
+                            <span>Cashier: <strong>{{ trim(($order->user->first_name ?? '') . ' ' . ($order->user->last_name ?? '')) ?: ($order->user->name ?? 'STAFF') }}</strong></span>
+                        </div>
+                        <div class="receipt-meta-row">
+                            <span>Account ID: <strong>{{ $order->user->employee_id ?? ('ACC-' . str_pad($order->user_id, 4, '0', STR_PAD_LEFT)) }}</strong></span>
+                        </div>
+                        @endif
                     </div>
 
                     @if($order->order_type === 'Delivery' && $order->delivery_address)
@@ -892,7 +885,7 @@
                                 @if($item->options->count() > 0)
                                     @foreach($item->options as $opt)
                                         <div class="receipt-item-sub">
-                                            + {{ $opt->option->name }} 
+                                            + {{ $opt->option->name }}
                                             @if($opt->price > 0)
                                                 ({{ $currency }}{{ number_format($opt->price, 2) }})
                                             @endif
@@ -966,28 +959,50 @@
                         @endif
                     </div>
 
+                    {{-- Customer Name & Address (under Totals) --}}
+                    @if($order->customer_name || $order->delivery_address)
+                        <div class="divider-dashed"></div>
+                        @if($order->customer_name)
+                            <div class="receipt-meta-row">
+                                <span>Customer Name: <strong>{{ $order->customer_name }}</strong></span>
+                            </div>
+                        @endif
+                        @if($order->delivery_address && $order->order_type !== 'Delivery')
+                            <div class="receipt-meta-row">
+                                <span>Address: {{ $order->delivery_address }}</span>
+                            </div>
+                        @endif
+                    @endif
+
+                    {{-- QR Code (above Claim Number and Footer) --}}
+                    @if(($settings['show_receipt_qr_code'] ?? true) && !empty($reviewUrl))
+                        <div class="receipt-qr-wrap">
+                            <div class="divider-dashed"></div>
+                            <div class="receipt-qr-title">SCAN TO REVIEW &amp; RATE ORDER</div>
+                            <div class="divider-dashed"></div>
+                            <div class="qr-canvas-container">
+                                <canvas id="receiptQrCanvas" class="qr-code-canvas" width="100" height="100"></canvas>
+                            </div>
+                            <div class="receipt-qr-url">Review us: {{ $reviewUrl }}</div>
+                        </div>
+                    @endif
+
+                    {{-- Claim Number (below QR Code, above Footer) --}}
+                    @php $claimNo = $order->table_number ?: $order->reference_no; @endphp
+                    <div class="divider-dashed"></div>
+                    <div class="text-center" style="margin: 6px 0 4px;">
+                        <div style="font-size: var(--font-size-xs, 7px); font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #555;">CLAIM NUMBER</div>
+                        <div style="font-size: 16px; font-weight: 900; letter-spacing: 3px; margin-top: 2px;">#{{ $claimNo }}</div>
+                    </div>
                     <div class="divider-dashed"></div>
 
-                    {{-- Footer Message --}}
+                    {{-- Footer Message (very bottom) --}}
                     @if(($settings['show_receipt_footer'] ?? true) !== false)
                         <div class="receipt-footer">
                             <div class="footer-message">{{ $settings['receipt_footer_message'] ?? 'Thank you for your visit!' }}</div>
                             @if(!empty($settings['receipt_return_policy']))
                                 <div class="return-policy">{{ $settings['receipt_return_policy'] }}</div>
                             @endif
-                        </div>
-                    @endif
-
-                    {{-- Crystal-Clear 1-Bit Monochrome QR Code --}}
-                    @if(($settings['show_receipt_qr_code'] ?? true) && !empty($reviewUrl))
-                        <div class="receipt-qr-wrap">
-                            <div class="divider-dashed"></div>
-                            <div class="receipt-qr-title">SCAN TO REVIEW & RATE ORDER</div>
-                            <div class="divider-dashed"></div>
-                            <div class="qr-canvas-container">
-                                <canvas id="receiptQrCanvas" class="qr-code-canvas" width="100" height="100"></canvas>
-                            </div>
-                            <div class="receipt-qr-url">Review us: {{ $reviewUrl }}</div>
                         </div>
                     @endif
                 </div>

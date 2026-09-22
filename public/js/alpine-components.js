@@ -40,7 +40,9 @@
                 const el = this.$el.closest('[wire\\:id]');
                 if (!window.Livewire || !el) return;
                 const component = window.Livewire.find(el.getAttribute('wire:id'));
-                if (component && component.get(prop) !== value) {
+                if (!component) return;
+                const existsOnLivewire = component.snapshot?.data && Object.prototype.hasOwnProperty.call(component.snapshot.data, prop);
+                if (existsOnLivewire && component.get(prop) !== value) {
                     try { component.set(prop, value); } catch (e) { }
                 }
             },
@@ -50,7 +52,7 @@
                 if (!active) return;
 
                 requestAnimationFrame(() => {
-                    const list = this.$refs[`${p}List`] || this.$refs.tabList || this.$el.querySelector(`[x-ref="${p}List"], [x-ref="tabList"]`);
+                    const list = this.$refs[`${p}List`] || this.$refs.tabList || this.$el.querySelector(`[x-ref="${p}List"], [x-ref="tabList"], [x-ref="${p}TabList"]`);
                     if (!list) return;
 
                     const el = list.querySelector(`[data-tab='${active}'], [data-panel='${active}'], [value='${active}']`);
@@ -1296,7 +1298,6 @@
         window.Alpine.data('thermalTearOffModal', () => window.thermalTearOffModal());
         window.Alpine.data('stockAdjustment', ($wire) => window.stockAdjustment($wire));
         window.Alpine.data('adjustmentMovementForm', ($wire, ingredientsList) => window.adjustmentMovementForm($wire, ingredientsList));
-
         if (typeof window.registerReconcileStore === 'function') {
             window.registerReconcileStore();
         }

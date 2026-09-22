@@ -16,6 +16,38 @@ trait HandlesValidations
         return preg_replace('/\s+/', ' ', trim($value));
     }
 
+        /**
+     * Capitalize the first letter after a space, hyphen or apostrophe (multibyte-safe).
+     * "mary-jane" → "Mary-Jane", "o'brien" → "O'Brien", "ñoño" → "Ñoño". Existing capitals are kept.
+     */
+    protected function titleCaseName(?string $value): string
+    {
+        $value = $this->normalizeString($value);
+        if ($value === '') return '';
+
+        return preg_replace_callback(
+            '/(^|[\s\-\'])(\p{Ll})/u',
+            fn ($m) => $m[1] . mb_strtoupper($m[2], 'UTF-8'),
+            $value
+        );
+    }
+
+    /**
+     * Reduce a pasted PH mobile number to its 10 digits: "+63 912 345 6789" / "09123456789" → "9123456789".
+     */
+    protected function normalizePhMobile(?string $phone): string
+    {
+        $digits = preg_replace('/\D+/', '', (string) $phone);
+
+        if (strlen($digits) === 12 && str_starts_with($digits, '63')) {
+            $digits = substr($digits, 2);
+        } elseif (strlen($digits) === 11 && str_starts_with($digits, '0')) {
+            $digits = substr($digits, 1);
+        }
+
+        return $digits;
+    }
+    
     /**
      * Sanitize input string based on type (name, email, phone, etc).
      * Wrapper around ValidationHelper::sanitizeInput for convenience.

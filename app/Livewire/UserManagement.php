@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Role;
 use App\Models\Branch;
 use App\Models\Order;
+use App\Models\UserActivityLog;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use App\Traits\HandlesValidations;
@@ -56,16 +57,26 @@ class UserManagement extends Component
     public $forceReplaceManager = false;
     public $conflictingManagerName = '';
     public $skipValidation = false;
-    public $deleteTargetId = null;
-    public $deleteTargetName = '';
+    public $statusTargetId = null;
+    public $statusTargetName = '';
+    public $statusTargetActive = false; // the status BEFORE the toggle, for modal copy
+    public $archiveTargetId = null;
+    public $archiveTargetName = '';
+    public $archiveReason = '';
+    public $restoreTargetId = null;
+    public $restoreTargetName = '';
+    public $activeTab = 'directory'; // 'directory' | 'archived' — display only; both lists are queried every render (see render())
     public ?array $editUserAvatar = null;
+    public $editUserArchived = false;
 
+    
     // ── User History Dashboard State ──────────────────────────────
     public $historyTab = 'overview';
     public $historyStartDate = '';
     public $historyEndDate = '';
     public $activeFilter = 'All Time';
     public $viewingOrder = null;
+    public $timelineLimit = 5; // number of timeline events loaded; incremented by loadMoreTimeline()
 
     // Standardized positions for consistent selection
     public $availablePositions = [
@@ -80,6 +91,7 @@ class UserManagement extends Component
         'is_active' => ['except' => '', 'as' => 'u_active'],
         'view'      => ['except' => 'table', 'as' => 'u_view'],
         'perPage'   => ['except' => 5, 'as' => 'u_pp'],
+        'activeTab' => ['except' => 'directory', 'as' => 'tab'],
     ];
 
     public function mount()
@@ -101,7 +113,25 @@ class UserManagement extends Component
      */
     public function updatingSearch()
     {
-        $this->resetPage();
+        $this->resetPage('page');
+        $this->resetPage('archivedPage');
+    }
+
+    public function updatedRoleId()
+    {
+        $this->resetPage('page');
+        $this->resetPage('archivedPage');
+    }
+
+    public function updatedBranchId()
+    {
+        $this->resetPage('page');
+        $this->resetPage('archivedPage');
+    }
+
+    public function updatedIsActive()
+    {
+        $this->resetPage('page');
     }
 
     /**
@@ -144,9 +174,11 @@ class UserManagement extends Component
 
     $this->skipValidation = true; // suppress live validation while populating fields
 
+    $this->resetForm();
+
     $this->panel = 'form';
-        $this->mode = $mode;
-        $this->editUserId = $user->id;
+    $this->mode = $mode;
+    $this->editUserId = $user->id;
         $this->firstName = $user->first_name;
         $this->middleName = $user->middle_name ?? '';
         $this->lastName = $user->last_name;
@@ -163,6 +195,8 @@ class UserManagement extends Component
         $this->employeeId = $user->employee_id ?? '';
         $this->dateHired = $user->date_hired ?? '';
         $this->formIsActive = (bool) $user->is_active;
+        $this->editUserArchived = (bool) $user->archived_at;
+        $this->archiveReason = $user->archive_reason ?? '';
 
         // Load avatar display data
         $this->editUserAvatar = null;
@@ -229,9 +263,94 @@ class UserManagement extends Component
         ];
     }
 
+    public function getTimelineTotalCountProperty()
+    {
+        if (!$this->editUserId) return 0;
+
+        $count = UserActivityLog::where('user_id', $this->editUserId)->count();
+
+        // Check if fallback hired event should be included
+        $hasHiredLog = UserActivityLog::where('user_id', $this->editUserId)
+            ->where('event_type', 'hired')
+            ->exists();
+
+        if (!$hasHiredLog) {
+            $user = User::find($this->editUserId);
+            if ($user && ($user->date_hired || $user->created_at)) {
+                $count++;
+            }
+        }
+
+        return $count;
+    }
+
+    public function loadMoreTimeline()
+    {
+        $this->timelineLimit += 5;
+    }
+
+    public function getTimelineEventsProperty()
+    {
+        if (!$this->editUserId) return collect();
+
+        $user = User::with(['role', 'branch'])->find($this->editUserId);
+        if (!$user) return collect();
+
+        // ── Pull from the persistent log table with limit ─────────
+        // We query up to $this->timelineLimit to avoid heavy overhead
+        $logs = UserActivityLog::with('performer')
+            ->where('user_id', $this->editUserId)
+            ->orderByDesc('created_at')
+            ->take($this->timelineLimit)
+            ->get();
+
+        $events = $logs->map(function ($log) {
+            return [
+                'type'        => $log->event_type,
+                'title'       => $log->event_label,
+                'description' => $log->description,
+                'timestamp'   => $log->created_at,
+                'color'       => $log->color,
+                'badge'       => $log->badge,
+                'performed_by'=> $log->performer ? $log->performer->first_name . ' ' . $log->performer->last_name : null,
+            ];
+        });
+
+        // ── Backward-compatible fallback ──────────────────────────
+        // If no 'hired' log exists anywhere in table for this user,
+        // synthesise one from date_hired / created_at so old accounts still
+        // show a "Joined the Team" milestone.
+        $hasHiredLog = UserActivityLog::where('user_id', $this->editUserId)
+            ->where('event_type', 'hired')
+            ->exists();
+
+        if (!$hasHiredLog) {
+            $hireDate = $user->date_hired
+                ? \Carbon\Carbon::parse($user->date_hired)
+                : $user->created_at;
+
+            if ($hireDate) {
+                $events->push([
+                    'type'         => 'hired',
+                    'title'        => 'Joined the Team',
+                    'description'  => 'Account registered as ' . (optional($user->role)->name ?? 'Team Member')
+                                    . ($user->branch ? ' at ' . $user->branch->branch_name : ''),
+                    'timestamp'    => $hireDate,
+                    'color'        => 'indigo',
+                    'badge'        => 'Milestone',
+                    'performed_by' => null,
+                ]);
+            }
+        }
+
+        return $events->sortByDesc('timestamp')->take($this->timelineLimit)->values();
+    }
+
+
+
     public function getSystemStatsProperty()
     {
-        $baseQuery = User::where('role_id', '!=', 4);
+        $baseQuery = User::where('role_id', '!=', 4)->notArchived();
         
         if (auth()->user()->isAdmin()) {
             $baseQuery->where('branch_id', auth()->user()->branch_id);
@@ -270,6 +389,41 @@ class UserManagement extends Component
             'active'   => (clone $baseQuery)->where('is_active', 1)->count(),
             'inactive' => (clone $baseQuery)->where('is_active', 0)->count(),
             'staff'    => (clone $baseQuery)->whereIn('role_id', [3, 5])->count(),
+        ];
+    }
+
+    public function getArchivedStatsProperty()
+    {
+        $baseQuery = User::where('role_id', '!=', 4)->archived();
+
+        if (auth()->user()->isAdmin()) {
+            $baseQuery->where('role_id', 3)->where('branch_id', auth()->user()->branch_id);
+        }
+        if ($this->search) {
+            $searchTerm = "%{$this->search}%";
+            $baseQuery->where(function ($q) use ($searchTerm) {
+                $q->where('first_name', 'like', $searchTerm)
+                    ->orWhere('last_name', 'like', $searchTerm)
+                    ->orWhere('email', 'like', $searchTerm)
+                    ->orWhere('employee_id', 'like', $searchTerm);
+            });
+        }
+        if ($this->role_id) {
+            if ($this->role_id == 3) {
+                $baseQuery->whereIn('role_id', [3, 5]);
+            } else {
+                $baseQuery->where('role_id', $this->role_id);
+            }
+        }
+        if ($this->branch_id) {
+            $baseQuery->where('branch_id', $this->branch_id);
+        }
+
+        return [
+            'total'  => (clone $baseQuery)->count(),
+            'staff'  => (clone $baseQuery)->whereIn('role_id', [3, 5])->count(),
+            'admins' => (clone $baseQuery)->where('role_id', 2)->count(),
+            'recent' => (clone $baseQuery)->where('archived_at', '>=', now()->subDays(30))->count(),
         ];
     }
 
@@ -354,7 +508,7 @@ class UserManagement extends Component
         $this->updateGlobalHeader('list');
     }
 
-    public function runPreSaveValidation()
+    protected function sanitizeInput(): void
     {
         $this->firstName  = ucwords($this->normalizeString($this->firstName));
         $this->middleName = ucwords($this->normalizeString($this->middleName));
@@ -362,75 +516,141 @@ class UserManagement extends Component
         $this->email      = trim(strtolower($this->email));
         $this->phone      = trim($this->phone);
         $this->position   = $this->normalizeString($this->position);
+        if ($this->editUserId) {
+            $this->employeeId = trim($this->employeeId);
+        }
+    }
+
+    protected function getValidationRules(): array
+    {
+        $emailRules = array_merge(ValidationHelper::rulesEmail(), [
+            $this->editUserId
+                ? Rule::unique('users', 'email')->whereNot('role_id', 4)->ignore($this->editUserId)
+                : Rule::unique('users', 'email')->whereNot('role_id', 4)
+        ]);
 
         $rules = [
             'firstName'    => ValidationHelper::rulesName(),
             'middleName'   => ValidationHelper::rulesOptionalName(),
             'lastName'     => ValidationHelper::rulesName(),
-            'email'        => array_merge(ValidationHelper::rulesEmail(), [
-                $this->editUserId 
-                    ? Rule::unique('users', 'email')->whereNot('role_id', 4)->ignore($this->editUserId) 
-                    : Rule::unique('users', 'email')->whereNot('role_id', 4)
-            ]),
-            'phone'        => ['nullable', 'string', 'regex:/^[0-9]{10}$/'],
+            'email'        => $emailRules,
+            'phone'        => ['nullable', 'string', 'regex:' . ValidationHelper::REGEX_PH_MOBILE],
             'formRoleId'   => ['required', 'exists:roles,id', 'in:1,2,3'],
             'formBranchId' => ['required', 'exists:branches,id'],
-            'position'     => $this->formRoleId == 3 ? ['required', 'string', 'max:100', Rule::in($this->availablePositions)] : ['nullable', 'string', 'max:100'],
+            'position'     => $this->formRoleId == 3
+                ? ['required', 'string', 'max:100', Rule::in($this->availablePositions)]
+                : ['nullable', 'string', 'max:100'],
             'dateHired'    => ['nullable', 'date', 'before_or_equal:today'],
             'formIsActive' => ['boolean'],
         ];
 
         if ($this->editUserId) {
-            $rules['employeeId'] = ['nullable', 'string', 'max:50', 'regex:' . ValidationHelper::REGEX_ID, Rule::unique('users', 'employee_id')->ignore($this->editUserId)];
+            $rules['employeeId'] = [
+                'nullable',
+                'string',
+                'max:50',
+                'regex:' . ValidationHelper::REGEX_ID,
+                Rule::unique('users', 'employee_id')->ignore($this->editUserId)
+            ];
         }
 
-        $messages = array_merge(
+        return $rules;
+    }
+
+    protected function getValidationMessages(): array
+    {
+        return array_merge(
             ValidationHelper::commonMessages(),
             ValidationHelper::nameMessages(),
             [
-                'phone.regex' => 'Enter 10-digit mobile number (e.g. 9123456789).',
-                'formBranchId.required' => 'Work location is required for all accounts.'
+                'phone.regex'           => 'Enter 10-digit mobile number (e.g. 9123456789).',
+                'formBranchId.required' => 'Work location is required.'
             ]
         );
+    }
 
-        $this->validateBeforeModal($rules, $messages, 'confirm-save-user');
+    protected function buildAddressData(): array
+    {
+        $parts = array_filter([
+            $this->addr_street,
+            $this->addr_barangay,
+            $this->addr_city,
+            $this->addr_province,
+            $this->addr_region,
+        ]);
+        $formatted = implode(', ', $parts);
+
+        $addressJson = json_encode([
+            'region'    => $this->addr_region,
+            'province'  => $this->addr_province,
+            'city'      => $this->addr_city,
+            'barangay'  => $this->addr_barangay,
+            'street'    => $this->addr_street,
+            'lat'       => $this->addr_lat,
+            'lng'       => $this->addr_lng,
+            'formatted' => $formatted,
+        ]);
+
+        return [
+            'address'   => $addressJson,
+            'latitude'  => $this->addr_lat,
+            'longitude' => $this->addr_lng,
+        ];
+    }
+
+    protected function syncBranchManager(User $user, ?int $oldBranchId = null, ?int $oldRoleId = null): void
+    {
+        if ($user->role_id == 2) {
+            if ($oldBranchId != $user->branch_id || $oldRoleId != 2) {
+                Branch::where('user_id', $user->id)->update(['user_id' => null]);
+
+                if ($user->branch_id) {
+                    $branch = Branch::find($user->branch_id);
+                    if ($branch) {
+                        if ($branch->user_id && $branch->user_id != $user->id) {
+                            User::where('id', $branch->user_id)->update(['branch_id' => null]);
+                        }
+                        $branch->update(['user_id' => $user->id]);
+                    }
+                }
+            } elseif ($user->branch_id) {
+                $branch = Branch::find($user->branch_id);
+                if ($branch && $branch->user_id != $user->id) {
+                    if ($branch->user_id) {
+                        User::where('id', $branch->user_id)->update(['branch_id' => null]);
+                    }
+                    $branch->update(['user_id' => $user->id]);
+                }
+            }
+        } else {
+            if ($oldRoleId == 2) {
+                Branch::where('user_id', $user->id)->update(['user_id' => null]);
+            }
+        }
+    }
+
+    public function runPreSaveValidation()
+    {
+        $this->sanitizeInput();
+        $this->validateBeforeModal(
+            $this->getValidationRules(),
+            $this->getValidationMessages(),
+            'confirm-save-user'
+        );
     }
 
     // ── Save (create) ─────────────────────────────────────────────
-        public function saveUser()
+    public function saveUser()
     {
-        $this->firstName = ucwords($this->normalizeString($this->firstName));
-        $this->middleName = ucwords($this->normalizeString($this->middleName));
-        $this->lastName = ucwords($this->normalizeString($this->lastName));
-        $this->email = trim(strtolower($this->email));
-        $this->phone = trim($this->phone);
-        $this->position = $this->normalizeString($this->position);
+        $this->sanitizeInput();
+        $this->validate($this->getValidationRules(), $this->getValidationMessages());
 
-        $this->validate([
-            'firstName'    => ValidationHelper::rulesName(),
-            'middleName'   => ValidationHelper::rulesOptionalName(),
-            'lastName'     => ValidationHelper::rulesName(),
-            'email'        => ['required', 'email:rfc', 'max:255', Rule::unique('users', 'email')->whereNot('role_id', 4)],
-            'phone'        => ['nullable', 'string', 'regex:/^[0-9]{10}$/'],
-            'formRoleId'   => ['required', 'exists:roles,id', 'in:1,2,3'],
-            'formBranchId' => ['required', 'exists:branches,id'],
-            'position'     => $this->formRoleId == 3 ? ['required', 'string', 'max:100', Rule::in($this->availablePositions)] : ['nullable', 'string', 'max:100'],
-            'dateHired'    => ['nullable', 'date', 'before_or_equal:today'],
-            'formIsActive' => ['boolean'],
-        ], array_merge(ValidationHelper::commonMessages(), ValidationHelper::nameMessages(), [
-            'phone.regex' => 'Enter 10-digit mobile number (e.g. 9123456789).',
-            'formBranchId.required' => 'Work location is required.'
-        ]));
-
-        // Admins can only create Staff roles (3=Cashier, 5=Rider) mapped via formRoleId=3
+        // Admins can only create Staff roles mapped via formRoleId=3
         if (auth()->user()->isAdmin()) {
-            if (!in_array($this->formRoleId, [3])) {
-                $this->formRoleId = 3; // Default to Staff
-            }
+            $this->formRoleId = 3;
             $this->formBranchId = auth()->user()->branch_id;
         }
 
-        // Data is already sanitized in validateBeforeCreate()
         $plainPassword = \Illuminate\Support\Str::random(10);
 
         $attempts = 0;
@@ -451,73 +671,38 @@ class UserManagement extends Component
             }
         }
 
-        // Enforce position requirement: only Staff (role_id 3) needs a position
         if (!in_array($this->formRoleId, [3])) {
             $this->position = null;
         }
 
-        $finalRoleId = $this->formRoleId;
-        if ($this->formRoleId == 3 && $this->position === 'Delivery Rider') {
-            $finalRoleId = 5;
-        } else if ($this->formRoleId == 3 && $this->position === 'Cashier') {
-            $finalRoleId = 3;
-        }
+        $finalRoleId = ($this->formRoleId == 3 && $this->position === 'Delivery Rider') ? 5 : (int) $this->formRoleId;
+        $addrData = $this->buildAddressData();
 
-        // Compose address JSON from PSGC sub-fields
-        $parts = array_filter([
-            $this->addr_street,
-            $this->addr_barangay,
-            $this->addr_city,
-            $this->addr_province,
-            $this->addr_region,
-        ]);
-        $formatted = implode(', ', $parts);
-
-        $addressJson = json_encode([
-            'region'    => $this->addr_region,
-            'province'  => $this->addr_province,
-            'city'      => $this->addr_city,
-            'barangay'  => $this->addr_barangay,
-            'street'    => $this->addr_street,
-            'lat'       => $this->addr_lat,
-            'lng'       => $this->addr_lng,
-            'formatted' => $formatted,
-        ]);
-
-        $user = User::create([
+        $user = User::create(array_merge([
             'employee_id' => $generatedEmployeeId,
-            'first_name' => $this->firstName,
+            'first_name'  => $this->firstName,
             'middle_name' => $this->middleName ?: null,
-            'last_name' => $this->lastName,
-            'email' => $this->email,
-            'phone' => $this->phone ? '+63' . trim($this->phone) : null,
-            'password' => Hash::make($plainPassword),
-            'role_id' => $finalRoleId,
-            'branch_id' => $this->formBranchId ?: null,
-            'position' => $this->position ?: null,
-            'date_hired' => $this->dateHired ?: null,
-            'is_active' => $this->formIsActive,
-            'address' => $addressJson,
-            'latitude' => $this->addr_lat,
-            'longitude' => $this->addr_lng,
-        ]);
+            'last_name'   => $this->lastName,
+            'email'       => $this->email,
+            'phone'       => $this->phone ? '+63' . trim($this->phone) : null,
+            'password'    => Hash::make($plainPassword),
+            'role_id'     => $finalRoleId,
+            'branch_id'   => $this->formBranchId ?: null,
+            'position'    => $this->position ?: null,
+            'date_hired'  => $this->dateHired ?: null,
+            'is_active'   => $this->formIsActive,
+        ], $addrData));
 
-        // Sync: If this user is a Branch Manager, update the branch record.
-        if ($user->role_id == 2 && $user->branch_id) {
-            $branch = Branch::find($user->branch_id);
-            if ($branch) {
-                // If this branch already had a different manager (the one
-                // just replaced via the conflict-confirmation modal), clear
-                // their branch_id — otherwise they stay stuck pointing at a
-                // branch they no longer manage.
-                if ($branch->user_id && $branch->user_id != $user->id) {
-                    User::where('id', $branch->user_id)->update(['branch_id' => null]);
-                }
-                // Clear this user's manager status on any other branch first
-                Branch::where('user_id', $user->id)->update(['user_id' => null]);
-                $branch->update(['user_id' => $user->id]);
-            }
-        }
+        $this->syncBranchManager($user);
+
+        // Log the initial hire event
+        UserActivityLog::create([
+            'user_id'      => $user->id,
+            'performed_by' => auth()->id(),
+            'event_type'   => 'hired',
+            'description'  => 'Account registered as ' . (optional($user->role)->name ?? 'Team Member')
+                            . ($user->branch ? ' at ' . $user->branch->branch_name : ''),
+        ]);
 
         $message = 'User created successfully. Credentials are being emailed.';
         $this->dispatch('notify', type: 'success', message: $message);
@@ -536,7 +721,7 @@ class UserManagement extends Component
         $this->backToList();
     }
 
-       public function updateUser()
+    public function updateUser()
     {
         $user = User::findOrFail($this->editUserId);
 
@@ -547,35 +732,13 @@ class UserManagement extends Component
                 return;
             }
             if (!in_array($this->formRoleId, [3])) {
-                $this->formRoleId = 3; // Force back to Staff
+                $this->formRoleId = 3;
             }
-            $this->formBranchId = auth()->user()->branch_id; // Force own branch
+            $this->formBranchId = auth()->user()->branch_id;
         }
 
-        $this->firstName = ucwords($this->normalizeString($this->firstName));
-        $this->middleName = ucwords($this->normalizeString($this->middleName));
-        $this->lastName = ucwords($this->normalizeString($this->lastName));
-        $this->email = trim(strtolower($this->email));
-        $this->phone = trim($this->phone);
-        $this->position = $this->normalizeString($this->position);
-        $this->employeeId = trim($this->employeeId);
-
-        $this->validate([
-            'employeeId'   => ['nullable', 'string', 'max:50', 'regex:' . ValidationHelper::REGEX_ID, Rule::unique('users', 'employee_id')->ignore($user->id)],
-            'firstName'    => ValidationHelper::rulesName(),
-            'middleName'   => ValidationHelper::rulesOptionalName(),
-            'lastName'     => ValidationHelper::rulesName(),
-            'email'        => ['required', 'email:rfc', 'max:255', Rule::unique('users', 'email')->whereNot('role_id', 4)->ignore($user->id)],
-            'phone'        => ['nullable', 'string', 'regex:/^[0-9]{10}$/'],
-            'formRoleId'   => ['required', 'exists:roles,id', 'in:1,2,3'],
-            'formBranchId' => ['required', 'exists:branches,id'],
-            'position'     => $this->formRoleId == 3 ? ['required', 'string', 'max:100', Rule::in($this->availablePositions)] : ['nullable', 'string', 'max:100'],
-            'dateHired'    => ['nullable', 'date', 'before_or_equal:today'],
-            'formIsActive' => ['boolean'],
-        ], array_merge(ValidationHelper::commonMessages(), ValidationHelper::nameMessages(), [
-            'phone.regex' => 'Enter 10-digit mobile number (e.g. 9123456789).',
-            'formBranchId.required' => 'Work location is required.'
-        ]));
+        $this->sanitizeInput();
+        $this->validate($this->getValidationRules(), $this->getValidationMessages());
 
         // Manager conflict check
         if ($this->formRoleId == 2 && $this->formBranchId && !$this->forceReplaceManager) {
@@ -595,86 +758,25 @@ class UserManagement extends Component
             $this->position = null;
         }
 
-        $finalRoleId = $this->formRoleId;
-        if ($this->formRoleId == 3 && $this->position === 'Delivery Rider') {
-            $finalRoleId = 5;
-        } else if ($this->formRoleId == 3 && $this->position === 'Cashier') {
-            $finalRoleId = 3;
-        }
+        $finalRoleId = ($this->formRoleId == 3 && $this->position === 'Delivery Rider') ? 5 : (int) $this->formRoleId;
+        $addrData = $this->buildAddressData();
 
-        $user->first_name = $this->firstName;
+        $user->first_name  = $this->firstName;
         $user->middle_name = $this->middleName ?: null;
-        $user->last_name = $this->lastName;
-        $user->email = $this->email;
-        $user->phone = $this->phone ? '+63' . trim($this->phone) : null;
-        $user->role_id = $finalRoleId;
-        $user->branch_id = $this->formBranchId ?: null;
-        $user->position = $this->position ?: null;
-        $user->date_hired = $this->dateHired ?: null;
-        $user->is_active = $this->formIsActive;
-
-        $parts = array_filter([
-            $this->addr_street,
-            $this->addr_barangay,
-            $this->addr_city,
-            $this->addr_province,
-            $this->addr_region,
-        ]);
-        $formatted = implode(', ', $parts);
-
-        $addressJson = json_encode([
-            'region'    => $this->addr_region,
-            'province'  => $this->addr_province,
-            'city'      => $this->addr_city,
-            'barangay'  => $this->addr_barangay,
-            'street'    => $this->addr_street,
-            'lat'       => $this->addr_lat,
-            'lng'       => $this->addr_lng,
-            'formatted' => $formatted,
-        ]);
-
-        $user->address = $addressJson;
-        $user->latitude = $this->addr_lat;
-        $user->longitude = $this->addr_lng;
-
+        $user->last_name   = $this->lastName;
+        $user->email       = $this->email;
+        $user->phone       = $this->phone ? '+63' . trim($this->phone) : null;
+        $user->role_id     = $finalRoleId;
+        $user->branch_id   = $this->formBranchId ?: null;
+        $user->position    = $this->position ?: null;
+        $user->date_hired  = $this->dateHired ?: null;
+        $user->is_active   = $this->formIsActive;
+        $user->address     = $addrData['address'];
+        $user->latitude    = $addrData['latitude'];
+        $user->longitude   = $addrData['longitude'];
         $user->save();
 
-        // Sync manager status
-        if ($user->role_id == 2) {
-            if ($oldBranchId != $user->branch_id || $oldRoleId != 2) {
-                Branch::where('user_id', $user->id)->update(['user_id' => null]);
-
-                if ($user->branch_id) {
-                    $branch = Branch::find($user->branch_id);
-                    if ($branch) {
-                        // If this branch already had a different manager
-                        // (the one just replaced via the conflict modal),
-                        // clear their branch_id — otherwise they stay stuck
-                        // pointing at a branch they no longer manage.
-                        if ($branch->user_id && $branch->user_id != $user->id) {
-                            User::where('id', $branch->user_id)->update(['branch_id' => null]);
-                        }
-                        $branch->update(['user_id' => $user->id]);
-                    }
-                }
-            } elseif ($user->branch_id) {
-                // Same branch, same role — but this branch might still point
-                // to a stale different manager if it was reassigned to THIS
-                // user via the conflict-replace flow while branch/role didn't
-                // change on the user side. Ensure it's pointed correctly.
-                $branch = Branch::find($user->branch_id);
-                if ($branch && $branch->user_id != $user->id) {
-                    if ($branch->user_id) {
-                        User::where('id', $branch->user_id)->update(['branch_id' => null]);
-                    }
-                    $branch->update(['user_id' => $user->id]);
-                }
-            }
-        } else {
-            if ($oldRoleId == 2) {
-                Branch::where('user_id', $user->id)->update(['user_id' => null]);
-            }
-        }
+        $this->syncBranchManager($user, $oldBranchId, $oldRoleId);
 
         $this->dispatch('notify', type: 'success', message: 'User updated successfully.');
         $this->dispatch('close-modal', name: 'confirm-save-user');
@@ -695,9 +797,27 @@ class UserManagement extends Component
     }
 
     // ── Toggle status ─────────────────────────────────────────────
-    public function toggleStatus($userId)
+    public function confirmToggleStatus($userId, $name, $isActive)
     {
-        $user = User::findOrFail($userId);
+        $user = User::find($userId);
+
+        if ($user && auth()->user()->isAdmin() && ($user->role_id !== 3 || $user->branch_id !== auth()->user()->branch_id)) {
+            $this->dispatch('notify', type: 'warning', message: 'Unauthorized: You do not have permission to change this account\'s status.');
+            return;
+        }
+
+        $this->statusTargetId = $userId;
+        $this->statusTargetName = $name;
+        $this->statusTargetActive = (bool) $isActive;
+        $this->dispatch('open-modal', name: 'toggle-status');
+    }
+
+    public function toggleStatus($userId = null)
+    {
+        $idToToggle = $userId ?: $this->statusTargetId;
+        if (!$idToToggle) return;
+
+        $user = User::findOrFail($idToToggle);
 
         if (auth()->user()->isAdmin() && ($user->role_id !== 3 || $user->branch_id !== auth()->user()->branch_id)) {
             $this->dispatch('notify', type: 'warning', message: 'Unauthorized to change this account\'s status.');
@@ -707,56 +827,127 @@ class UserManagement extends Component
         $user->is_active = !$user->is_active;
         $user->save();
 
+        // Log the status change
+        UserActivityLog::create([
+            'user_id'      => $user->id,
+            'performed_by' => auth()->id(),
+            'event_type'   => $user->is_active ? 'activated' : 'deactivated',
+            'description'  => 'Account ' . ($user->is_active ? 'set to Active' : 'set to Inactive') . '.',
+        ]);
+
+        $this->statusTargetId   = null;
+        $this->statusTargetName = '';
+
         $this->dispatch('notify', type: 'success', message: 'Status for ' . $user->first_name . ' updated successfully.');
     }
 
-    // ── Delete ────────────────────────────────────────────────────
-    public function deleteUser($userId = null)
-    {
-        $idToDelete = $userId ?: $this->deleteTargetId;
-        if (!$idToDelete) return;
-
-        $user = User::findOrFail($idToDelete);
-
-        // Admins may only delete Staff accounts within their own branch —
-        // without this, deleteUser() is directly callable with any user
-        // ID, letting an Admin permanently delete a Super Admin or another
-        // branch's staff account.
-        if (auth()->user()->isAdmin() && ($user->role_id !== 3 || $user->branch_id !== auth()->user()->branch_id)) {
-            $this->dispatch('notify', type: 'warning', message: 'Unauthorized to delete this account.');
-            return;
-        }
-
-        // Nullify foreign key references before deletion to avoid constraint violations
-        \App\Models\Order::where('rider_id', $idToDelete)->update(['rider_id' => null]);
-        \App\Models\Order::where('user_id', $idToDelete)->update(['user_id' => null]);
-
-        // Nullify proof_of_deliveries.rider_id — has a FK referencing users.id
-        \App\Models\ProofOfDelivery::where('rider_id', $idToDelete)->update(['rider_id' => null]);
-
-        // If user was a branch manager, unlink them from the branch
-        \App\Models\Branch::where('user_id', $idToDelete)->update(['user_id' => null]);
-
-        $user->delete();
-
-        $this->deleteTargetId = null;
-        $this->deleteTargetName = '';
-        
-        $this->dispatch('notify', type: 'success', message: 'User deleted successfully.');
-        $this->backToList();
-    }
-
-    public function confirmDelete($id, $name)
+    // ── Archive (soft-delete replacement) ───────────────────────────
+    public function confirmArchive($id, $name)
     {
         $user = User::find($id);
         if ($user && auth()->user()->isAdmin() && ($user->role_id !== 3 || $user->branch_id !== auth()->user()->branch_id)) {
-            $this->dispatch('notify', type: 'warning', message: 'Unauthorized: You do not have permission to delete this account.');
+            $this->dispatch('notify', type: 'warning', message: 'Unauthorized: You do not have permission to archive this account.');
             return;
         }
 
-        $this->deleteTargetId = $id;
-        $this->deleteTargetName = $name;
-        $this->dispatch('open-modal', name: 'delete-user');
+        $this->archiveTargetId = $id;
+        $this->archiveTargetName = $name;
+        $this->archiveReason = '';
+        $this->dispatch('open-modal', name: 'archive-user');
+    }
+
+    public function archiveUser($userId = null)
+    {
+        $idToArchive = $userId ?: $this->archiveTargetId;
+        if (!$idToArchive) return;
+
+        $user = User::findOrFail($idToArchive);
+
+        if (auth()->user()->isAdmin() && ($user->role_id !== 3 || $user->branch_id !== auth()->user()->branch_id)) {
+            $this->dispatch('notify', type: 'warning', message: 'Unauthorized to archive this account.');
+            return;
+        }
+
+        // If this user was a branch manager, free up the branch — an
+        // archived account shouldn't stay wired as the acting manager.
+        \App\Models\Branch::where('user_id', $idToArchive)->update(['user_id' => null]);
+
+        $user->is_active = false;
+        $user->archived_at = now();
+        $user->archive_reason = $this->archiveReason ?: null;
+        $user->save();
+
+        // Log the archive event
+        UserActivityLog::create([
+            'user_id'      => $user->id,
+            'performed_by' => auth()->id(),
+            'event_type'   => 'archived',
+            'description'  => $user->archive_reason ? 'Reason: ' . $user->archive_reason : 'Account moved to archives.',
+        ]);
+
+        $this->archiveTargetId   = null;
+        $this->archiveTargetName = '';
+        $this->archiveReason     = '';
+
+        $this->dispatch('notify', type: 'success', message: 'User archived successfully.');
+        $this->backToList();
+    }
+
+    public function confirmRestore($id, $name)
+    {
+        $user = User::find($id);
+        if ($user && auth()->user()->isAdmin() && ($user->role_id !== 3 || $user->branch_id !== auth()->user()->branch_id)) {
+            $this->dispatch('notify', type: 'warning', message: 'Unauthorized: You do not have permission to restore this account.');
+            return;
+        }
+
+        $this->restoreTargetId = $id;
+        $this->restoreTargetName = $name;
+        $this->dispatch('open-modal', name: 'restore-user');
+    }
+
+    public function restoreUser($userId = null)
+    {
+        $idToRestore = $userId ?: $this->restoreTargetId;
+        if (!$idToRestore) return;
+
+        $user = User::findOrFail($idToRestore);
+
+        if (auth()->user()->isAdmin() && ($user->role_id !== 3 || $user->branch_id !== auth()->user()->branch_id)) {
+            $this->dispatch('notify', type: 'warning', message: 'Unauthorized to restore this account.');
+            return;
+        }
+
+        // Restoring clears the archive flag only — is_active stays false,
+        // so the account doesn't silently regain sign-in access. A
+        // separate deliberate "Activate" action (the status toggle) is
+        // required to let them sign in again.
+        $user->archived_at = null;
+        $user->archive_reason = null;
+        $user->save();
+
+        // Log the restore event
+        UserActivityLog::create([
+            'user_id'      => $user->id,
+            'performed_by' => auth()->id(),
+            'event_type'   => 'restored',
+            'description'  => 'Account restored to the directory.',
+        ]);
+
+        $this->restoreTargetId = null;
+        $this->restoreTargetName = '';
+
+        if ($this->editUserId == $user->id) {
+            $this->editUserArchived = false;
+        }
+
+        $this->dispatch('close-modal', name: 'restore-user');
+
+        if ($this->panel === 'form') {
+            $this->backToList();
+        }
+
+        $this->dispatch('notify', type: 'success', message: 'User restored to the directory.');
     }
 
     // ── Reset form fields ─────────────────────────────────────────
@@ -807,6 +998,8 @@ class UserManagement extends Component
         $this->employeeId = '';
         $this->dateHired = '';
         $this->formIsActive = true;
+        $this->editUserArchived = false;
+        $this->archiveReason = '';
         $this->addr_region   = '';
         $this->addr_province = '';
         $this->addr_city     = '';
@@ -814,61 +1007,79 @@ class UserManagement extends Component
         $this->addr_street   = '';
         $this->addr_lat      = null;
         $this->addr_lng      = null;
+        $this->timelineLimit = 5;
         $this->resetValidation();
     }
 
     // ── Render ────────────────────────────────────────────────────
     public function render()
     {
-        $authUser = auth()->user();
-        $query = User::with(['role', 'branch'])->where('role_id', '!=', 4);
-
-        // Admins (role_id=2) can only see Staff (role_id=3) in their own branch
-        if (auth()->user()->isAdmin()) {
-            $query->where('role_id', 3)
-                ->where('branch_id', $authUser->branch_id);
-        }
-
-        if ($this->search) {
-            $query->where(function ($q) {
-                $searchTerm = "%{$this->search}%";
-                $q->where('first_name', 'like', $searchTerm)
-                    ->orWhere('last_name', 'like', $searchTerm)
-                    ->orWhere('middle_name', 'like', $searchTerm)
-                    ->orWhere('email', 'like', $searchTerm)
-                    ->orWhere('employee_id', 'like', $searchTerm)
-                    ->orWhere('phone', 'like', $searchTerm)
-                    ->orWhere(\Illuminate\Support\Facades\DB::raw("CONCAT(first_name, ' ', last_name)"), 'like', $searchTerm);
-            });
-        }
-
-        if ($this->role_id) {
-            if ($this->role_id == 3) {
-                $query->whereIn('role_id', [3, 5]);
-            } else {
-                $query->where('role_id', $this->role_id);
+        $applyCommonFilters = function ($query) {
+            if (auth()->user()->isAdmin()) {
+                $query->where('role_id', 3)->where('branch_id', auth()->user()->branch_id);
             }
-        }
-        if ($this->branch_id) {
-            $query->where('branch_id', $this->branch_id);
-        }
-        if ($this->is_active !== '') {
-            $query->where('is_active', $this->is_active);
-        }
+            if ($this->search) {
+                $searchTerm = "%{$this->search}%";
+                $query->where(function ($q) use ($searchTerm) {
+                    $q->where('first_name', 'like', $searchTerm)
+                        ->orWhere('last_name', 'like', $searchTerm)
+                        ->orWhere('middle_name', 'like', $searchTerm)
+                        ->orWhere('email', 'like', $searchTerm)
+                        ->orWhere('employee_id', 'like', $searchTerm)
+                        ->orWhere('phone', 'like', $searchTerm)
+                        ->orWhere(\Illuminate\Support\Facades\DB::raw("CONCAT(first_name, ' ', last_name)"), 'like', $searchTerm);
+                });
+            }
+            if ($this->role_id) {
+                if ($this->role_id == 3) {
+                    $query->whereIn('role_id', [3, 5]);
+                } else {
+                    $query->where('role_id', $this->role_id);
+                }
+            }
+            if ($this->branch_id) {
+                $query->where('branch_id', $this->branch_id);
+            }
+            return $query;
+        };
 
-        $users = $query->orderBy('created_at', 'desc')->paginate($this->perPage);
+        // Both tabs are rendered together and toggled client-side (same
+        // pattern as Stock Management's Ingredients/Expiry tabs), so both
+        // lists are queried on every request.
+
+        $directoryQuery = User::with(['role', 'branch'])->where('role_id', '!=', 4)->notArchived();
+        $applyCommonFilters($directoryQuery);
+        if ($this->is_active !== '') {
+            $directoryQuery->where('is_active', $this->is_active);
+        }
+        $users = $directoryQuery->orderByRaw("
+                CASE
+                    WHEN is_active = 0 THEN 4
+                    WHEN role_id = 1 THEN 1
+                    WHEN role_id = 2 THEN 2
+                    WHEN role_id IN (3, 5) THEN 3
+                    ELSE 5
+                END ASC
+            ")
+            ->orderBy('first_name')
+            ->paginate($this->perPage, ['*'], 'page');
+
+        $archivedQuery = User::with(['role', 'branch'])->where('role_id', '!=', 4)->archived();
+        $applyCommonFilters($archivedQuery);
+        $archivedUsers = $archivedQuery->orderBy('archived_at', 'desc')
+            ->paginate($this->perPage, ['*'], 'archivedPage');
+
         $roles = auth()->user()->isSuperAdmin()
-            ? Role::whereIn('id', [1, 2, 3])->get()       // Super Admin: Super Admin, Admin, Staff
-            : Role::whereIn('id', [3])->get();            // Admin: Staff only
-            
-        // Rename Cashier to Staff for UI
+            ? Role::whereIn('id', [1, 2, 3])->get()
+            : Role::whereIn('id', [3])->get();
+
         if ($staffRole = $roles->firstWhere('id', 3)) {
             $staffRole->name = 'Staff';
         }
-        
+
         $branches = Branch::where('status', 1)->get();
         $totalUsers = $users->total();
 
-        return view('livewire.user-management', compact('users', 'roles', 'branches', 'totalUsers'))->layout('layouts.app');
+        return view('livewire.user-management', compact('users', 'archivedUsers', 'roles', 'branches', 'totalUsers'))->layout('layouts.app');
     }
 }

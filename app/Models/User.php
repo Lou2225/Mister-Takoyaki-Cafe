@@ -30,6 +30,29 @@ class User extends Authenticatable
         return $this->belongsTo(Branch::class);
     }
 
+    public function activityLogs()
+    {
+        return $this->hasMany(UserActivityLog::class)->latest();
+    }
+
+    /**
+     * Archive scopes
+     */
+    public function scopeNotArchived($query)
+    {
+        return $query->whereNull('archived_at');
+    }
+
+    public function scopeArchived($query)
+    {
+        return $query->whereNotNull('archived_at');
+    }
+
+    public function getIsArchivedAttribute(): bool
+    {
+        return $this->archived_at !== null;
+    }
+
     /**
      * Role checking helpers
      */
@@ -232,6 +255,8 @@ class User extends Authenticatable
         'hide_modules',
         'latitude',
         'longitude',
+        'archived_at',
+        'archive_reason',
     ];
 
     /**
@@ -251,6 +276,7 @@ class User extends Authenticatable
      */
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'archived_at'       => 'datetime',
         'is_active'         => 'boolean',
         'hide_modules'      => 'boolean',
     ];

@@ -709,10 +709,14 @@
 
                                 <div class="border-y border-dashed border-gray-200 py-1.5 mb-3 space-y-0.5 text-[9px]">
                                     <div class="flex justify-between"><span>#10425</span><span>{{ now()->format('d/m/y H:i') }}</span></div>
-                                    <div class="flex justify-between font-bold" style="font-size:9px; margin-top:4px;">
+                                    <div class="flex justify-between font-bold" style="font-size:9px; margin-top:3px;">
                                         <span style="text-transform:uppercase; letter-spacing:0.05em;">⬛ DINE-IN</span>
                                     </div>
-                                    <div class="text-center font-bold text-[8px] text-gray-500 uppercase tracking-wider pt-0.5" x-text="customerTitle || 'Customer Receipt & Invoice'"></div>
+                                    <div class="flex justify-between text-[8px] text-gray-600 pt-0.5">
+                                        <span>Cashier: <strong class="text-gray-800">Maria Santos</strong></span>
+                                        <span>ID: <strong class="text-gray-800">ACC-1042</strong></span>
+                                    </div>
+                                    <div class="text-center font-bold text-[8px] text-gray-500 uppercase tracking-wider pt-1 border-t border-gray-100" x-text="customerTitle || 'Customer Receipt & Invoice'"></div>
                                 </div>
 
                                 <div class="space-y-1 mb-3">
@@ -720,7 +724,7 @@
                                     <div class="flex justify-between"><span>2x Cheese Takoyaki</span><span x-text="currency + '200.00'"></span></div>
                                 </div>
 
-                                <div class="border-t border-dashed border-gray-200 pt-1.5 mb-3 space-y-0.5">
+                                <div class="border-t border-dashed border-gray-200 pt-1.5 mb-2 space-y-0.5">
                                     <div class="flex justify-between"><span>Subtotal</span><span x-text="currency + subtotal.toFixed(2)"></span></div>
 
                                     <div class="flex justify-between text-[9px] text-gray-500">
@@ -743,31 +747,42 @@
                                     </div>
                                 </div>
 
-                                                                <div class="text-center mt-4">
-                                    <div x-show="showFooter">
-                                        <p class="font-bold italic text-gray-700 text-[8px]" x-text="footer || 'Thank you for your visit!'"></p>
-                                        <p class="text-[7px] text-gray-600 mt-1" x-text="policy || 'No return, no exchange.'"></p>
-                                    </div>
+                                {{-- Customer Name & Address (under Totals) --}}
+                                <div class="border-t border-dashed border-gray-200 pt-1.5 mb-2 space-y-0.5 text-[8.5px] text-gray-700">
+                                    <div class="flex justify-between"><span class="text-gray-500">Customer:</span><span class="font-bold">Juan Dela Cruz</span></div>
+                                    <div class="flex justify-between"><span class="text-gray-500">Address:</span><span class="text-right truncate max-w-[130px]">123 Rizal St., Manila</span></div>
+                                </div>
 
-                                    <div x-show="showQrCode" class="mt-2 pt-2 border-t border-gray-200">
-                                        <p class="text-[7px] text-gray-600 mb-1">Scan to Review:</p>
-                                        @if($sampleQrCode)
-                                            <div class="bg-white p-1 inline-block border border-gray-300 mx-auto">
-                                                <img src="{{ $sampleQrCode }}" alt="Review QR Code" class="w-14 h-14 block">
-                                            </div>
-                                        @else
-                                            <svg class="w-12 h-12 mx-auto border border-gray-300" viewBox="0 0 100 100">
-                                                <!-- Fallback QR placeholder -->
-                                                <rect width="100" height="100" fill="white"/>
-                                                <rect x="10" y="10" width="30" height="30" fill="black"/>
-                                                <rect x="60" y="10" width="30" height="30" fill="black"/>
-                                                <rect x="10" y="60" width="30" height="30" fill="black"/>
-                                                <rect x="40" y="40" width="20" height="20" fill="black"/>
-                                                <circle cx="50" cy="50" r="5" fill="white"/>
-                                            </svg>
-                                        @endif
-                                        <p class="text-[6.5px] text-gray-600 mt-1 break-all">Review us: {{ url('/review') }}</p>
-                                    </div>
+                                {{-- Review QR Code (above Claim Number & Footer) --}}
+                                <div x-show="showQrCode" class="mt-2 pt-2 border-t border-dashed border-gray-200 text-center">
+                                    <p class="text-[7px] font-bold text-gray-600 mb-1 uppercase tracking-wider">Scan to Review &amp; Rate</p>
+                                    @if($sampleQrCode)
+                                        <div class="bg-white p-1 inline-block border border-gray-300 mx-auto">
+                                            <img src="{{ $sampleQrCode }}" alt="Review QR Code" class="w-14 h-14 block">
+                                        </div>
+                                    @else
+                                        <svg class="w-12 h-12 mx-auto border border-gray-300" viewBox="0 0 100 100">
+                                            <rect width="100" height="100" fill="white"/>
+                                            <rect x="10" y="10" width="30" height="30" fill="black"/>
+                                            <rect x="60" y="10" width="30" height="30" fill="black"/>
+                                            <rect x="10" y="60" width="30" height="30" fill="black"/>
+                                            <rect x="40" y="40" width="20" height="20" fill="black"/>
+                                            <circle cx="50" cy="50" r="5" fill="white"/>
+                                        </svg>
+                                    @endif
+                                    <p class="text-[6.5px] text-gray-600 mt-1 break-all">Review us: {{ url('/review') }}</p>
+                                </div>
+
+                                {{-- Claim Number (below QR Code, above Footer) --}}
+                                <div class="my-2 py-1.5 border-y border-dashed border-gray-300 text-center">
+                                    <span class="text-[7px] uppercase tracking-widest text-gray-500 font-bold block">Claim Number</span>
+                                    <span class="text-[14px] font-black tracking-widest text-gray-900 block mt-0.5">#10425</span>
+                                </div>
+
+                                {{-- Footer Greeting & Policy (very bottom) --}}
+                                <div x-show="showFooter" class="text-center mt-2">
+                                    <p class="font-bold italic text-gray-700 text-[8px]" x-text="footer || 'Thank you for your visit!'"></p>
+                                    <p class="text-[7px] text-gray-600 mt-0.5" x-text="policy || 'No return, no exchange.'"></p>
                                 </div>
                             </div>
                         </div>

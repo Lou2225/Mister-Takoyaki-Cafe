@@ -385,6 +385,7 @@ class OrderManagement extends Component
     public function openReceiptModal(Order $order)
     {
         if (!auth()->user()->can('manage', $order)) return;
+        $order->loadMissing(['user', 'branch', 'items.product', 'items.options.option', 'items.modifiers.modifier']);
         $this->selectedOrder = $order;
         $this->dispatch('open-modal', 'receipt-modal');
     }

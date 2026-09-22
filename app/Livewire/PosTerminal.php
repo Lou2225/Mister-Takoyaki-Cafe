@@ -40,6 +40,8 @@ class PosTerminal extends Component
     public string $paymentMethod = '';
     public string $paymentReference = '';
     public $amountTendered = 0;
+    public string $customerName = '';
+    public string $customerAddress = '';
 
     // ─── Branch / Settings ─────────────────────────────────────────────────
     public ?int $branchId = null;
@@ -662,6 +664,8 @@ public function change(): float
         $this->tableNumber = '';
         $this->amountTendered = 0;
         $this->paymentReference = '';
+        $this->customerName = '';
+        $this->customerAddress = '';
         $this->referenceNo = $this->generateReferenceNo();
         $this->resetErrorBag();
         $this->resetGCashState();
@@ -1229,7 +1233,9 @@ public function change(): float
         ?string $paymentMethod = null,
         ?string $paymentReference = null,
         ?string $tableNumber = null,
-        ?string $orderType = null
+        ?string $orderType = null,
+        ?string $customerName = null,
+        ?string $customerAddress = null
     ): void
     {
         $this->resetErrorBag('gcashCancel');
@@ -1251,6 +1257,12 @@ public function change(): float
         }
         if ($orderType !== null) {
             $this->orderType = $orderType;
+        }
+        if ($customerName !== null) {
+            $this->customerName = $customerName;
+        }
+        if ($customerAddress !== null) {
+            $this->customerAddress = $customerAddress;
         }
 
         if ($this->gcashVerified && $this->paymentMethod !== 'GCash') {
@@ -1350,6 +1362,8 @@ public function change(): float
                 'change_amount'   => $this->paymentMethod === 'Cash' ? $this->change : null,
                 'order_type'      => $this->orderType,
                 'table_number'    => $this->tableNumber,
+                'customer_name'   => !empty($this->customerName) ? $this->customerName : null,
+                'delivery_address'=> !empty($this->customerAddress) ? $this->customerAddress : null,
                 'status'          => Order::STATUS_COMPLETED, // POS orders complete immediately when paid
                 'payment_status'  => 'Paid',
                 'source'          => 'POS',

@@ -41,7 +41,12 @@ class ValidationHelper
      * Strict Phone Pattern: Optional leading +, then 7–20 digits.
      * Allows: +639123456789, 09123456789, 123456789
      */
-    const REGEX_PHONE = '~^[+]?[0-9]{7,20}$~';
+        const REGEX_PHONE = '~^[+]?[0-9]{7,20}$~';
+
+    /**
+     * Philippine mobile number without the country code: 10 digits starting with 9.
+     */
+    const REGEX_PH_MOBILE = '~^9[0-9]{9}$~';
 
     /**
      * Employee / Reference ID: Uppercase letters, numbers, hyphens.

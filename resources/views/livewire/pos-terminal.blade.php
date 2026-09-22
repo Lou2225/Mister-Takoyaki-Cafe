@@ -1756,240 +1756,291 @@
                     </div>
             </div>
 
-            {{-- RIGHT CARD: Payment Details --}}
-            <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
-                <div class="px-4 py-3 border-b border-gray-100 bg-gray-50">
-                    <h3 class="text-[13px] font-bold text-gray-900">Payment Details</h3>
-                </div>
+            {{-- RIGHT CARD: Flipping Card (Payment Details ↔ Customer Details) --}}
+            <div x-data="{ flipped: false }"
+                 @open-modal.window="if ($event.detail === 'pos-payment') flipped = false"
+                 class="flex flex-col"
+                 style="perspective: 2000px;">
 
-                <div class="flex-1 overflow-y-auto px-4 py-4 space-y-5">
-                    {{-- Order Type --}}
-                    <div>
-                        <p class="text-[11px] font-semibold text-gray-600 uppercase tracking-wide mb-2">Order Type</p>
-                        <div class="px-3 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
-                            <p class="text-[13px] font-bold text-gray-900" x-text="orderType">{{ $orderType }}</p>
-                        </div>
-                    </div>
+                <div class="relative w-full flex-1 flex flex-col min-h-[460px]"
+                     :style="'transform-style: preserve-3d; transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1); transform: rotateY(' + (flipped ? '180deg' : '0deg') + ');'">
 
-                    {{-- Payment Method --}}
-                    <div>
-                        <p class="text-[11px] font-semibold text-gray-600 uppercase tracking-wide mb-2">Payment Method</p>
-                        <div class="grid grid-cols-2 gap-2">
-                            @foreach($paymentMethods as $method)
-                                <button type="button"
-                                    data-payment-method="{{ $method }}"
-                                    @click="(!gcashVerified || $el.dataset.paymentMethod === 'GCash') && (paymentMethod = $el.dataset.paymentMethod)"
-                                    :disabled="gcashVerified && $el.dataset.paymentMethod !== 'GCash'"
-                                    :class="paymentMethod === $el.dataset.paymentMethod ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : (gcashVerified ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50')"
-                                    id="pos_pay_method_{{ strtolower($method) }}"
-                                    class="flex-1 justify-center py-2 px-4 text-[13px] font-bold rounded-lg border transition-all">
-                                    {{ $method }}
-                                </button>
-                            @endforeach
-                        </div>
-                    </div>
+                    {{-- FRONT FACE: Payment Details --}}
+                    <div class="relative bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col w-full h-full"
+                         :class="flipped ? 'pointer-events-none' : 'pointer-events-auto'"
+                         style="backface-visibility: hidden;">
 
-                    {{-- Cash: Amount Tendered + Change --}}
-                    <div x-show="paymentMethod === 'Cash'" class="space-y-4">
-                        <div>
-                            <x-input-label for="pos_amount_tendered" class="text-[11px] font-semibold text-gray-600 uppercase tracking-wide mb-2 block">Amount Tendered</x-input-label>
-                            <x-text-input id="pos_amount_tendered" x-model="amountTendered" type="number" min="0" step="0.01"
-                                x-bind:class="amountTenderedError ? 'border-red-400 bg-red-50/30 focus:border-red-400 focus:ring-red-300' : ''"
-                                class="block w-full text-[14px] py-2.5 px-3 font-mono font-bold" placeholder="0.00"/>
-                            <div x-show="amountTenderedError" x-cloak class="text-[11px] font-medium text-red-500 mt-1.5 flex items-start gap-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
-                                <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        {{-- Card Header with Flip Button --}}
+                        <div class="px-4 py-3 border-b border-gray-100 bg-gray-50 rounded-t-xl flex items-center justify-between gap-2">
+                            <h3 class="text-[13px] font-bold text-gray-900">Payment Details</h3>
+                            <button type="button"
+                                @click="flipped = true"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-gray-700 bg-white border border-gray-200 shadow-sm hover:bg-gray-50 hover:text-indigo-600 transition-all active:scale-95"
+                                title="Flip to Customer Details">
+                                <svg class="w-3.5 h-3.5 text-indigo-600 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                                 </svg>
-                                <ul class="space-y-0.5">
-                                    <li x-text="amountTenderedError"></li>
-                                </ul>
-                            </div>                            <x-input-error :messages="$errors->get('amountTendered')" class="mt-1" />
-                        </div>
-                        
-                        {{-- Quick Tenders --}}
-                        <div class="grid grid-cols-2 xs:grid-cols-4 gap-2">
-                            <button type="button" @click="amountTendered = total" class="py-2.5 px-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-[12px] font-bold rounded-lg transition-colors">Exact</button>
-                            <button type="button" @click="amountTendered = 100" class="py-2.5 px-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-[12px] font-bold font-mono rounded-lg transition-colors">{{ $currencySymbol }}100</button>
-                            <button type="button" @click="amountTendered = 500" class="py-2.5 px-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-[12px] font-bold font-mono rounded-lg transition-colors">{{ $currencySymbol }}500</button>
-                            <button type="button" @click="amountTendered = 1000" class="py-2.5 px-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-[12px] font-bold font-mono rounded-lg transition-colors">{{ $currencySymbol }}1000</button>
-                        </div>
-
-                        <div x-show="amountTendered >= total && total > 0" class="flex items-center justify-between bg-emerald-50 rounded-lg px-3 py-3 border border-emerald-200">
-                            <span class="text-[11px] font-semibold text-emerald-700 uppercase tracking-wide">Change</span>
-                            <span class="text-[14px] font-black text-emerald-700 font-mono" x-text="'{{ $currencySymbol }}' + (amountTendered - total).toFixed(2)"></span>
-                        </div>
-                    </div>
-
-                    {{-- Custom Payment Method: Reference Number --}}
-                    <div x-show="paymentMethod !== 'Cash' && paymentMethod !== 'GCash'" class="space-y-4">
-                        <div>
-                            <x-input-label for="pos_payment_reference" class="text-[11px] font-semibold text-gray-600 uppercase tracking-wide mb-2 block">Payment Reference / Confirmation No.</x-input-label>
-                            <x-text-input id="pos_payment_reference" wire:model.blur="paymentReference" type="text" class="block w-full text-[14px] py-2.5 px-3 font-mono font-bold" :hasError="$errors->has('paymentReference')" />                            <x-input-error :messages="$errors->get('paymentReference')" class="mt-1" />
-                        </div>
-                    </div>
-
-                    {{-- GCash Details (PayMongo + Static QR Fallback) --}}
-                    <div x-show="paymentMethod === 'GCash'"
-                         wire:key="gcash-panel-{{ $referenceNo ?: 'new' }}"
-                         x-data="{ gcashUrl: null, showStatic: false }"
-                         @gcash-url-ready.window="gcashUrl = $event.detail.url; showStatic = false"
-                         @gcash-reset.window="gcashUrl = null; showStatic = false">
-
-                        {{-- Step 1: No URL yet — show options --}}
-                        <div x-show="!gcashUrl && !gcashVerified && !showStatic" class="space-y-4"
-                             x-data="{ isGenerating: false }"
-                             @gcash-url-ready.window="isGenerating = false"
-                             @notify.window="if($event.detail.type === 'error') isGenerating = false">
-                            <div class="bg-blue-50 rounded-2xl p-6 border border-blue-100 flex flex-col items-center text-center">
-                                <div class="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mb-3">
-                                    <svg class="w-8 h-8 text-blue-600" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
-                                </div>
-                                <p class="text-[13px] font-bold text-blue-900 mb-1">Pay via GCash</p>
-                                <p class="text-[11px] text-blue-500 mb-5">Choose how you want to collect the payment.</p>
-                                
-                                <div class="w-full space-y-3">
-                                                                        {{-- PayMongo Option — disabled for now, kept for future production use.
-                                         Re-enable by removing the @if(false)/@endif wrapper below. --}}
-                                    @if(false)
-                                    <button type="button" 
-                                        @click="isGenerating = true; $wire.initiateGCashPayment()" 
-                                        :disabled="isGenerating"
-                                        class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[13px] font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-200 disabled:opacity-50 disabled:cursor-not-allowed">
-                                        <span x-show="!isGenerating" class="flex items-center gap-2">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m0 14v1M4 12H3m18 0h-1M6.343 6.343l-.707-.707m12.728 12.728l-.707-.707M6.343 17.657l-.707.707M17.657 6.343l-.707.707M12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>
-                                            Generate Dynamic QR (PayMongo)
-                                        </span>
-                                        <span x-show="isGenerating" x-cloak class="flex items-center gap-2">
-                                            <svg class="animate-spin w-4 h-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                            Generating...
-                                        </span>
-                                    </button>
-                                    @endif
-
-                                    {{-- Static QR Fallback --}}
-                                    <button type="button" @click="showStatic = true"
-                                        class="w-full py-3 bg-white hover:bg-gray-50 text-blue-600 border-2 border-blue-100 rounded-xl text-[13px] font-bold flex items-center justify-center gap-2 transition-all">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m0 14v1M4 12H3m18 0h-1M6.343 6.343l-.707-.707m12.728 12.728l-.707-.707M6.343 17.657l-.707.707M17.657 6.343l-.707.707M12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>
-                                        Use Personal Static QR
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        {{-- Static QR Display Panel --}}
-                        <div x-show="showStatic && !gcashVerified" class="space-y-4">
-                            <div class="bg-blue-50 rounded-2xl p-5 border border-blue-100 flex flex-col items-center text-center">
-                                <p class="text-[11px] font-black text-blue-600 uppercase tracking-widest mb-3">Scan Personal QR</p>
-
-                                {{-- Uploaded Static QR --}}
-                                <div class="bg-white p-3 rounded-2xl shadow-sm border border-blue-200 mb-3">
-                                    @if($gcashQrImage)
-                                        <img src="{{ asset('storage/' . $gcashQrImage) }}" 
-                                             alt="GCash Static QR" class="w-[180px] h-[180px] mx-auto object-contain">
-                                    @else
-                                        <div class="w-[180px] h-[180px] flex flex-col items-center justify-center bg-gray-100 rounded-xl text-gray-400 p-4">
-                                            <svg class="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                            <p class="text-[10px] font-bold">No QR Uploaded in Settings</p>
-                                        </div>
-                                    @endif
-                                </div>
-
-                                <p class="text-[12px] font-bold text-blue-900">{{ $gcashAccountName }}</p>
-                                <p class="text-[11px] text-blue-500 font-mono">{{ $gcashAccountNumber }}</p>
-
-                                <button type="button" @click="showStatic = false"
-                                    class="mt-4 text-[10px] text-gray-400 font-bold uppercase tracking-widest hover:text-gray-600 transition-colors">
-                                    ← Back to options
-                                </button>
-                            </div>
-
-                            <button type="button" wire:click="verifyStaticPayment" wire:loading.attr="disabled" wire:target="verifyStaticPayment"
-                                class="w-full h-14 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[14px] font-black transition-all shadow-lg shadow-emerald-200 disabled:opacity-70 disabled:cursor-not-allowed">
-                                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                Verify & Lock Payment
+                                <span>Customer Details</span>
                             </button>
                         </div>
 
-                                                {{-- Step 2: URL generated — show dynamic QR — disabled for now, kept for
-                             future production use. Re-enable by removing the @if(false)/@endif wrapper. --}}
-                        @if(false)
-                        <div x-show="gcashUrl && !gcashVerified" class="space-y-4"
-                             x-init="
-                                let pollInterval = null;
-                                const startPolling = () => {
-                                    clearInterval(pollInterval);
-                                    pollInterval = setInterval(() => {
-                                        if (gcashVerified) { clearInterval(pollInterval); return; }
-                                        $wire.pollGCashStatus();
-                                    }, 4000);
-                                };
-                                if (gcashUrl && !gcashVerified) startPolling();
-                                $watch('gcashUrl', (url) => { url && !gcashVerified ? startPolling() : clearInterval(pollInterval); });
-                                $watch('gcashVerified', (paid) => { if (paid) clearInterval(pollInterval); });
-                             ">
-                            <div class="bg-blue-50 rounded-2xl p-5 border border-blue-100 flex flex-col items-center text-center">
-                                <p class="text-[11px] font-black text-blue-600 uppercase tracking-widest mb-3">Scan to Pay with GCash</p>
+                        {{-- Order Type Dropdown (shared UI component just like in the cart) --}}
+                        <div class="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
+                            <span class="text-[12px] font-semibold text-gray-600 uppercase tracking-wide">Order Type</span>
+                            <x-dropdown align="right" width="48">
+                                <x-slot name="trigger">
+                                    <button id="pos_modal_order_type_trigger" type="button"
+                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-[12px] font-bold text-gray-800 hover:bg-gray-100 focus:outline-none transition-colors">
+                                        <span x-text="orderType">{{ $orderType }}</span>
+                                        <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                        </svg>
+                                    </button>
+                                </x-slot>
+                                <x-slot name="content">
+                                    @foreach($orderTypes as $type)
+                                        <button type="button"
+                                            @click.stop="dropdownOpen = false; orderType = @js($type)"
+                                            class="block w-full px-4 py-2 text-left text-sm leading-5 text-gray-700 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 transition duration-150 ease-in-out">
+                                            {{ $type }}
+                                        </button>
+                                    @endforeach
+                                </x-slot>
+                            </x-dropdown>
+                        </div>
 
-                                {{-- Dynamic QR --}}
-                                <div class="bg-white p-3 rounded-2xl shadow-sm border border-blue-200 mb-3">
-                                    <template x-if="gcashUrl">
-                                        <img :src="`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(gcashUrl)}`"
-                                             alt="GCash QR" class="w-[180px] h-[180px] mx-auto">
-                                    </template>
+                        {{-- Payment Details Body --}}
+                        <div class="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+                            {{-- Payment Method --}}
+                            <div>
+                                <p class="text-[11px] font-semibold text-gray-600 uppercase tracking-wide mb-2">Payment Method</p>
+                                <div class="grid grid-cols-2 gap-2">
+                                    @foreach($paymentMethods as $method)
+                                        <button type="button"
+                                            data-payment-method="{{ $method }}"
+                                            @click="(!gcashVerified || $el.dataset.paymentMethod === 'GCash') && (paymentMethod = $el.dataset.paymentMethod)"
+                                            :disabled="gcashVerified && $el.dataset.paymentMethod !== 'GCash'"
+                                            :class="paymentMethod === $el.dataset.paymentMethod ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : (gcashVerified ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50')"
+                                            id="pos_pay_method_{{ strtolower($method) }}"
+                                            class="flex-1 justify-center py-2 px-4 text-[13px] font-bold rounded-lg border transition-all">
+                                            {{ $method }}
+                                        </button>
+                                    @endforeach
+                                </div>
+                            </div>
+
+                            {{-- Cash: Amount Tendered + Change --}}
+                            <div x-show="paymentMethod === 'Cash'" class="space-y-4">
+                                <div>
+                                    <x-input-label for="pos_amount_tendered" class="text-[11px] font-semibold text-gray-600 uppercase tracking-wide mb-2 block">Amount Tendered</x-input-label>
+                                    <x-text-input id="pos_amount_tendered" x-model="amountTendered" type="number" min="0" step="0.01"
+                                        x-bind:class="amountTenderedError ? 'border-red-400 bg-red-50/30 focus:border-red-400 focus:ring-red-300' : ''"
+                                        class="block w-full text-[14px] py-2.5 px-3 font-mono font-bold" placeholder="0.00"/>
+                                    <div x-show="amountTenderedError" x-cloak class="text-[11px] font-medium text-red-500 mt-1.5 flex items-start gap-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                                        <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                        </svg>
+                                        <ul class="space-y-0.5">
+                                            <li x-text="amountTenderedError"></li>
+                                        </ul>
+                                    </div>
+                                    <x-input-error :messages="$errors->get('amountTendered')" class="mt-1" />
                                 </div>
 
-                                <p class="text-[12px] font-bold text-blue-900">{{ $currencySymbol }}<span x-text="total.toFixed(2)">{{ number_format($this->total, 2) }}</span> due</p>
-                                <p class="text-[10px] text-blue-500 mt-0.5" x-text="'Order #' + (currentReferenceNo || '{{ $referenceNo }}')">Order #{{ $referenceNo }}</p>
-
-                                <a :href="gcashUrl" target="_blank"
-                                   class="mt-3 text-[11px] text-blue-600 font-bold underline underline-offset-2">
-                                    Open in browser instead ↗
-                                </a>
-
-                                <div class="mt-4 flex items-center gap-2 text-[11px] text-amber-600 font-semibold">
-                                    <svg class="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                    Waiting for customer payment...
+                                {{-- Quick Tenders --}}
+                                <div class="grid grid-cols-2 xs:grid-cols-4 gap-2">
+                                    <button type="button" @click="amountTendered = total" class="py-2.5 px-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-[12px] font-bold rounded-lg transition-colors">Exact</button>
+                                    <button type="button" @click="amountTendered = 100" class="py-2.5 px-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-[12px] font-bold font-mono rounded-lg transition-colors">{{ $currencySymbol }}100</button>
+                                    <button type="button" @click="amountTendered = 500" class="py-2.5 px-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-[12px] font-bold font-mono rounded-lg transition-colors">{{ $currencySymbol }}500</button>
+                                    <button type="button" @click="amountTendered = 1000" class="py-2.5 px-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-[12px] font-bold font-mono rounded-lg transition-colors">{{ $currencySymbol }}1000</button>
                                 </div>
+
+                                <div x-show="amountTendered >= total && total > 0" class="flex items-center justify-between bg-emerald-50 rounded-lg px-3 py-3 border border-emerald-200">
+                                    <span class="text-[11px] font-semibold text-emerald-700 uppercase tracking-wide">Change</span>
+                                    <span class="text-[14px] font-black text-emerald-700 font-mono" x-text="'{{ $currencySymbol }}' + (amountTendered - total).toFixed(2)"></span>
+                                </div>
+                            </div>
+
+                            {{-- Custom Payment Method: Reference Number --}}
+                            <div x-show="paymentMethod !== 'Cash' && paymentMethod !== 'GCash'" class="space-y-4">
+                                <div>
+                                    <x-input-label for="pos_payment_reference" class="text-[11px] font-semibold text-gray-600 uppercase tracking-wide mb-2 block">Payment Reference / Confirmation No.</x-input-label>
+                                    <x-text-input id="pos_payment_reference" wire:model.blur="paymentReference" type="text" class="block w-full text-[14px] py-2.5 px-3 font-mono font-bold" :hasError="$errors->has('paymentReference')" />
+                                    <x-input-error :messages="$errors->get('paymentReference')" class="mt-1" />
+                                </div>
+                            </div>
+
+                            {{-- GCash Details (PayMongo + Static QR Fallback) --}}
+                            <div x-show="paymentMethod === 'GCash'"
+                                 wire:key="gcash-panel-{{ $referenceNo ?: 'new' }}"
+                                 x-data="{ gcashUrl: null, showStatic: false }"
+                                 @gcash-url-ready.window="gcashUrl = $event.detail.url; showStatic = false"
+                                 @gcash-reset.window="gcashUrl = null; showStatic = false">
+
+                                {{-- Step 1: No URL yet — show options --}}
+                                <div x-show="!gcashUrl && !gcashVerified && !showStatic" class="space-y-4"
+                                     x-data="{ isGenerating: false }"
+                                     @gcash-url-ready.window="isGenerating = false"
+                                     @notify.window="if($event.detail.type === 'error') isGenerating = false">
+                                    <div class="bg-blue-50 rounded-2xl p-6 border border-blue-100 flex flex-col items-center text-center">
+                                        <div class="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mb-3">
+                                            <svg class="w-8 h-8 text-blue-600" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+                                        </div>
+                                        <p class="text-[13px] font-bold text-blue-900 mb-1">Pay via GCash</p>
+                                        <p class="text-[11px] text-blue-500 mb-5">Choose how you want to collect the payment.</p>
+
+                                        <div class="w-full space-y-3">
+                                            {{-- Static QR Fallback --}}
+                                            <button type="button" @click="showStatic = true"
+                                                class="w-full py-3 bg-white hover:bg-gray-50 text-blue-600 border-2 border-blue-100 rounded-xl text-[13px] font-bold flex items-center justify-center gap-2 transition-all">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m0 14v1M4 12H3m18 0h-1M6.343 6.343l-.707-.707m12.728 12.728l-.707-.707M6.343 17.657l-.707.707M17.657 6.343l-.707.707M12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>
+                                                Use Personal Static QR
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {{-- Static QR Display Panel --}}
+                                <div x-show="showStatic && !gcashVerified" class="space-y-4">
+                                    <div class="bg-blue-50 rounded-2xl p-5 border border-blue-100 flex flex-col items-center text-center">
+                                        <p class="text-[11px] font-black text-blue-600 uppercase tracking-widest mb-3">Scan Personal QR</p>
+
+                                        {{-- Uploaded Static QR --}}
+                                        <div class="bg-white p-3 rounded-2xl shadow-sm border border-blue-200 mb-3">
+                                            @if($gcashQrImage)
+                                                <img src="{{ asset('storage/' . $gcashQrImage) }}"
+                                                     alt="GCash Static QR" class="w-[180px] h-[180px] mx-auto object-contain">
+                                            @else
+                                                <div class="w-[180px] h-[180px] flex flex-col items-center justify-center bg-gray-100 rounded-xl text-gray-400 p-4">
+                                                    <svg class="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                                    <p class="text-[10px] font-bold">No QR Uploaded in Settings</p>
+                                                </div>
+                                            @endif
+                                        </div>
+
+                                        <p class="text-[12px] font-bold text-blue-900">{{ $gcashAccountName }}</p>
+                                        <p class="text-[11px] text-blue-500 font-mono">{{ $gcashAccountNumber }}</p>
+
+                                        <button type="button" @click="showStatic = false"
+                                            class="mt-4 text-[10px] text-gray-400 font-bold uppercase tracking-widest hover:text-gray-600 transition-colors">
+                                            ← Back to options
+                                        </button>
+                                    </div>
+
+                                    <button type="button" wire:click="verifyStaticPayment" wire:loading.attr="disabled" wire:target="verifyStaticPayment"
+                                        class="w-full h-14 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[14px] font-black transition-all shadow-lg shadow-emerald-200 disabled:opacity-70 disabled:cursor-not-allowed">
+                                        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                        Verify & Lock Payment
+                                    </button>
+                                </div>
+
+                                {{-- Step 3: Paid — show success --}}
+                                <template x-if="gcashVerified">
+                                    <div class="bg-emerald-50 rounded-2xl p-6 border border-emerald-100 flex flex-col items-center text-center gcash-success-pop">
+                                        <svg class="w-16 h-16 mb-3" viewBox="0 0 52 52">
+                                            <circle class="gcash-success-circle" cx="26" cy="26" r="24" fill="none" stroke="#059669" stroke-width="3"/>
+                                            <path class="gcash-success-check" fill="none" stroke="#059669" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M14 27l7 7 17-17"/>
+                                        </svg>
+                                        <p class="text-[14px] font-black text-emerald-900 leading-none">Confirmed Payment</p>
+                                        @if(!$isManualGcash)
+                                            <p class="text-[11px] text-emerald-600 font-bold mt-1.5 uppercase tracking-tighter">Verified</p>
+                                        @endif
+                                    </div>
+                                </template>
+
+                                <x-input-error :messages="$errors->get('gcashVerified')" class="mt-3 text-center" />
+
+                                <style>
+                                    .gcash-success-pop { animation: gcashPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+                                    @@keyframes gcashPop { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
+                                    .gcash-success-circle {
+                                        stroke-dasharray: 151; stroke-dashoffset: 151;
+                                        animation: gcashCircle 0.5s cubic-bezier(0.65, 0, 0.45, 1) 0.1s forwards;
+                                    }
+                                    .gcash-success-check {
+                                        stroke-dasharray: 36; stroke-dashoffset: 36;
+                                        animation: gcashCheck 0.35s ease-out 0.55s forwards;
+                                    }
+                                    @@keyframes gcashCircle { to { stroke-dashoffset: 0; } }
+                                    @@keyframes gcashCheck { to { stroke-dashoffset: 0; } }
+                                </style>
+                            </div>{{-- end GCash --}}
+                        </div>{{-- end payment details scrollable --}}
+
+                        {{-- Total Due Display --}}
+                        <div class="border-t border-gray-100 px-4 py-4 bg-gray-900 text-white text-center rounded-b-xl">
+                            <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Total Due</p>
+                            <p class="text-[24px] font-black font-mono">{{ $currencySymbol }}<span x-text="total.toFixed(2)">{{ number_format($this->total, 2) }}</span></p>
+                        </div>
+                    </div>
+
+                    {{-- BACK FACE: Customer Details --}}
+                    <div class="absolute inset-0 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col w-full h-full"
+                         :class="flipped ? 'pointer-events-auto' : 'pointer-events-none'"
+                         style="backface-visibility: hidden; transform: rotateY(180deg);">
+
+                        {{-- Card Header with Flip Button --}}
+                        <div class="px-4 py-3 border-b border-gray-100 bg-gray-50 rounded-t-xl flex items-center justify-between gap-2">
+                            <h3 class="text-[13px] font-bold text-gray-900">Customer Details</h3>
+                            <button type="button"
+                                @click="flipped = false"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold text-white bg-indigo-600 shadow-sm hover:bg-indigo-700 transition-all active:scale-95"
+                                title="Flip back to Payment Details">
+                                <svg class="w-3.5 h-3.5 text-white transition-transform duration-500 -scale-x-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                </svg>
+                                <span>Payment Details</span>
+                            </button>
+                        </div>
+
+                        {{-- Customer Details Body --}}
+                        <div class="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+                            <div class="bg-blue-50 rounded-xl p-3 border border-blue-100">
+                                <p class="text-[11px] text-blue-700 font-semibold leading-snug">Optional — add customer info for delivery or walk-ins requesting customer name &amp; address on the receipt.</p>
+                            </div>
+
+                            <div>
+                                <x-input-label for="pos_customer_name" class="text-[11px] font-semibold text-gray-600 uppercase tracking-wide mb-1.5 block">Customer Name</x-input-label>
+                                <x-text-input
+                                    id="pos_customer_name"
+                                    wire:model.blur="customerName"
+                                    type="text"
+                                    class="block w-full text-[13px] py-2.5 px-3"
+                                    placeholder="e.g. Juan Dela Cruz" />
+                            </div>
+
+                            <div>
+                                <x-input-label for="pos_customer_address" class="text-[11px] font-semibold text-gray-600 uppercase tracking-wide mb-1.5 block">Address</x-input-label>
+                                <x-text-input
+                                    id="pos_customer_address"
+                                    wire:model.blur="customerAddress"
+                                    type="text"
+                                    class="block w-full text-[13px] py-2.5 px-3"
+                                    placeholder="e.g. 123 Rizal St., Manila" />
+                            </div>
+
+                            {{-- Preview of what will appear on receipt --}}
+                            <div x-show="$wire.customerName || $wire.customerAddress"
+                                 class="mt-2 bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1">
+                                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Receipt Preview</p>
+                                <p class="text-[12px] text-gray-700">
+                                    <span class="font-semibold">Name:</span>
+                                    <span x-text="$wire.customerName || '—'"></span>
+                                </p>
+                                <p class="text-[12px] text-gray-700">
+                                    <span class="font-semibold">Address:</span>
+                                    <span x-text="$wire.customerAddress || '—'"></span>
+                                </p>
                             </div>
                         </div>
-                        @endif
 
-                        {{-- Step 3: Paid — show success (x-if so the draw-in animation replays every time) --}}
-                        <template x-if="gcashVerified">
-                            <div class="bg-emerald-50 rounded-2xl p-6 border border-emerald-100 flex flex-col items-center text-center gcash-success-pop">
-                                <svg class="w-16 h-16 mb-3" viewBox="0 0 52 52">
-                                    <circle class="gcash-success-circle" cx="26" cy="26" r="24" fill="none" stroke="#059669" stroke-width="3"/>
-                                    <path class="gcash-success-check" fill="none" stroke="#059669" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M14 27l7 7 17-17"/>
-                                </svg>
-                                <p class="text-[14px] font-black text-emerald-900 leading-none">Confirmed Payment</p>
-                                @if(!$isManualGcash)
-                                    <p class="text-[11px] text-emerald-600 font-bold mt-1.5 uppercase tracking-tighter">Verified</p>
-                                @endif
-                            </div>
-                        </template>
+                        {{-- Total Due Display --}}
+                        <div class="border-t border-gray-100 px-4 py-4 bg-gray-900 text-white text-center rounded-b-xl">
+                            <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Total Due</p>
+                            <p class="text-[24px] font-black font-mono">{{ $currencySymbol }}<span x-text="total.toFixed(2)">{{ number_format($this->total, 2) }}</span></p>
+                        </div>
+                    </div>
 
-                    <x-input-error :messages="$errors->get('gcashVerified')" class="mt-3 text-center" />
-
-                        <style>
-                            .gcash-success-pop { animation: gcashPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
-                            @@keyframes gcashPop { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
-                            .gcash-success-circle {
-                                stroke-dasharray: 151; stroke-dashoffset: 151;
-                                animation: gcashCircle 0.5s cubic-bezier(0.65, 0, 0.45, 1) 0.1s forwards;
-                            }
-                            .gcash-success-check {
-                                stroke-dasharray: 36; stroke-dashoffset: 36;
-                                animation: gcashCheck 0.35s ease-out 0.55s forwards;
-                            }
-                            @@keyframes gcashCircle { to { stroke-dashoffset: 0; } }
-                            @@keyframes gcashCheck { to { stroke-dashoffset: 0; } }
-                        </style>
-                    </div>{{-- end GCash --}}
-                </div>{{-- end payment details scrollable --}}
-                {{-- Total Due Display --}}
-                <div class="border-t border-gray-100 px-4 py-4 bg-gray-900 text-white text-center">
-                    <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Total Due</p>
-                    <p class="text-[24px] font-black font-mono">{{ $currencySymbol }}<span x-text="total.toFixed(2)">{{ number_format($this->total, 2) }}</span></p>
                 </div>
             </div>
         </div>
@@ -2022,7 +2073,9 @@
         paymentMethod,
         $wire.paymentReference || '',
         tableNumber || '',
-        orderType
+        orderType,
+        $wire.customerName || '',
+        $wire.customerAddress || ''
     ).then(() => {
         if (Object.keys(cart).length > 0 && window.pendingThermalReceiptWindow && !window.pendingThermalReceiptWindow.closed) {
             window.pendingThermalReceiptWindow.close();

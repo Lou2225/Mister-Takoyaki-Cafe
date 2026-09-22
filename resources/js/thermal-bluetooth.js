@@ -409,8 +409,8 @@ function generateQrRasterBytes(text, charsPerLine = 32) {
 
         // Keep the black area a little less packed so the pattern prints with cleaner contrast
         // and less muddy density on narrow thermal receipt paper.
-        const maxDots = charsPerLine > 32 ? 220 : 180;
-        const dotScale = Math.max(8, Math.min(12, Math.floor(maxDots / totalModules)));
+        const maxDots = charsPerLine > 32 ? 190 : 155;
+        const dotScale = Math.max(7, Math.min(10, Math.floor(maxDots / totalModules)));
         const rawWidth = totalModules * dotScale;
         const heightDots = totalModules * dotScale;
 
@@ -826,17 +826,26 @@ class ThermalPrinterBase {
                 ln('Order #: ' + (order.reference || order.reference_no || 'N/A'));
                 ln('Date:    ' + (order.date || 'N/A'));
                 ln('Type:    ' + (order.type || order.order_type || 'N/A').toUpperCase());
-                if (order.table_number) {
-                    ln('Claim No: ' + order.table_number);
-                }
-                if (order.customer_name) {
-                    ln('Customer:' + order.customer_name);
-                }
-                if (order.customer_phone) {
-                    ln('Phone:   ' + order.customer_phone);
-                }
-                if (section.type === 'customer' && order.payment_method) {
-                    ln('Payment: ' + order.payment_method);
+                if (section.type !== 'customer') {
+                    if (order.table_number) {
+                        ln('Claim No: ' + order.table_number);
+                    }
+                    if (order.customer_name) {
+                        ln('Customer:' + order.customer_name);
+                    }
+                    if (order.customer_phone) {
+                        ln('Phone:   ' + order.customer_phone);
+                    }
+                } else {
+                    if (order.payment_method) {
+                        ln('Payment: ' + order.payment_method);
+                    }
+                    if (order.cashier_name) {
+                        ln('Cashier: ' + order.cashier_name);
+                    }
+                    if (order.account_id) {
+                        ln('Account ID: ' + order.account_id);
+                    }
                 }
 
                 // ── Delivery Address (customer receipt only) ──
@@ -913,19 +922,20 @@ class ThermalPrinterBase {
                         }
                         ln(this.divider('-'));
                     }
-                    // Footer
-                    if (settings.show_receipt_footer !== false) {
-                        push(CMD.alignCenter());
-                        push(CMD.boldOn());
-                        ln(this.wrap(settings.receipt_footer_message || 'Thank you for your visit!'));
-                        push(CMD.boldOff());
-                        if (settings.receipt_return_policy) {
-                            ln(this.wrap(settings.receipt_return_policy));
+
+                    // Customer Details (under Totals)
+                    if (order.customer_name || order.customer_address || order.delivery_address) {
+                        ln(this.divider('-'));
+                        if (order.customer_name) {
+                            ln('Customer Name: ' + order.customer_name);
+                        }
+                        const custAddr = order.customer_address || (orderType !== 'delivery' ? order.delivery_address : '');
+                        if (custAddr) {
+                            ln(this.wrap('Address: ' + custAddr));
                         }
                     }
 
-                    // QR Code — Large, Crystal-Clear 1-Bit Monochrome Raster QR with 4-Module Quiet Zone
-                                        // QR Code — center aligned, tight spacing (no blank lines above/below the code itself)
+                    // QR Code (above Claim Number and Footer)
                     const qrTarget = settings.qr_url || '';
                     if (settings.show_receipt_qr_code !== false && qrTarget) {
                         push(CMD.alignCenter());
@@ -937,6 +947,31 @@ class ThermalPrinterBase {
                             push(qrBytes);
                         }
                         ln(this.wrap('Review us: ' + qrTarget));
+                    }
+
+                    // Claim Number (below QR Code, above Footer)
+                    const claimNo = order.claim_number || order.table_number || order.reference || order.reference_no;
+                    if (claimNo) {
+                        push(CMD.alignCenter());
+                        ln(this.divider('-'));
+                        ln('CLAIM NUMBER');
+                        push(CMD.boldOn());
+                        push(CMD.doubleHeightOn());
+                        ln('#' + claimNo);
+                        push(CMD.doubleHeightOff());
+                        push(CMD.boldOff());
+                        ln(this.divider('-'));
+                    }
+
+                    // Footer Greeting & Return Policy (very bottom)
+                    if (settings.show_receipt_footer !== false) {
+                        push(CMD.alignCenter());
+                        push(CMD.boldOn());
+                        ln(this.wrap(settings.receipt_footer_message || 'Thank you for your visit!'));
+                        push(CMD.boldOff());
+                        if (settings.receipt_return_policy) {
+                            ln(this.wrap(settings.receipt_return_policy));
+                        }
                     }
                 }
 

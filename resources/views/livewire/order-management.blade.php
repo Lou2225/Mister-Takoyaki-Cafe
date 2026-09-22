@@ -957,18 +957,21 @@
 
                     <div class="border-y border-dashed border-gray-200 py-1.5 mb-3 space-y-0.5 text-[9px]">
                         <div class="flex justify-between"><span>#{{ $order->reference_no }}</span><span>{{ $order->created_at->format('d/m/y H:i') }}</span></div>
-                        <div class="flex justify-between font-bold" style="font-size:9px; margin-top:4px;">
+                        <div class="flex justify-between font-bold" style="font-size:9px; margin-top:3px;">
                             <span style="text-transform:uppercase; letter-spacing:0.05em;">⬛ {{ strtoupper($order->order_type ?? 'DINE-IN') }}</span>
-                            <span>STAFF: {{ strtoupper($order->user->first_name ?? 'APP') }}</span>
+                            @if($order->payment_method)
+                                <span>{{ strtoupper($order->payment_method) }}</span>
+                            @endif
                         </div>
-                        
-                        @if($order->source === 'App' || ($order->order_type ?? '') === 'Delivery')
-                            <div class="mt-2 pt-2 border-t border-gray-100 flex flex-col gap-0.5">
-                                <span class="font-bold">Customer: {{ $order->customer_name ?? 'N/A' }}</span>
-                                <span>Phone: {{ $order->customer_phone ?? 'N/A' }}</span>
-                                <span class="whitespace-normal leading-tight">Address: {{ $order->delivery_address ?? 'N/A' }}</span>
-                            </div>
-                        @endif
+                        @php
+                            $cashierName = $order->user ? trim(($order->user->first_name ?? '') . ' ' . ($order->user->last_name ?? '')) : 'STAFF';
+                            if (empty($cashierName)) { $cashierName = $order->user->name ?? 'STAFF'; }
+                            $accountId = $order->user?->employee_id ?? ('ACC-' . str_pad($order->user_id ?? 0, 4, '0', STR_PAD_LEFT));
+                        @endphp
+                        <div class="flex justify-between text-[8px] text-gray-600 pt-0.5">
+                            <span>Cashier: <strong class="text-gray-800">{{ $cashierName }}</strong></span>
+                            <span>ID: <strong class="text-gray-800">{{ $accountId }}</strong></span>
+                        </div>
                     </div>
 
                     <div class="space-y-1 mb-3">
@@ -985,12 +988,23 @@
                                     </div>
                                 @endforeach
                             @endif
+                            @if($item->modifiers && $item->modifiers->isNotEmpty())
+                                @foreach($item->modifiers as $mod)
+                                    <div class="flex justify-between text-[8px] text-gray-500 pl-3 leading-tight">
+                                        <span>+ {{ $mod->modifier->name ?? 'N/A' }}</span>
+                                        <span>₱{{ number_format($mod->unit_price, 2) }}</span>
+                                    </div>
+                                @endforeach
+                            @endif
+                            @if($item->special_instructions)
+                                <div class="text-[8px] text-gray-500 pl-3 italic leading-tight">Note: {{ $item->special_instructions }}</div>
+                            @endif
                         @empty
                             <div class="text-center italic">No items</div>
                         @endforelse
                     </div>
 
-                    <div class="border-t border-dashed border-gray-200 pt-1.5 mb-3 space-y-0.5">
+                    <div class="border-t border-dashed border-gray-200 pt-1.5 mb-2 space-y-0.5">
                         <div class="flex justify-between">
                             <span>Subtotal</span>
                             <span>₱{{ number_format($order->total_amount - $order->delivery_fee + $order->discount_amount, 2) }}</span>
@@ -1036,25 +1050,51 @@
                     </div>
 
                     @if($order->refunded_amount > 0)
-                        <div class="text-center font-bold text-[9px] mb-3 mt-1 py-1 border-y border-dashed border-gray-200 uppercase text-gray-900">
+                        <div class="text-center font-bold text-[9px] mb-2 mt-1 py-1 border-y border-dashed border-gray-200 uppercase text-gray-900">
                             Refunded: ₱{{ number_format($order->refunded_amount, 2) }}
                         </div>
                     @endif
 
-                    <div class="text-center mt-4">
-                        <p class="font-bold italic text-gray-700 text-[8px] mb-2">{{ $footer }}</p>
-                        
-                        @if(!empty($returnPolicy))
-                            <p class="text-[7px] text-gray-500 border-t border-dashed border-gray-200 pt-2 mb-2 leading-tight">{{ $returnPolicy }}</p>
-                        @endif
+                    {{-- Customer Name & Address (under Totals) --}}
+                    @if($order->customer_name || $order->delivery_address)
+                        <div class="border-t border-dashed border-gray-200 pt-1.5 mb-2 space-y-0.5 text-[8.5px] text-gray-700">
+                            @if($order->customer_name)
+                                <div class="flex justify-between"><span class="text-gray-500">Customer:</span><span class="font-bold">{{ $order->customer_name }}</span></div>
+                            @endif
+                            @if($order->customer_phone)
+                                <div class="flex justify-between"><span class="text-gray-500">Phone:</span><span>{{ $order->customer_phone }}</span></div>
+                            @endif
+                            @if($order->delivery_address)
+                                <div class="flex justify-between"><span class="text-gray-500">Address:</span><span class="text-right truncate max-w-[150px]">{{ $order->delivery_address }}</span></div>
+                            @endif
+                        </div>
+                    @endif
 
-                        @if($qrCodeSvg)
-                            <div class="mt-2 pt-2 border-t border-gray-200">
-                                <p class="text-[7px] text-gray-600 mb-1">Scan to Review:</p>
-                                <div class="bg-white p-1 inline-block border border-gray-300 mx-auto">
-                                    <img src="{{ $qrCodeSvg }}" alt="Review QR Code" class="w-16 h-16 block">
-                                </div>
+                    {{-- QR Code (above Claim Number and Footer) --}}
+                    @if($qrCodeSvg)
+                        <div class="mt-2 pt-2 border-t border-dashed border-gray-200 text-center">
+                            <p class="text-[7px] font-bold text-gray-600 mb-1 uppercase tracking-wider">Scan to Review &amp; Rate</p>
+                            <div class="bg-white p-1 inline-block border border-gray-300 mx-auto">
+                                <img src="{{ $qrCodeSvg }}" alt="Review QR Code" class="w-16 h-16 block">
                             </div>
+                            @if(!empty($qrUrl))
+                                <p class="text-[6.5px] text-gray-600 mt-1 break-all">Review us: {{ $qrUrl }}</p>
+                            @endif
+                        </div>
+                    @endif
+
+                    {{-- Claim Number (below QR Code, above Footer) --}}
+                    @php $claimNo = $order->table_number ?: $order->reference_no; @endphp
+                    <div class="my-2 py-1.5 border-y border-dashed border-gray-300 text-center">
+                        <span class="text-[7px] uppercase tracking-widest text-gray-500 font-bold block">Claim Number</span>
+                        <span class="text-[14px] font-black tracking-widest text-gray-900 block mt-0.5">#{{ $claimNo }}</span>
+                    </div>
+
+                    {{-- Footer Greeting & Return Policy (very bottom) --}}
+                    <div class="text-center mt-2">
+                        <p class="font-bold italic text-gray-700 text-[8px] mb-1">{{ $footer }}</p>
+                        @if(!empty($returnPolicy))
+                            <p class="text-[7px] text-gray-500 leading-tight">{{ $returnPolicy }}</p>
                         @endif
                     </div>
                 </div>
@@ -1249,6 +1289,7 @@ window.printOrderReceipt = async function(orderId) {
         const doc = iframe.contentWindow.document;
     doc.open();
     doc.write("<html><head><title>Print Receipt</title><style>@page { size: 58mm auto; margin: 0; } * { box-sizing: border-box; } body { font-family: 'Courier New', Courier, monospace; font-size: 10px; line-height: 1.25; color: #000; margin: 0; padding: 4px 6px; background: #fff; width: 58mm; max-width: 58mm; } .text-center { text-align: center; } .mb-2 { margin-bottom: 6px; } .mb-4 { margin-bottom: 10px; } .mt-2 { margin-top: 6px; } .mt-4 { margin-top: 10px; } .py-1.5 { padding-top: 4px; padding-bottom: 4px; } .pt-1 { padding-top: 2px; } .pt-2 { padding-top: 4px; } .pl-3 { padding-left: 8px; } .font-bold { font-weight: bold; } .italic { font-style: italic; } .border-y { border-top: 1px dashed #000; border-bottom: 1px dashed #000; } .border-t { border-top: 1px dashed #000; } .space-y-0.5 > * + * { margin-top: 2px; } .space-y-1 > * + * { margin-top: 3px; } .flex { display: flex; } .justify-between { justify-content: space-between; align-items: baseline; } .items-start { align-items: flex-start; } .flex-col { flex-direction: column; } .gap-0.5 { gap: 2px; } .gap-2 { gap: 4px; } .flex-1 { flex: 1; } .pr-2 { padding-right: 4px; } .whitespace-nowrap { white-space: nowrap; flex-shrink: 0; } .whitespace-normal { white-space: normal; } .leading-tight { line-height: 1.2; } .uppercase { text-transform: uppercase; } .text-[7px] { font-size: 7px; } .text-[8px] { font-size: 8px; } .text-[9px] { font-size: 9px; } .text-[10px] { font-size: 10px; } .text-[11px] { font-size: 11px; } img { max-width: 100px; height: auto; display: block; margin: 0 auto; }</style></head><body>" + element.innerHTML + "<script>window.onload = function() { window.focus(); window.print(); };<\/script></body></html>");
+    doc.write("<html><head><title>Print Receipt</title><style>@page { size: 58mm auto; margin: 0; } * { box-sizing: border-box; } body { font-family: 'Courier New', Courier, monospace; font-size: 10px; line-height: 1.25; color: #000; margin: 0; padding: 4px 6px; background: #fff; width: 58mm; max-width: 58mm; } .text-center { text-align: center; } .mb-1 { margin-bottom: 3px; } .mb-2 { margin-bottom: 6px; } .mb-3 { margin-bottom: 8px; } .mb-4 { margin-bottom: 10px; } .mt-1 { margin-top: 3px; } .mt-2 { margin-top: 6px; } .mt-4 { margin-top: 10px; } .my-2 { margin-top: 6px; margin-bottom: 6px; } .py-1.5 { padding-top: 4px; padding-bottom: 4px; } .pt-0.5 { padding-top: 2px; } .pt-1 { padding-top: 2px; } .pt-1.5 { padding-top: 4px; } .pt-2 { padding-top: 4px; } .pl-3 { padding-left: 8px; } .font-bold { font-weight: bold; } .font-black { font-weight: 900; } .italic { font-style: italic; } .block { display: block; } .border-y { border-top: 1px dashed #000; border-bottom: 1px dashed #000; } .border-t { border-top: 1px dashed #000; } .space-y-0.5 > * + * { margin-top: 2px; } .space-y-1 > * + * { margin-top: 3px; } .flex { display: flex; } .justify-between { justify-content: space-between; align-items: baseline; } .items-start { align-items: flex-start; } .flex-col { flex-direction: column; } .gap-0.5 { gap: 2px; } .gap-2 { gap: 4px; } .flex-1 { flex: 1; } .pr-2 { padding-right: 4px; } .whitespace-nowrap { white-space: nowrap; flex-shrink: 0; } .whitespace-normal { white-space: normal; } .leading-tight { line-height: 1.2; } .uppercase { text-transform: uppercase; } .tracking-wider { letter-spacing: 0.05em; } .tracking-widest { letter-spacing: 0.15em; } .text-[6.5px] { font-size: 6.5px; } .text-[7px] { font-size: 7px; } .text-[8px] { font-size: 8px; } .text-[8.5px] { font-size: 8.5px; } .text-[9px] { font-size: 9px; } .text-[10px] { font-size: 10px; } .text-[11px] { font-size: 11px; } .text-[14px] { font-size: 14px; } img { max-width: 100px; height: auto; display: block; margin: 0 auto; }</style></head><body>" + element.innerHTML + "<script>window.onload = function() { window.focus(); window.print(); };<\/script></body></html>");
     doc.close();
 
     window.dispatchEvent(new CustomEvent('notify', {
