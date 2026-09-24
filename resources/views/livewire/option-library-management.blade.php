@@ -3,10 +3,8 @@
     $requiredTemplates = $allTemplates->where('is_required', true)->count();
     $totalItems = $allTemplates->sum(fn($t) => $t->items->count());
     $fixedTemplates = $allTemplates->where('price_mode', 'fixed')->count();
-@endphp
 
-<div
-    x-data="typeof window.optionLibraryManagement === 'function' ? window.optionLibraryManagement($wire, @js($allIngredients), @js($allTemplates->map(fn($t) => [
+    $templatesPayload = $allTemplates->map(fn($t) => [
         'id' => (int)$t->id,
         'name' => (string)$t->name,
         'price_mode' => (string)$t->price_mode,
@@ -27,10 +25,18 @@
                 'cost' => (float)($ri->ingredient?->cost ?? 0),
             ])->values(),
         ])->values(),
-    ]))) : { panel: 'list', mode: 'list', tableView: 'table', searchQuery: '', templatesList: [], filteredTemplateIds: [], currentPage: 1, perPage: 5, isItemVisible: () => true, formErrors: {}, formSubmitted: false, isSaving: false }"
+    ])->values();
+@endphp
+
+<div
+    x-data="typeof window.optionLibraryManagement === 'function' ? window.optionLibraryManagement($wire, @js($allIngredients), @js($templatesPayload)) : { panel: 'list', mode: 'list', tableView: 'table', searchQuery: '', templatesList: @js($templatesPayload), filteredTemplateIds: [], currentPage: 1, perPage: 5, isItemVisible: () => true, updateTemplatesList: () => {}, formErrors: {}, formSubmitted: false, isSaving: false }"
     class="relative"
-    wire:ignore
+    wire:ignore.self
+    x-on:templates-updated.window="updateTemplatesList($event.detail.templates)"
     wire:key="option-library-main-container">
+
+    {{-- Hidden reactive updater — mirrors products-sync-helper in Menu Management --}}
+    <div x-effect="updateTemplatesList(@js($templatesPayload))" class="hidden" wire:key="templates-sync-helper"></div>
 
     {{-- ════════════════ PANEL 1 — LIST ════════════════ --}}
     <div x-show="panel === 'list'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="px-1">
@@ -51,7 +57,7 @@
         {{-- Library Metrics Grid --}}
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             {{-- Total Templates --}}
-            <div class="p-3 sm:p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+            <div class="p-3 sm:p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm transition-all duration-300 relative overflow-hidden group">
                 <div class="flex items-center justify-between mb-1 sm:mb-2">
                     <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Templates</span>
                     <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
@@ -63,7 +69,7 @@
             </div>
 
             {{-- Required Fields --}}
-            <div class="p-3 sm:p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+            <div class="p-3 sm:p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm transition-all duration-300 relative overflow-hidden group">
                 <div class="flex items-center justify-between mb-1 sm:mb-2">
                     <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Required</span>
                     <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm shrink-0">
@@ -75,7 +81,7 @@
             </div>
 
             {{-- Total Variations --}}
-            <div class="p-3 sm:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+            <div class="p-3 sm:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm transition-all duration-300 relative overflow-hidden group">
                 <div class="flex items-center justify-between mb-1 sm:mb-2">
                     <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Variations</span>
                     <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
@@ -85,9 +91,10 @@
                 <h3 class="text-xl sm:text-2xl font-black text-emerald-600 tracking-tight leading-none">{{ $totalItems }}</h3>
                 <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Individual option choices</p>
             </div>
-
-            {{-- Fixed Pricing --}}
-            <div class="p-3 sm:p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+{{-- Fixed Pricing --}}
+            <div @click="priceModeFilter = priceModeFilter === 'fixed' ? '' : 'fixed'"
+                :class="priceModeFilter === 'fixed' ? 'bg-gradient-to-br from-amber-100 via-amber-50 to-white border-amber-300 shadow-md scale-[1.01]' : 'bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border-amber-500/10 shadow-sm'"
+                class="p-3 sm:p-4 rounded-2xl cursor-pointer transition-all duration-300 hover:scale-[1.01] hover:shadow-md hover:border-amber-300/70 relative overflow-hidden group border">
                 <div class="flex items-center justify-between mb-1 sm:mb-2">
                     <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fixed Price</span>
                     <div class="w-7 h-7 rounded-lg bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm shrink-0">
@@ -504,32 +511,43 @@
                                 <div class="flex items-center gap-4">
                                     <div class="flex-1">
                                         <x-input-label value="Option Name" class="text-[10px] mb-1 ml-1" />
-                                        <x-text-input type="text" x-model="item.name" 
-                                            @input="if (typeof formErrors !== 'undefined' && formErrors) { delete formErrors.itemNames; delete formErrors.templateItems; }"
-                                            ::class="(typeof formSubmitted !== 'undefined' && formSubmitted && (!item.name || !item.name.trim())) ? '!border-red-400 focus:!border-red-400 focus:!ring-red-300 !bg-red-50/30' : ''"
-                                            class="w-full h-10 text-[13px] font-bold text-slate-800 placeholder-slate-300" 
-                                            placeholder="e.g. Regular Size" />
-                                        <div x-show="typeof formSubmitted !== 'undefined' && formSubmitted && (!item.name || !item.name.trim())" 
+<x-text-input type="text" x-model="item.name" 
+    @input="if (itemErrors[idx]) { delete itemErrors[idx].name; if (Object.keys(itemErrors[idx]).length === 0) delete itemErrors[idx]; } if (typeof formErrors !== 'undefined' && formErrors) { delete formErrors.itemNames; delete formErrors.templateItems; }"
+    ::class="(itemErrors[idx] && itemErrors[idx].name) || (typeof formSubmitted !== 'undefined' && formSubmitted && (!item.name || !item.name.trim())) ? '!border-red-400 focus:!border-red-400 focus:!ring-red-300 !bg-red-50/30' : ''"
+    class="w-full h-10 text-[13px] font-bold text-slate-800 placeholder-slate-300" 
+    placeholder="e.g. Regular Size" />
+                                        <div x-show="(itemErrors[idx] && itemErrors[idx].name) || (typeof formSubmitted !== 'undefined' && formSubmitted && (!item.name || !item.name.trim()))"
                                             class="text-[11px] font-medium text-red-500 mt-1.5 flex items-start gap-1.5 animate-in fade-in slide-in-from-top-1 duration-200" 
                                             x-cloak>
                                             <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                             </svg>
                                             <ul class="space-y-0.5">
-                                                <li>Option name is required.</li>
+                                                <li x-text="(itemErrors[idx] && itemErrors[idx].name) || 'Option name is required.'"></li>
                                             </ul>
                                         </div>
                                     </div>
                                     <div class="w-40">
-                                        <x-input-label value="Extra Price" class="text-[10px] mb-1 ml-1" />
+                                        <x-input-label value="Price" class="text-[10px] mb-1 ml-1" />
                                         <div class="relative">
                                             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                                 <span class="text-[12px] font-black text-slate-400">₱</span>
                                             </div>
-                                            <x-text-input type="text" x-model="item.price" 
-                                                class="w-full h-10 pl-7 text-[13px] font-black text-slate-800 text-right" 
-                                                placeholder="0.00" inputFilter="price" />
-                                        </div>
+<x-text-input type="text" x-model="item.price"
+    @input="item.price = window.clampPriceInput($event); if (itemErrors[idx]) delete itemErrors[idx].price; if (typeof formErrors !== 'undefined' && formErrors) delete formErrors.templateItems;"
+    maxlength="9" inputmode="decimal"
+    ::class="(itemErrors[idx] && itemErrors[idx].price) || (typeof formSubmitted !== 'undefined' && formSubmitted && !noRecipeRequired && (!item.price || parseFloat(item.price) <= 0)) ? '!border-red-400 focus:!border-red-400 focus:!ring-red-300 !bg-red-50/30' : ''"
+    class="w-full h-10 pl-7 text-[13px] font-black text-slate-800 text-right" 
+    placeholder="0.00" inputFilter="price" />
+    </div>
+    <div x-show="(itemErrors[idx] && itemErrors[idx].price) || (typeof formSubmitted !== 'undefined' && formSubmitted && !noRecipeRequired && (!item.price || parseFloat(item.price) <= 0))"
+        class="text-[11px] font-medium text-red-500 mt-1.5 flex items-start gap-1.5 animate-in fade-in slide-in-from-top-1 duration-200" 
+        x-cloak>
+        <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+        <span x-text="(itemErrors[idx] && itemErrors[idx].price) || 'Option price must be greater than 0.'"></span>
+    </div>
                                     </div>
                                     <div class="flex items-center gap-2 pt-5">
                                         <button type="button" x-show="!noRecipeRequired" @click="showRecipe = !showRecipe"
@@ -758,7 +776,7 @@
 
                         <div class="pt-5 border-t border-slate-50 space-y-4">
                             <label class="flex items-center gap-3 cursor-pointer group">
-                                <input type="checkbox" x-model="noRecipeRequired" @change="if(noRecipeRequired) templateItems.forEach(it => it.ingredients = [])" class="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+                                <input type="checkbox" x-model="noRecipeRequired" @change="noRecipeRequired = $event.target.checked; if(noRecipeRequired) templateItems.forEach(it => it.ingredients = []); clearPriceErrors()" class="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500">
                                 <div>
                                     <span class="text-[13px] font-bold text-slate-800 group-hover:text-amber-600 transition-colors">No Recipe Required</span>
                                     <p class="text-[11px] text-slate-400 font-medium leading-none mt-1">Options skip ingredient tracking and are always available</p>
@@ -858,7 +876,7 @@
         </div>
     </x-modal>
 
-    <script>
+    <script data-navigate-once>
         (function() {
             const defineFn = function() {
                 window.optionLibraryManagement = function($wire, allIngredients, initialTemplates) {
@@ -879,6 +897,7 @@
                         noRecipeRequired: false,
                         templateItems: [],
                         formErrors: {},
+                        itemErrors: {},
                         formSubmitted: false,
                         isSaving: false,
 
@@ -925,6 +944,16 @@
                         },
                         isItemVisible(id) {
                             return this.paginatedTemplateIds.includes(id);
+                        },
+                        updateTemplatesList(newList) {
+                            // Mirrors updateProductsList() in Menu Management.
+                            if (!Array.isArray(newList)) return;
+                            const oldIds = this.templatesList.map(t => t.id).join(',');
+                            const newIds = newList.map(t => t.id).join(',');
+                            if (oldIds !== newIds) {
+                                this.templatesList = newList;
+                                this.currentPage = 1;
+                            }
                         },
 
                         // ── Instant (0ms) local panel actions — no server round-trip ──
@@ -998,6 +1027,17 @@
                             const isCurrent = !!this.templateItems[idx].is_default;
                             this.templateItems.forEach((item, i) => {
                                 item.is_default = (i === idx && !isCurrent);
+                            });
+                        },
+                        clearPriceErrors() {
+                            Object.keys(this.itemErrors || {}).forEach(index => {
+                                if (this.itemErrors[index]) {
+                                    delete this.itemErrors[index].price;
+                                    if (Object.keys(this.itemErrors[index]).length === 0) delete this.itemErrors[index];
+                                }
+                            });
+                            Object.keys(this.formErrors || {}).forEach(key => {
+                                if (/^templateItems\.\d+\.price$/.test(key)) delete this.formErrors[key];
                             });
                         },
 
@@ -1075,6 +1115,7 @@
                         // ── Client-side validation before opening the confirm modal ──
                         validateAndPromptSave() {
                             this.formErrors = {};
+                            this.itemErrors = {};
                             this.formSubmitted = true;
                             const trimmedName = (this.templateName || '').trim();
 
@@ -1093,13 +1134,30 @@
                             if (!this.templateItems || this.templateItems.length === 0) {
                                 this.formErrors.templateItems = 'At least one variation option is required.';
                             } else {
-                                const emptyItem = this.templateItems.some(item => !(item.name || '').trim());
-                                if (emptyItem) {
-                                    this.formErrors.itemNames = 'Every option must have a name.';
-                                }
+                                const seenNames = {};
+                                this.templateItems.forEach((item, index) => {
+                                    const name = (item.name || '').trim();
+                                    const price = item.price === '' || item.price === null || item.price === undefined ? '' : Number(item.price);
+                                    if (!name) {
+                                        this.itemErrors[index] = { ...(this.itemErrors[index] || {}), name: 'Option name is required.' };
+                                    } else {
+                                        const normalized = name.toLowerCase();
+                                        if (seenNames[normalized] !== undefined) {
+                                            const message = 'Option name must be unique within this template.';
+                                            this.itemErrors[seenNames[normalized]] = { ...(this.itemErrors[seenNames[normalized]] || {}), name: message };
+                                            this.itemErrors[index] = { ...(this.itemErrors[index] || {}), name: message };
+                                        } else {
+                                            seenNames[normalized] = index;
+                                        }
+                                    }
+
+if (!this.noRecipeRequired && (price === '' || price <= 0)) {
+    this.itemErrors[index] = { ...(this.itemErrors[index] || {}), price: 'Option price must be greater than 0.' };
+}
+                                });
                             }
 
-                            if (Object.keys(this.formErrors).length > 0) {
+                            if (Object.keys(this.formErrors).length > 0 || Object.keys(this.itemErrors).length > 0) {
                                 return; // inline errors shown below fields, modal stays closed
                             }
 
@@ -1121,19 +1179,24 @@
                                     noRecipeRequired: !!this.noRecipeRequired,
                                     templateItems: JSON.parse(JSON.stringify(this.templateItems || []))
                                 };
-                                const res = await this.$wire.saveTemplate(payload);
+const res = await this.$wire.saveTemplate(payload);
                                 if (res && res.success) {
-                                    const idx = this.templatesList.findIndex(t => Number(t.id) === Number(res.template.id));
-                                    if (idx >= 0) {
-                                        this.templatesList[idx] = res.template;
-                                    } else {
-                                        this.templatesList.push(res.template);
-                                    }
+                                    // templatesList refreshes automatically via the
+                                    // templates-sync-helper x-effect once Livewire
+                                    // morphs the re-rendered HTML back in — no manual
+                                    // push/replace and no reload needed.
                                     this.$dispatch('notify', { type: 'success', message: 'Template saved to library.' });
                                     this.backToList();
                                 } else {
                                     this.formErrors = (res && res.errors) || { general: 'Failed to save template.' };
                                     this.formSubmitted = true;
+                                    this.itemErrors = {};
+                                    Object.entries((res && res.errors) || {}).forEach(([key, messages]) => {
+                                        const match = key.match(/^templateItems\.(\d+)\.(name|price)$/);
+                                        if (match) {
+                                            this.itemErrors[match[1]] = { ...(this.itemErrors[match[1]] || {}), [match[2]]: Array.isArray(messages) ? messages[0] : messages };
+                                        }
+                                    });
                                     this.$dispatch('notify', { type: 'error', message: (res && res.errors && (res.errors.name || res.errors.general)) || 'Failed to save template.' });
                                 }
                             } catch (err) {
@@ -1179,6 +1242,13 @@
                 };
             };
             defineFn();
+            if (window.Alpine) {
+                Alpine.data('optionLibraryManagement', window.optionLibraryManagement);
+            } else {
+                document.addEventListener('alpine:init', () => {
+                    Alpine.data('optionLibraryManagement', window.optionLibraryManagement);
+                });
+            }
         })();
     </script>
 </div>

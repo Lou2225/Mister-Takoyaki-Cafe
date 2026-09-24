@@ -7,7 +7,20 @@
 @endphp
 
 <div
-    x-data="window.categoryManagement($wire)"
+    x-data="typeof window.categoryManagement === 'function' ? window.categoryManagement($wire, @js($allCategories)) : {
+        view: $wire.entangle('view').live,
+        panel: $wire.entangle('panel').live,
+        filterType: $wire.entangle('filterType').live,
+        searchQuery: '',
+        currentPage: 1,
+        perPage: 5,
+        categoriesList: @js($allCategories),
+        get filteredCategories() { return this.categoriesList || []; },
+        get paginatedCategories() { return this.filteredCategories || []; },
+        get pageNumbers() { return [1]; },
+        isItemVisible() { return true; },
+        updateCategoriesList(l) { if (Array.isArray(l)) this.categoriesList = l; }
+    }"
     class="relative"
     wire:ignore.self
     wire:key="category-management-main-container"
@@ -54,8 +67,10 @@
             <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
                 @php $stats = $this->kpiStats; @endphp
                 
-                {{-- Total Categories --}}
-                <div class="p-3 sm:p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+{{-- Total Categories --}}
+                <div @click="filterType = 'all'"
+                    :class="filterType === 'all' ? 'bg-gradient-to-br from-indigo-100 via-indigo-50 to-white border-indigo-300 shadow-md scale-[1.02]' : 'bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border-indigo-500/10 shadow-sm'"
+                    class="p-3 sm:p-4 rounded-2xl hover:shadow-md hover:scale-[1.02] hover:border-indigo-300/70 cursor-pointer transition-all duration-300 relative overflow-hidden group border">
                     <div class="flex items-center justify-between mb-1 sm:mb-2">
                         <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Categories</span>
                         <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
@@ -66,8 +81,10 @@
                     <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Active category tags</p>
                 </div>
 
-                {{-- Product Groups --}}
-                <div class="p-3 sm:p-4 bg-gradient-to-br from-violet-500/10 via-violet-500/5 to-white border border-violet-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+{{-- Product Groups --}}
+                <div @click="filterType = filterType === 'product' ? 'all' : 'product'"
+                    :class="filterType === 'product' ? 'bg-gradient-to-br from-violet-100 via-violet-50 to-white border-violet-300 shadow-md scale-[1.02]' : 'bg-gradient-to-br from-violet-500/10 via-violet-500/5 to-white border-violet-500/10 shadow-sm'"
+                    class="p-3 sm:p-4 rounded-2xl hover:shadow-md hover:scale-[1.02] hover:border-violet-300/70 cursor-pointer transition-all duration-300 relative overflow-hidden group border">
                     <div class="flex items-center justify-between mb-1 sm:mb-2">
                         <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Products</span>
                         <div class="w-7 h-7 rounded-lg bg-white border border-violet-100 flex items-center justify-center text-violet-600 shadow-sm shrink-0">
@@ -78,8 +95,10 @@
                     <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Menu classification groups</p>
                 </div>
 
-                {{-- Inventory Assets --}}
-                <div class="p-3 sm:p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group col-span-2 lg:col-span-1">
+{{-- Inventory Assets --}}
+                <div @click="filterType = filterType === 'ingredient' ? 'all' : 'ingredient'"
+                    :class="filterType === 'ingredient' ? 'bg-gradient-to-br from-rose-100 via-rose-50 to-white border-rose-300 shadow-md scale-[1.02]' : 'bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border-rose-500/10 shadow-sm'"
+                    class="p-3 sm:p-4 rounded-2xl hover:shadow-md hover:scale-[1.02] hover:border-rose-300/70 cursor-pointer transition-all duration-300 relative overflow-hidden group col-span-2 lg:col-span-1 border">
                     <div class="flex items-center justify-between mb-1 sm:mb-2">
                         <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Inventory</span>
                         <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm shrink-0">
@@ -580,9 +599,9 @@
         </div>
     </x-modal>
 
-    <script>
+    <script data-navigate-once>
         (function() {
-            window.categoryManagement = function($wire) {
+            window.categoryManagement = function($wire, initialCategories = []) {
                 return {
                     view: $wire.entangle('view').live,
                     panel: $wire.entangle('panel').live,
@@ -591,15 +610,15 @@
                     searchQuery: '',
                     currentPage: 1,
                     perPage: 5,
-                    categoriesList: [],
+                    categoriesList: Array.isArray(initialCategories) ? initialCategories : [],
 
                     get filteredCategories() {
-                        const query = this.searchQuery.toLowerCase().trim();
+                        const query = (this.searchQuery || '').toLowerCase().trim();
                         const type = this.filterType;
-                        return this.categoriesList.filter(cat => {
+                        return (this.categoriesList || []).filter(cat => {
                             // Filter by search query
                             const matchesSearch = !query || 
-                                cat.name.toLowerCase().includes(query) || 
+                                (cat.name && cat.name.toLowerCase().includes(query)) || 
                                 (cat.description && cat.description.toLowerCase().includes(query));
                             
                             // Filter by segment type
@@ -626,11 +645,13 @@
                     },
 
                     isItemVisible(id, catType) {
-                        return this.paginatedCategories.some(c => c.id === id && c.cat_type === catType);
+                        if (!this.paginatedCategories) return false;
+                        return this.paginatedCategories.some(c => Number(c.id) === Number(id) && c.cat_type === catType);
                     },
 
                     updateCategoriesList(newList) {
-                        const oldIds = this.categoriesList.map(c => `${c.cat_type}-${c.id}`).join(',');
+                        if (!Array.isArray(newList)) return;
+                        const oldIds = (this.categoriesList || []).map(c => `${c.cat_type}-${c.id}`).join(',');
                         const newIds = newList.map(c => `${c.cat_type}-${c.id}`).join(',');
                         if (oldIds !== newIds) {
                             this.categoriesList = newList;
@@ -648,6 +669,14 @@
                     }
                 };
             };
+
+            if (window.Alpine) {
+                Alpine.data('categoryManagement', window.categoryManagement);
+            } else {
+                document.addEventListener('alpine:init', () => {
+                    Alpine.data('categoryManagement', window.categoryManagement);
+                });
+            }
         })();
     </script>
 </div>
