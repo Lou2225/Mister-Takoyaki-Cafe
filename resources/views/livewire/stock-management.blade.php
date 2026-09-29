@@ -90,10 +90,11 @@
         {{-- ═══════════════ PANEL 1 – LIST ═══════════════ --}}
 <div x-show="panel === 'list'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak wire:ignore.self class="px-1">
             {{-- KPI Dashboard (User Management Aesthetic) --}}
-            {{-- KPI Dashboard (Compact Glassmorphic Theme) --}}
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
                 {{-- Total Assets --}}
-                <div class="bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300">
+                <div @click="stockStatusFilter = ''; stockCurrentPage = 1"
+                    :class="stockStatusFilter === '' ? 'ring-2 ring-indigo-400 shadow-md scale-[1.01]' : ''"
+                    class="bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer">
                     <div class="flex items-center justify-between mb-2">
                         <span class="text-[10px] font-black text-indigo-700/80 uppercase tracking-widest leading-none">Total Catalog</span>
                         <div class="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-600 border border-indigo-500/10">
@@ -115,7 +116,9 @@
                     $lowStockIconBg = $isLowStockActive ? 'bg-amber-500/10 text-amber-600 border-amber-500/10' : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/10';
                     $lowStockValColor = $isLowStockActive ? 'text-amber-600' : 'text-emerald-600';
                 @endphp
-                <div class="bg-gradient-to-br {{ $lowStockGradient }} to-white border rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300">
+                <div @click="stockStatusFilter = (stockStatusFilter === 'low' ? '' : 'low'); stockCurrentPage = 1"
+                    :class="stockStatusFilter === 'low' ? 'ring-2 ring-amber-400 shadow-md scale-[1.01]' : ''"
+                    class="bg-gradient-to-br {{ $lowStockGradient }} to-white border rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer">
                     <div class="flex items-center justify-between mb-2">
                         <span class="text-[10px] font-black uppercase tracking-widest leading-none">Low Stock</span>
                         <div class="w-7 h-7 rounded-lg {{ $lowStockIconBg }} flex items-center justify-center">
@@ -137,7 +140,8 @@
                     $expIconBg = $isExpiringActive ? 'bg-rose-500/10 text-rose-600 border-rose-500/10' : 'bg-slate-500/10 text-slate-500 border-slate-500/10';
                     $expValColor = $isExpiringActive ? 'text-rose-600' : 'text-slate-800';
                 @endphp
-                <div class="bg-gradient-to-br {{ $expGradient }} to-white border rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300">
+                <div @click="panel = 'expiry'; expiryStatus = 'expiring'; expiryCurrentPage = 1"
+                    class="bg-gradient-to-br {{ $expGradient }} to-white border rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer">
                     <div class="flex items-center justify-between mb-2">
                         <span class="text-[10px] font-black uppercase tracking-widest leading-none">Expiring</span>
                         <div class="w-7 h-7 rounded-lg {{ $expIconBg }} flex items-center justify-center">
@@ -152,7 +156,7 @@
                 </div>
 
                 {{-- Monthly Procurement --}}
-                <div class="bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300">
+                <div class="bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] duration-300">
                     <div class="flex items-center justify-between mb-2">
                         <span class="text-[10px] font-black text-emerald-700/80 uppercase tracking-widest leading-none">Procurement</span>
                         <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 border border-emerald-500/10">
@@ -208,7 +212,7 @@
             <x-slot name="trigger">
                 <x-secondary-button type="button" class="gap-0 sm:gap-1.5 h-10 !px-2.5 sm:!px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
                     <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
-                    <span class="hidden sm:inline text-[12px] truncate max-w-[100px]" x-text="stockCategoryFilter ? (stockCategoryLabels[stockCategoryFilter] || 'Category') : 'All Categories'">All Categories</span>
+                        <span class="text-[12px] truncate max-w-[100px]" x-text="stockCategoryFilter ? (stockCategoryLabels[stockCategoryFilter] || 'Category') : 'All Categories'">All Categories</span>
                     <svg class="hidden sm:block w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                 </x-secondary-button>
             </x-slot>
@@ -352,7 +356,7 @@
                                 </td>
                             </tr>
                         @endforelse
-                        <tr x-show="filteredIngredientIds.length === 0 && stockSearch.trim() !== ''" x-cloak>
+                        <tr x-show="filteredIngredientIds.length === 0" x-cloak>
                             <td colspan="5" class="py-12">
                                 <x-empty-state title="No ingredients match your search" description="Try a different name or clear your search." />
                             </td>
@@ -1101,7 +1105,7 @@
                             </div>
                         </div>
 
-                        <div class="p-4 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-100 flex items-center justify-between transition-all hover:scale-[1.02] relative overflow-hidden group">
+                        <div class="p-4 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-100 flex items-center justify-between relative overflow-hidden group">
                             <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
                             <div class="relative z-10">
                                 <span class="text-[10px] font-black text-indigo-100 uppercase tracking-widest block mb-0.5">Calculated Base Cost</span>
@@ -1458,7 +1462,7 @@
                     </x-slot>
                     <x-slot name="content">
                         @foreach(['all' => 'All Batches', 'expired' => 'Expired Only', 'expiring' => 'Expiring Soon', 'fresh' => 'Stable Stock', 'no_date' => 'Non-Perishables'] as $val => $label)
-                            <x-dropdown-link href="#" @click.prevent="expiryStatus = '{{ $val }}'">
+                            <x-dropdown-link href="#" @click.prevent="expiryStatus = '{{ $val }}'; $dispatch('close')">
                                 <div class="flex items-center gap-2">
                                     @if($val === 'expired') <span class="w-2 h-2 rounded-full bg-rose-500"></span>
                                     @elseif($val === 'expiring') <span class="w-2 h-2 rounded-full bg-amber-500"></span>
@@ -1680,6 +1684,7 @@
                     stockSearch: '',
                     stockStatusFilter: '',
                     stockCategoryFilter: '',
+                    stockCategoryLabels: @js($allIngredientCategories->pluck('name', 'id')),
                     stockCurrentPage: 1,
                     stockPerPage: 5,
                     ingredientsList: [],

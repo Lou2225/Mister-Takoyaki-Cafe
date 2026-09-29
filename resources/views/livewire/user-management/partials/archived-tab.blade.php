@@ -5,52 +5,75 @@
     x-transition:enter-end="opacity-100 translate-y-0"
     x-cloak wire:ignore.self>
 
-    {{-- Archived KPI Grid --}}
+    {{-- Archived KPI Grid (Interactive Design System) --}}
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
         @php $archStats = $this->archivedStats; @endphp
 
-        <div class="p-3 sm:p-4 bg-gradient-to-br from-slate-500/10 via-slate-500/5 to-white border border-slate-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300">
-            <div class="flex items-center justify-between mb-1 sm:mb-2">
-                <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Archived</span>
-                <div class="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 shadow-sm">
+        {{-- Total Archived --}}
+        <div wire:key="kpi-archived-card-total"
+            wire:click="toggleArchivedKpiFilter('all')"
+            class="bg-gradient-to-br from-slate-50 to-white border border-slate-200 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer {{ $role_id === '' ? 'ring-2 ring-slate-400 shadow-md scale-[1.01]' : '' }}">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-black text-slate-700/80 uppercase tracking-widest leading-none">Total Archived</span>
+                <div class="w-7 h-7 rounded-lg bg-slate-500/10 flex items-center justify-center text-slate-600 border border-slate-500/10">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 8h14M5 8a2 2 0 01-2-2V4a2 2 0 012-2h14a2 2 0 012 2v2a2 2 0 01-2 2M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
                 </div>
             </div>
-            <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($archStats['total']) }}</h3>
-            <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Former team members on file</p>
+            <div class="flex items-baseline gap-1">
+                <span class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ number_format($archStats['total']) }}</span>
+                <span class="text-[9px] font-bold text-slate-400">records</span>
+            </div>
+            <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Former team members on file</p>
         </div>
 
-        <div class="p-3 sm:p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300">
-            <div class="flex items-center justify-between mb-1 sm:mb-2">
-                <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Archived Staff</span>
-                <div class="w-7 h-7 rounded-lg bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm">
+        {{-- Archived Staff --}}
+        <div wire:key="kpi-archived-card-staff"
+            wire:click="toggleArchivedKpiFilter('staff')"
+            class="bg-gradient-to-br from-amber-50 to-white border border-amber-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer {{ $role_id == '3' ? 'ring-2 ring-amber-400 shadow-md scale-[1.01]' : '' }}">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-black text-amber-700/80 uppercase tracking-widest leading-none">Archived Staff</span>
+                <div class="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600 border border-amber-500/10">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                 </div>
             </div>
-            <h3 class="text-xl sm:text-2xl font-black text-amber-600 tracking-tight leading-none">{{ number_format($archStats['staff']) }}</h3>
-            <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Cashiers &amp; riders no longer active</p>
+            <div class="flex items-baseline gap-1">
+                <span class="text-[20px] font-black text-amber-600 tracking-tight leading-none">{{ number_format($archStats['staff']) }}</span>
+                <span class="text-[9px] font-bold text-amber-600/70">staff</span>
+            </div>
+            <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Cashiers &amp; riders no longer active</p>
         </div>
 
-        <div class="p-3 sm:p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300">
-            <div class="flex items-center justify-between mb-1 sm:mb-2">
-                <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Archived Managers</span>
-                <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm">
+        {{-- Archived Managers --}}
+        <div wire:key="kpi-archived-card-admin"
+            wire:click="toggleArchivedKpiFilter('admin')"
+            class="bg-gradient-to-br from-rose-50 to-white border border-rose-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer {{ $role_id == '2' ? 'ring-2 ring-rose-400 shadow-md scale-[1.01]' : '' }}">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-black text-rose-700/80 uppercase tracking-widest leading-none">Archived Managers</span>
+                <div class="w-7 h-7 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-600 border border-rose-500/10">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                 </div>
             </div>
-            <h3 class="text-xl sm:text-2xl font-black text-rose-600 tracking-tight leading-none">{{ number_format($archStats['admins']) }}</h3>
-            <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Branch admins no longer active</p>
+            <div class="flex items-baseline gap-1">
+                <span class="text-[20px] font-black text-rose-600 tracking-tight leading-none">{{ number_format($archStats['admins']) }}</span>
+                <span class="text-[9px] font-bold text-rose-600/70">managers</span>
+            </div>
+            <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Branch admins no longer active</p>
         </div>
 
-        <div class="p-3 sm:p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300">
-            <div class="flex items-center justify-between mb-1 sm:mb-2">
-                <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Last 30 Days</span>
-                <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
+        {{-- Last 30 Days --}}
+        <div wire:key="kpi-archived-card-recent"
+            class="bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] duration-300">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-black text-indigo-700/80 uppercase tracking-widest leading-none">Last 30 Days</span>
+                <div class="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-600 border border-indigo-500/10">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 </div>
             </div>
-            <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($archStats['recent']) }}</h3>
-            <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Newly archived this month</p>
+            <div class="flex items-baseline gap-1">
+                <span class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ number_format($archStats['recent']) }}</span>
+                <span class="text-[9px] font-bold text-slate-400">recent</span>
+            </div>
+            <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Newly archived this month</p>
         </div>
     </div>
 
@@ -65,8 +88,15 @@
     </div>
 
     <div class="relative z-20 flex flex-row items-center justify-between mb-6 gap-2 sm:gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
-        <div class="flex flex-1 min-w-0 lg:flex-initial">
+        <div class="flex flex-1 items-center gap-2 min-w-0 lg:flex-initial">
             <x-search-bar wireModel="search" placeholder="Find records..." width="w-full lg:w-72" />
+            @if($role_id)
+                <button type="button" wire:click="$set('role_id', '')"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-amber-50 text-amber-800 rounded-lg border border-amber-200/60 hover:bg-amber-100 transition-colors shrink-0">
+                    <span>Role: {{ ucfirst($roles->firstWhere('id', $role_id)?->name ?? ($role_id == '2' ? 'Branch Admin' : 'Staff')) }}</span>
+                    <svg class="w-3.5 h-3.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            @endif
         </div>
         <div class="flex flex-nowrap items-center justify-end gap-1.5 sm:gap-2 shrink-0">
             @if(auth()->user()->role_id === 1)
@@ -131,7 +161,7 @@
     </div>
 
     {{-- ── Archived Table View ── --}}
-    <div x-show="tableView === 'table'" x-transition:enter="transition ease-out duration-400"
+    <div x-show="tableView === 'table'" wire:key="archived-table-wrap-{{ $role_id }}-{{ $archivedUsers->currentPage() }}" x-transition:enter="transition ease-out duration-400"
         x-transition:enter-start="opacity-0 translate-y-4"
         x-transition:enter-end="opacity-100 translate-y-0"
         class="w-full">
@@ -192,7 +222,7 @@
                     </td>
                 </tr>
             @empty
-                <tr>
+                <tr wire:key="archived-empty-{{ $role_id }}">
                     <td colspan="6" class="py-0">
                         <x-empty-state title="No archived accounts" description="Accounts you archive will show up here." />
                     </td>
@@ -204,7 +234,7 @@
     </div>
 
     {{-- ── Archived Board View ── --}}
-    <div x-show="tableView === 'board'" x-transition:enter="transition ease-out duration-400"
+    <div x-show="tableView === 'board'" wire:key="archived-board-wrap-{{ $role_id }}-{{ $archivedUsers->currentPage() }}" x-transition:enter="transition ease-out duration-400"
         x-transition:enter-start="opacity-0 translate-y-4"
         x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="mt-6">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -215,7 +245,7 @@
                     $grad = $colors[$user->id % count($colors)];
                     $userAvatar = $user->avatar ? $avatarCollection->firstWhere('id', $user->avatar) : null;
                 @endphp
-                <div class="bg-white rounded-2xl border border-slate-200/60 p-5 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_30px_-6px_rgba(0,0,0,0.1)] hover:-translate-y-0.5 transition-all duration-300 opacity-80">
+                <div wire:key="archived-board-user-{{ $user->id }}" class="bg-white rounded-2xl border border-slate-200/60 p-5 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_30px_-6px_rgba(0,0,0,0.1)] hover:-translate-y-0.5 transition-all duration-300 opacity-80">
                     <div class="flex items-start justify-between mb-3">
                         @if($userAvatar)
                             <div class="w-10 h-10 rounded-full flex items-center justify-center text-2xl shadow-sm grayscale" style="{{ $userAvatar['style'] }}">
@@ -274,7 +304,7 @@
                     </div>
                 </div>
             @empty
-                <div class="col-span-full">
+                <div wire:key="archived-board-empty-{{ $role_id }}" class="col-span-full">
                     <x-empty-state title="No archived accounts" description="Accounts you archive will show up here." />
                 </div>
             @endforelse

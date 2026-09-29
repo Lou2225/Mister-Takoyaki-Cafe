@@ -5,7 +5,7 @@
     x-transition:enter-end="opacity-100 translate-y-0"
     x-cloak wire:ignore.self>
 
-    {{-- System Metrics Grid (Matching Dashboard Premium Aesthetic - Compact Footprint) --}}
+    {{-- System Metrics Grid (Matching Dashboard Premium Aesthetic - Interactive KPIs) --}}
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
         @php
             $sysStats = $this->systemStats;
@@ -13,60 +13,94 @@
         @endphp
         
         {{-- Total Users --}}
-        <div class="p-3 sm:p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-            <div class="flex items-center justify-between mb-1 sm:mb-2">
-                <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Users</span>
-                <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
+        <div wire:key="kpi-user-card-total"
+            wire:click="toggleKpiFilter('all')"
+            class="bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer {{ ($is_active === '' && $role_id === '') ? 'ring-2 ring-indigo-400 shadow-md scale-[1.01]' : '' }}">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-black text-indigo-700/80 uppercase tracking-widest leading-none">Total Users</span>
+                <div class="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-600 border border-indigo-500/10">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
                 </div>
             </div>
-            <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($sysStats['total']) }}</h3>
-            <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Registered accounts in database</p>
+            <div class="flex items-baseline gap-1">
+                <span class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ number_format($sysStats['total']) }}</span>
+                <span class="text-[9px] font-bold text-slate-400">members</span>
+            </div>
+            <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Registered database accounts</p>
         </div>
 
         {{-- Active Status --}}
-        <div class="p-3 sm:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-            <div class="flex items-center justify-between mb-1 sm:mb-2">
-                <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active Now</span>
-                <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
+        <div wire:key="kpi-user-card-active"
+            wire:click="toggleKpiFilter('active')"
+            class="bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer {{ $is_active === '1' ? 'ring-2 ring-emerald-400 shadow-md scale-[1.01]' : '' }}">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-black text-emerald-700/80 uppercase tracking-widest leading-none">Active Now</span>
+                <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 border border-emerald-500/10">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 </div>
             </div>
-            <h3 class="text-xl sm:text-2xl font-black text-emerald-600 tracking-tight leading-none">{{ number_format($sysStats['active']) }}</h3>
-            <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Accounts with active access</p>
+            <div class="flex items-baseline gap-1">
+                <span class="text-[20px] font-black text-emerald-600 tracking-tight leading-none">{{ number_format($sysStats['active']) }}</span>
+                <span class="text-[9px] font-bold text-emerald-600/70">online</span>
+            </div>
+            <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Accounts with active access</p>
         </div>
 
         {{-- Inactive Accounts --}}
-        <div class="p-3 sm:p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-            <div class="flex items-center justify-between mb-1 sm:mb-2">
-                <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Inactive</span>
-                <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm">
+        <div wire:key="kpi-user-card-inactive"
+            wire:click="toggleKpiFilter('inactive')"
+            class="bg-gradient-to-br from-rose-50 to-white border border-rose-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer {{ $is_active === '0' ? 'ring-2 ring-rose-400 shadow-md scale-[1.01]' : '' }}">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-black text-rose-700/80 uppercase tracking-widest leading-none">Inactive</span>
+                <div class="w-7 h-7 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-600 border border-rose-500/10">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
                 </div>
             </div>
-            <h3 class="text-xl sm:text-2xl font-black text-rose-600 tracking-tight leading-none">{{ number_format($sysStats['inactive']) }}</h3>
-            <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Deactivated user profiles</p>
+            <div class="flex items-baseline gap-1">
+                <span class="text-[20px] font-black text-rose-600 tracking-tight leading-none">{{ number_format($sysStats['inactive']) }}</span>
+                <span class="text-[9px] font-bold text-rose-600/70">paused</span>
+            </div>
+            <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Deactivated user profiles</p>
         </div>
 
-        {{-- Workforce --}}
-        <div class="p-3 sm:p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-            <div class="flex items-center justify-between mb-1 sm:mb-2">
-                <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Staff Members</span>
-                <div class="w-7 h-7 rounded-lg bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm">
+        {{-- Staff Members --}}
+        <div wire:key="kpi-user-card-staff"
+            wire:click="toggleKpiFilter('staff')"
+            class="bg-gradient-to-br from-amber-50 to-white border border-amber-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer {{ $role_id == '3' ? 'ring-2 ring-amber-400 shadow-md scale-[1.01]' : '' }}">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-black text-amber-700/80 uppercase tracking-widest leading-none">Staff Members</span>
+                <div class="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600 border border-amber-500/10">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                 </div>
             </div>
-            <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($sysStats['staff']) }}</h3>
-            <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Operational store employees</p>
+            <div class="flex items-baseline gap-1">
+                <span class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ number_format($sysStats['staff']) }}</span>
+                <span class="text-[9px] font-bold text-slate-400">staff</span>
+            </div>
+            <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Operational store employees</p>
         </div>
     </div>
 
     {{-- macOS Style Unified Toolbar --}}
     <div class="relative z-20 flex flex-row items-center justify-between mb-6 gap-2 sm:gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
         
-        {{-- Left: Search Bar --}}
-        <div class="flex flex-1 min-w-0 lg:flex-initial">
+        {{-- Left: Search Bar & Active Filter Chips --}}
+        <div class="flex flex-1 items-center gap-2 min-w-0 lg:flex-initial">
             <x-search-bar wireModel="search" placeholder="Find records..." width="w-full lg:w-72" />
+            @if($is_active !== '')
+                <button type="button" wire:click="toggleKpiFilter('active')"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-200/60 hover:bg-indigo-100 transition-colors shrink-0">
+                    <span>Status: {{ $is_active === '1' ? 'Active' : 'Inactive' }}</span>
+                    <svg class="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            @endif
+            @if($role_id)
+                <button type="button" wire:click="$set('role_id', '')"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-amber-50 text-amber-800 rounded-lg border border-amber-200/60 hover:bg-amber-100 transition-colors shrink-0">
+                    <span>Role: {{ ucfirst($roles->firstWhere('id', $role_id)?->name ?? 'Staff') }}</span>
+                    <svg class="w-3.5 h-3.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            @endif
         </div>
 
         {{-- Right: Filters & View Toggle --}}
@@ -167,7 +201,7 @@
     </div>
 
     {{-- ── Table View ── --}}
-    <div x-show="tableView === 'table'" x-transition:enter="transition ease-out duration-400"
+    <div x-show="tableView === 'table'" wire:key="directory-table-wrap-{{ $is_active }}-{{ $role_id }}-{{ $users->currentPage() }}" x-transition:enter="transition ease-out duration-400"
         x-transition:enter-start="opacity-0 translate-y-4"
         x-transition:enter-end="opacity-100 translate-y-0"
         class="w-full">
@@ -242,7 +276,7 @@
                     </td>
                 </tr>
             @empty
-                <tr>
+                <tr wire:key="directory-empty-{{ $is_active }}-{{ $role_id }}">
                     <td colspan="7" class="py-0">
                         <x-empty-state 
                             title="No users identified" 
@@ -257,7 +291,7 @@
     </div>
 
     {{-- ── Board View ── --}}
-    <div x-show="tableView === 'board'" x-transition:enter="transition ease-out duration-400"
+    <div x-show="tableView === 'board'" wire:key="directory-board-wrap-{{ $is_active }}-{{ $role_id }}-{{ $users->currentPage() }}" x-transition:enter="transition ease-out duration-400"
         x-transition:enter-start="opacity-0 translate-y-4"
         x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="mt-6">
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -271,7 +305,7 @@
                         $userAvatar = $avatarCollection->firstWhere('id', $user->avatar);
                     }
                 @endphp
-                <div class="bg-white rounded-2xl border border-slate-200/60 p-5 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_30px_-6px_rgba(0,0,0,0.1)] hover:-translate-y-0.5 transition-all duration-300">
+                <div wire:key="directory-board-user-{{ $user->id }}" class="bg-white rounded-2xl border border-slate-200/60 p-5 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_30px_-6px_rgba(0,0,0,0.1)] hover:-translate-y-0.5 transition-all duration-300">
                     <div class="flex items-start justify-between mb-3">
                         @if($userAvatar)
                             <div class="w-10 h-10 rounded-full flex items-center justify-center text-2xl shadow-sm" style="{{ $userAvatar['style'] }}">
@@ -320,7 +354,7 @@
                     </div>
                 </div>
             @empty
-                <div class="col-span-full">
+                <div wire:key="directory-board-empty-{{ $is_active }}-{{ $role_id }}" class="col-span-full">
                     <x-empty-state 
                         title="No employee profiles" 
                         description="Your search yielded no results. Consider checking the spelling or removing filters."

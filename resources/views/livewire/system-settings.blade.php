@@ -791,9 +791,14 @@
             @endif
 
             {{-- Inventory Controls --}}
-            <div x-show="tab === 'inventory'" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="space-y-6">
-                <div class="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
-                    <h2 class="text-[13px] font-bold text-gray-900 uppercase tracking-widest mb-6 border-b border-gray-50 pb-2">Inventory Operations</h2>
+<div x-show="tab === 'inventory'" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" class="space-y-6">
+    <div class="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+        <div class="flex items-center justify-between mb-6 border-b border-gray-50 pb-2">
+            <h2 class="text-[13px] font-bold text-gray-900 uppercase tracking-widest">Inventory Operations</h2>
+            <span class="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full {{ $settingsBranchId ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-600' }}">
+                {{ $settingsBranchId ? 'Editing: ' . $settingsBranchName : 'Editing Global Default' }}
+            </span>
+        </div>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
                         <div>
                             <x-input-label for="lowStockThreshold" value="Low Stock Warning" />
@@ -1818,7 +1823,7 @@
     </style>
     <script>
     (function() {
-        const registerSettingsData = () => { if (Alpine.data('systemSettingsData')) return; Alpine.data('systemSettingsData', (initialData) => ({ ...initialData,
+        const registerSettingsData = () => { if (window.__systemSettingsRegistered) return; window.__systemSettingsRegistered = true; Alpine.data('systemSettingsData', (initialData) => ({ ...initialData,
                 // ── Location state ───────────────────────────────────────
                 loc: {
                     region:   { items: [], search: '', loading: false },
@@ -2258,7 +2263,7 @@
 
     <script>
     (function() {
-        const registerBtPrinterCard = () => { if (Alpine.data('btPrinterCard')) return; Alpine.data('btPrinterCard', () => ({
+        const registerBtPrinterCard = () => { if (window.__btPrinterCardRegistered) return; window.__btPrinterCardRegistered = true; Alpine.data('btPrinterCard', () => ({
             btSupported: false,
             btConnected: false,
             btBusy: false,
@@ -2335,7 +2340,7 @@
 
     <script>
     (function() {
-        const registerWiredPrinterCard = () => { if (Alpine.data('wiredPrinterCard')) return; Alpine.data('wiredPrinterCard', () => ({
+        const registerWiredPrinterCard = () => { if (window.__wiredPrinterCardRegistered) return; window.__wiredPrinterCardRegistered = true; Alpine.data('wiredPrinterCard', () => ({
             bridgeOnline: false,
             wiredConnected: false,
             wiredBusy: false,

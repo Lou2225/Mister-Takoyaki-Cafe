@@ -125,6 +125,44 @@
     </div>
 </div>
 
+{{-- Global Floating Island Unstable Network Alert --}}
+{{-- Only shown after 2 consecutive slow pings (≥500ms RTT to ping.txt) to avoid false positives --}}
+<div class="fixed top-4 inset-x-0 z-[9999] flex justify-center pointer-events-none px-4 mt-12" style="z-index: 999998 !important;">
+    <div
+        x-data="{
+            unstable: false,
+            init() {
+                // Listen for confirmed slow status from the telemetry widget.
+                // 'network-slow-confirmed' is only fired after 2 consecutive slow pings.
+                window.addEventListener('network-slow-confirmed', () => { this.unstable = true; });
+                window.addEventListener('network-status', (e) => {
+                    // Clear immediately on any non-slow reading.
+                    if (e.detail.status !== 'slow') this.unstable = false;
+                });
+                window.addEventListener('offline', () => { this.unstable = false; });
+            }
+        }"
+        x-show="unstable"
+        x-cloak
+        x-transition:enter="transition ease-out duration-300 transform"
+        x-transition:enter-start="-translate-y-10 opacity-0 scale-95"
+        x-transition:enter-end="translate-y-0 opacity-100 scale-100"
+        x-transition:leave="transition ease-in duration-200 transform"
+        x-transition:leave-start="translate-y-0 opacity-100 scale-100"
+        x-transition:leave-end="-translate-y-10 opacity-0 scale-95"
+        class="pointer-events-auto flex items-center gap-3 px-5 py-2.5 rounded-full text-white shadow-2xl select-none"
+        style="background-color: #d97706 !important; color: #ffffff !important; border: 1.5px solid #fbbf24 !important; box-shadow: 0 20px 30px -10px rgba(217, 119, 6, 0.55), 0 10px 15px -3px rgba(0, 0, 0, 0.25) !important;"
+    >
+        <span class="relative flex h-2.5 w-2.5 shrink-0">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-200 opacity-80"></span>
+            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
+        </span>
+        <svg class="w-4 h-4 text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+        </svg>
+        <span class="text-xs font-bold tracking-wide">Unstable Network. Requests may be delayed.</span>
+    </div>
+</div>
 <div
     x-data="{
         sidebarOpen: localStorage.getItem('sidebarOpen') ? JSON.parse(localStorage.getItem('sidebarOpen')) : (window.innerWidth >= 1024),
@@ -215,21 +253,31 @@
         </div>
 
         {{-- Professional 4-Bar Signal Telemetry Widget (Matches Clock Line Height) --}}
+        {{--
+            Latency is measured ONLY via ping.txt (true network RTT).
+            PerformanceObserver is NOT used — it captures Livewire XHR total time
+            (including PHP processing) which is not a network quality metric.
+            A rolling median of the last 3 samples smooths jitter.
+            The "Unstable" banner requires 2 consecutive slow pings before showing.
+            State is stored in window.__mtcTelemetry so navigation never re-inits.
+        --}}
         <div wire:ignore wire:key="topbar-telemetry-widget" x-data="{
                 ping: null,
-                bars: 4, // 0 to 4
-                status: 'online', // 'online', 'fair', 'slow', 'offline'
+                bars: 4,
+                status: 'online',
                 popoverOpen: false,
                 networkType: 'WiFi/LAN',
                 downlink: null,
                 isChecking: false,
+                _pingHistory: [],
+                _consecutiveSlow: 0,
 
                 get activeBarFill() {
                     if (this.status === 'offline') return '#E5E7EB';
                     if (this.ping === null) return '#D1D5DB';
-                    if (this.bars >= 3) return '#10B981'; // emerald-500
-                    if (this.bars === 2) return '#F59E0B'; // amber-500
-                    return '#F97316'; // orange-500
+                    if (this.bars >= 3) return '#10B981';
+                    if (this.bars === 2) return '#F59E0B';
+                    return '#F97316';
                 },
 
                 get textClass() {
@@ -248,38 +296,62 @@
                     return 'text-orange-500';
                 },
 
+                // Median of last N samples - immune to single-spike outliers.
+                _rollingMedian(ms) {
+                    this._pingHistory.push(ms);
+                    if (this._pingHistory.length > 3) this._pingHistory.shift();
+                    const sorted = [...this._pingHistory].sort((a, b) => a - b);
+                    return sorted[Math.floor(sorted.length / 2)];
+                },
+
                 calculateBars(ms) {
                     if (ms === null || !navigator.onLine) {
                         this.bars = 0;
                         this.status = 'offline';
+                        this._consecutiveSlow = 0;
+                        this._pingHistory = [];
                         window.dispatchEvent(new CustomEvent('network-status', { detail: { status: 'offline' } }));
                         return;
                     }
-                    if (ms < 150) {
+
+                    const smoothed = this._rollingMedian(ms);
+                    this.ping = smoothed;
+
+                    let newStatus;
+                    if (smoothed < 150) {
                         this.bars = 4;
-                        this.status = 'online';
-                    } else if (ms < 300) {
+                        newStatus = 'online';
+                    } else if (smoothed < 300) {
                         this.bars = 3;
-                        this.status = 'online';
-                    } else if (ms < 500) {
+                        newStatus = 'online';
+                    } else if (smoothed < 500) {
                         this.bars = 2;
-                        this.status = 'fair';
+                        newStatus = 'fair';
                     } else {
                         this.bars = 1;
-                        this.status = 'slow';
+                        newStatus = 'slow';
                     }
-                    window.dispatchEvent(new CustomEvent('network-status', { detail: { status: this.status } }));
+
+                    this.status = newStatus;
+                    window.dispatchEvent(new CustomEvent('network-status', { detail: { status: newStatus } }));
+
+                    // Require 2 consecutive slow readings before firing the 'Unstable' banner.
+                    // Any non-slow reading resets the counter immediately.
+                    if (newStatus === 'slow') {
+                        this._consecutiveSlow++;
+                        if (this._consecutiveSlow >= 2) {
+                            window.dispatchEvent(new CustomEvent('network-slow-confirmed'));
+                        }
+                    } else {
+                        this._consecutiveSlow = 0;
+                    }
                 },
 
                 detectNetworkType() {
                     const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
                     if (conn) {
-                        if (conn.effectiveType) {
-                            this.networkType = conn.effectiveType.toUpperCase();
-                        }
-                        if (conn.downlink) {
-                            this.downlink = conn.downlink + ' Mbps';
-                        }
+                        if (conn.effectiveType) this.networkType = conn.effectiveType.toUpperCase();
+                        if (conn.downlink) this.downlink = conn.downlink + ' Mbps';
                     }
                 },
 
@@ -292,23 +364,27 @@
                     }
 
                     this.isChecking = true;
+                    // Record start AFTER acquiring the lock to avoid counting queue wait time.
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 3000);
                     const start = performance.now();
                     try {
-                        const controller = new AbortController();
-                        const timeoutId = setTimeout(() => controller.abort(), 2500);
-                        const pingUrl = (window.location.origin || '') + '/ping.txt?t=' + Date.now();
+                        const pingUrl = window.location.origin + '/ping.txt?_=' + Date.now();
                         const response = await fetch(pingUrl, {
-                            method: 'GET',
+                            method: 'HEAD', // HEAD avoids body download overhead - pure RTT
                             cache: 'no-store',
                             signal: controller.signal
                         });
                         clearTimeout(timeoutId);
-                        if (!response.ok) throw new Error('Ping failed');
-                        const duration = Math.max(4, Math.round(performance.now() - start));
-                        this.ping = duration;
-                        this.calculateBars(duration);
+                        if (response.ok) {
+                            const rtt = Math.max(1, Math.round(performance.now() - start));
+                            this.calculateBars(rtt);
+                        }
+                        // Non-200 from local server: likely dev server hiccup, ignore.
                     } catch (e) {
-                        if (!navigator.onLine) {
+                        clearTimeout(timeoutId);
+                        // AbortError = timeout, not a real network failure - ignore.
+                        if (e.name !== 'AbortError' && !navigator.onLine) {
                             this.ping = null;
                             this.calculateBars(null);
                         }
@@ -317,68 +393,44 @@
                     }
                 },
 
-                observeRealTraffic() {
-                    if (!('PerformanceObserver' in window)) return;
-
-                    const obs = new PerformanceObserver((list) => {
-                        for (const entry of list.getEntries()) {
-                            if (entry.initiatorType !== 'fetch' && entry.initiatorType !== 'xmlhttprequest') continue;
-                            if (!navigator.onLine) continue;
-
-                            const duration = Math.max(1, Math.round(entry.duration));
-                            this.ping = duration;
-                            this.calculateBars(duration);
-                        }
-                    });
-
-                    obs.observe({ type: 'resource', buffered: true });
-                    window.__mtcTrafficObserver = obs;
-                },
-
                 init() {
                     this.detectNetworkType();
-                    this.observeRealTraffic();
 
-                    const isReInit = !!window.__mtcPingInterval;
-                    if (window.__mtcPingInterval) {
-                        clearInterval(window.__mtcPingInterval);
-                        window.__mtcPingInterval = null;
+                    // Restore state from previous init (survive wire:navigate without flicker).
+                    if (window.__mtcTelemetry) {
+                        const t = window.__mtcTelemetry;
+                        this.ping = t.ping;
+                        this.bars = t.bars;
+                        this.status = t.status;
+                        this._pingHistory = t.pingHistory || [];
+                        this._consecutiveSlow = t.consecutiveSlow || 0;
                     }
 
-                    if (!isReInit) {
+                    // Keep state in sync so navigate restores it.
+                    this.$watch('ping',   v => { if (window.__mtcTelemetry) window.__mtcTelemetry.ping = v; });
+                    this.$watch('bars',   v => { if (window.__mtcTelemetry) window.__mtcTelemetry.bars = v; });
+                    this.$watch('status', v => { if (window.__mtcTelemetry) window.__mtcTelemetry.status = v; });
+
+                    // Only start the global interval once - survive navigation.
+                    if (!window.__mtcPingInterval) {
+                        window.__mtcTelemetry = { ping: this.ping, bars: this.bars, status: this.status, pingHistory: this._pingHistory, consecutiveSlow: this._consecutiveSlow };
                         this.checkPing();
+                        window.__mtcPingInterval = setInterval(() => {
+                            if (!document.hidden && navigator.onLine) this.checkPing();
+                        }, 6000);
                     }
 
-                    window.__mtcPingInterval = setInterval(() => {
-                        if (!document.hidden && navigator.onLine) {
-                            this.checkPing();
-                        }
-                    }, 5000);
-
-                    document.addEventListener('livewire:navigated', () => {
-                        if (navigator.onLine) this.checkPing();
-                    });
-
-                    window.addEventListener('online', () => this.checkPing());
-                    window.addEventListener('offline', () => {
-                        this.ping = null;
-                        this.calculateBars(null);
-                    });
+                    window.addEventListener('online',  () => { this._pingHistory = []; this._consecutiveSlow = 0; this.checkPing(); });
+                    window.addEventListener('offline', () => { this.ping = null; this.calculateBars(null); });
                     document.addEventListener('visibilitychange', () => {
                         if (!document.hidden && navigator.onLine) this.checkPing();
                     });
-
                 },
 
                 destroy() {
-                    if (window.__mtcPingInterval) {
-                        clearInterval(window.__mtcPingInterval);
-                        window.__mtcPingInterval = null;
-                    }
-                    if (window.__mtcTrafficObserver) {
-                        window.__mtcTrafficObserver.disconnect();
-                        window.__mtcTrafficObserver = null;
-                    }
+                    // Do NOT clear __mtcPingInterval on destroy - navigation re-inits this
+                    // component and we want the interval to survive. It is only cleared if the
+                    // user actually leaves the app entirely (page unload).
                 }
             }"
             @click.outside="popoverOpen = false"

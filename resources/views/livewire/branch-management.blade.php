@@ -2,6 +2,8 @@
     x-data="branchManagementData($wire, @js($panel), @js($view), @js($managers->map(fn($m) => ['id' => (string)$m->id, 'name' => trim($m->first_name . ' ' . $m->last_name)])))"
     x-on:refresh-global-map.window="latestBranches = ($event.detail.branches || $event.detail[0]?.branches) || latestBranches; updateGlobalBranches(latestBranches)"
     @trigger-edit-branch.window="$wire.showEdit($event.detail.id)"
+    wire:ignore.self
+    wire:key="branch-management-main-container"
     class="relative">
 
     <script>
@@ -1121,63 +1123,89 @@
                 </div>
             </div>
 
-            {{-- Fleet Metrics Grid (Matching Dashboard Premium Aesthetic - Compact Footprint) --}}
+            {{-- Fleet Metrics Grid (Matching Dashboard Premium Aesthetic - Interactive KPIs) --}}
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
                 {{-- Total Branches --}}
-                <div class="p-3 sm:p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-1 sm:mb-2">
-                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Branches</span>
-                        <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm">
+                <div wire:key="kpi-branch-card-total"
+                    wire:click="toggleStatusFilter('')"
+                    class="bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer {{ $is_active === '' ? 'ring-2 ring-indigo-400 shadow-md scale-[1.01]' : '' }}">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-indigo-700/80 uppercase tracking-widest leading-none">Total Branches</span>
+                        <div class="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-600 border border-indigo-500/10">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
                         </div>
                     </div>
-                    <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $systemStats['total'] }}</h3>
-                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Registered branch locations</p>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ $systemStats['total'] }}</span>
+                        <span class="text-[9px] font-bold text-slate-400">nodes</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Registered branch locations</p>
                 </div>
                 
-                {{-- Operational --}}
-                <div class="p-3 sm:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-1 sm:mb-2">
-                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active</span>
-                        <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
+                {{-- Operational / Active --}}
+                <div wire:key="kpi-branch-card-active"
+                    wire:click="toggleStatusFilter('1')"
+                    class="bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer {{ $is_active === '1' ? 'ring-2 ring-emerald-400 shadow-md scale-[1.01]' : '' }}">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-emerald-700/80 uppercase tracking-widest leading-none">Active Nodes</span>
+                        <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 border border-emerald-500/10">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </div>
                     </div>
-                    <h3 class="text-xl sm:text-2xl font-black text-emerald-600 tracking-tight leading-none">{{ $systemStats['active'] }}</h3>
-                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Operational store nodes</p>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-emerald-600 tracking-tight leading-none">{{ $systemStats['active'] }}</span>
+                        <span class="text-[9px] font-bold text-emerald-600/70">online</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Operational store nodes</p>
                 </div>
 
-                {{-- Decommissioned --}}
-                <div class="p-3 sm:p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-1 sm:mb-2">
-                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Inactive</span>
-                        <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm">
+                {{-- Decommissioned / Inactive --}}
+                <div wire:key="kpi-branch-card-inactive"
+                    wire:click="toggleStatusFilter('0')"
+                    class="bg-gradient-to-br from-rose-50 to-white border border-rose-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer {{ $is_active === '0' ? 'ring-2 ring-rose-400 shadow-md scale-[1.01]' : '' }}">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-rose-700/80 uppercase tracking-widest leading-none">Inactive Nodes</span>
+                        <div class="w-7 h-7 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-600 border border-rose-500/10">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
                         </div>
                     </div>
-                    <h3 class="text-xl sm:text-2xl font-black text-rose-600 tracking-tight leading-none">{{ $systemStats['inactive'] }}</h3>
-                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Temporarily closed locations</p>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-rose-600 tracking-tight leading-none">{{ $systemStats['inactive'] }}</span>
+                        <span class="text-[9px] font-bold text-rose-600/70">closed</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Temporarily closed locations</p>
                 </div>
 
                 {{-- Workforce --}}
-                <div class="p-3 sm:p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-1 sm:mb-2">
-                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Workforce</span>
-                        <div class="w-7 h-7 rounded-lg bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm">
+                <a href="{{ route('users.index') }}" wire:navigate wire:key="kpi-branch-card-workforce"
+                    class="bg-gradient-to-br from-amber-50 to-white border border-amber-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer block group">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-amber-700/80 uppercase tracking-widest leading-none">Workforce</span>
+                        <div class="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600 border border-amber-500/10 group-hover:scale-110 transition-transform">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                         </div>
                     </div>
-                    <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $systemStats['staff'] }}</h3>
-                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Total employees deployed</p>
-                </div>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ $systemStats['staff'] }}</span>
+                        <span class="text-[9px] font-bold text-slate-400">staff</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Manage store workforce &rarr;</p>
+                </a>
             </div>
 
             {{-- Unified Toolbar --}}
             <div class="relative z-20 flex flex-row items-center justify-between mb-6 gap-2 sm:gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
                 
-                {{-- Left: Search Bar --}}
-                <div class="flex flex-1 min-w-0 lg:flex-initial">
+                {{-- Left: Search Bar & Active Filters --}}
+                <div class="flex flex-1 items-center gap-2 min-w-0 lg:flex-initial">
                     <x-search-bar wireModel="search" placeholder="Find branches..." width="w-full lg:w-72" />
+                    @if($is_active !== '')
+                        <button type="button" wire:click="toggleStatusFilter('')"
+                            class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-200/60 hover:bg-indigo-100 transition-colors shrink-0">
+                            <span>Status: {{ $is_active === '1' ? 'Active' : 'Inactive' }}</span>
+                            <svg class="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    @endif
                 </div>
 
                 {{-- Right: Filters & View Toggle --}}
@@ -1235,7 +1263,7 @@
                 </div>
             </div>
 
-            <div x-show="view === 'table'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
+            <div x-show="view === 'table'" wire:key="branch-table-wrap-{{ $is_active }}-{{ $branches->currentPage() }}" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
                 <x-data-table>
                     <x-slot name="header">
                         <th class="py-3 px-4 border-r border-slate-100/50 text-[11px] font-black text-slate-500 uppercase tracking-widest">Branch Name</th>
@@ -1308,7 +1336,7 @@
                             @endif
                         </tr>
                     @empty
-                        <tr>
+                        <tr wire:key="branch-empty-{{ $is_active }}">
                             <td colspan="4">
                                 <x-empty-state title="No branches found" description="Adjust filters or add a new branch." />
                             </td>
@@ -1321,7 +1349,7 @@
             </div>
 
             {{-- Board View --}}
-            <div x-show="view === 'board'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="mt-6">
+            <div x-show="view === 'board'" wire:key="branch-board-wrap-{{ $is_active }}-{{ $branches->currentPage() }}" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="mt-6">
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     @forelse($branches as $branch)
                         <div wire:key="branch-card-{{ $branch->id }}" class="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm hover:shadow-xl hover:shadow-indigo-500/5 hover:-translate-y-1 transition-all duration-300 group">
@@ -1364,7 +1392,7 @@
                             </div>
                         </div>
                     @empty
-                        <div class="col-span-full">
+                        <div wire:key="branch-board-empty-{{ $is_active }}" class="col-span-full">
                             <x-empty-state title="No branches found" description="Try adjusting your filters or search criteria." />
                         </div>
                     @endforelse

@@ -700,6 +700,12 @@ class BranchManagement extends Component
     public function isAdmin()      { return auth()->user()?->isAdmin();      }
     public function isStaff()      { return auth()->user()?->isStaff();      }
 
+    public function toggleStatusFilter($status)
+    {
+        $this->is_active = ($this->is_active === (string)$status && $status !== '') ? '' : (string)$status;
+        $this->resetPage();
+    }
+
     public function updating($name, $value)
     {
         if ($name !== 'page') {

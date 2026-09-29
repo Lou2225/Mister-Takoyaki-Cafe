@@ -177,6 +177,28 @@ class ValidationHelper
         return ['required', 'numeric', "min:{$min}", "max:{$max}"];
     }
 
+    public static function duplicateNormalizedNames(iterable $items, string $key = 'name'): array
+    {
+        $seen = [];
+        $duplicates = [];
+
+        foreach ($items as $item) {
+            $value = is_array($item) ? ($item[$key] ?? '') : data_get($item, $key, '');
+            $normalized = mb_strtolower(trim((string) $value));
+            if ($normalized === '') {
+                continue;
+            }
+
+            if (isset($seen[$normalized])) {
+                $duplicates[$normalized] = $normalized;
+            } else {
+                $seen[$normalized] = true;
+            }
+        }
+
+        return array_values($duplicates);
+    }
+
     /**
      * Quantity rules (for stock/recipe quantities).
      */

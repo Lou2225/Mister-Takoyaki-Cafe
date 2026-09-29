@@ -340,6 +340,252 @@
         };
     };
 
+    // Category Management Component
+    window.categoryManagement = function($wire, initialCategories = []) {
+        return {
+            view: $wire.entangle('view').live,
+            panel: $wire.entangle('panel').live,
+            filterType: $wire.entangle('filterType').live,
+
+            searchQuery: '',
+            currentPage: 1,
+            perPage: 5,
+            categoriesList: Array.isArray(initialCategories) ? initialCategories : [],
+
+            get filteredCategories() {
+                const query = (this.searchQuery || '').toLowerCase().trim();
+                const type = this.filterType || 'all';
+                return (this.categoriesList || []).filter(cat => {
+                    if (!cat) return false;
+                    const matchesSearch = !query ||
+                        (cat.name && cat.name.toLowerCase().includes(query)) ||
+                        (cat.description && cat.description.toLowerCase().includes(query));
+                    const matchesType = type === 'all' || cat.cat_type === type;
+                    return matchesSearch && matchesType;
+                });
+            },
+
+            get paginatedCategories() {
+                const start = ((this.currentPage || 1) - 1) * (this.perPage || 5);
+                return (this.filteredCategories || []).slice(start, start + (this.perPage || 5));
+            },
+
+            get pageNumbers() {
+                const totalPages = Math.ceil((this.filteredCategories || []).length / (this.perPage || 5)) || 1;
+                const start = Math.max(1, (this.currentPage || 1) - 1);
+                const end = Math.min(totalPages, (this.currentPage || 1) + 1);
+                const pages = [];
+                for (let i = start; i <= end; i++) pages.push(i);
+                return pages;
+            },
+
+            isItemVisible(id, catType) {
+                if (!this.paginatedCategories) return false;
+                return this.paginatedCategories.some(c => Number(c.id) === Number(id) && c.cat_type === catType);
+            },
+
+            updateCategoriesList(newList) {
+                if (!Array.isArray(newList)) return;
+                const oldIds = (this.categoriesList || []).map(c => `${c.cat_type}-${c.id}`).join(',');
+                const newIds = newList.map(c => `${c.cat_type}-${c.id}`).join(',');
+                if (oldIds !== newIds) {
+                    this.categoriesList = newList;
+                    this.currentPage = 1;
+                }
+            },
+
+            init() {
+                this.$watch('filterType', () => { this.currentPage = 1; });
+                this.$watch('searchQuery', () => { this.currentPage = 1; });
+            }
+        };
+    };
+
+    // Order Management Component (0ms Instant Tab Switch & Detail Preview)
+    // NOTE: sourceFilter is entangled directly (NOT via slidingTabsLogic spread) so that
+    // Alpine.cloneNode() can correctly propagate the resolved reactive value through the
+    // data-stack to morphed child elements. Spreading an Alpine interceptor via
+    // slidingTabsLogic causes `sourceFilter is not defined` errors during Livewire DOM morphs.
+    window.orderManagement = function($wire) {
+        return {
+            sourceFilter: $wire.entangle('sourceFilter').live,
+            statusFilter: $wire.entangle('statusFilter').live,
+            sourceFilterWidth: 0,
+            sourceFilterLeft: 0,
+            selectedOrderId: $wire.entangle('selectedOrderId').live,
+            loadingOrderId: null,
+
+            init() {
+                // Sliding-tab indicator — mirrors slidingTabsLogic but keeps sourceFilter
+                // as a plain reactive property in this scope rather than an interceptor spread.
+                const p = 'sourceFilter';
+                const runUpdate = () => this.updateIndicator(p);
+
+                setTimeout(runUpdate, 50);
+                setTimeout(runUpdate, 300);
+
+                this.$watch(p, () => runUpdate());
+
+                window.addEventListener('resize', runUpdate);
+                window.addEventListener('app:refresh-ui', runUpdate);
+                document.addEventListener('livewire:navigated', runUpdate);
+
+                this.$el.addEventListener('alpine:destroy', () => {
+                    window.removeEventListener('resize', runUpdate);
+                    window.removeEventListener('app:refresh-ui', runUpdate);
+                    document.removeEventListener('livewire:navigated', runUpdate);
+                });
+            },
+
+            updateIndicator(p) {
+                const active = this[p];
+                if (!active) return;
+
+                requestAnimationFrame(() => {
+                    const list = this.$refs[`${p}List`]
+                        || this.$refs.tabList
+                        || this.$el.querySelector(`[x-ref="${p}List"], [x-ref="tabList"], [x-ref="${p}TabList"]`);
+                    if (!list) return;
+
+                    const el = list.querySelector(`[data-tab='${active}'], [data-panel='${active}'], [value='${active}']`);
+
+                    if (el && el.offsetWidth > 0) {
+                        this[`${p}Width`] = el.offsetWidth;
+                        this[`${p}Left`] = el.offsetLeft;
+                    } else if (el) {
+                        setTimeout(() => {
+                            if (el.offsetWidth > 0) {
+                                this[`${p}Width`] = el.offsetWidth;
+                                this[`${p}Left`] = el.offsetLeft;
+                            }
+                        }, 150);
+                    }
+                });
+            },
+
+            async openOrderDetail(id) {
+                this.loadingOrderId = id;
+                try {
+                    await this.$wire.openOrderDetail(id);
+                } finally {
+                    this.loadingOrderId = null;
+                }
+            },
+
+            deliveryMapUrl: '',
+            deliveryMapExternalUrl: '',
+            openDeliveryLocation(lat, lng) {
+                this.deliveryMapUrl = `https://www.google.com/maps?q=${lat},${lng}&z=16&output=embed`;
+                this.deliveryMapExternalUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+                this.$dispatch('open-modal', 'delivery-location-modal');
+            },
+
+            proofPhotoUrl: '',
+            proofPhotoCaption: '',
+            openProofPhoto(url, caption) {
+                this.proofPhotoUrl = url;
+                this.proofPhotoCaption = caption || '';
+                this.$dispatch('open-modal', 'proof-photo-modal');
+            },
+        };
+    };
+
+    // Kitchen Display System Component (0ms Instant Tab Switch & Delay Filter)
+    // NOTE: activeTab is entangled directly (NOT via slidingTabsLogic spread) so that
+    // Alpine.cloneNode() can correctly propagate the resolved reactive value through the
+    // data-stack to morphed child elements. Spreading an Alpine interceptor via
+    // slidingTabsLogic causes `activeTab is not defined` errors during Livewire DOM morphs.
+    window.kitchenDisplay = function($wire, delayThresholdMinutes = 10) {
+        return {
+            activeTab: $wire.entangle('activeTab').live,
+            activeTabWidth: 0,
+            activeTabLeft: 0,
+            delayedOnly: false,
+            delayThreshold: delayThresholdMinutes,
+            _timerInterval: null,
+
+            isOrderDelayed(createdAt) {
+                if (!createdAt) return false;
+                const diff = Math.floor((new Date() - new Date(createdAt)) / 1000);
+                return (diff / 60) >= this.delayThreshold;
+            },
+
+            updateTimers() {
+                const now = new Date();
+                const warnThreshold = Math.max(1, Math.floor(this.delayThreshold / 2));
+                document.querySelectorAll('[data-created-at]').forEach(el => {
+                    const createdAt = el.dataset.createdAt;
+                    if (!createdAt) return;
+                    const diff = Math.floor((now - new Date(createdAt)) / 1000);
+                    const m = Math.floor(diff / 60);
+                    const s = diff % 60;
+                    el.innerText = `${m}:${s.toString().padStart(2, '0')}`;
+
+                    const container = el.closest('.ticket-timer-container');
+                    if (container) {
+                        container.className =
+                            'ticket-timer-container flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-black tabular-nums transition-all ' +
+                            (m >= this.delayThreshold
+                                ? 'bg-red-50 text-red-600 border border-red-100 animate-pulse'
+                                : m >= warnThreshold
+                                    ? 'bg-amber-50 text-amber-600 border border-amber-100'
+                                    : 'bg-slate-100 text-slate-700 border border-slate-200');
+                    }
+                });
+            },
+
+            init() {
+                const p = 'activeTab';
+                const runUpdate = () => this.updateIndicator(p);
+
+                setTimeout(runUpdate, 50);
+                setTimeout(runUpdate, 300);
+
+                this.$watch(p, () => runUpdate());
+
+                window.addEventListener('resize', runUpdate);
+                window.addEventListener('app:refresh-ui', runUpdate);
+                document.addEventListener('livewire:navigated', runUpdate);
+
+                this.updateTimers();
+                this._timerInterval = setInterval(() => this.updateTimers(), 1000);
+
+                this.$el.addEventListener('alpine:destroy', () => {
+                    window.removeEventListener('resize', runUpdate);
+                    window.removeEventListener('app:refresh-ui', runUpdate);
+                    document.removeEventListener('livewire:navigated', runUpdate);
+                    if (this._timerInterval) clearInterval(this._timerInterval);
+                });
+            },
+
+            updateIndicator(p) {
+                const active = this[p];
+                if (!active) return;
+
+                requestAnimationFrame(() => {
+                    const list = this.$refs[`${p}List`]
+                        || this.$refs.tabList
+                        || this.$el.querySelector(`[x-ref="${p}List"], [x-ref="tabList"], [x-ref="${p}TabList"]`);
+                    if (!list) return;
+
+                    const el = list.querySelector(`[data-tab='${active}'], [data-panel='${active}'], [value='${active}']`);
+
+                    if (el && el.offsetWidth > 0) {
+                        this[`${p}Width`] = el.offsetWidth;
+                        this[`${p}Left`] = el.offsetLeft;
+                    } else if (el) {
+                        setTimeout(() => {
+                            if (el.offsetWidth > 0) {
+                                this[`${p}Width`] = el.offsetWidth;
+                                this[`${p}Left`] = el.offsetLeft;
+                            }
+                        }, 150);
+                    }
+                });
+            }
+        };
+    };
+
     // Stock Management Component (0ms Instant Operations)
     window.stockManagement = function($wire) {
         const tabState = (typeof slidingTabsLogic === 'function') 
@@ -1225,6 +1471,7 @@
             init() {}
         };
     };
+    window.stockAdjustmentPanel = window.stockAdjustment;
 
     window.adjustmentMovementForm = function($wire, ingredientsList) {
         return {
@@ -1286,18 +1533,34 @@
         };
     };
 
+    // Alpine.data() is a ONE-TIME registration in Alpine v3 — re-calling it with the same
+    // name after navigation throws "component already registered" errors. Use a window flag
+    // to ensure we only register factories once (on first alpine:init or eager call).
+    // livewire:navigated only re-runs the reconcile store helper (which is idempotent).
     const registerAlpineFactories = () => {
         if (!window.Alpine) return;
+        if (window.__alpineFactoriesRegistered) {
+            // Already registered — only re-run idempotent helpers (e.g. store init).
+            if (typeof window.registerReconcileStore === 'function') {
+                window.registerReconcileStore();
+            }
+            return;
+        }
+        window.__alpineFactoriesRegistered = true;
 
         window.Alpine.data('slidingTabs', slidingTabsLogic);
         window.Alpine.data('modal', ({ name, show }) => window.modal({ name, show }));
         window.Alpine.data('sidePanel', ({ name, show }) => window.sidePanel({ name, show }));
+        window.Alpine.data('categoryManagement', ($wire, initialCategories) => window.categoryManagement($wire, initialCategories));
+        window.Alpine.data('orderManagement', ($wire) => window.orderManagement($wire));
         window.Alpine.data('optionLibraryManagement', ($wire, allIngredients) => window.optionLibraryManagement($wire, allIngredients));
         window.Alpine.data('stockManagement', ($wire) => window.stockManagement($wire));
         window.Alpine.data('branchStockOrdering', ($wire, config) => window.branchStockOrdering($wire, config));
         window.Alpine.data('thermalTearOffModal', () => window.thermalTearOffModal());
         window.Alpine.data('stockAdjustment', ($wire) => window.stockAdjustment($wire));
+        window.Alpine.data('stockAdjustmentPanel', ($wire) => window.stockAdjustment($wire));
         window.Alpine.data('adjustmentMovementForm', ($wire, ingredientsList) => window.adjustmentMovementForm($wire, ingredientsList));
+        window.Alpine.data('reconcileTable', (initialItems) => window.reconcileTable(initialItems));
         if (typeof window.registerReconcileStore === 'function') {
             window.registerReconcileStore();
         }

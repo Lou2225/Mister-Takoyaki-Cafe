@@ -9,13 +9,13 @@
     activeCategoryLeft: 0,
 
     // ── Address / map picker state (mirrors User Management) ──
-    addr_region: $wire.entangle('addr_region'),
-    addr_province: $wire.entangle('addr_province'),
-    addr_city: $wire.entangle('addr_city'),
-    addr_barangay: $wire.entangle('addr_barangay'),
-    addr_street: $wire.entangle('addr_street'),
-    addr_lat: $wire.entangle('addr_lat'),
-    addr_lng: $wire.entangle('addr_lng'),
+    addr_region: @entangle('addr_region'),
+    addr_province: @entangle('addr_province'),
+    addr_city: @entangle('addr_city'),
+    addr_barangay: @entangle('addr_barangay'),
+    addr_street: @entangle('addr_street'),
+    addr_lat: @entangle('addr_lat'),
+    addr_lng: @entangle('addr_lng'),
     loc: {
         noProvince: false,
         region:   { items: [], search: '' },

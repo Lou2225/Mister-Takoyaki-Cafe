@@ -19,9 +19,9 @@
         </x-slot>
  
         @forelse($orders as $order)
-            <tr wire:key="{{ ($tabName ?? 'order') . '-row-' . $order->id }}" 
-                class="hover:bg-slate-50/50 transition-colors cursor-pointer" 
-                wire:click="openOrderDetail({{ $order->id }})">
+<tr wire:key="{{ ($tabName ?? 'order') . '-row-' . $order->id }}" 
+    class="hover:bg-slate-50/50 transition-colors cursor-pointer" 
+    @click="openOrderDetail({{ $order->id }})">
                 <td class="py-3 px-4 whitespace-nowrap">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-xl bg-{{ $primaryColor }}-50 flex items-center justify-center {{ $primaryText }} font-bold text-[13px] flex-shrink-0 shadow-sm">
@@ -95,21 +95,33 @@
                                 Accept
                             </x-secondary-button>
                         @endif
-                        <x-secondary-button type="button" wire:click="openOrderDetail({{ $order->id }})" class="h-9 px-3 whitespace-nowrap">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                            View Details
-                        </x-secondary-button>
+<x-secondary-button type="button" @click="openOrderDetail({{ $order->id }})" ::disabled="loadingOrderId === {{ $order->id }}" class="h-9 px-3 whitespace-nowrap">
+    <svg x-show="loadingOrderId !== {{ $order->id }}" class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+    <svg x-show="loadingOrderId === {{ $order->id }}" x-cloak class="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+    <span x-text="loadingOrderId === {{ $order->id }} ? 'Loading...' : 'View Details'"></span>
+</x-secondary-button>
                     </div>
                 </td>
             </tr>
         @empty
             <tr>
                 <td colspan="6" class="py-12">
-                    <x-empty-state 
-                        title="No Orders Found"
-                        description="Adjust your filters or search terms to find what you're looking for."
-                        icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                    />
+                    @if($statusFilter === 'Completed' && ($tabName === 'app' || $tabName === 'pos'))
+                        <x-empty-state 
+                            title="No Recently Completed Orders"
+                            description="Completed orders only stay on this tab for 1 hour after completion. Check the Order History tab for orders completed earlier today."
+                            icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                    @else
+                        <x-empty-state 
+                            title="No Orders Found"
+                            description="Adjust your filters or search terms to find what you're looking for."
+                            icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                        />
+                    @endif
                 </td>
             </tr>
         @endforelse

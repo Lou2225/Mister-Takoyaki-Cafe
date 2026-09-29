@@ -41,7 +41,8 @@ class StockDeductionService
         ?string $remarks = null,
         string $movementType = 'order',
         ?string $transferRef = null,
-        ?int $destBranchId = null  // destination branch for transfer movements
+        ?int $destBranchId = null,  // destination branch for transfer movements
+        ?string $movementDate = null
     ): array {
         try {
             // ──── STEP 1: Validate aggregate stock availability ────
@@ -117,7 +118,7 @@ class StockDeductionService
             $stock->save();
 
             // ──── STEP 5: Create audit trail ────
-            StockMovement::create([
+            $movement = [
                 'branch_id'          => $branchId,
                 'ingredient_id'      => $ingredientId,
                 'type'               => $movementType,
@@ -127,7 +128,12 @@ class StockDeductionService
                 'remarks'            => $remarks ?? 'Order fulfillment (FEFO)',
                 'transfer_reference' => $transferRef,
                 'from_branch_id'     => $destBranchId, // stores destination for transfer_out movements
-            ]);
+            ];
+            if ($movementDate) {
+                $movement['created_at'] = $movementDate;
+                $movement['updated_at'] = $movementDate;
+            }
+            StockMovement::create($movement);
 
             return [
                 'success' => true,

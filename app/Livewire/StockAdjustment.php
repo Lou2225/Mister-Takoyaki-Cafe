@@ -36,6 +36,7 @@ class StockAdjustment extends Component
     public $startDate = '';
     public $endDate = '';
     public $activeFilter = 'All Time';
+    public $typeFilter = 'all';
     
     // Core Data
     public $selectedBranchId = '';
@@ -76,6 +77,7 @@ class StockAdjustment extends Component
         'startDate' => ['except' => '', 'as' => 'adj_start'],
         'endDate' => ['except' => '', 'as' => 'adj_end'],
         'activeFilter' => ['except' => 'All Time', 'as' => 'adj_filter'],
+        'typeFilter' => ['except' => 'all', 'as' => 'adj_type'],
     ];
 
     protected $listeners = [
@@ -165,6 +167,23 @@ class StockAdjustment extends Component
 
     public function updatedEndDate()
     {
+        $this->resetPage();
+    }
+
+    public function updatedTypeFilter()
+    {
+        $this->resetPage();
+    }
+
+    public function toggleTypeFilter($type)
+    {
+        $this->typeFilter = ($this->typeFilter === $type && $type !== 'all') ? 'all' : $type;
+        $this->resetPage();
+    }
+
+    public function setTypeFilter($type)
+    {
+        $this->typeFilter = $type;
         $this->resetPage();
     }
 
@@ -493,17 +512,23 @@ class StockAdjustment extends Component
                     $variance = (float)$data['variance'];
                     if ($variance == 0) continue;
 
-                    $this->processMovement(
-                        $this->selectedBranchId,
-                        $id,
-                        'adjust',
-                        (float)$data['actual'],
-                        $data['unit'],
-                        null, // cost
-                        null, // expiry
-                        "Physical Count Reconciliation (from {$data['current']} to {$data['actual']})", // remarks
-                        $this->globalReference // ref — same generation scheme as Stock Adjustment
-                    );
+$originalBatch = StockBatch::where('branch_id', $this->selectedBranchId)
+    ->where('ingredient_id', $id)
+    ->orderBy('created_at')
+    ->first(['created_at', 'expiry_date']);
+
+$this->processMovement(
+    $this->selectedBranchId,
+    $id,
+    'adjust',
+    (float)$data['actual'],
+    $data['unit'],
+    null, // cost
+    $originalBatch?->expiry_date, // expiry — inherited from the original batch
+    "Physical Count Reconciliation (from {$data['current']} to {$data['actual']})", // remarks
+    $this->globalReference, // ref — same generation scheme as Stock Adjustment
+    $originalBatch?->created_at
+);
                     $modifiedCount++;
                 }
             });
@@ -522,7 +547,7 @@ class StockAdjustment extends Component
      * Core Inventory Engine
      * Handles Batching, FEFO Deductions, and Movement Logging in one place.
      */
-    private function processMovement($branchId, $ingId, $type, $inputQty, $unit, $cost = null, $expiry = null, $remarks = null, $ref = null)
+    private function processMovement($branchId, $ingId, $type, $inputQty, $unit, $cost = null, $expiry = null, $remarks = null, $ref = null, $movementDate = null)
     {
         $baseQty = StockHelper::toBase($inputQty, $unit);
         $stock = BranchIngredientStock::lockForUpdate()->firstOrCreate(
@@ -562,7 +587,7 @@ if ($type === 'in' || $type === 'customer_return') {
         ? (float) str_replace(',', '', $cost)
         : (float) ($ingMaster->cost ?? 0);
 
-    StockBatch::create([
+    $batchData = [
         'ingredient_id'    => $ingId,
         'branch_id'        => $branchId,
         'batch_number'     => $ref,
@@ -570,7 +595,12 @@ if ($type === 'in' || $type === 'customer_return') {
         'current_quantity' => $baseQty,
         'expiry_date'      => empty($expiry) ? null : $expiry,
         'unit_cost'        => $normalizedCost,
-    ]);
+    ];
+    if ($movementDate) {
+        $batchData['created_at'] = $movementDate;
+        $batchData['updated_at'] = $movementDate;
+    }
+    StockBatch::create($batchData);
         } elseif (in_array($type, ['out', 'waste', 'waste_expired', 'return_to_supplier'])) {
             $result = \App\Services\StockDeductionService::deductByFEFO(
                 $branchId, $ingId, $baseQty, null, auth()->id(), $remarks, $type, $ref
@@ -585,21 +615,26 @@ if ($type === 'in' || $type === 'customer_return') {
             
             if ($diff < 0) {
                 \App\Services\StockDeductionService::deductByFEFO(
-                    $branchId, $ingId, abs($diff), null, auth()->id(), "Reconciliation Deficit", 'adjust', $ref
+                    $branchId, $ingId, abs($diff), null, auth()->id(), "Reconciliation Deficit", 'adjust', $ref, null, $movementDate
                 );
                 return; // service already updated stock + logged the movement — don't let the fallthrough below re-save stale $stock or double-log
 } elseif ($diff > 0) {
     $adjustmentCost = (float) ($ingMaster->cost ?? 0);
 
-    StockBatch::create([
+    $batchData = [
         'ingredient_id'    => $ingId,
         'branch_id'        => $branchId,
         'batch_number'     => $ref,
         'initial_quantity' => $diff,
         'current_quantity' => $diff,
-        'expiry_date'      => null,
+        'expiry_date'      => empty($expiry) ? null : $expiry,
         'unit_cost'        => $adjustmentCost,
-    ]);
+    ];
+    if ($movementDate) {
+        $batchData['created_at'] = $movementDate;
+        $batchData['updated_at'] = $movementDate;
+    }
+    StockBatch::create($batchData);
 
     $stock->stock_quantity = $newStock;
     $stock->save();
@@ -609,7 +644,7 @@ if ($type === 'in' || $type === 'customer_return') {
         // 2. Log Movement (If not handled by Service)
         if ($type !== 'out' && !str_starts_with($type, 'waste')) {
             $stock->save();
-            StockMovement::create([
+            $movement = [
                 'branch_id' => $branchId,
                 'ingredient_id' => $ingId,
                 'type' => $type,
@@ -619,7 +654,12 @@ if ($type === 'in' || $type === 'customer_return') {
                 'expiry_date' => $expiry,
                 'user_id' => auth()->id(),
                 'remarks' => $remarks,
-            ]);
+            ];
+            if ($movementDate) {
+                $movement['created_at'] = $movementDate;
+                $movement['updated_at'] = $movementDate;
+            }
+            StockMovement::create($movement);
         }
     }
 
@@ -631,6 +671,25 @@ if ($type === 'in' || $type === 'customer_return') {
 
         $movements = StockMovement::with(['ingredient', 'branch', 'user'])
             ->where('branch_id', $this->selectedBranchId)
+            ->when($this->startDate && $this->endDate, function($q) {
+                $q->whereBetween('created_at', [
+                    $this->startDate . ' 00:00:00',
+                    $this->endDate . ' 23:59:59'
+                ]);
+            })
+            ->when($this->typeFilter && $this->typeFilter !== 'all', function($q) {
+                if ($this->typeFilter === 'waste') {
+                    $q->whereIn('type', ['waste', 'waste_expired']);
+                } elseif ($this->typeFilter === 'in') {
+                    $q->whereIn('type', ['in', 'customer_return', 'transfer_in']);
+                } elseif ($this->typeFilter === 'out') {
+                    $q->whereIn('type', ['out', 'transfer_out']);
+                } elseif ($this->typeFilter === 'adjust') {
+                    $q->where('type', 'adjust');
+                } else {
+                    $q->where('type', $this->typeFilter);
+                }
+            })
             ->when($this->search, function($q) {
                 $q->where(function($sub) {
                     $sub->whereHas('ingredient', fn($ing) => $ing->where('name', 'like', '%' . $this->search . '%'))
@@ -699,6 +758,19 @@ if ($type === 'in' || $type === 'customer_return') {
                     $this->endDate . ' 23:59:59'
                 ]);
             })
+            ->when($this->typeFilter && $this->typeFilter !== 'all', function($q) {
+                if ($this->typeFilter === 'waste') {
+                    $q->whereIn('type', ['waste', 'waste_expired']);
+                } elseif ($this->typeFilter === 'in') {
+                    $q->whereIn('type', ['in', 'customer_return', 'transfer_in']);
+                } elseif ($this->typeFilter === 'out') {
+                    $q->whereIn('type', ['out', 'transfer_out']);
+                } elseif ($this->typeFilter === 'adjust') {
+                    $q->where('type', 'adjust');
+                } else {
+                    $q->where('type', $this->typeFilter);
+                }
+            })
             ->when($this->search, function($q) {
                 $q->where(function($sub) {
                     $sub->whereHas('ingredient', fn($ing) => $ing->where('ingredients.name', 'like', '%' . $this->search . '%'))
@@ -718,9 +790,9 @@ if ($type === 'in' || $type === 'customer_return') {
 
         $stats = [
             'today_count' => StockMovement::whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])->where('branch_id', $this->selectedBranchId)->count(),
-            'waste_count' => StockMovement::where('type', 'waste')->whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])->where('branch_id', $this->selectedBranchId)->count(),
-            'in_value'    => StockMovement::where('type', 'in')->whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])->where('branch_id', $this->selectedBranchId)->sum(DB::raw('unit_cost * quantity')),
-            'out_count'   => StockMovement::whereIn('type', ['out', 'waste'])->whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])->where('branch_id', $this->selectedBranchId)->count(),
+            'waste_count' => StockMovement::whereIn('type', ['waste', 'waste_expired'])->whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])->where('branch_id', $this->selectedBranchId)->count(),
+            'in_value'    => StockMovement::whereIn('type', ['in', 'customer_return', 'transfer_in'])->whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])->where('branch_id', $this->selectedBranchId)->sum(DB::raw('unit_cost * quantity')),
+            'out_count'   => StockMovement::whereIn('type', ['out', 'transfer_out'])->whereBetween('created_at', [$start . ' 00:00:00', $end . ' 23:59:59'])->where('branch_id', $this->selectedBranchId)->count(),
         ];
 
 return view('livewire.stock-adjustment', [

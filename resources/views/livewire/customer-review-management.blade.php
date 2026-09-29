@@ -17,66 +17,89 @@
             </div>
         </div>
 
-        {{-- KPI Cards Section (Matching Dashboard Premium Aesthetic - Compact Footprint) --}}
+        {{-- KPI Cards Section (Matching Dashboard Premium Aesthetic - Interactive KPIs) --}}
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-8">
             {{-- Total Feedback --}}
-            <div class="p-3 sm:p-4 bg-gradient-to-br from-{{ $primaryColor }}-500/10 via-{{ $primaryColor }}-500/5 to-white border border-{{ $primaryColor }}-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-                <div class="flex items-center justify-between mb-1 sm:mb-2">
-                    <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Feedbacks</span>
-                    <div class="w-7 h-7 rounded-lg bg-white border border-{{ $primaryColor }}-100 flex items-center justify-center {{ $primaryText }} shadow-sm">
+            <div wire:key="kpi-review-card-total"
+                wire:click="toggleRatingFilter('')"
+                class="bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer {{ $ratingFilter === '' ? 'ring-2 ring-indigo-400 shadow-md scale-[1.01]' : '' }}">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-black text-indigo-700/80 uppercase tracking-widest leading-none">Total Feedbacks</span>
+                    <div class="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-600 border border-indigo-500/10">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"/></svg>
                     </div>
                 </div>
-                <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $stats['total'] }}</h3>
-                <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Aggregated customer submissions</p>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ $stats['total'] }}</span>
+                    <span class="text-[9px] font-bold text-slate-400">reviews</span>
+                </div>
+                <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Aggregated customer feedback</p>
+            </div>
+
+            {{-- Positive Reviews --}}
+            <div wire:key="kpi-review-card-positive"
+                wire:click="toggleRatingFilter('positive')"
+                class="bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer {{ $ratingFilter === 'positive' ? 'ring-2 ring-emerald-400 shadow-md scale-[1.01]' : '' }}">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-black text-emerald-700/80 uppercase tracking-widest leading-none">Positive (4-5★)</span>
+                    <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 border border-emerald-500/10">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/></svg>
+                    </div>
+                </div>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-[20px] font-black text-emerald-600 tracking-tight leading-none">{{ $stats['positive_count'] }}</span>
+                    <span class="text-[9px] font-bold text-emerald-600/70">satisfied</span>
+                </div>
+                <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">High satisfaction ratings</p>
+            </div>
+
+            {{-- Needs Attention / Critical --}}
+            <div wire:key="kpi-review-card-critical"
+                wire:click="toggleRatingFilter('critical')"
+                class="bg-gradient-to-br from-rose-50 to-white border border-rose-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer {{ $ratingFilter === 'critical' ? 'ring-2 ring-rose-400 shadow-md scale-[1.01]' : '' }}">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-black text-rose-700/80 uppercase tracking-widest leading-none">Needs Attention</span>
+                    <div class="w-7 h-7 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-600 border border-rose-500/10">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    </div>
+                </div>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-[20px] font-black text-rose-600 tracking-tight leading-none">{{ $stats['critical_count'] }}</span>
+                    <span class="text-[9px] font-bold text-rose-600/70">critical</span>
+                </div>
+                <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Ratings below 4 stars</p>
             </div>
 
             {{-- Average Rating --}}
-            <div class="p-3 sm:p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-                <div class="flex items-center justify-between mb-1 sm:mb-2">
-                    <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Average</span>
-                    <div class="w-7 h-7 rounded-lg bg-white border border-amber-100 flex items-center justify-center text-amber-500 shadow-sm">
+            <div wire:key="kpi-review-card-average"
+                class="bg-gradient-to-br from-amber-50 to-white border border-amber-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] duration-300">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-black text-amber-700/80 uppercase tracking-widest leading-none">Satisfaction Index</span>
+                    <div class="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600 border border-amber-500/10">
                         <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
                     </div>
                 </div>
                 <div class="flex items-baseline gap-1">
-                    <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($stats['average'], 1) }}</h3>
-                    <span class="text-[10px] sm:text-[11px] font-bold text-slate-400">/ 5.0</span>
+                    <span class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ number_format($stats['average'], 1) }}</span>
+                    <span class="text-[10px] font-bold text-slate-400">/ 5.0</span>
                 </div>
-                <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Overall satisfaction index</p>
-            </div>
-
-            {{-- Branch Specific Volume --}}
-            <div class="p-3 sm:p-4 bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-white border border-blue-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-                <div class="flex items-center justify-between mb-1 sm:mb-2">
-                    <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Scope</span>
-                    <div class="w-7 h-7 rounded-lg bg-white border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                    </div>
-                </div>
-                <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $stats['branch_count'] }}</h3>
-                <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Interactions in active scope</p>
-            </div>
-
-            {{-- Latest Activity --}}
-            <div class="p-3 sm:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-                <div class="flex items-center justify-between mb-1 sm:mb-2">
-                    <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Latest</span>
-                    <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    </div>
-                </div>
-                <h3 class="text-[12px] sm:text-[13px] font-black text-slate-900 tracking-tight leading-none uppercase truncate" title="{{ $stats['latest'] }}">{{ $stats['latest'] }}</h3>
-                <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-2 sm:mt-2.5 leading-none">Most recent event logged</p>
+                <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Network overall satisfaction</p>
             </div>
         </div>
 
         {{-- macOS Style Unified Toolbar --}}
         <div class="relative z-20 flex flex-row items-center justify-between mb-6 gap-2 sm:gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm mx-1">
             
-            {{-- Left: Search Bar --}}
-            <div class="flex flex-1 min-w-0 lg:flex-initial">
+            {{-- Left: Search Bar & Active Filter Chips --}}
+            <div class="flex flex-1 items-center gap-2 min-w-0 lg:flex-initial">
                 <x-search-bar wireModel="search" placeholder="Find records..." width="w-full lg:w-72" />
+                @if($ratingFilter)
+                    <button type="button" wire:click="toggleRatingFilter('')"
+                        class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-200/60 hover:bg-indigo-100 transition-colors shrink-0">
+                        <span>Sentiment: {{ ucfirst($ratingFilter) }}</span>
+                        <svg class="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                @endif
             </div>
 
             {{-- Right: Filters --}}
@@ -112,7 +135,7 @@
         </div>
 
         {{-- Table View --}}
-        <div class="mx-1">
+        <div class="mx-1" wire:key="reviews-table-wrap-{{ $ratingFilter }}-{{ $selectedBranchId }}-{{ $reviews->currentPage() }}">
             <x-data-table>
                 <x-slot name="header">
                     <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Customer Details</th>
@@ -131,7 +154,7 @@
                         $colors = ['from-indigo-400 to-blue-500', 'from-rose-400 to-pink-500', 'from-emerald-400 to-teal-500', 'from-amber-400 to-orange-500'];
                         $grad = $colors[$review->id % count($colors)];
                     @endphp
-                    <tr class="hover:bg-slate-50/50 transition-colors">
+                    <tr wire:key="review-row-{{ $review->id }}" class="hover:bg-slate-50/50 transition-colors">
                         <td class="py-3 px-4 whitespace-nowrap">
                             <div class="flex items-center gap-3">
                                 <div class="w-8 h-8 rounded-lg bg-gradient-to-br {{ $grad }} flex items-center justify-center text-white text-[12px] font-black shadow-sm">
@@ -199,7 +222,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr>
+                    <tr wire:key="review-empty-{{ $ratingFilter }}-{{ $selectedBranchId }}">
                         <td colspan="6" class="py-0">
                             <x-empty-state title="No Feedbacks Yet" description="Feedback will appear here." icon="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" />
                         </td>

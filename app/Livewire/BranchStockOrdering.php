@@ -138,6 +138,27 @@ class BranchStockOrdering extends Component
         $this->resetPage('hist_page');
     }
 
+    public function toggleStatusFilter(string $status): void
+    {
+        if ($status === 'delivered') {
+            if ($this->panel === 'history' && $this->statusFilter === 'delivered') {
+                $this->statusFilter = 'all';
+            } else {
+                $this->panel = 'history';
+                $this->statusFilter = 'delivered';
+            }
+        } else {
+            if ($this->panel === 'requests' && $this->statusFilter === $status) {
+                $this->statusFilter = 'all';
+            } else {
+                $this->panel = 'requests';
+                $this->statusFilter = $status;
+            }
+        }
+        $this->resetPage('req_page');
+        $this->resetPage('hist_page');
+    }
+
     private function calculateEstimatedFee(): void
     {
         $branch = Branch::find($this->selectedBranchId);
@@ -630,14 +651,17 @@ class BranchStockOrdering extends Component
     public function getRequestOrdersProperty()
     {
         $activeStatuses = ['pending', 'approved', 'preparing', 'in_transit'];
-        $statusFilter = ($this->statusFilter !== 'all' && in_array($this->statusFilter, $activeStatuses))
-            ? $this->statusFilter : null;
-
-        return StockOrder::with(['items.ingredient', 'sourceBranch', 'approver', 'requester'])
+        $query = StockOrder::with(['items.ingredient', 'sourceBranch', 'approver', 'requester'])
             ->where('requesting_branch_id', $this->selectedBranchId)
-            ->whereIn('status', $activeStatuses)
-            ->when($statusFilter, fn($q) => $q->where('status', $statusFilter))
-            ->when($this->search, fn($q) => $q->where('reference_no', 'like', "%{$this->search}%"))
+            ->whereIn('status', $activeStatuses);
+
+        if ($this->statusFilter === 'approved') {
+            $query->whereIn('status', ['approved', 'preparing']);
+        } elseif ($this->statusFilter !== 'all' && in_array($this->statusFilter, $activeStatuses)) {
+            $query->where('status', $this->statusFilter);
+        }
+
+        return $query->when($this->search, fn($q) => $q->where('reference_no', 'like', "%{$this->search}%"))
             ->latest()
             ->paginate($this->perPage, ['*'], 'req_page');
     }

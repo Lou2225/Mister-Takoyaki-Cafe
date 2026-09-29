@@ -1,4 +1,4 @@
-<div class="px-2 py-2 space-y-6" x-data="{ panel: $wire.entangle('panel').live, ...(typeof window.slidingTabs === 'function' ? window.slidingTabs({ panel: $wire.entangle('panel').live }, ['panel']) : {}) }" @if($selectedOrderId === null) wire:poll.10s @endif>
+<div class="px-2 py-2 space-y-6" x-data="{ panel: $wire.entangle('panel').live, init() {} }" @if($selectedOrderId === null) wire:poll.10s @endif>
     {{-- ════════════════ DYNAMIC HEADER ════════════════ --}}
     <div class="px-1 pt-2">
         <div class="mb-6 flex items-center justify-between">
@@ -33,61 +33,81 @@
         </x-sliding-tabs>
     </div>
 
-    <!-- KPI Metrics (Premium Redesigned) -->
+    <!-- KPI Metrics (Premium Redesigned Interactive) -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-8" x-show="$wire.panel !== 'analytics'">
-        {{-- New Requests --}}
-        <div class="p-3 sm:p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
-            <div class="flex items-center justify-between mb-1 sm:mb-2">
-                <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">New Requests</span>
-                <div class="w-7 h-7 rounded-lg bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm shrink-0">
+        {{-- 1. New Requests --}}
+        <div wire:key="kpi-admin-card-pending"
+            wire:click="filterByKpi('pending')"
+            class="bg-gradient-to-br from-amber-50 to-white border border-amber-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer {{ $panel === 'inbox' ? 'ring-2 ring-amber-400 shadow-md scale-[1.01]' : '' }}">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-black text-amber-700/80 uppercase tracking-widest leading-none">New Requests</span>
+                <div class="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600 border border-amber-500/10">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
                 </div>
             </div>
-            <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($kpis['pending']) }}</h3>
-            <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Pending HQ review</p>
+            <div class="flex items-baseline gap-1">
+                <span class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ number_format($kpis['pending']) }}</span>
+                <span class="text-[9px] font-bold text-slate-400">orders</span>
+            </div>
+            <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Pending HQ review</p>
         </div>
 
-        {{-- Active Transfers --}}
-        <div class="p-3 sm:p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
-            <div class="flex items-center justify-between mb-1 sm:mb-2">
-                <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active Transfers</span>
-                <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
+        {{-- 2. Active Transfers --}}
+        <div wire:key="kpi-admin-card-active"
+            wire:click="filterByKpi('active')"
+            class="bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer {{ $panel === 'active' ? 'ring-2 ring-indigo-400 shadow-md scale-[1.01]' : '' }}">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-black text-indigo-700/80 uppercase tracking-widest leading-none">Active Transfers</span>
+                <div class="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-600 border border-indigo-500/10">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                 </div>
             </div>
-            <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($kpis['active']) }}</h3>
-            <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Currently in transit/packing</p>
+            <div class="flex items-baseline gap-1">
+                <span class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ number_format($kpis['active']) }}</span>
+                <span class="text-[9px] font-bold text-slate-400">in transit</span>
+            </div>
+            <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Currently in transit/packing</p>
         </div>
 
-        {{-- Delivered --}}
-        <div class="p-3 sm:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
-            <div class="flex items-center justify-between mb-1 sm:mb-2">
-                <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Delivered (Mo)</span>
-                <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
+        {{-- 3. Delivered --}}
+        <div wire:key="kpi-admin-card-delivered"
+            wire:click="filterByKpi('delivered')"
+            class="bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer {{ ($panel === 'history' && $statusFilter === 'delivered') ? 'ring-2 ring-emerald-400 shadow-md scale-[1.01]' : '' }}">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-black text-emerald-700/80 uppercase tracking-widest leading-none">{{ $startDate ? 'Delivered (Period)' : 'Delivered (Mo)' }}</span>
+                <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 border border-emerald-500/10">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </div>
             </div>
-            <h3 class="text-xl sm:text-2xl font-black text-emerald-600 tracking-tight leading-none">{{ number_format($kpis['delivered_month']) }}</h3>
-            <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Completed this month</p>
+            <div class="flex items-baseline gap-1">
+                <span class="text-[20px] font-black text-emerald-600 tracking-tight leading-none">{{ number_format($kpis['delivered_month']) }}</span>
+                <span class="text-[9px] font-bold text-slate-400">orders</span>
+            </div>
+            <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Completed this month</p>
         </div>
 
-        {{-- Rejected --}}
-        <div class="p-3 sm:p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
-            <div class="flex items-center justify-between mb-1 sm:mb-2">
-                <span class="text-[10px] sm:text-[11px] font-bold text-rose-600/90 uppercase tracking-wider">Rejected (Mo)</span>
-                <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm shrink-0">
+        {{-- 4. Rejected --}}
+        <div wire:key="kpi-admin-card-rejected"
+            wire:click="filterByKpi('rejected')"
+            class="bg-gradient-to-br from-rose-50 to-white border border-rose-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer {{ ($panel === 'history' && $statusFilter === 'rejected') ? 'ring-2 ring-rose-400 shadow-md scale-[1.01]' : '' }}">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-black text-rose-700/80 uppercase tracking-widest leading-none">{{ $startDate ? 'Rejected (Period)' : 'Rejected (Mo)' }}</span>
+                <div class="w-7 h-7 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-600 border border-rose-500/10">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </div>
             </div>
-            <h3 class="text-xl sm:text-2xl font-black text-rose-600 tracking-tight leading-none">{{ number_format($kpis['rejected_month']) }}</h3>
-            <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Declined/cancelled this month</p>
+            <div class="flex items-baseline gap-1">
+                <span class="text-[20px] font-black text-rose-600 tracking-tight leading-none">{{ number_format($kpis['rejected_month']) }}</span>
+                <span class="text-[9px] font-bold text-slate-400">declined</span>
+            </div>
+            <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Declined/cancelled this month</p>
         </div>
     </div>
 
     <!-- Analytics KPI Metrics (Premium Redesigned) -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-8" x-show="$wire.panel === 'analytics'">
         {{-- KPI 1: Value Dispatched --}}
-        <div class="p-3 sm:p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+        <div class="p-3 sm:p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm duration-300 relative overflow-hidden">
             <div class="flex items-center justify-between mb-1 sm:mb-2">
                 <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">HQ Dispatched</span>
                 <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
@@ -99,7 +119,7 @@
         </div>
 
         {{-- KPI 2: Avg Lead Time --}}
-        <div class="p-3 sm:p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+        <div class="p-3 sm:p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm duration-300 relative overflow-hidden">
             <div class="flex items-center justify-between mb-1 sm:mb-2">
                 <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Avg Lead Time</span>
                 <div class="w-7 h-7 rounded-lg bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm shrink-0">
@@ -111,7 +131,7 @@
         </div>
 
         {{-- KPI 3: Fulfillment Success Rate --}}
-        <div class="p-3 sm:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+        <div class="p-3 sm:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm duration-300 relative overflow-hidden">
             <div class="flex items-center justify-between mb-1 sm:mb-2">
                 <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fulfillment Rate</span>
                 <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
@@ -123,7 +143,7 @@
         </div>
 
         {{-- KPI 4: HQ Inventory Alerts --}}
-        <div class="p-3 sm:p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+        <div class="p-3 sm:p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm duration-300 relative overflow-hidden">
             <div class="flex items-center justify-between mb-1 sm:mb-2">
                 <span class="text-[10px] sm:text-[11px] font-bold text-rose-600/90 uppercase tracking-wider">HQ Stock Alerts</span>
                 <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm shrink-0">
@@ -141,6 +161,14 @@
             <x-search-bar wireModel="search" placeholder="Find records..." width="w-full lg:w-72" />
         </div>
         <div class="flex flex-nowrap items-center justify-end gap-1.5 sm:gap-2 shrink-0">
+            {{-- Status Filter Quick Reset Badge --}}
+            @if($panel === 'history' && $statusFilter !== 'all')
+                <button wire:click="$set('statusFilter', 'all')" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 text-[11px] font-bold hover:bg-indigo-100 transition-colors shadow-sm" title="Clear Status Filter">
+                    <span>Status: {{ ucfirst($statusFilter) }}</span>
+                    <svg class="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            @endif
+
             {{-- 3-in-1 Date Filter Component --}}
             <x-date-filter startModel="startDate" endModel="endDate" activeModel="activeFilter" />
 
@@ -153,6 +181,13 @@
                     </x-secondary-button>
                 </x-slot>
                 <x-slot name="content">
+                    @if($panel === 'history')
+                        <div class="px-4 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Status Filter</div>
+                        <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', 'all')">All Status</x-dropdown-link>
+                        <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', 'delivered')">Delivered</x-dropdown-link>
+                        <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', 'rejected')">Rejected</x-dropdown-link>
+                        <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', 'cancelled')">Cancelled</x-dropdown-link>
+                    @endif
                     <div class="px-4 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Branch Filter</div>
                     <x-dropdown-link href="#" wire:click.prevent="$set('branchFilter', '')">All Branches</x-dropdown-link>
                     @foreach($branches as $branch) <x-dropdown-link href="#" wire:click.prevent="$set('branchFilter', '{{ $branch->id }}')">{{ $branch->branch_name }}</x-dropdown-link> @endforeach
@@ -164,7 +199,7 @@
     <!-- MAIN PANELS -->
     <div class="relative min-h-[400px]">
         <!-- 1. Inbox Panel -->
-        <div x-show="$wire.panel === 'inbox'" class="animate-fadeIn px-1 space-y-4">
+        <div wire:key="admin-inbox-wrap-{{ $inboxOrders->currentPage() }}" x-show="$wire.panel === 'inbox'" class="animate-fadeIn px-1 space-y-4">
             <x-data-table>
                 <x-slot name="header">
                     <th class="py-3 px-6 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest">Reference / Branch</th>
@@ -175,7 +210,7 @@
                     <th class="py-3 px-6 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest">Actions</th>
                 </x-slot>
                 @forelse($inboxOrders as $order)
-                    <tr class="hover:bg-slate-50/50 transition-colors group">
+                    <tr wire:key="admin-inbox-row-{{ $order->id }}" class="hover:bg-slate-50/50 transition-colors group">
                         <td class="px-6 py-4">
                             <div class="flex flex-col">
                                 <span class="text-[13px] font-bold text-slate-900 group-hover:text-indigo-600 transition-colors cursor-pointer" wire:click="viewOrder({{ $order->id }})">{{ $order->reference_no }}</span>
@@ -204,14 +239,14 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="6" class="py-12 text-center"><x-empty-state title="Inbox Zero!" description="All stock requests have been processed." icon="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></td></tr>
+                    <tr wire:key="admin-inbox-empty"><td colspan="6" class="py-12 text-center"><x-empty-state title="Inbox Zero!" description="All stock requests have been processed." icon="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" /></td></tr>
                 @endforelse
             </x-data-table>
             <x-pagination :paginator="$inboxOrders" keyPrefix="inbox" />
         </div>
 
         <!-- 2. Active Panel -->
-        <div x-show="$wire.panel === 'active'" class="animate-fadeIn px-1 space-y-4">
+        <div wire:key="admin-active-wrap-{{ $activeOrders->currentPage() }}" x-show="$wire.panel === 'active'" class="animate-fadeIn px-1 space-y-4">
             <x-data-table>
                 <x-slot name="header">
                     <th class="py-3 px-6 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest">Reference / Branch</th>
@@ -220,7 +255,7 @@
                     <th class="py-3 px-6 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest">Actions</th>
                 </x-slot>
                 @forelse($activeOrders as $order)
-                    <tr class="hover:bg-slate-50/50 transition-colors group">
+                    <tr wire:key="admin-active-row-{{ $order->id }}" class="hover:bg-slate-50/50 transition-colors group">
                         <td class="px-6 py-4">
                             <div class="flex flex-col">
                                 <span class="text-[13px] font-bold text-slate-900 group-hover:text-indigo-600 transition-colors cursor-pointer" wire:click="viewOrder({{ $order->id }})">{{ $order->reference_no }}</span>
@@ -242,14 +277,14 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="4" class="py-12 text-center"><x-empty-state title="No Active Transfers" description="Transfers will appear here once approved." icon="M13 10V3L4 14h7v7l9-11h-7z" /></td></tr>
+                    <tr wire:key="admin-active-empty"><td colspan="4" class="py-12 text-center"><x-empty-state title="No Active Transfers" description="Transfers will appear here once approved." icon="M13 10V3L4 14h7v7l9-11h-7z" /></td></tr>
                 @endforelse
             </x-data-table>
             <x-pagination :paginator="$activeOrders" keyPrefix="active" />
         </div>
 
         <!-- 3. History Panel -->
-        <div x-show="$wire.panel === 'history'" class="animate-fadeIn px-1 space-y-4">
+        <div wire:key="admin-history-wrap-{{ $statusFilter }}-{{ $historyOrders->currentPage() }}" x-show="$wire.panel === 'history'" class="animate-fadeIn px-1 space-y-4">
             <x-data-table>
                 <x-slot name="header">
                     <th class="py-3 px-6 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest">Reference / Branch</th>
@@ -260,7 +295,7 @@
                     <th class="py-3 px-6 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest">Actions</th>
                 </x-slot>
                 @forelse($historyOrders as $order)
-                    <tr class="hover:bg-slate-50/50 transition-colors group">
+                    <tr wire:key="admin-history-row-{{ $order->id }}" class="hover:bg-slate-50/50 transition-colors group">
                         <td class="px-6 py-4">
                             <div class="flex flex-col">
                                 <span class="text-[13px] font-bold text-slate-900 group-hover:text-indigo-600 transition-colors cursor-pointer" wire:click="viewOrder({{ $order->id }})">{{ $order->reference_no }}</span>
@@ -284,7 +319,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="6" class="py-12 text-center"><x-empty-state title="History Clear" description="Your fulfillment history will be logged here." icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></td></tr>
+                    <tr wire:key="admin-history-empty-{{ $statusFilter }}"><td colspan="6" class="py-12 text-center"><x-empty-state title="History Clear" description="Your fulfillment history will be logged here." icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></td></tr>
                 @endforelse
             </x-data-table>
             <x-pagination :paginator="$historyOrders" keyPrefix="history" />

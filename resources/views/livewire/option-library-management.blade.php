@@ -3,8 +3,10 @@
     $requiredTemplates = $allTemplates->where('is_required', true)->count();
     $totalItems = $allTemplates->sum(fn($t) => $t->items->count());
     $fixedTemplates = $allTemplates->where('price_mode', 'fixed')->count();
+@endphp
 
-    $templatesPayload = $allTemplates->map(fn($t) => [
+<div
+    x-data="typeof window.optionLibraryManagement === 'function' ? window.optionLibraryManagement($wire, @js($allIngredients), @js($allTemplates->map(fn($t) => [
         'id' => (int)$t->id,
         'name' => (string)$t->name,
         'price_mode' => (string)$t->price_mode,
@@ -25,21 +27,37 @@
                 'cost' => (float)($ri->ingredient?->cost ?? 0),
             ])->values(),
         ])->values(),
-    ])->values();
-@endphp
-
-<div
-    x-data="typeof window.optionLibraryManagement === 'function' ? window.optionLibraryManagement($wire, @js($allIngredients), @js($templatesPayload)) : { panel: 'list', mode: 'list', tableView: 'table', searchQuery: '', templatesList: @js($templatesPayload), filteredTemplateIds: [], currentPage: 1, perPage: 5, isItemVisible: () => true, updateTemplatesList: () => {}, formErrors: {}, formSubmitted: false, isSaving: false }"
-    class="relative"
+    ]))) : { panel: 'list', mode: 'list', tableView: 'table', searchQuery: '', templatesList: [], filteredTemplateIds: [], currentPage: 1, perPage: 5, isItemVisible: () => true, formErrors: {}, formSubmitted: false, isSaving: false, onlyRequired: false }"
+class="relative"
     wire:ignore.self
     x-on:templates-updated.window="updateTemplatesList($event.detail.templates)"
     wire:key="option-library-main-container">
 
     {{-- Hidden reactive updater — mirrors products-sync-helper in Menu Management --}}
-    <div x-effect="updateTemplatesList(@js($templatesPayload))" class="hidden" wire:key="templates-sync-helper"></div>
-
+    <div x-effect="updateTemplatesList(@js($allTemplates->map(fn($t) => [
+        'id' => (int)$t->id,
+        'name' => (string)$t->name,
+        'price_mode' => (string)$t->price_mode,
+        'max_select' => $t->max_select !== null ? (int)$t->max_select : null,
+        'is_required' => (bool)$t->is_required,
+        'no_recipe_required' => (bool)$t->no_recipe_required,
+        'items_count' => (int)$t->items->count(),
+        'items' => $t->items->map(fn($i) => [
+            'id' => (int)$i->id,
+            'name' => (string)$i->name,
+            'price' => (float)$i->price == 0 ? '' : (float)$i->price,
+            'is_default' => (bool)$i->is_default,
+            'ingredients' => $i->ingredients->map(fn($ri) => [
+                'id' => (int)$ri->ingredient_id,
+                'name' => $ri->ingredient ? (string)$ri->ingredient->name : 'Unknown',
+                'unit' => $ri->ingredient ? (string)\App\Helpers\StockHelper::getAbbreviation($ri->ingredient->unit) : '',
+                'quantity' => (float)$ri->quantity,
+                'cost' => (float)($ri->ingredient?->cost ?? 0),
+            ])->values(),
+        ])->values(),
+    ])))" class="hidden" wire:key="templates-sync-helper"></div>
     {{-- ════════════════ PANEL 1 — LIST ════════════════ --}}
-    <div x-show="panel === 'list'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="px-1">
+    <div x-show="panel === 'list'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" wire:ignore.self x-cloak class="px-1">
         
         <div class="mb-5 flex items-center justify-between">
             <div>
@@ -54,55 +72,72 @@
             </x-primary-button>
         </div>
 
-        {{-- Library Metrics Grid --}}
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        {{-- Library Metrics Grid (Stock Management Aesthetic) --}}
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
             {{-- Total Templates --}}
-            <div class="p-3 sm:p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm transition-all duration-300 relative overflow-hidden group">
-                <div class="flex items-center justify-between mb-1 sm:mb-2">
-                    <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Templates</span>
-                    <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+            <div @click="priceModeFilter = ''; onlyRequired = false; currentPage = 1"
+                :class="(typeof priceModeFilter !== 'undefined' ? priceModeFilter : '') === '' && !onlyRequired ? 'ring-2 ring-indigo-400 shadow-md scale-[1.01]' : ''"
+                class="bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-black text-indigo-700/80 uppercase tracking-widest leading-none">Total Templates</span>
+                    <div class="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-600 border border-indigo-500/10">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
                     </div>
                 </div>
-                <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $totalTemplates }}</h3>
-                <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Configured library items</p>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ $totalTemplates }}</span>
+                    <span class="text-[9px] font-bold text-slate-400">templates</span>
+                </div>
+                <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Configured library items</p>
             </div>
 
             {{-- Required Fields --}}
-            <div class="p-3 sm:p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm transition-all duration-300 relative overflow-hidden group">
-                <div class="flex items-center justify-between mb-1 sm:mb-2">
-                    <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Required</span>
-                    <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm shrink-0">
+            <div @click="onlyRequired = !onlyRequired; currentPage = 1"
+                :class="onlyRequired ? 'ring-2 ring-rose-400 shadow-md scale-[1.01]' : ''"
+                class="bg-gradient-to-br from-rose-50 to-white border border-rose-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-black text-rose-700/80 uppercase tracking-widest leading-none">Required</span>
+                    <div class="w-7 h-7 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-600 border border-rose-500/10">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                     </div>
                 </div>
-                <h3 class="text-xl sm:text-2xl font-black text-rose-600 tracking-tight leading-none">{{ $requiredTemplates }}</h3>
-                <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Mandatory input fields</p>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-[20px] font-black text-rose-600 tracking-tight leading-none">{{ $requiredTemplates }}</span>
+                    <span class="text-[9px] font-bold text-slate-400">mandatory</span>
+                </div>
+                <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Mandatory input fields</p>
             </div>
 
-            {{-- Total Variations --}}
-            <div class="p-3 sm:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm transition-all duration-300 relative overflow-hidden group">
-                <div class="flex items-center justify-between mb-1 sm:mb-2">
-                    <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Variations</span>
-                    <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            {{-- Total Variations (Static metric - no hover, no filter) --}}
+            <div class="bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] duration-300">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-black text-emerald-700/80 uppercase tracking-widest leading-none">Variations</span>
+                    <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 border border-emerald-500/10">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </div>
                 </div>
-                <h3 class="text-xl sm:text-2xl font-black text-emerald-600 tracking-tight leading-none">{{ $totalItems }}</h3>
-                <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Individual option choices</p>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ $totalItems }}</span>
+                    <span class="text-[9px] font-bold text-slate-400">choices</span>
+                </div>
+                <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Individual option choices</p>
             </div>
-{{-- Fixed Pricing --}}
-            <div @click="priceModeFilter = priceModeFilter === 'fixed' ? '' : 'fixed'"
-                :class="priceModeFilter === 'fixed' ? 'bg-gradient-to-br from-amber-100 via-amber-50 to-white border-amber-300 shadow-md scale-[1.01]' : 'bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border-amber-500/10 shadow-sm'"
-                class="p-3 sm:p-4 rounded-2xl cursor-pointer transition-all duration-300 hover:scale-[1.01] hover:shadow-md hover:border-amber-300/70 relative overflow-hidden group border">
-                <div class="flex items-center justify-between mb-1 sm:mb-2">
-                    <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Fixed Price</span>
-                    <div class="w-7 h-7 rounded-lg bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm shrink-0">
+
+            {{-- Fixed Pricing --}}
+            <div @click="priceModeFilter = (priceModeFilter === 'fixed' ? '' : 'fixed'); currentPage = 1"
+                :class="(typeof priceModeFilter !== 'undefined' ? priceModeFilter : '') === 'fixed' ? 'ring-2 ring-amber-400 shadow-md scale-[1.01]' : ''"
+                class="bg-gradient-to-br from-amber-50 to-white border border-amber-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] font-black text-amber-700/80 uppercase tracking-widest leading-none">Fixed Price</span>
+                    <div class="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600 border border-amber-500/10">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                     </div>
                 </div>
-                <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $fixedTemplates }}</h3>
-                <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Templates using set prices</p>
+                <div class="flex items-baseline gap-1">
+                    <span class="text-[20px] font-black text-amber-600 tracking-tight leading-none">{{ $fixedTemplates }}</span>
+                    <span class="text-[9px] font-bold text-slate-400">templates</span>
+                </div>
+                <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Templates using set prices</p>
             </div>
         </div>
 
@@ -366,7 +401,7 @@
         </div>
     </div>
 
-    <div x-show="panel === 'form'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="px-1">
+    <div x-show="panel === 'form'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" wire:ignore.self x-cloak class="px-1">
         <div class="mb-5 flex items-center justify-between">
             <div>
                 <h2 class="text-[17px] font-bold text-gray-900 tracking-tight" x-text="mode === 'create' ? 'Create New Template' : 'Refine Template'"></h2>
@@ -876,7 +911,7 @@
         </div>
     </x-modal>
 
-    <script data-navigate-once>
+    <script>
         (function() {
             const defineFn = function() {
                 window.optionLibraryManagement = function($wire, allIngredients, initialTemplates) {
@@ -907,6 +942,7 @@
 
                         // ── List / table state ──
                         priceModeFilter: '',
+                        onlyRequired: false,
                         searchQuery: '',
                         currentPage: 1,
                         perPage: 5,
@@ -916,6 +952,7 @@
                         get filteredTemplateIds() {
                             const query = (this.searchQuery || '').toLowerCase().trim();
                             const filter = this.priceModeFilter;
+                            const reqOnly = this.onlyRequired;
                             return (this.templatesList || [])
                                 .filter(t => {
                                     const matchesSearch = !query ||
@@ -923,8 +960,9 @@
                                         (t.items && t.items.some(item => (item.name || '').toLowerCase().includes(query)));
 
                                     const matchesMode = !filter || t.price_mode === filter;
+                                    const matchesReq = !reqOnly || t.is_required;
 
-                                    return matchesSearch && matchesMode;
+                                    return matchesSearch && matchesMode && matchesReq;
                                 })
                                 .map(t => t.id);
                         },
@@ -1236,19 +1274,13 @@ const res = await this.$wire.saveTemplate(payload);
                         init() {
                             this.$watch('searchQuery', () => { this.currentPage = 1; });
                             this.$watch('priceModeFilter', () => { this.currentPage = 1; });
+                            this.$watch('onlyRequired', () => { this.currentPage = 1; });
                             this.$watch('perPage', () => { this.currentPage = 1; });
                         }
                     };
                 };
             };
             defineFn();
-            if (window.Alpine) {
-                Alpine.data('optionLibraryManagement', window.optionLibraryManagement);
-            } else {
-                document.addEventListener('alpine:init', () => {
-                    Alpine.data('optionLibraryManagement', window.optionLibraryManagement);
-                });
-            }
         })();
     </script>
 </div>

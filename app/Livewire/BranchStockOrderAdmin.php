@@ -93,6 +93,58 @@ class BranchStockOrderAdmin extends Component
         $this->resetPage('historyPage');
     }
 
+    public function updatedStatusFilter()
+    {
+        $this->resetPage('historyPage');
+    }
+
+    public function updatedSearch()
+    {
+        $this->resetPage('inboxPage');
+        $this->resetPage('activePage');
+        $this->resetPage('historyPage');
+    }
+
+    public function updatedBranchFilter()
+    {
+        $this->resetPage('inboxPage');
+        $this->resetPage('activePage');
+        $this->resetPage('historyPage');
+    }
+
+    public function filterByKpi(string $target): void
+    {
+        switch ($target) {
+            case 'pending':
+                $this->panel = 'inbox';
+                $this->statusFilter = 'all';
+                break;
+            case 'active':
+                $this->panel = 'active';
+                $this->statusFilter = 'all';
+                break;
+            case 'delivered':
+                if ($this->panel === 'history' && $this->statusFilter === 'delivered') {
+                    $this->statusFilter = 'all';
+                } else {
+                    $this->panel = 'history';
+                    $this->statusFilter = 'delivered';
+                }
+                break;
+            case 'rejected':
+                if ($this->panel === 'history' && $this->statusFilter === 'rejected') {
+                    $this->statusFilter = 'all';
+                } else {
+                    $this->panel = 'history';
+                    $this->statusFilter = 'rejected';
+                }
+                break;
+        }
+        $this->resetPage('inboxPage');
+        $this->resetPage('activePage');
+        $this->resetPage('historyPage');
+    }
+
     public function mount()
     {
         $this->guardMainBranchContext();
@@ -495,7 +547,12 @@ foreach ($sourceBatches as $sourceBatch) {
     }
     public function updatedPanel($value)
     {
-        $this->resetPage();
+        if ($value !== 'history') {
+            $this->statusFilter = 'all';
+        }
+        $this->resetPage('inboxPage');
+        $this->resetPage('activePage');
+        $this->resetPage('historyPage');
     }
 
     private function getInboxOrders() {

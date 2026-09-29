@@ -6,29 +6,13 @@
     $primaryBg = "bg-{$primaryColor}-600";
 @endphp
 
-<div 
-    x-data="{
-        sourceFilter: $wire.entangle('sourceFilter').live,
-        selectedOrderId: $wire.entangle('selectedOrderId').live,
-        ...(typeof window.slidingTabs === 'function' ? window.slidingTabs({ sourceFilter: $wire.entangle('sourceFilter').live }, 'sourceFilter') : {}),
-        deliveryMapUrl: '',
-        deliveryMapExternalUrl: '',
-        openDeliveryLocation(lat, lng) {
-            this.deliveryMapUrl = `https://www.google.com/maps?q=${lat},${lng}&z=16&output=embed`;
-            this.deliveryMapExternalUrl = `https://www.google.com/maps?q=${lat},${lng}`;
-            this.$dispatch('open-modal', 'delivery-location-modal');
-        },
-        proofPhotoUrl: '',
-        proofPhotoCaption: '',
-        openProofPhoto(url, caption) {
-            this.proofPhotoUrl = url;
-            this.proofPhotoCaption = caption || '';
-            this.$dispatch('open-modal', 'proof-photo-modal');
-        }
-    }"
-        class="relative overflow-hidden">
+<div
+    wire:ignore.self
+    wire:key="order-management-main-container"
+    x-data="orderManagement($wire)"
+    class="relative overflow-hidden">
 
-    <script>
+    <script wire:ignore>
     // Shared with pos-terminal.blade.php — both pages need this listener
     // so an order can be auto-printed from either module, using whichever
     // printer is currently paired via window.thermalBluetoothPrinter.
@@ -188,33 +172,29 @@
         <div class="px-1 mt-4">
 
             {{-- ── Order Health Overview ── --}}
+            {{-- Styled to match Stock Management KPI cards exactly --}}
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
-                {{-- Total Orders --}}
-                <div class="p-3 sm:p-4 bg-gradient-to-br from-{{ $primaryColor }}-500/10 via-{{ $primaryColor }}-500/5 to-white border border-{{ $primaryColor }}-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-1 sm:mb-2">
-                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Orders</span>
-                        <div class="w-7 h-7 rounded-lg bg-white border border-{{ $primaryColor }}-100 flex items-center justify-center text-{{ $primaryColor }}-600 shadow-sm shrink-0">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+
+                {{-- Total Orders -- filterable, resets to All Status --}}
+                <div @click="(typeof statusFilter !== 'undefined' ? statusFilter = '' : $wire.set('statusFilter', ''))"
+                    :class="(typeof statusFilter !== 'undefined' ? statusFilter : $wire.statusFilter) === '' ? 'ring-2 ring-{{ $primaryColor }}-400 shadow-md scale-[1.01]' : ''"
+                    class="bg-gradient-to-br from-{{ $primaryColor }}-50 to-white border border-{{ $primaryColor }}-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-{{ $primaryColor }}-700/80 uppercase tracking-widest leading-none">Total Orders</span>
+                        <div class="w-7 h-7 rounded-lg bg-{{ $primaryColor }}-500/10 flex items-center justify-center text-{{ $primaryColor }}-600 border border-{{ $primaryColor }}-500/10">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                         </div>
                     </div>
-                    <span x-show="sourceFilter === 'App'">
-                        <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $appOrders->total() }}</h3>
-                    </span>
-                    <span x-show="sourceFilter === 'POS'" x-cloak>
-                        <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $posOrders->total() }}</h3>
-                    </span>
-                    <span x-show="sourceFilter === 'History'" x-cloak>
-                        <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $historyOrders->total() }}</h3>
-                    </span>
-                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Placed orders count</p>
+                    <div class="flex items-baseline gap-1">
+                        <span x-show="sourceFilter === 'App'" class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ $appOrders->total() }}</span>
+                        <span x-show="sourceFilter === 'POS'" x-cloak class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ $posOrders->total() }}</span>
+                        <span x-show="sourceFilter === 'History'" x-cloak class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ $historyOrders->total() }}</span>
+                        <span class="text-[9px] font-bold text-slate-400">orders</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Placed orders count</p>
                 </div>
-                
-                {{-- Active / Unresolved Orders (covers the full lifecycle before Completed —
-                     previously only counted Pending/Preparing, which meant an order stuck at
-                     "Handed to Rider" or "Out for Delivery" was invisible here).
-                     Computed for all three tabs up front (like Total Orders above) and
-                     switched client-side via x-show, so clicking a tab updates this card
-                     instantly instead of waiting for the next Livewire round-trip. --}}
+
+                {{-- Active / Unresolved Orders -- color-coded by urgency, matches Low Stock card style --}}
                 @php
                     $unresolvedStatuses = ['Pending', 'Preparing', 'Ready', 'Handed to Rider', 'Out for Delivery'];
                     $activeCounts = [];
@@ -227,49 +207,67 @@
                             'stale'   => (clone $q)->where('created_at', '<', now()->subHours(24))->count(),
                         ];
                     }
-                    // History tab has no "active" orders by definition — always zero.
                     $activeCounts['History'] = ['pending' => 0, 'stale' => 0];
                 @endphp
                 @foreach($activeCounts as $tabKey => $counts)
-                    <div x-show="sourceFilter === '{{ $tabKey }}'" @if($tabKey !== 'App') x-cloak @endif class="p-3 sm:p-4 bg-gradient-to-br {{ $counts['pending'] > 0 ? 'from-amber-500/10 via-amber-500/5 to-white border-amber-500/10' : 'from-emerald-500/10 via-emerald-500/5 to-white border-emerald-500/10' }} border rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
-                        @if($counts['stale'] > 0)
-                            <span class="absolute top-2.5 right-2.5 flex h-2 w-2">
-                                <span class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-red-400 opacity-75"></span>
-                                <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                            </span>
-                        @endif
-                        <div class="flex items-center justify-between mb-1 sm:mb-2">
-                            <span class="text-[10px] sm:text-[11px] font-bold {{ $counts['pending'] > 0 ? 'text-amber-600/90' : 'text-emerald-600/90' }} uppercase tracking-wider">Active Orders</span>
-                            <div class="w-7 h-7 rounded-lg bg-white border {{ $counts['pending'] > 0 ? 'border-amber-100 text-amber-600' : 'border-emerald-100 text-emerald-600' }} flex items-center justify-center shadow-sm shrink-0">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                            </div>
+                @php
+                    $isActiveUrgent = $counts['pending'] > 0;
+                    $activeGrad    = $isActiveUrgent ? 'from-amber-50 border-amber-100' : 'from-emerald-50 border-emerald-100';
+                    $activeLbl     = $isActiveUrgent ? 'text-amber-700/80' : 'text-emerald-700/80';
+                    $activeIcon    = $isActiveUrgent ? 'bg-amber-500/10 text-amber-600 border-amber-500/10' : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/10';
+                    $activeVal     = $isActiveUrgent ? 'text-amber-600' : 'text-emerald-600';
+                    $activeRing    = $isActiveUrgent ? 'ring-2 ring-amber-400 shadow-md scale-[1.01]' : 'ring-2 ring-emerald-400 shadow-md scale-[1.01]';
+                    $activeSub     = $counts['stale'] > 0 ? 'text-red-500' : 'text-slate-400';
+                    $activeSubTxt  = $counts['stale'] > 0 ? $counts['stale'].' unresolved 24h+' : 'Not yet completed';
+                @endphp
+                <div x-show="sourceFilter === '{{ $tabKey }}'" @if($tabKey !== 'App') x-cloak @endif
+                    @click="(typeof statusFilter !== 'undefined' ? statusFilter = (statusFilter === 'active' ? '' : 'active') : null); $wire.set('statusFilter', (typeof statusFilter !== 'undefined' ? statusFilter : ($wire.statusFilter === 'active' ? '' : 'active')))"
+                    :class="(typeof statusFilter !== 'undefined' ? statusFilter : $wire.statusFilter) === 'active' ? '{{ $activeRing }}' : ''"
+                    class="relative bg-gradient-to-br {{ $activeGrad }} to-white border rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer overflow-hidden">
+                    @if($counts['stale'] > 0)
+                        <span class="absolute top-2.5 right-2.5 flex h-2 w-2">
+                            <span class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-red-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                        </span>
+                    @endif
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black {{ $activeLbl }} uppercase tracking-widest leading-none">Active Orders</span>
+                        <div class="w-7 h-7 rounded-lg {{ $activeIcon }} flex items-center justify-center border">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </div>
-                        <h3 class="text-xl sm:text-2xl font-black {{ $counts['pending'] > 0 ? 'text-amber-600' : 'text-emerald-600' }} tracking-tight leading-none">{{ number_format($counts['pending']) }}</h3>
-                        <p class="text-[9px] sm:text-[10px] {{ $counts['stale'] > 0 ? 'text-red-500 font-bold' : 'text-slate-400 font-semibold' }} mt-1 sm:mt-1.5 leading-none">
-                            {{ $counts['stale'] > 0 ? $counts['stale'] . ' unresolved 24h+' : 'Not yet completed' }}
-                        </p>
                     </div>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black {{ $activeVal }} tracking-tight leading-none">{{ number_format($counts['pending']) }}</span>
+                        <span class="text-[9px] font-bold text-slate-400">orders</span>
+                    </div>
+                    <p class="text-[10px] font-bold {{ $activeSub }} mt-1.5 leading-none">{{ $activeSubTxt }}</p>
+                </div>
                 @endforeach
 
-                {{-- Completed Orders Today --}}
+                {{-- Completed Today -- filterable, toggles Completed status --}}
                 @php
                     $completedToday = \App\Models\Order::where('branch_id', auth()->user()->branch_id)
                         ->where('status', 'Completed')
                         ->whereDate('created_at', today())
                         ->count();
                 @endphp
-                <div class="p-3 sm:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-1 sm:mb-2">
-                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Completed Today</span>
-                        <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
+                <div @click="(typeof statusFilter !== 'undefined' ? statusFilter = (statusFilter === 'Completed' ? '' : 'Completed') : null); $wire.set('statusFilter', (typeof statusFilter !== 'undefined' ? statusFilter : ($wire.statusFilter === 'Completed' ? '' : 'Completed')))"
+                    :class="(typeof statusFilter !== 'undefined' ? statusFilter : $wire.statusFilter) === 'Completed' ? 'ring-2 ring-emerald-400 shadow-md scale-[1.01]' : ''"
+                    class="bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-emerald-700/80 uppercase tracking-widest leading-none">Completed Today</span>
+                        <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 border border-emerald-500/10">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </div>
                     </div>
-                    <h3 class="text-xl sm:text-2xl font-black text-emerald-600 tracking-tight leading-none">{{ number_format($completedToday) }}</h3>
-                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Served and cleared today</p>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-emerald-600 tracking-tight leading-none">{{ number_format($completedToday) }}</span>
+                        <span class="text-[9px] font-bold text-slate-400">orders</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Served and cleared today</p>
                 </div>
 
-                {{-- Today's Revenue --}}
+                {{-- Today's Revenue -- read-only display, no hover (same as Procurement card) --}}
                 @php
                     $todayRevenue = \App\Models\Order::where('branch_id', auth()->user()->branch_id)
                         ->where('payment_status', 'Paid')
@@ -280,18 +278,20 @@
                         ->selectRaw('SUM(total_amount - refunded_amount) as net_revenue')
                         ->value('net_revenue') ?? 0;
                 @endphp
-                <div class="p-3 sm:p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-1 sm:mb-2">
-                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Today's Revenue</span>
-                        <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm shrink-0">
+                <div class="bg-gradient-to-br from-rose-50 to-white border border-rose-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] duration-300">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-rose-700/80 uppercase tracking-widest leading-none">Today's Revenue</span>
+                        <div class="w-7 h-7 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-600 border border-rose-500/10">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </div>
                     </div>
-                    <h3 class="text-xl sm:text-2xl font-black text-rose-600 tracking-tight leading-none">₱{{ number_format($todayRevenue, 0) }}</h3>
-                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Net generated income today</p>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-slate-900 tracking-tight leading-none">₱{{ number_format($todayRevenue, 0) }}</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Net generated income today</p>
                 </div>
-            </div>
 
+            </div>
             {{-- macOS Style Unified Toolbar --}}
             <div class="relative z-20 flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 bg-white p-2.5 rounded-xl border border-slate-200/60 shadow-sm">
                 
@@ -315,13 +315,14 @@
                                     <x-secondary-button type="button" class="gap-1.5 h-10 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none justify-between whitespace-nowrap">
                                         <div class="flex items-center gap-1.5">
                                             <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-                                            <span class="text-[12px] truncate max-w-[120px]">{{ $statusFilter ?: 'All Status' }}</span>
+                                            <span class="text-[12px] truncate max-w-[120px]">{{ $statusFilter === 'active' ? 'Active Orders' : ($statusFilter ?: 'All Status') }}</span>
                                         </div>
                                         <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                                     </x-secondary-button>
                                 </x-slot>
                                 <x-slot name="content">
                                     <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', '')" x-on:click="dropdownOpen = false">All Status</x-dropdown-link>
+                                    <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', 'active')" x-on:click="dropdownOpen = false">Active Orders</x-dropdown-link>
 <hr class="my-1 border-slate-100">
 @foreach($statuses as $status => $label)
     <x-dropdown-link href="#" wire:click.prevent="$set('statusFilter', '{{ $status }}')" x-on:click="dropdownOpen = false">{{ $label }}</x-dropdown-link>
@@ -335,17 +336,17 @@
 
             <div class="w-full relative">
                 {{-- App Orders Tab Content --}}
-                <div x-show="sourceFilter === 'App'" class="w-full">
+                <div wire:key="orders-tab-content-app" wire:ignore.self x-show="sourceFilter === 'App'" class="w-full">
                     @include('livewire.order-list-table', ['orders' => $appOrders, 'tabName' => 'app'])
                 </div>
 
                 {{-- POS Orders Tab Content --}}
-                <div x-show="sourceFilter === 'POS'" class="w-full" x-cloak>
+                <div wire:key="orders-tab-content-pos" wire:ignore.self x-show="sourceFilter === 'POS'" class="w-full" x-cloak>
                     @include('livewire.order-list-table', ['orders' => $posOrders, 'tabName' => 'pos'])
                 </div>
 
                 {{-- History Orders Tab Content --}}
-                <div x-show="sourceFilter === 'History'" class="w-full" x-cloak>
+                <div wire:key="orders-tab-content-history" wire:ignore.self x-show="sourceFilter === 'History'" class="w-full" x-cloak>
                     @include('livewire.order-list-table', ['orders' => $historyOrders, 'tabName' => 'history'])
                 </div>
             </div>

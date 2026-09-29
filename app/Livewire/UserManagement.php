@@ -348,6 +348,34 @@ class UserManagement extends Component
 
 
 
+    public function toggleKpiFilter($filter)
+    {
+        if ($filter === 'active') {
+            $this->is_active = ($this->is_active === '1') ? '' : '1';
+        } elseif ($filter === 'inactive') {
+            $this->is_active = ($this->is_active === '0') ? '' : '0';
+        } elseif ($filter === 'staff') {
+            $this->role_id = ($this->role_id == '3') ? '' : '3';
+        } elseif ($filter === 'all') {
+            $this->is_active = '';
+            $this->role_id = '';
+        }
+        $this->resetPage('page');
+        $this->resetPage('archivedPage');
+    }
+
+    public function toggleArchivedKpiFilter($filter)
+    {
+        if ($filter === 'staff') {
+            $this->role_id = ($this->role_id == '3') ? '' : '3';
+        } elseif ($filter === 'admin') {
+            $this->role_id = ($this->role_id == '2') ? '' : '2';
+        } elseif ($filter === 'all') {
+            $this->role_id = '';
+        }
+        $this->resetPage('archivedPage');
+    }
+
     public function getSystemStatsProperty()
     {
         $baseQuery = User::where('role_id', '!=', 4)->notArchived();
@@ -356,10 +384,10 @@ class UserManagement extends Component
             $baseQuery->where('branch_id', auth()->user()->branch_id);
         }
 
-        // Apply filters same as render()
+        // Apply search and branch filters so user sees branch/search metrics
         if ($this->search) {
-            $baseQuery->where(function ($q) {
-                $searchTerm = "%{$this->search}%";
+            $searchTerm = "%{$this->search}%";
+            $baseQuery->where(function ($q) use ($searchTerm) {
                 $q->where('first_name', 'like', $searchTerm)
                     ->orWhere('last_name', 'like', $searchTerm)
                     ->orWhere('middle_name', 'like', $searchTerm)
@@ -370,18 +398,8 @@ class UserManagement extends Component
             });
         }
 
-        if ($this->role_id) {
-            if ($this->role_id == 3) {
-                $baseQuery->whereIn('role_id', [3, 5]);
-            } else {
-                $baseQuery->where('role_id', $this->role_id);
-            }
-        }
         if ($this->branch_id) {
             $baseQuery->where('branch_id', $this->branch_id);
-        }
-        if ($this->is_active !== '') {
-            $baseQuery->where('is_active', $this->is_active);
         }
 
         return [
@@ -407,13 +425,6 @@ class UserManagement extends Component
                     ->orWhere('email', 'like', $searchTerm)
                     ->orWhere('employee_id', 'like', $searchTerm);
             });
-        }
-        if ($this->role_id) {
-            if ($this->role_id == 3) {
-                $baseQuery->whereIn('role_id', [3, 5]);
-            } else {
-                $baseQuery->where('role_id', $this->role_id);
-            }
         }
         if ($this->branch_id) {
             $baseQuery->where('branch_id', $this->branch_id);

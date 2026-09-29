@@ -15,42 +15,10 @@
      Livewire still processes wire:click inside the modal.
      ═══════════════════════════════════════════════════════════════════ --}}
 <div
-    x-data="{
-        activeTab: $wire.entangle('activeTab').live,
-        ...(typeof window.slidingTabs === 'function' ? window.slidingTabs({ activeTab: $wire.entangle('activeTab').live }, 'activeTab') : {}),
-                _timerInterval: null,
-        delayThreshold: @js($delayThresholdMinutes),
-        updateTimers() {
-            const now = new Date();
-            const warnThreshold = Math.max(1, Math.floor(this.delayThreshold / 2));
-            document.querySelectorAll('[data-created-at]').forEach(el => {
-                const createdAt = el.dataset.createdAt;
-                if (!createdAt) return;
-                const diff = Math.floor((now - new Date(createdAt)) / 1000);
-                const m = Math.floor(diff / 60);
-                const s = diff % 60;
-                el.innerText = `${m}:${s.toString().padStart(2, '0')}`;
-
-                const container = el.closest('.ticket-timer-container');
-                if (container) {
-                    container.className =
-                        'ticket-timer-container flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-black tabular-nums transition-all ' +
-                        (m >= this.delayThreshold
-                            ? 'bg-red-50 text-red-600 border border-red-100 animate-pulse'
-                            : m >= warnThreshold
-                                ? 'bg-amber-50 text-amber-600 border border-amber-100'
-                                : 'bg-slate-100 text-slate-700 border border-slate-200');
-                }
-            });
-        },
-    }"
-    x-init="
-        updateTimers();
-        _timerInterval = setInterval(() => updateTimers(), 1000);
-        $el.addEventListener('alpine:destroy', () => clearInterval(_timerInterval));
-    "
+    wire:ignore.self
     wire:key="kds-master-container"
     wire:poll.15s="refreshStats"
+    x-data="kitchenDisplay($wire, @js($delayThresholdMinutes))"
     class="relative bg-[#F9FAFB] p-2 md:p-4"
     x-cloak>
 
@@ -87,7 +55,7 @@
                     'ready' => ['Ready Board', 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z', 'text-emerald-600'],
                     'history' => ['Historical Record', 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', 'text-amber-600'],
                 ] as $val => $info)
-                    <x-sliding-tab model="activeTab" value="{{ $val }}">
+                    <x-sliding-tab model="activeTab" value="{{ $val }}" @click="delayedOnly = false">
                         <x-slot name="icon">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $info[1] }}"/></svg>
                         </x-slot>
@@ -107,51 +75,86 @@
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
 
                 {{-- Active Queue --}}
-                <div class="p-3 md:p-4 bg-gradient-to-br from-{{ $primaryColor }}-500/10 via-{{ $primaryColor }}-500/5 to-white border border-{{ $primaryColor }}-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-1 md:mb-2">
-                        <span class="text-[10px] md:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Queue</span>
-                        <div class="w-7 h-7 rounded-lg bg-white border border-{{ $primaryColor }}-100 flex items-center justify-center text-{{ $primaryColor }}-600 shadow-sm shrink-0">
+                <div @click="(typeof activeTab !== 'undefined' ? activeTab = 'active' : $wire.set('activeTab', 'active')); if(typeof delayedOnly !== 'undefined') delayedOnly = false"
+                    :class="((typeof activeTab !== 'undefined' ? activeTab : $wire.activeTab) === 'active' && !(typeof delayedOnly !== 'undefined' && delayedOnly)) ? 'ring-2 ring-{{ $primaryColor }}-400 shadow-md scale-[1.01]' : ''"
+                    class="bg-gradient-to-br from-{{ $primaryColor }}-50 to-white border border-{{ $primaryColor }}-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-{{ $primaryColor }}-700/80 uppercase tracking-widest leading-none">Queue</span>
+                        <div class="w-7 h-7 rounded-lg bg-{{ $primaryColor }}-500/10 flex items-center justify-center text-{{ $primaryColor }}-600 border border-{{ $primaryColor }}-500/10">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
                         </div>
                     </div>
-                    <h3 class="text-xl md:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $stats['active'] }}</h3>
-                    <p class="text-[9px] md:text-[10px] text-slate-400 font-semibold mt-1 md:mt-1.5 leading-none">Active orders cooking</p>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ $stats['active'] }}</span>
+                        <span class="text-[9px] font-bold text-slate-400">orders</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Active orders cooking</p>
                 </div>
 
-                {{-- Critical Delay --}}
-                <div class="p-3 md:p-4 bg-gradient-to-br {{ $stats['delayed'] > 0 ? 'from-rose-500/10 via-rose-500/5 to-white border-rose-500/10' : 'from-slate-500/10 via-slate-500/5 to-white border-slate-500/10' }} border rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group {{ $stats['delayed'] > 0 ? '' : 'opacity-65' }}">
-                    <div class="flex items-center justify-between mb-1 md:mb-2">
-                        <span class="text-[10px] md:text-[11px] font-bold {{ $stats['delayed'] > 0 ? 'text-rose-600/90' : 'text-slate-400' }} uppercase tracking-wider">Delayed</span>
-                        <div class="w-7 h-7 rounded-lg bg-white border {{ $stats['delayed'] > 0 ? 'border-rose-100 text-rose-600' : 'border-slate-100 text-slate-400' }} flex items-center justify-center shadow-sm shrink-0">
+                {{-- Critical Delay -- color-coded by urgency, matches Low Stock card style --}}
+                @php
+                    $isDelayed       = $stats['delayed'] > 0;
+                    $delayGrad       = $isDelayed ? 'from-rose-50 border-rose-100' : 'from-slate-50 border-slate-100';
+                    $delayLbl        = $isDelayed ? 'text-rose-700/80' : 'text-slate-500/80';
+                    $delayIcon       = $isDelayed ? 'bg-rose-500/10 text-rose-600 border-rose-500/10' : 'bg-slate-500/10 text-slate-400 border-slate-500/10';
+                    $delayVal        = $isDelayed ? 'text-rose-600' : 'text-slate-500';
+                    $delayRing       = $isDelayed ? 'ring-2 ring-rose-400 shadow-md scale-[1.01]' : 'ring-2 ring-slate-400 shadow-md scale-[1.01]';
+                    $delayOpacity    = $isDelayed ? '' : 'opacity-65';
+                @endphp
+                <div @click="(typeof activeTab !== 'undefined' ? activeTab = 'active' : $wire.set('activeTab', 'active')); if(typeof delayedOnly !== 'undefined') delayedOnly = !delayedOnly"
+                    :class="((typeof activeTab !== 'undefined' ? activeTab : $wire.activeTab) === 'active' && (typeof delayedOnly !== 'undefined' && delayedOnly)) ? '{{ $delayRing }}' : ''"
+                    class="relative bg-gradient-to-br {{ $delayGrad }} to-white border rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer {{ $delayOpacity }}">
+                    @if($isDelayed)
+                        <span class="absolute top-2.5 right-2.5 flex h-2 w-2">
+                            <span class="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-rose-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                        </span>
+                    @endif
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black {{ $delayLbl }} uppercase tracking-widest leading-none">Delayed</span>
+                        <div class="w-7 h-7 rounded-lg {{ $delayIcon }} flex items-center justify-center border">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </div>
                     </div>
-                    <h3 class="text-xl md:text-2xl font-black {{ $stats['delayed'] > 0 ? 'text-rose-600' : 'text-slate-500' }} tracking-tight leading-none">{{ $stats['delayed'] }}</h3>
-                    <p class="text-[9px] md:text-[10px] text-slate-400 font-semibold mt-1 md:mt-1.5 leading-none">Pending past target limit</p>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black {{ $delayVal }} tracking-tight leading-none">{{ $stats['delayed'] }}</span>
+                        <span class="text-[9px] font-bold text-slate-400">orders</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Pending past target limit</p>
                 </div>
 
                 {{-- Ready Board --}}
-                <div class="p-3 md:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-1 md:mb-2">
-                        <span class="text-[10px] md:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Ready</span>
-                        <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
+                <div @click="(typeof activeTab !== 'undefined' ? activeTab = 'ready' : $wire.set('activeTab', 'ready')); if(typeof delayedOnly !== 'undefined') delayedOnly = false"
+                    :class="((typeof activeTab !== 'undefined' ? activeTab : $wire.activeTab) === 'ready') ? 'ring-2 ring-emerald-400 shadow-md scale-[1.01]' : ''"
+                    class="bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-emerald-700/80 uppercase tracking-widest leading-none">Ready</span>
+                        <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 border border-emerald-500/10">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
                         </div>
                     </div>
-                    <h3 class="text-xl md:text-2xl font-black text-emerald-600 tracking-tight leading-none">{{ $stats['ready'] }}</h3>
-                    <p class="text-[9px] md:text-[10px] text-slate-400 font-semibold mt-1 md:mt-1.5 leading-none">Awaiting pickup/delivery</p>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-emerald-600 tracking-tight leading-none">{{ $stats['ready'] }}</span>
+                        <span class="text-[9px] font-bold text-slate-400">orders</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Awaiting pickup/delivery</p>
                 </div>
 
-                {{-- Throughput --}}
-                <div class="p-3 md:p-4 bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-white border border-blue-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-1 md:mb-2">
-                        <span class="text-[10px] md:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Served</span>
-                        <div class="w-7 h-7 rounded-lg bg-white border border-blue-100 flex items-center justify-center text-blue-600 shadow-sm shrink-0">
+                {{-- Throughput / Served --}}
+                <div @click="(typeof activeTab !== 'undefined' ? activeTab = 'history' : $wire.set('activeTab', 'history')); if(typeof delayedOnly !== 'undefined') delayedOnly = false"
+                    :class="((typeof activeTab !== 'undefined' ? activeTab : $wire.activeTab) === 'history') ? 'ring-2 ring-blue-400 shadow-md scale-[1.01]' : ''"
+                    class="bg-gradient-to-br from-blue-50 to-white border border-blue-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-blue-700/80 uppercase tracking-widest leading-none">Served</span>
+                        <div class="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600 border border-blue-500/10">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                         </div>
                     </div>
-                    <h3 class="text-xl md:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ $stats['completed'] }}</h3>
-                    <p class="text-[9px] md:text-[10px] text-slate-400 font-semibold mt-1 md:mt-1.5 leading-none">Completed today</p>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ $stats['completed'] }}</span>
+                        <span class="text-[9px] font-bold text-slate-400">orders</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Completed today</p>
                 </div>
 
             </div>
@@ -234,7 +237,8 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pb-2">
                     @forelse($activeOrders as $order)
-                        <div class="w-full bg-white border border-slate-200 rounded-2xl flex flex-col shadow-sm hover:shadow-md hover:border-{{ $primaryColor }}-200 transition-all group">
+                        <div x-show="!(typeof delayedOnly !== 'undefined' && delayedOnly) || (typeof isOrderDelayed === 'function' && isOrderDelayed('{{ $order->created_at->toIso8601String() }}'))"
+                            class="w-full bg-white border border-slate-200 rounded-2xl flex flex-col shadow-sm hover:shadow-md hover:border-{{ $primaryColor }}-200 transition-all group">
 
                             {{-- Ticket Header --}}
                             <div class="p-4 border-b border-slate-100 {{ $order->created_at->lt(now()->subMinutes(10)) ? 'bg-red-50' : 'bg-slate-50/50' }} rounded-t-2xl">

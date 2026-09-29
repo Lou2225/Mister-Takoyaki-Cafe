@@ -361,6 +361,12 @@
                                                         <li x-text="fieldError('optionGroups.' + idx + '.name')"></li>
                                                     </ul>
                                                 </div>
+                                                <div x-show="templateSaveErrors[idx]" x-cloak class="text-[11px] font-medium text-red-500 mt-1.5 flex items-start gap-1.5">
+                                                    <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.732.192 1.732 1.732 1.732z" />
+                                                    </svg>
+                                                    <span x-text="templateSaveErrors[idx]"></span>
+                                                </div>
                                             </div>
                                             {{-- Top-right aligned actions: Sync, Save, Delete --}}
                                             <div class="flex items-center gap-1.5 shrink-0">
@@ -416,7 +422,7 @@
                                             {{-- No Recipe Checkbox (Consistent with Options Library) --}}
                                             <label class="flex items-center gap-2 cursor-pointer bg-white border border-slate-200 rounded-xl px-3 h-10 shadow-sm hover:border-amber-300 transition-all select-none group" title="Options in this group skip ingredient tracking and are always available">
                                                 <input type="checkbox" x-model="group.no_recipe_required"
-                                                    @change="if (group.no_recipe_required) { (group.options || []).forEach((o, oIdx) => { const ownerA = 'option:' + idx + '_' + oIdx; const ownerB = o.id ? ('option:' + o.id) : null; if (recipeIngredients) recipeIngredients = recipeIngredients.filter(ri => ri.owner !== ownerA && (!ownerB || ri.owner !== ownerB)); }); }"
+                                                    @change="if (group.no_recipe_required) { (group.options || []).forEach((o, oIdx) => { const ownerA = 'option:' + idx + '_' + oIdx; const ownerB = o.id ? ('option:' + o.id) : null; if (recipeIngredients) recipeIngredients = recipeIngredients.filter(ri => ri.owner !== ownerA && (!ownerB || ri.owner !== ownerB)); }); } clearOptionPriceErrors(idx)"
                                                     class="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500">
                                                 <span class="text-[11px] font-bold text-slate-700 group-hover:text-amber-700 transition-colors whitespace-nowrap">No Recipe</span>
                                             </label>
@@ -445,7 +451,8 @@
                                                             <span class="text-[12px] font-bold">₱</span>
                                                         </div>
                                                         <input type="text" x-model="option.price"
-                                                            @input="clearOptionError(idx, oIdx, 'price')"
+                                                            @input="option.price = window.clampPriceInput($event); clearOptionError(idx, oIdx, 'price')"
+                                                            maxlength="9" inputmode="decimal"
                                                             class="w-full h-10 pl-7 pr-3 text-[13px] font-black text-right rounded-xl border focus:ring-2 transition-all"
                                                             :class="fieldError('optionGroups.' + idx + '.options.' + oIdx + '.price') ? 'border-rose-400 focus:border-rose-400 focus:ring-rose-300 bg-rose-50/30' : 'border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20'"
                                                             placeholder="0.00" />
@@ -837,7 +844,7 @@
                                     <span class="text-[11px] font-black text-slate-400 uppercase tracking-widest block group-hover:text-slate-500 transition-colors">Listing Price</span>
                                     <span class="text-[20px] sm:text-[22px] font-black text-slate-900 italic font-mono block leading-none truncate">₱{{ number_format($salePrice, 2) }}</span>
                                 </div>
-                                <div class="p-4 sm:p-5 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-100 flex flex-col justify-center transition-all hover:scale-[1.01] space-y-1.5 sm:space-y-2 sm:col-span-2 xl:col-span-1">
+                                <div class="p-4 sm:p-5 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-100 flex flex-col justify-center space-y-1.5 sm:space-y-2 sm:col-span-2 xl:col-span-1">
                                     <span class="text-[11px] font-black text-indigo-100 uppercase tracking-widest block">Net Profit</span>
                                     <div class="flex flex-wrap items-baseline justify-between gap-2">
                                         <span class="text-[22px] sm:text-[24px] font-black text-white italic font-mono leading-none truncate">₱{{ number_format($netProfit, 2) }}</span>
@@ -880,6 +887,31 @@
                                         <svg class="w-8 h-8 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
                                     </div>
                                     <p class="text-[13px] text-slate-400 font-medium">Add ingredients to the recipe to see your profit analysis.</p>
+                                </div>
+                            @endif
+
+                            @php $optionBreakdown = $this->getOptionProfitBreakdown(); @endphp
+                            @if(!empty($optionBreakdown))
+                                <div class="pt-6 mt-6 border-t border-slate-100">
+                                    <div class="flex items-center justify-between border-b border-slate-50 pb-4 mb-5">
+                                        <div>
+                                            <h3 class="text-[14px] font-black text-slate-900 uppercase tracking-widest">Option Profitability</h3>
+                                            <p class="text-[11px] text-slate-400 font-medium mt-1">Each option uses its price minus its mapped recipe cost.</p>
+                                        </div>
+                                    </div>
+                                    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                                        @foreach($optionBreakdown as $option)
+                                            <div class="flex flex-col gap-3 p-5 bg-white border border-slate-200 rounded-2xl shadow-sm min-h-[104px]">
+                                                <span class="text-[14px] font-black text-slate-800">{{ $option['name'] }}</span>
+                                                <div class="flex items-center gap-3 text-[13px] font-mono">
+                                                    <span class="text-slate-400">₱{{ number_format($option['price'], 2) }}</span>
+                                                    <span class="text-slate-300">-</span>
+                                                    <span class="text-rose-500">₱{{ number_format($option['cost'], 2) }}</span>
+                                                    <span class="font-black text-[16px] {{ $option['profit'] >= 0 ? 'text-emerald-600' : 'text-rose-600' }}">= ₱{{ number_format($option['profit'], 2) }}</span>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
                                 </div>
                             @endif
                         </div>
@@ -1057,53 +1089,72 @@
 
         <div class="p-4 md:p-6 space-y-6">
             {{-- ── Menu Health Overview ── --}}
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                {{-- Total Assets --}}
-                <div class="p-3 sm:p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-1 sm:mb-2">
-                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Catalog</span>
-                        <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+            {{-- Styled to match Stock Management KPI cards exactly --}}
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
+                {{-- Total Catalog --}}
+                <div @click="(typeof statusFilter !== 'undefined' ? statusFilter = '' : $wire.set('statusFilter', '')); if (typeof currentPage !== 'undefined') currentPage = 1"
+                    :class="(typeof statusFilter !== 'undefined' && statusFilter !== null ? String(statusFilter) : (typeof $wire !== 'undefined' && $wire.statusFilter !== null && $wire.statusFilter !== undefined ? String($wire.statusFilter) : '')) === '' ? 'ring-2 ring-indigo-400 shadow-md scale-[1.01]' : ''"
+                    class="bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-indigo-700/80 uppercase tracking-widest leading-none">Total Catalog</span>
+                        <div class="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-600 border border-indigo-500/10">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                         </div>
                     </div>
-                    <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($totalProducts) }}</h3>
-                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Total listed products</p>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ number_format($totalProducts) }}</span>
+                        <span class="text-[9px] font-bold text-slate-400">products</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Total listed products</p>
                 </div>
                 
                 {{-- Active --}}
-                <div class="p-3 sm:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-1 sm:mb-2">
-                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active</span>
-                        <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
+                <div @click="(typeof statusFilter !== 'undefined' ? statusFilter = (String(statusFilter) === '1' ? '' : '1') : null); $wire.set('statusFilter', (typeof statusFilter !== 'undefined' ? statusFilter : ($wire.statusFilter == '1' ? '' : '1'))); if (typeof currentPage !== 'undefined') currentPage = 1"
+                    :class="(typeof statusFilter !== 'undefined' && statusFilter !== null ? String(statusFilter) : (typeof $wire !== 'undefined' && $wire.statusFilter !== null && $wire.statusFilter !== undefined ? String($wire.statusFilter) : '')) === '1' ? 'ring-2 ring-emerald-400 shadow-md scale-[1.01]' : ''"
+                    class="bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-emerald-700/80 uppercase tracking-widest leading-none">Active</span>
+                        <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 border border-emerald-500/10">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </div>
                     </div>
-                    <h3 class="text-xl sm:text-2xl font-black text-emerald-600 tracking-tight leading-none">{{ number_format($this->activeCount) }}</h3>
-                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Active on POS/App</p>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-emerald-600 tracking-tight leading-none">{{ number_format($this->activeCount) }}</span>
+                        <span class="text-[9px] font-bold text-slate-400">active</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Available on POS/App</p>
                 </div>
 
                 {{-- Hidden --}}
-                <div class="p-3 sm:p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-1 sm:mb-2">
-                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Hidden</span>
-                        <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm shrink-0">
+                <div @click="(typeof statusFilter !== 'undefined' ? statusFilter = (String(statusFilter) === '0' ? '' : '0') : null); $wire.set('statusFilter', (typeof statusFilter !== 'undefined' ? statusFilter : ($wire.statusFilter == '0' ? '' : '0'))); if (typeof currentPage !== 'undefined') currentPage = 1"
+                    :class="(typeof statusFilter !== 'undefined' && statusFilter !== null ? String(statusFilter) : (typeof $wire !== 'undefined' && $wire.statusFilter !== null && $wire.statusFilter !== undefined ? String($wire.statusFilter) : '')) === '0' ? 'ring-2 ring-rose-400 shadow-md scale-[1.01]' : ''"
+                    class="bg-gradient-to-br from-rose-50 to-white border border-rose-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-rose-700/80 uppercase tracking-widest leading-none">Hidden</span>
+                        <div class="w-7 h-7 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-600 border border-rose-500/10">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 14.12l4.242-4.242M3 3l18 18"/></svg>
                         </div>
                     </div>
-                    <h3 class="text-xl sm:text-2xl font-black text-rose-600 tracking-tight leading-none">{{ number_format($this->hiddenCount) }}</h3>
-                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Hidden on POS/App</p>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-rose-600 tracking-tight leading-none">{{ number_format($this->hiddenCount) }}</span>
+                        <span class="text-[9px] font-bold text-slate-400">hidden</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Deactivated on POS/App</p>
                 </div>
 
                 {{-- Categories --}}
-                <div class="p-3 sm:p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-1 sm:mb-2">
-                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Categories</span>
-                        <div class="w-7 h-7 rounded-lg bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm shrink-0">
+                <div class="bg-gradient-to-br from-amber-50 to-white border border-amber-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] duration-300">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-amber-700/80 uppercase tracking-widest leading-none">Categories</span>
+                        <div class="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600 border border-amber-500/10">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
                         </div>
                     </div>
-                    <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($totalCategories) }}</h3>
-                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Product class divisions</p>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ number_format($totalCategories) }}</span>
+                        <span class="text-[9px] font-bold text-slate-400">classes</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Product class divisions</p>
                 </div>
             </div>
 
@@ -1751,6 +1802,7 @@
                     panel: $wire.entangle('panel').live,
                     tableView: $wire.entangle('view').live,
                     mode: $wire.entangle('mode').live,
+                    statusFilter: $wire.entangle('statusFilter').live,
                     ...window.slidingTabs($wire.entangle('activeTab').live, 'activeTab'),
 
                     optionGroups: $wire.entangle('optionGroups'),
@@ -1765,6 +1817,7 @@
                     newGroupIsRequired: false,
                     newGroupNoRecipeRequired: false,
                     newGroupError: '',
+                    templateSaveErrors: {},
 
                     // Options action confirmation modal state
                     confirmActionType: '',
@@ -1791,6 +1844,29 @@
                             this.serverErrors = copy;
                         }
                     },
+                    clearOptionPriceErrors(gIdx) {
+                        Object.keys(this.serverErrors || {}).forEach(key => {
+                            if (key.startsWith('optionGroups.' + gIdx + '.options.') && key.endsWith('.price')) {
+                                const copy = { ...this.serverErrors };
+                                delete copy[key];
+                                this.serverErrors = copy;
+                            }
+                        });
+                    },
+                    getOptionCost(gIdx, oIdx) {
+                        const group = this.optionGroups?.[gIdx];
+                        const option = group?.options?.[oIdx];
+                        if (!option || group.no_recipe_required) return 0;
+                        const owners = [`option:${gIdx}_${oIdx}`];
+                        if (option.id) owners.push(`option:${option.id}`);
+                        return (this.recipeIngredients || [])
+                            .filter(ri => owners.includes(ri.owner))
+                            .reduce((total, ri) => total + Number(ri.quantity || 0) * Number(ri.cost || 0), 0);
+                    },
+                    formatOptionProfit(gIdx, oIdx) {
+                        const option = this.optionGroups?.[gIdx]?.options?.[oIdx];
+                        return (Number(option?.price || 0) - this.getOptionCost(gIdx, oIdx)).toFixed(2);
+                    },
 
                     syncToWire() {
                         if (typeof $wire !== 'undefined' && $wire.set) {
@@ -1802,15 +1878,7 @@
                     },
                     attemptSave() {
                         this.syncToWire();
-                        const nameMissing  = !$wire.name || !$wire.name.trim();
-                        const priceMissing = !$wire.price;
-                        const hasErrors    = this.serverErrors && Object.keys(this.serverErrors).length > 0;
-
-                        if (nameMissing || priceMissing || hasErrors) {
-                            $wire.validateBeforeSave();
-                            return;
-                        }
-                        this.$dispatch('open-modal', 'confirm-save-product');
+                        $wire.validateBeforeSave();
                     },
                     getGroupKey(group, idx) {
                         if (!group) return 'g_' + idx;
@@ -2025,17 +2093,22 @@
                         this.confirmActionMessage = "This will update '" + group.name + "' with the latest options and recipe ingredients from the library template. Any local edits may be overwritten.";
                         this.$dispatch('open-modal', 'confirm-options-action');
                     },
-                    promptSaveGroup(gIdx) {
-                        const group = this.optionGroups[gIdx];
-                        if (!group) return;
-                        this.confirmActionType = 'save_template';
-                        this.confirmActionGroupIndex = gIdx;
-                        this.confirmActionOptionIndex = null;
-                        this.confirmActionTitle = 'Save Group as Template';
-                        this.confirmActionTargetName = group.name;
-                        this.confirmActionMessage = "Save '" + group.name + "' and its configured recipe mappings to the Options Library? This template will become available for all products.";
-                        this.$dispatch('open-modal', 'confirm-options-action');
-                    },
+promptSaveGroup(gIdx) {
+    const group = this.optionGroups[gIdx];
+    if (!group) return;
+    const trimmedName = (group.name || '').trim();
+    const existing = (this.templates || []).find(t => (t.name || '').trim().toLowerCase() === trimmedName.toLowerCase());
+    delete this.templateSaveErrors[gIdx];
+    this.confirmActionType = 'save_template';
+    this.confirmActionGroupIndex = gIdx;
+    this.confirmActionOptionIndex = null;
+    this.confirmActionTitle = existing ? 'Update Library Template' : 'Save Group as Template';
+    this.confirmActionTargetName = group.name;
+    this.confirmActionMessage = existing
+        ? "'" + group.name + "' already exists in the library. Saving will update it with this group's current options, prices, and recipe mappings."
+        : "Save '" + group.name + "' and its configured recipe mappings to the Options Library? This template will become available for all products.";
+    this.$dispatch('open-modal', 'confirm-options-action');
+},
                     executeConfirmedOptionAction() {
                         const gIdx = this.confirmActionGroupIndex;
                         const oIdx = this.confirmActionOptionIndex;
@@ -2337,7 +2410,7 @@
                         return this.paginatedProductIds.includes(id);
                     },
                     updateProductsList(newList) {
-                        if (!Array.isArray(newList) || newList.length === 0) {
+                        if (!Array.isArray(newList)) {
                             return;
                         }
                         const oldIds = this.productsList.map(p => p.id).join(',');
@@ -2370,6 +2443,11 @@
 
                         // Reset page on search
                         this.$watch('searchQuery', () => {
+                            this.currentPage = 1;
+                        });
+
+                        // Reset page on status filter change
+                        this.$watch('statusFilter', () => {
                             this.currentPage = 1;
                         });
                     }

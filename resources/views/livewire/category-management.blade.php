@@ -7,20 +7,7 @@
 @endphp
 
 <div
-    x-data="typeof window.categoryManagement === 'function' ? window.categoryManagement($wire, @js($allCategories)) : {
-        view: $wire.entangle('view').live,
-        panel: $wire.entangle('panel').live,
-        filterType: $wire.entangle('filterType').live,
-        searchQuery: '',
-        currentPage: 1,
-        perPage: 5,
-        categoriesList: @js($allCategories),
-        get filteredCategories() { return this.categoriesList || []; },
-        get paginatedCategories() { return this.filteredCategories || []; },
-        get pageNumbers() { return [1]; },
-        isItemVisible() { return true; },
-        updateCategoriesList(l) { if (Array.isArray(l)) this.categoriesList = l; }
-    }"
+    x-data="typeof window.categoryManagement === 'function' ? window.categoryManagement($wire, @js($allCategories)) : { panel: $wire.entangle('panel').live, view: $wire.entangle('view').live, filterType: $wire.entangle('filterType').live, searchQuery: '', currentPage: 1, perPage: 5, categoriesList: @js($allCategories), filteredCategories: @js($allCategories), pageNumbers: [1], isItemVisible: () => true, updateCategoriesList: () => {} }"
     class="relative"
     wire:ignore.self
     wire:key="category-management-main-container"
@@ -39,13 +26,14 @@
             x-transition:leave="transition ease-in duration-200"
             x-transition:leave-start="opacity-100 lg:translate-x-0"
             x-transition:leave-end="opacity-0 lg:translate-x-4"
+            wire:ignore.self
             x-cloak class="px-1">
 
             {{-- Dynamic Header: Management Hub --}}
             <div class="mb-5 flex items-center justify-between">
                 <div>
                     <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Category Intelligence</h2>
-                    <p class="text-[12px] text-gray-500 font-medium">Unified Hub: <span class="text-indigo-600 font-bold"><span x-text="filteredCategories.length"></span> segments</span></p>
+                    <p class="text-[12px] text-gray-500 font-medium">Unified Hub: <span class="text-indigo-600 font-bold"><span x-text="(typeof filteredCategories !== 'undefined' && filteredCategories) ? filteredCategories.length : {{ $allCategories->count() }}"></span> segments</span></p>
                 </div>
                 <div class="flex items-center gap-2">
                     <x-dropdown align="right" width="48">
@@ -63,50 +51,59 @@
                 </div>
             </div>
 
-            {{-- System Metrics Grid (User Management Aesthetic) --}}
+            {{-- System Metrics Grid (Stock Management Aesthetic) --}}
             <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
                 @php $stats = $this->kpiStats; @endphp
                 
-{{-- Total Categories --}}
-                <div @click="filterType = 'all'"
-                    :class="filterType === 'all' ? 'bg-gradient-to-br from-indigo-100 via-indigo-50 to-white border-indigo-300 shadow-md scale-[1.02]' : 'bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border-indigo-500/10 shadow-sm'"
-                    class="p-3 sm:p-4 rounded-2xl hover:shadow-md hover:scale-[1.02] hover:border-indigo-300/70 cursor-pointer transition-all duration-300 relative overflow-hidden group border">
-                    <div class="flex items-center justify-between mb-1 sm:mb-2">
-                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Categories</span>
-                        <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                {{-- Total Categories --}}
+                <div @click="(typeof filterType !== 'undefined' ? filterType = 'all' : $wire.set('filterType', 'all')); if (typeof currentPage !== 'undefined') currentPage = 1"
+                    :class="(typeof filterType !== 'undefined' ? filterType : $wire.filterType) === 'all' ? 'ring-2 ring-indigo-400 shadow-md scale-[1.01]' : ''"
+                    class="bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-indigo-700/80 uppercase tracking-widest leading-none">Total Categories</span>
+                        <div class="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-600 border border-indigo-500/10">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
                         </div>
                     </div>
-                    <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($stats['total_count']) }}</h3>
-                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Active category tags</p>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ number_format($stats['total_count']) }}</span>
+                        <span class="text-[9px] font-bold text-slate-400">total</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Active category tags</p>
                 </div>
 
-{{-- Product Groups --}}
-                <div @click="filterType = filterType === 'product' ? 'all' : 'product'"
-                    :class="filterType === 'product' ? 'bg-gradient-to-br from-violet-100 via-violet-50 to-white border-violet-300 shadow-md scale-[1.02]' : 'bg-gradient-to-br from-violet-500/10 via-violet-500/5 to-white border-violet-500/10 shadow-sm'"
-                    class="p-3 sm:p-4 rounded-2xl hover:shadow-md hover:scale-[1.02] hover:border-violet-300/70 cursor-pointer transition-all duration-300 relative overflow-hidden group border">
-                    <div class="flex items-center justify-between mb-1 sm:mb-2">
-                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Products</span>
-                        <div class="w-7 h-7 rounded-lg bg-white border border-violet-100 flex items-center justify-center text-violet-600 shadow-sm shrink-0">
+                {{-- Product Groups --}}
+                <div @click="(typeof filterType !== 'undefined' ? filterType = (filterType === 'product' ? 'all' : 'product') : null); $wire.set('filterType', (typeof filterType !== 'undefined' ? filterType : ($wire.filterType === 'product' ? 'all' : 'product'))); if (typeof currentPage !== 'undefined') currentPage = 1"
+                    :class="(typeof filterType !== 'undefined' ? filterType : $wire.filterType) === 'product' ? 'ring-2 ring-violet-400 shadow-md scale-[1.01]' : ''"
+                    class="bg-gradient-to-br from-violet-50 to-white border border-violet-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-violet-700/80 uppercase tracking-widest leading-none">Product Groups</span>
+                        <div class="w-7 h-7 rounded-lg bg-violet-500/10 flex items-center justify-center text-violet-600 border border-violet-500/10">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" /></svg>
                         </div>
                     </div>
-                    <h3 class="text-xl sm:text-2xl font-black text-violet-600 tracking-tight leading-none">{{ number_format($stats['product_count']) }}</h3>
-                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Menu classification groups</p>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-violet-600 tracking-tight leading-none">{{ number_format($stats['product_count']) }}</span>
+                        <span class="text-[9px] font-bold text-slate-400">products</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Menu classification groups</p>
                 </div>
 
-{{-- Inventory Assets --}}
-                <div @click="filterType = filterType === 'ingredient' ? 'all' : 'ingredient'"
-                    :class="filterType === 'ingredient' ? 'bg-gradient-to-br from-rose-100 via-rose-50 to-white border-rose-300 shadow-md scale-[1.02]' : 'bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border-rose-500/10 shadow-sm'"
-                    class="p-3 sm:p-4 rounded-2xl hover:shadow-md hover:scale-[1.02] hover:border-rose-300/70 cursor-pointer transition-all duration-300 relative overflow-hidden group col-span-2 lg:col-span-1 border">
-                    <div class="flex items-center justify-between mb-1 sm:mb-2">
-                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Inventory</span>
-                        <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm shrink-0">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                {{-- Inventory Assets --}}
+                <div @click="(typeof filterType !== 'undefined' ? filterType = (filterType === 'ingredient' ? 'all' : 'ingredient') : null); $wire.set('filterType', (typeof filterType !== 'undefined' ? filterType : ($wire.filterType === 'ingredient' ? 'all' : 'ingredient'))); if (typeof currentPage !== 'undefined') currentPage = 1"
+                    :class="(typeof filterType !== 'undefined' ? filterType : $wire.filterType) === 'ingredient' ? 'ring-2 ring-rose-400 shadow-md scale-[1.01]' : ''"
+                    class="bg-gradient-to-br from-rose-50 to-white border border-rose-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer col-span-2 lg:col-span-1">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-rose-700/80 uppercase tracking-widest leading-none">Inventory Assets</span>
+                        <div class="w-7 h-7 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-600 border border-rose-500/10">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
                         </div>
                     </div>
-                    <h3 class="text-xl sm:text-2xl font-black text-rose-600 tracking-tight leading-none">{{ number_format($stats['ingredient_count']) }}</h3>
-                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Stock category groupings</p>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-rose-600 tracking-tight leading-none">{{ number_format($stats['ingredient_count']) }}</span>
+                        <span class="text-[9px] font-bold text-slate-400">ingredients</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Stock category groupings</p>
                 </div>
             </div>
 
@@ -398,6 +395,7 @@
             x-transition:leave="transition ease-in duration-200"
             x-transition:leave-start="opacity-100 translate-y-0"
             x-transition:leave-end="opacity-0 translate-y-4"
+            wire:ignore.self
             x-cloak class="px-1">
 
             {{-- Dynamic Header: Command Center --}}
@@ -601,83 +599,67 @@
 
     <script data-navigate-once>
         (function() {
-            window.categoryManagement = function($wire, initialCategories = []) {
-                return {
-                    view: $wire.entangle('view').live,
-                    panel: $wire.entangle('panel').live,
-                    filterType: $wire.entangle('filterType').live,
-                    
-                    searchQuery: '',
-                    currentPage: 1,
-                    perPage: 5,
-                    categoriesList: Array.isArray(initialCategories) ? initialCategories : [],
-
-                    get filteredCategories() {
-                        const query = (this.searchQuery || '').toLowerCase().trim();
-                        const type = this.filterType;
-                        return (this.categoriesList || []).filter(cat => {
-                            // Filter by search query
-                            const matchesSearch = !query || 
-                                (cat.name && cat.name.toLowerCase().includes(query)) || 
-                                (cat.description && cat.description.toLowerCase().includes(query));
-                            
-                            // Filter by segment type
-                            const matchesType = type === 'all' || cat.cat_type === type;
-
-                            return matchesSearch && matchesType;
-                        });
-                    },
-
-                    get paginatedCategories() {
-                        const start = (this.currentPage - 1) * this.perPage;
-                        return this.filteredCategories.slice(start, start + this.perPage);
-                    },
-
-                    get pageNumbers() {
-                        const totalPages = Math.ceil(this.filteredCategories.length / this.perPage) || 1;
-                        const start = Math.max(1, this.currentPage - 1);
-                        const end = Math.min(totalPages, this.currentPage + 1);
-                        const pages = [];
-                        for (let i = start; i <= end; i++) {
-                            pages.push(i);
+            if (typeof window.categoryManagement === 'undefined') {
+                window.categoryManagement = function($wire, initialCategories = []) {
+                    return {
+                        view: $wire.entangle('view').live,
+                        panel: $wire.entangle('panel').live,
+                        filterType: $wire.entangle('filterType').live,
+                        searchQuery: '',
+                        currentPage: 1,
+                        perPage: 5,
+                        categoriesList: Array.isArray(initialCategories) ? initialCategories : [],
+                        get filteredCategories() {
+                            const query = (this.searchQuery || '').toLowerCase().trim();
+                            const type = this.filterType || 'all';
+                            return (this.categoriesList || []).filter(cat => {
+                                if (!cat) return false;
+                                const matchesSearch = !query ||
+                                    (cat.name && cat.name.toLowerCase().includes(query)) ||
+                                    (cat.description && cat.description.toLowerCase().includes(query));
+                                const matchesType = type === 'all' || cat.cat_type === type;
+                                return matchesSearch && matchesType;
+                            });
+                        },
+                        get paginatedCategories() {
+                            const start = ((this.currentPage || 1) - 1) * (this.perPage || 5);
+                            return (this.filteredCategories || []).slice(start, start + (this.perPage || 5));
+                        },
+                        get pageNumbers() {
+                            const totalPages = Math.ceil((this.filteredCategories || []).length / (this.perPage || 5)) || 1;
+                            const start = Math.max(1, (this.currentPage || 1) - 1);
+                            const end = Math.min(totalPages, (this.currentPage || 1) + 1);
+                            const pages = [];
+                            for (let i = start; i <= end; i++) pages.push(i);
+                            return pages;
+                        },
+                        isItemVisible(id, catType) {
+                            if (!this.paginatedCategories) return false;
+                            return this.paginatedCategories.some(c => Number(c.id) === Number(id) && c.cat_type === catType);
+                        },
+                        updateCategoriesList(newList) {
+                            if (!Array.isArray(newList)) return;
+                            const oldIds = (this.categoriesList || []).map(c => `${c.cat_type}-${c.id}`).join(',');
+                            const newIds = newList.map(c => `${c.cat_type}-${c.id}`).join(',');
+                            if (oldIds !== newIds) {
+                                this.categoriesList = newList;
+                                this.currentPage = 1;
+                            }
+                        },
+                        init() {
+                            this.$watch('filterType', () => { this.currentPage = 1; });
+                            this.$watch('searchQuery', () => { this.currentPage = 1; });
                         }
-                        return pages;
-                    },
-
-                    isItemVisible(id, catType) {
-                        if (!this.paginatedCategories) return false;
-                        return this.paginatedCategories.some(c => Number(c.id) === Number(id) && c.cat_type === catType);
-                    },
-
-                    updateCategoriesList(newList) {
-                        if (!Array.isArray(newList)) return;
-                        const oldIds = (this.categoriesList || []).map(c => `${c.cat_type}-${c.id}`).join(',');
-                        const newIds = newList.map(c => `${c.cat_type}-${c.id}`).join(',');
-                        if (oldIds !== newIds) {
-                            this.categoriesList = newList;
-                            this.currentPage = 1;
-                        }
-                    },
-
-                    init() {
-                        this.$watch('filterType', () => {
-                            this.currentPage = 1;
-                        });
-                        this.$watch('searchQuery', () => {
-                            this.currentPage = 1;
-                        });
-                    }
+                    };
                 };
-            };
-
+            }
             if (window.Alpine) {
-                Alpine.data('categoryManagement', window.categoryManagement);
+                Alpine.data('categoryManagement', ($wire, initialCategories) => window.categoryManagement($wire, initialCategories));
             } else {
                 document.addEventListener('alpine:init', () => {
-                    Alpine.data('categoryManagement', window.categoryManagement);
+                    Alpine.data('categoryManagement', ($wire, initialCategories) => window.categoryManagement($wire, initialCategories));
                 });
             }
         })();
     </script>
 </div>
-

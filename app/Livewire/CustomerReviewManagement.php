@@ -14,6 +14,7 @@ class CustomerReviewManagement extends Component
 
     public $search = '';
     public $selectedBranchId = '';
+    public $ratingFilter = '';
     public $viewingReview = null;
     public $perPage = 5;
     public $startDate = '';
@@ -39,10 +40,17 @@ class CustomerReviewManagement extends Component
     protected $queryString = [
         'search' => ['except' => ''],
         'selectedBranchId' => ['except' => ''],
+        'ratingFilter' => ['except' => ''],
         'startDate' => ['except' => ''],
         'endDate' => ['except' => ''],
         'activeFilter' => ['except' => 'All Time'],
     ];
+
+    public function toggleRatingFilter($filter)
+    {
+        $this->ratingFilter = ($this->ratingFilter === $filter && $filter !== '') ? '' : $filter;
+        $this->resetPage();
+    }
 
     public function updatedStartDate()
     {
@@ -117,12 +125,29 @@ class CustomerReviewManagement extends Component
             ]);
         }
 
+        if ($this->ratingFilter) {
+            $matchingIds = (clone $query)->get()->filter(function($r) {
+                $ratings = collect($r->answers)->where('type', 'rating')->pluck('answer');
+                if ($ratings->isEmpty()) return false;
+                $avg = (float)$ratings->avg();
+                if ($this->ratingFilter === 'positive') {
+                    return $avg >= 4.0;
+                } elseif ($this->ratingFilter === 'critical') {
+                    return $avg < 4.0;
+                }
+                return true;
+            })->pluck('id');
+            $query->whereIn('id', $matchingIds);
+        }
+
         $reviews = $query->latest()->paginate($this->perPage);
 
-        // Calculate Stats (Scoped to branch if not super admin)
+        // Calculate Stats (Scoped to branch if not super admin or if branch selected)
         $statsQuery = CustomerReview::query();
         if ($user->role_id !== 1) {
             $statsQuery->where('branch_id', $user->branch_id);
+        } elseif ($this->selectedBranchId) {
+            $statsQuery->where('branch_id', $this->selectedBranchId);
         }
 
         if ($this->startDate && $this->endDate) {
@@ -135,16 +160,25 @@ class CustomerReviewManagement extends Component
         $totalReviews = (clone $statsQuery)->count();
         $branchReviews = $this->selectedBranchId ? (clone $statsQuery)->where('branch_id', $this->selectedBranchId)->count() : $totalReviews;
         
-        // Calculate Average Rating (Scoped)
+        // Calculate Average Rating & Counts (Scoped)
         $allReviews = (clone $statsQuery)->get();
         $totalRatingSum = 0;
         $ratingCount = 0;
+        $posCount = 0;
+        $critCount = 0;
 
         foreach ($allReviews as $review) {
             if (is_array($review->answers)) {
-                foreach ($review->answers as $a) {
-                    if (isset($a['type']) && $a['type'] === 'rating' && isset($a['answer'])) {
-                        $totalRatingSum += (float)$a['answer'];
+                $ratings = collect($review->answers)->where('type', 'rating')->pluck('answer');
+                if ($ratings->isNotEmpty()) {
+                    $avg = (float)$ratings->avg();
+                    if ($avg >= 4.0) {
+                        $posCount++;
+                    } else {
+                        $critCount++;
+                    }
+                    foreach ($ratings as $rVal) {
+                        $totalRatingSum += (float)$rVal;
                         $ratingCount++;
                     }
                 }
@@ -160,10 +194,12 @@ class CustomerReviewManagement extends Component
             'reviews' => $reviews,
             'branches' => $branches,
             'stats' => [
-                'total' => $totalReviews,
-                'average' => $averageRating,
-                'branch_count' => $branchReviews,
-                'latest' => $latestReview ? $latestReview->created_at->diffForHumans() : 'No reviews yet'
+                'total'          => $totalReviews,
+                'positive_count' => $posCount,
+                'critical_count' => $critCount,
+                'average'        => $averageRating,
+                'branch_count'   => $branchReviews,
+                'latest'         => $latestReview ? $latestReview->created_at->diffForHumans() : 'No reviews yet'
             ]
         ])->layout('layouts.app');
     }

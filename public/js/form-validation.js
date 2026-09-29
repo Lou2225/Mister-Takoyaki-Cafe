@@ -173,6 +173,15 @@
         }
     };
 
+    window.clampPriceInput = (event) => {
+        const value = String(event?.target?.value || '').replace(/[^0-9.]/g, '');
+        const parts = value.split('.');
+        const whole = (parts[0] || '').slice(0, 6);
+        const decimals = (parts[1] || '').slice(0, 2);
+        const numeric = Number(`${whole || '0'}${decimals ? '.' + decimals : ''}`);
+        return numeric > 999999.99 ? '999999.99' : (decimals ? `${whole}.${decimals}` : whole);
+    };
+
     // Observers & Events
     init();
     const observer = new MutationObserver((mutations) => {

@@ -1,80 +1,20 @@
 <div
-    x-data="stockAdjustmentPanel($wire)"
-    wire:ignore.self
-    wire:key="stock-adjustment-main-container"
+    x-data="{
+        panel: $wire.entangle('panel').live,
+        init() {}
+    }"
+    x-on:switch-panel.window="panel = $event.detail?.panel || $event.detail[0]?.panel || 'list'"
     class="relative overflow-hidden">
-
-    @script
-    <script>
-        Alpine.data('stockAdjustmentPanel', ($wire) => ({
-                        panel: $wire.entangle('panel').live,
-            init() {}
-        }));
-
-        Alpine.data('adjustmentMovementForm', ($wire, ingredientsList) => ({
-                isOpen: false,
-                dropUp: false,
-                search: '',
-                selectedId: $wire.entangle('newItemId').live,
-                qty: $wire.entangle('newItemQty').live,
-                formErrors: {},
-                ingredients: ingredientsList || [],
-                get selectedItem() {
-                    if (!this.selectedId) return null;
-                    return this.ingredients.find(i => Number(i.id) === Number(this.selectedId)) || null;
-                },
-                get filteredItems() {
-                    if (!this.search || !this.search.trim()) return this.ingredients;
-                    const q = this.search.toLowerCase().trim();
-                    return this.ingredients.filter(i => (i.name || '').toLowerCase().includes(q));
-                },
-                openDropdown() {
-                    this.checkFlip();
-                    this.isOpen = true;
-                    this.search = '';
-                },
-                closeDropdown() {
-                    this.isOpen = false;
-                    this.search = '';
-                },
-                checkFlip() {
-                    if (!this.$refs.comboboxContainer) return;
-                    const rect = this.$refs.comboboxContainer.getBoundingClientRect();
-                    const spaceBelow = window.innerHeight - rect.bottom;
-                    this.dropUp = spaceBelow < 250 && rect.top > 250;
-                },
-                select(id) {
-                    this.selectedId = id;
-                    this.search = '';
-                    this.isOpen = false;
-                    delete this.formErrors.newItemId;
-                },
-                clear() {
-                    this.selectedId = '';
-                    this.search = '';
-                    this.isOpen = false;
-                    delete this.formErrors.newItemId;
-                },
-                validateAndAdd() {
-                    this.formErrors = {};
-                    if (!this.selectedId) {
-                        this.formErrors.newItemId = 'Select an ingredient.';
-                    }
-                    if (!this.qty || parseFloat(this.qty) <= 0) {
-                        this.formErrors.newItemQty = 'Quantity is required.';
-                    }
-                    if (Object.keys(this.formErrors).length === 0) {
-                        $wire.addToQueue();
-                    }
-                }
-            }));
-    </script>
-    @endscript
 
     <div class="relative min-h-[600px]">
 
         {{-- ════════════════ PANEL 1 — ADJUSTMENT LIST ════════════════ --}}
-<div x-show="panel === 'list'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak wire:ignore.self class="px-1">
+        <div x-show="(typeof panel !== 'undefined' ? panel : $wire.panel) === 'list'"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 translate-y-4"
+             x-transition:enter-end="opacity-100 translate-y-0"
+             x-cloak
+             class="px-1">
             <div class="mb-5 flex items-center justify-between gap-3">
                 <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Stock Adjustment</h2>
                 
@@ -84,11 +24,11 @@
                             <svg class="w-4 h-4 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                             <span class="hidden sm:inline">Export CSV</span>
                         </x-secondary-button>
-<x-secondary-button @click="panel = 'bulk'; $wire.startBulkAdjustment()" class="h-10 !px-2.5 sm:!px-4">
+                        <x-secondary-button @click="panel = 'bulk'; $wire.startBulkAdjustment()" class="h-10 !px-2.5 sm:!px-4">
                             <svg class="w-4 h-4 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                             <span class="hidden sm:inline">Stock Reconcile</span>
                         </x-secondary-button>
-<x-primary-button @click="panel = 'adjust'; $wire.handleQuickAdjustment(null)" class="h-10 !px-2.5 sm:!px-4">
+                        <x-primary-button @click="panel = 'adjust'; $wire.handleQuickAdjustment(null)" class="h-10 !px-2.5 sm:!px-4">
                             <span class="text-lg leading-none sm:mr-2">+</span> <span class="hidden sm:inline">New Adjustment</span>
                         </x-primary-button>
                     @else
@@ -100,54 +40,73 @@
                 </div>
             </div>
 
-            {{-- ── Adjustment Stats Overview (Matching Menu Items) ── --}}
+            {{-- ── Adjustment Stats Overview (Interactive KPI Cards) ── --}}
             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
-                {{-- Today's Logs --}}
-                <div class="p-3 sm:p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-1 sm:mb-2">
-                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">{{ $startDate ? 'Period Logs' : "Today's Logs" }}</span>
-                        <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
+                {{-- Today's Logs / Period Logs --}}
+                <div wire:key="kpi-filter-card-all"
+                    wire:click="toggleTypeFilter('all')"
+                    class="bg-gradient-to-br from-indigo-50 to-white border border-indigo-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer {{ $typeFilter === 'all' ? 'ring-2 ring-indigo-400 shadow-md scale-[1.01]' : '' }}">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-indigo-700/80 uppercase tracking-widest leading-none">{{ $startDate ? 'Period Logs' : "Today's Logs" }}</span>
+                        <div class="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-600 border border-indigo-500/10">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                         </div>
                     </div>
-                    <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($stats['today_count']) }}</h3>
-                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Total changes logged</p>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ number_format($stats['today_count']) }}</span>
+                        <span class="text-[9px] font-bold text-slate-400">logs</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Total changes logged</p>
                 </div>
                 
                 {{-- Waste Count --}}
-                <div class="p-3 sm:p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-1 sm:mb-2">
-                        <span class="text-[10px] sm:text-[11px] font-bold text-rose-600/90 uppercase tracking-wider">{{ $startDate ? 'Waste (Period)' : 'Waste (Today)' }}</span>
-                        <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm shrink-0">
+                <div wire:key="kpi-filter-card-waste"
+                    wire:click="toggleTypeFilter('waste')"
+                    class="bg-gradient-to-br from-rose-50 to-white border border-rose-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer {{ $typeFilter === 'waste' ? 'ring-2 ring-rose-400 shadow-md scale-[1.01]' : '' }}">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-rose-700/80 uppercase tracking-widest leading-none">{{ $startDate ? 'Waste (Period)' : 'Waste (Today)' }}</span>
+                        <div class="w-7 h-7 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-600 border border-rose-500/10">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                         </div>
                     </div>
-                    <h3 class="text-xl sm:text-2xl font-black text-rose-600 tracking-tight leading-none">{{ number_format($stats['waste_count']) }}</h3>
-                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Spoiled / discarded stock</p>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-rose-600 tracking-tight leading-none">{{ number_format($stats['waste_count']) }}</span>
+                        <span class="text-[9px] font-bold text-slate-400">entries</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Spoiled / discarded stock</p>
                 </div>
 
                 {{-- Restock Value --}}
-                <div class="p-3 sm:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-1 sm:mb-2">
-                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">{{ $startDate ? 'Restock (Period)' : 'Restock Value' }}</span>
-                        <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
+                <div wire:key="kpi-filter-card-in"
+                    wire:click="toggleTypeFilter('in')"
+                    class="bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer {{ $typeFilter === 'in' ? 'ring-2 ring-emerald-400 shadow-md scale-[1.01]' : '' }}">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-emerald-700/80 uppercase tracking-widest leading-none">{{ $startDate ? 'Restock (Period)' : 'Restock Value' }}</span>
+                        <div class="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 border border-emerald-500/10">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </div>
                     </div>
-                    <h3 class="text-xl sm:text-2xl font-black text-emerald-600 tracking-tight leading-none">₱{{ number_format($stats['in_value'], 0) }}</h3>
-                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Cost value of items received</p>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-emerald-600 tracking-tight leading-none">₱{{ number_format($stats['in_value'], 0) }}</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Cost value of items received</p>
                 </div>
 
                 {{-- Out Count --}}
-                <div class="p-3 sm:p-4 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
-                    <div class="flex items-center justify-between mb-1 sm:mb-2">
-                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">{{ $startDate ? 'Out (Period)' : 'Out (Today)' }}</span>
-                        <div class="w-7 h-7 rounded-lg bg-white border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm shrink-0">
+                <div wire:key="kpi-filter-card-out"
+                    wire:click="toggleTypeFilter('out')"
+                    class="bg-gradient-to-br from-amber-50 to-white border border-amber-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] transition-all hover:shadow-md hover:scale-[1.01] duration-300 cursor-pointer {{ $typeFilter === 'out' ? 'ring-2 ring-amber-400 shadow-md scale-[1.01]' : '' }}">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[10px] font-black text-amber-700/80 uppercase tracking-widest leading-none">{{ $startDate ? 'Out (Period)' : 'Out (Today)' }}</span>
+                        <div class="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600 border border-amber-500/10">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                         </div>
                     </div>
-                    <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-none">{{ number_format($stats['out_count']) }}</h3>
-                    <p class="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-1 sm:mt-1.5 leading-none">Items checked out/reduced</p>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ number_format($stats['out_count']) }}</span>
+                        <span class="text-[9px] font-bold text-slate-400">items</span>
+                    </div>
+                    <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Items checked out/reduced</p>
                 </div>
             </div>
 
@@ -163,6 +122,41 @@
                 <div class="flex flex-nowrap items-center justify-end gap-1.5 sm:gap-2 shrink-0">
                     {{-- 3-in-1 Date Filter Component --}}
                     <x-date-filter startModel="startDate" endModel="endDate" activeModel="activeFilter" />
+
+                    {{-- Movement Type Filter Dropdown --}}
+                    <x-dropdown align="right" width="48" wire:key="filter-movement-type">
+                        <x-slot name="trigger">
+                            <x-secondary-button type="button" class="gap-0 sm:gap-1.5 h-10 !px-2.5 sm:!px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none">
+                                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                                </svg>
+                                <span class="hidden sm:inline text-[12px] whitespace-nowrap font-bold">
+                                    {{ match($typeFilter) { 'waste' => 'Waste Only', 'in' => 'Restock Only', 'out' => 'Stock Out', 'adjust' => 'Reconciliation', default => 'All Types' } }}
+                                </span>
+                                <svg class="hidden sm:block w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </x-secondary-button>
+                        </x-slot>
+                        <x-slot name="content">
+                            <x-dropdown-link href="#" wire:click.prevent="setTypeFilter('all')">
+                                <span class="{{ $typeFilter === 'all' ? 'font-bold text-indigo-600' : '' }}">All Types</span>
+                            </x-dropdown-link>
+                            <hr class="border-slate-100">
+                            <x-dropdown-link href="#" wire:click.prevent="setTypeFilter('waste')">
+                                <div class="flex items-center gap-2 {{ $typeFilter === 'waste' ? 'font-bold text-rose-600' : '' }}"><span class="w-2 h-2 rounded-full bg-rose-500"></span> Waste / Spoilage</div>
+                            </x-dropdown-link>
+                            <x-dropdown-link href="#" wire:click.prevent="setTypeFilter('in')">
+                                <div class="flex items-center gap-2 {{ $typeFilter === 'in' ? 'font-bold text-emerald-600' : '' }}"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Restock / Received</div>
+                            </x-dropdown-link>
+                            <x-dropdown-link href="#" wire:click.prevent="setTypeFilter('out')">
+                                <div class="flex items-center gap-2 {{ $typeFilter === 'out' ? 'font-bold text-amber-600' : '' }}"><span class="w-2 h-2 rounded-full bg-amber-500"></span> Stock Out / Reductions</div>
+                            </x-dropdown-link>
+                            <x-dropdown-link href="#" wire:click.prevent="setTypeFilter('adjust')">
+                                <div class="flex items-center gap-2 {{ $typeFilter === 'adjust' ? 'font-bold text-indigo-600' : '' }}"><span class="w-2 h-2 rounded-full bg-indigo-500"></span> Physical Reconciliation</div>
+                            </x-dropdown-link>
+                        </x-slot>
+                    </x-dropdown>
 
                     {{-- Branch Scope Filter (Super Admin only) --}}
                     @if($this->isSuperAdmin())
@@ -198,7 +192,7 @@
             </div>
 
             {{-- ── Table View ── --}}
-            <div class="w-full">
+            <div class="w-full" wire:key="stock-adj-table-wrap-{{ $typeFilter }}-{{ $movements->currentPage() }}">
                 <x-data-table>
                     <x-slot name="header">
                         <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Date & Reference</th>
@@ -220,7 +214,7 @@
                                 default => ['dot' => 'bg-slate-400', 'color' => 'slate', 'label' => str_replace('_', ' ', $mov->type)]
                             };
                         @endphp
-                        <tr wire:key="adj-{{ $mov->date }}-{{ $mov->type }}-{{ $movements->currentPage() }}" class="hover:bg-slate-50/50 transition-colors border-b border-slate-50 group">
+                        <tr wire:key="adj-row-{{ $mov->date }}-{{ $mov->type }}-{{ $loop->index }}" class="hover:bg-slate-50/50 transition-colors border-b border-slate-50 group">
                             <td class="py-3 px-4 whitespace-nowrap">
                                 <div class="flex flex-col">
                                     <span class="text-[13px] font-bold text-slate-900">{{ \Carbon\Carbon::parse($mov->date)->format('M d, Y') }}</span>
@@ -269,11 +263,11 @@
                             </td>
                         </tr>
                     @empty
-                        <tr>
+                        <tr wire:key="adj-empty-state-row-{{ $typeFilter }}">
                             <td colspan="6" class="py-0">
                                 <x-empty-state 
                                     title="No records identified" 
-                                    description="Try adjusting your search or branch filters."
+                                    description="Try adjusting your search, type, or branch filters."
                                 />
                             </td>
                         </tr>
@@ -287,12 +281,18 @@
         </div>{{-- end panel 1 --}}
 
         {{-- ════════════════ PANEL 2 — ADJUSTMENT FORM (Matching Menu Items Layout) ════════════════ --}}
-<div x-show="panel === 'adjust'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak wire:ignore.self class="px-1">            <div class="mb-5 flex items-center justify-between">
+        <div x-show="(typeof panel !== 'undefined' ? panel : $wire.panel) === 'adjust'"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 translate-y-4"
+             x-transition:enter-end="opacity-100 translate-y-0"
+             x-cloak
+             class="px-1">
+            <div class="mb-5 flex items-center justify-between">
                 <div>
                     <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Stock Adjustment</h2>
                     <p class="text-[12px] text-gray-500 font-medium">Record manual stock corrections and movements</p>
                 </div>
-<x-secondary-button @click="panel = 'list'; $wire.backToList()" class="h-10">
+                <x-secondary-button @click="panel = 'list'; $wire.backToList()" class="h-10">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
@@ -304,7 +304,7 @@
                 {{-- Left: Details + Queue --}}
                 <div class="lg:col-span-2 space-y-6">
                     {{-- Bulk Adjustment Operation Guide --}}
-                    <div x-show="panel === 'adjust'" class="flex items-start gap-4 p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100/50 mb-6">
+                    <div x-show="(typeof panel !== 'undefined' ? panel : $wire.panel) === 'adjust'" class="flex items-start gap-4 p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100/50 mb-6">
                         <div class="w-8 h-8 bg-white rounded-xl flex items-center justify-center text-indigo-600 shadow-sm shrink-0">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         </div>
@@ -411,7 +411,8 @@
                     {{-- Add Movement Form (Matching Menu Items "Add Component") --}}
                     <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] space-y-4"
                         wire:key="adjustment-movement-form"
-x-data="adjustmentMovementForm($wire, @js($ingredients->map(fn($i) => ['id' => $i->id, 'name' => $i->name, 'unit' => $i->unit])))">                        <h2 class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1 flex items-center gap-2">
+                        x-data="typeof window.adjustmentMovementForm === 'function' ? window.adjustmentMovementForm($wire, @js($ingredients->map(fn($i) => ['id' => $i->id, 'name' => $i->name, 'unit' => $i->unit]))) : { isOpen: false, dropUp: false, search: '', selectedId: $wire.entangle('newItemId').live, qty: $wire.entangle('newItemQty').live, formErrors: {}, ingredients: @js($ingredients->map(fn($i) => ['id' => $i->id, 'name' => $i->name, 'unit' => $i->unit])), get selectedItem() { if (!this.selectedId) return null; return this.ingredients.find(i => Number(i.id) === Number(this.selectedId)) || null; }, get filteredItems() { if (!this.search || !this.search.trim()) return this.ingredients; const q = this.search.toLowerCase().trim(); return this.ingredients.filter(i => (i.name || '').toLowerCase().includes(q)); }, openDropdown() { this.isOpen = true; this.search = ''; }, closeDropdown() { this.isOpen = false; this.search = ''; }, checkFlip() {}, select(id) { this.selectedId = id; this.isOpen = false; }, clear() { this.selectedId = ''; this.isOpen = false; }, validateAndAdd() { $wire.addToQueue(); } }">
+                        <h2 class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-1 flex items-center gap-2">
                             <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
                             Add Movement
                         </h2>
@@ -618,7 +619,7 @@ x-data="adjustmentMovementForm($wire, @js($ingredients->map(fn($i) => ['id' => $
                     <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
                         <h2 class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-5 ml-1">Finalize & Actions</h2>
                         
-                        <div class="p-4 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-100 flex items-center justify-between mb-6 transition-all hover:scale-[1.02]">
+                        <div class="p-4 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-100 flex items-center justify-between mb-6">
                             <span class="text-[11px] font-black text-indigo-100 uppercase tracking-widest">Queue Size</span>
                             <div class="text-right">
                                 <span class="block text-[18px] font-black text-white leading-none italic font-mono">{{ count($rows) }}</span>
@@ -679,7 +680,13 @@ x-data="adjustmentMovementForm($wire, @js($ingredients->map(fn($i) => ['id' => $
         </div>{{-- end panel 2 --}}
 
         {{-- ════════════════ PANEL 3 — STOCK RECONCILE (Matching Bulk Edit UI) ════════════════ --}}
-<div x-show="panel === 'bulk'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak wire:ignore.self class="px-1">            <div class="mb-5 flex items-center justify-between">
+        <div x-show="(typeof panel !== 'undefined' ? panel : $wire.panel) === 'bulk'"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 translate-y-4"
+             x-transition:enter-end="opacity-100 translate-y-0"
+             x-cloak
+             class="px-1">
+            <div class="mb-5 flex items-center justify-between">
                 <div>
                     <h2 class="text-[17px] font-bold text-gray-900 tracking-tight">Stock Reconcile</h2>
                     <p class="text-[12px] text-gray-500 font-medium">Reconcile physical counts for <span class="text-indigo-600 font-bold uppercase">{{ $branches->firstWhere('id', $selectedBranchId)->branch_name ?? 'N/A' }}</span></p>
@@ -698,7 +705,7 @@ x-data="adjustmentMovementForm($wire, @js($ingredients->map(fn($i) => ['id' => $
                                         <div class="bg-white border border-slate-200/60 rounded-2xl p-6 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]"
                         wire:ignore
                         wire:key="bulk-table-{{ $selectedBranchId }}-{{ $bulkVersion }}"
-                        x-data="reconcileTable(@js($bulkAdjustments))">
+                        x-data="typeof window.reconcileTable === 'function' ? window.reconcileTable(@js($bulkAdjustments)) : (typeof reconcileTable === 'function' ? reconcileTable(@js($bulkAdjustments)) : { items: @js($bulkAdjustments) || {}, bulkSearch: '', init() {}, updateVariance() {}, formatQty(val, unit) { return Number(val || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ' + (unit || ''); } })">
                         <div class="flex items-center justify-between mb-4">
                             <h2 class="text-[13px] font-semibold text-gray-700 uppercase tracking-wider">Physical Count Entry</h2>
                             <x-search-bar x-model="bulkSearch" placeholder="Filter items..." width="w-full md:w-64" class="h-10" />
@@ -764,7 +771,7 @@ x-data="adjustmentMovementForm($wire, @js($ingredients->map(fn($i) => ['id' => $
                             </div>
                             <div class="pt-2">
                                 <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Est. Cost Impact</span>
-                                <div class="p-4 bg-slate-50 border border-slate-100 rounded-2xl mt-2 flex items-center justify-between transition-all hover:scale-[1.02]">
+                                <div class="p-4 bg-slate-50 border border-slate-100 rounded-2xl mt-2 flex items-center justify-between">
                                     <div class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 shadow-sm">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                     </div>
@@ -911,10 +918,10 @@ x-data="adjustmentMovementForm($wire, @js($ingredients->map(fn($i) => ['id' => $
                 {{-- Fixed Summary Section --}}
                 <div class="shrink-0 p-6 pb-2 space-y-4">
                     <div class="grid grid-cols-2 gap-4">
-                        <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
-                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Items</p>
-                            <p class="text-[20px] font-black text-slate-900">{{ count($combinedMovements) }}</p>
-                        </div>
+<div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
+    <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Items</p>
+    <p class="text-[20px] font-black text-slate-900">{{ $combinedMovements->count() }}</p>
+</div>
                         <div class="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
                             <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Transaction Value</p>
                             <p class="text-[20px] font-black {{ $themeText }}">₱{{ number_format($totalValue, 2) }}</p>
@@ -1006,38 +1013,4 @@ x-data="adjustmentMovementForm($wire, @js($ingredients->map(fn($i) => ['id' => $
             </div>
          @endif
     </x-side-panel>
-
-     @script
-    <script>
-        if (typeof window.registerReconcileStore === 'function') {
-            window.registerReconcileStore();
-        }
-
-        Alpine.data('reconcileTable', (initialItems) => ({
-            items: initialItems || {},
-                bulkSearch: '',
-                init() {
-                    if (typeof window.registerReconcileStore === 'function') {
-                        window.registerReconcileStore();
-                    }
-                    if (window.Alpine && window.Alpine.store('reconcile')) {
-                        window.Alpine.store('reconcile').setItems(this.items);
-                    }
-                },
-                updateVariance(id) {
-                    if (!this.items || !this.items[id]) return;
-                    const item = this.items[id];
-                    const actual = (item.actual === '' || item.actual === null || item.actual === undefined) ? null : parseFloat(item.actual);
-                    item.variance = (actual === null || isNaN(actual)) ? 0 : actual - (item.current || 0);
-                    if (window.Alpine && window.Alpine.store('reconcile')) {
-                        window.Alpine.store('reconcile').setItems(this.items);
-                    }
-                },
-                formatQty(val, unit) {
-                    return Number(val || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' ' + (unit || '');
-                }
-            }));
-    </script>
-    @endscript
-
 </div>

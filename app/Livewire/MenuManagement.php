@@ -84,96 +84,160 @@ public function getOwnerLabel(string $owner): string
         ])->values()->toArray();
     }
 
-    public function saveGroupToLibrary(int $index)
-    {
-        $groupData = $this->optionGroups[$index] ?? null;
-        if (!$groupData) return;
+public function saveGroupToLibrary(int $index)
+{
+    $groupData = $this->optionGroups[$index] ?? null;
+    if (!$groupData) return;
 
-        $groupName = trim($groupData['name'] ?? '');
-        if ($groupName === '') return;
+    $groupName = trim($groupData['name'] ?? '');
+    if ($groupName === '') return;
 
-        $existingTemplate = OptionTemplate::whereRaw('LOWER(name) = ?', [strtolower($groupName)])->first();
+    $noRecipe = (bool)($groupData['no_recipe_required'] ?? false);
+    $maxSelect = !empty($groupData['max_select']) ? (int)$groupData['max_select'] : null;
 
-        try {
-            DB::transaction(function () use ($groupData, $groupName, $index, $existingTemplate) {
-                $noRecipe = (bool)($groupData['no_recipe_required'] ?? false);
-                $maxSelect = !empty($groupData['max_select']) ? (int)$groupData['max_select'] : null;
+    $existingTemplate = OptionTemplate::whereRaw('LOWER(TRIM(name)) = ?', [mb_strtolower($groupName)])
+        ->with('items.ingredients')
+        ->first();
+    $isUpdate = (bool) $existingTemplate;
 
-                if ($existingTemplate) {
-                    $template = $existingTemplate;
-                    $template->update([
-                        'price_mode'  => $groupData['price_mode'],
-                        'max_select'  => $maxSelect,
-                        'is_required' => (bool)$groupData['is_required'],
-                        'no_recipe_required' => $noRecipe,
-                    ]);
-                } else {
-                    $template = OptionTemplate::create([
-                        'name'        => $groupName,
-                        'price_mode'  => $groupData['price_mode'],
-                        'max_select'  => $maxSelect,
-                        'is_required' => (bool)$groupData['is_required'],
-                        'no_recipe_required' => $noRecipe,
-                    ]);
-                }
-
-                $keepItemIds = [];
-
-                foreach (($groupData['options'] ?? []) as $oIdx => $oData) {
-                    $optName = trim($oData['name'] ?? '');
-                    if ($optName === '') continue;
-
-                    $item = $existingTemplate
-                        ? $template->items()->whereRaw('LOWER(name) = ?', [strtolower($optName)])->first()
-                        : null;
-
-                    if ($item) {
-                        $item->update([
-                            'price'      => (float)($oData['price'] ?: 0),
-                            'is_default' => (bool)($oData['is_default'] ?? false),
-                        ]);
-                    } else {
-                        $item = $template->items()->create([
-                            'name'       => $optName,
-                            'price'      => (float)($oData['price'] ?: 0),
-                            'is_default' => (bool)($oData['is_default'] ?? false),
-                        ]);
-                    }
-                    $keepItemIds[] = $item->id;
-
-                    $owner = "option:{$index}_{$oIdx}";
-                    $legacyOwner = !empty($oData['id']) ? "option:{$oData['id']}" : null;
-
-                    $matchingIngredients = collect($this->recipeIngredients)
-                        ->filter(fn($ri) => $ri['owner'] === $owner || ($legacyOwner && $ri['owner'] === $legacyOwner))
-                        ->unique('id');
-
-                    $item->ingredients()->delete();
-                    if (!$noRecipe) {
-                        foreach ($matchingIngredients as $ri) {
-                            $item->ingredients()->create([
-                                'ingredient_id' => $ri['id'],
-                                'quantity'      => $ri['quantity'],
-                            ]);
-                        }
-                    }
-                }
-
-                if ($existingTemplate && !empty($keepItemIds)) {
-                    $template->items()->whereNotIn('id', $keepItemIds)->delete();
-                }
-            });
-
-            $msg = $existingTemplate
-                ? "Template '{$groupName}' updated in library."
-                : "Group '{$groupName}' saved to library.";
-            $this->dispatch('notify', type: 'success', message: $msg);
-            $this->dispatch('templates-updated', templates: $this->getTemplatesData());
-        } catch (\Exception $e) {
-            Log::error('MenuManagement.saveGroupToLibrary failed: ' . $e->getMessage());
-            $this->dispatch('notify', type: 'error', message: 'Failed to save group to library. Please check option prices and try again.');
+    // ── Snapshot BEFORE state (existing template's options) ──
+    $oldItemsByName = [];
+    if ($existingTemplate) {
+        foreach ($existingTemplate->items as $oldItem) {
+            $oldItemsByName[mb_strtolower(trim($oldItem->name))] = [
+                'price'            => (float) $oldItem->price,
+                'is_default'       => (bool) $oldItem->is_default,
+                'ingredient_count' => $oldItem->ingredients->count(),
+            ];
         }
     }
+
+    // ── Snapshot AFTER state (this group's current options) ──
+    $newItemsByName = [];
+    foreach (($groupData['options'] ?? []) as $oIdx => $oData) {
+        $optName = trim($oData['name'] ?? '');
+        if ($optName === '') continue;
+
+        $owner = "option:{$index}_{$oIdx}";
+        $legacyOwner = !empty($oData['id']) ? "option:{$oData['id']}" : null;
+        $ingredientCount = $noRecipe ? 0 : collect($this->recipeIngredients)
+            ->filter(fn($ri) => $ri['owner'] === $owner || ($legacyOwner && $ri['owner'] === $legacyOwner))
+            ->unique('id')
+            ->count();
+
+        $newItemsByName[mb_strtolower($optName)] = [
+            'price'            => (float) ($oData['price'] ?: 0),
+            'is_default'       => (bool) ($oData['is_default'] ?? false),
+            'ingredient_count' => $ingredientCount,
+        ];
+    }
+
+    // ── Diff ──
+    $addedOptions = 0;
+    $removedOptions = 0;
+    $updatedOptions = 0;
+    $ingredientChanges = 0;
+    $settingsChanged = false;
+
+    if ($isUpdate) {
+        foreach ($newItemsByName as $nName => $new) {
+            if (!isset($oldItemsByName[$nName])) {
+                $addedOptions++;
+                continue;
+            }
+            $old = $oldItemsByName[$nName];
+            if ($old['price'] !== $new['price'] || $old['is_default'] !== $new['is_default']) {
+                $updatedOptions++;
+            }
+            if ($old['ingredient_count'] !== $new['ingredient_count']) {
+                $ingredientChanges++;
+            }
+        }
+        foreach ($oldItemsByName as $nName => $old) {
+            if (!isset($newItemsByName[$nName])) {
+                $removedOptions++;
+            }
+        }
+
+        $settingsChanged =
+            $existingTemplate->price_mode !== $groupData['price_mode']
+            || (int)($existingTemplate->max_select ?? 0) !== (int)($maxSelect ?? 0)
+            || (bool)$existingTemplate->is_required !== (bool)$groupData['is_required']
+            || (bool)$existingTemplate->no_recipe_required !== $noRecipe;
+    }
+
+    try {
+        DB::transaction(function () use ($groupData, $groupName, $index, $noRecipe, $maxSelect, $existingTemplate) {
+            $template = $existingTemplate ?? new OptionTemplate();
+
+            $template->name = $groupName;
+            $template->price_mode = $groupData['price_mode'];
+            $template->max_select = $maxSelect;
+            $template->is_required = (bool)$groupData['is_required'];
+            $template->no_recipe_required = $noRecipe;
+            $template->save();
+
+            // Full replace: clear old items/ingredients so removed or
+            // renamed options don't linger from a previous save.
+            foreach ($template->items as $oldItem) {
+                $oldItem->ingredients()->delete();
+            }
+            $template->items()->delete();
+
+            foreach (($groupData['options'] ?? []) as $oIdx => $oData) {
+                $optName = trim($oData['name'] ?? '');
+                if ($optName === '') continue;
+
+                $item = $template->items()->create([
+                    'name'       => $optName,
+                    'price'      => (float)($oData['price'] ?: 0),
+                    'is_default' => (bool)($oData['is_default'] ?? false),
+                ]);
+                $owner = "option:{$index}_{$oIdx}";
+                $legacyOwner = !empty($oData['id']) ? "option:{$oData['id']}" : null;
+
+                $matchingIngredients = collect($this->recipeIngredients)
+                    ->filter(fn($ri) => $ri['owner'] === $owner || ($legacyOwner && $ri['owner'] === $legacyOwner))
+                    ->unique('id');
+
+                if (!$noRecipe) {
+                    foreach ($matchingIngredients as $ri) {
+                        $item->ingredients()->create([
+                            'ingredient_id' => $ri['id'],
+                            'quantity'      => $ri['quantity'],
+                        ]);
+                    }
+                }
+            }
+        });
+
+        if (!$isUpdate) {
+            $msg = "Group '{$groupName}' saved to library.";
+            $type = 'success';
+        } else {
+            $parts = [];
+            if ($addedOptions > 0) $parts[] = $addedOptions . ' new option(s)';
+            if ($removedOptions > 0) $parts[] = $removedOptions . ' option(s) removed';
+            if ($updatedOptions > 0) $parts[] = $updatedOptions . ' price/default update(s)';
+            if ($ingredientChanges > 0) $parts[] = $ingredientChanges . ' option(s) with recipe changes';
+            if ($settingsChanged) $parts[] = 'group settings updated';
+
+            if (empty($parts)) {
+                $msg = "'{$groupName}' is already saved and up to date — nothing new to update.";
+                $type = 'info';
+            } else {
+                $msg = "Updated '{$groupName}' in library: " . implode(', ', $parts) . '.';
+                $type = 'success';
+            }
+        }
+
+        $this->dispatch('notify', type: $type, message: $msg);
+        $this->dispatch('templates-updated', templates: $this->getTemplatesData());
+    } catch (\Exception $e) {
+        Log::error('MenuManagement.saveGroupToLibrary failed: ' . $e->getMessage());
+        $this->dispatch('notify', type: 'error', message: 'Failed to save group to library. Please check option prices and try again.');
+    }
+}
 
     // ── Filters & Display ─────────────────────────────────────────
     public $search = '';
@@ -577,11 +641,58 @@ public function getOwnerLabel(string $owner): string
             'optionGroups.*.price_mode'        => 'required|in:fixed,additive',
             'optionGroups.*.max_select'        => 'nullable|integer|min:1',
             'optionGroups.*.options.*.name'    => 'required|string|max:100',
-            'optionGroups.*.options.*.price'   => 'nullable|numeric|min:0',
             'recipeIngredients.*.id'           => 'required|exists:ingredients,id',
             'recipeIngredients.*.quantity'     => 'required|numeric|min:0.01',
         ];
+
+        foreach ($this->optionGroups as $groupIndex => $group) {
+            $priceRule = (bool)($group['no_recipe_required'] ?? false)
+                ? ['nullable', 'numeric', 'min:0', 'max:999999.99']
+                : ['required', 'numeric', 'min:0.01', 'max:999999.99'];
+
+            foreach (($group['options'] ?? []) as $optionIndex => $option) {
+                $rules["optionGroups.{$groupIndex}.options.{$optionIndex}.price"] = $priceRule;
+            }
+        }
+
         return $rules;
+    }
+
+    private function validateUniqueOptionNames(): bool
+    {
+        $valid = true;
+
+        foreach ($this->duplicateOptionNameErrors() as $field => $message) {
+            $this->addError($field, $message);
+            $valid = false;
+        }
+
+        return $valid;
+    }
+
+    private function duplicateOptionNameErrors(): array
+    {
+        $errors = [];
+
+        foreach ($this->optionGroups as $groupIndex => $group) {
+            $seen = [];
+            foreach (($group['options'] ?? []) as $optionIndex => $option) {
+                $normalized = mb_strtolower(trim((string)($option['name'] ?? '')));
+                if ($normalized === '') {
+                    continue;
+                }
+
+                if (isset($seen[$normalized])) {
+                    $message = 'Option name must be unique within this group.';
+                    $errors["optionGroups.{$groupIndex}.options.{$seen[$normalized]}.name"] = $message;
+                    $errors["optionGroups.{$groupIndex}.options.{$optionIndex}.name"] = $message;
+                } else {
+                    $seen[$normalized] = $optionIndex;
+                }
+            }
+        }
+
+        return $errors;
     }
 
     /**
@@ -591,7 +702,7 @@ public function getOwnerLabel(string $owner): string
      */
     private function getProductValidationAttributes(): array
     {
-        return [
+        $attributes = [
             'name'                              => 'product name',
             'categoryId'                        => 'category',
             'price'                              => 'sale price',
@@ -605,6 +716,15 @@ public function getOwnerLabel(string $owner): string
             'recipeIngredients.*.id'            => 'ingredient',
             'recipeIngredients.*.quantity'      => 'quantity',
         ];
+
+        foreach ($this->optionGroups as $groupIndex => $group) {
+            foreach (($group['options'] ?? []) as $optionIndex => $option) {
+                $attributes["optionGroups.{$groupIndex}.options.{$optionIndex}.name"] = 'option name';
+                $attributes["optionGroups.{$groupIndex}.options.{$optionIndex}.price"] = 'option price';
+            }
+        }
+
+        return $attributes;
     }
 
     private function prepareData()
@@ -642,13 +762,24 @@ public function getOwnerLabel(string $owner): string
         $this->prepareData();
 
         try {
-            $this->validateBeforeModal(
-                $this->getProductValidationRules(), 
-                ValidationHelper::commonMessages(), 
-                'confirm-save-product',
+            $this->validate(
+                $this->getProductValidationRules(),
+                ValidationHelper::commonMessages(),
                 $this->getProductValidationAttributes()
             );
+
+            if (!$this->validateUniqueOptionNames()) {
+                $this->activeTab = 'variants';
+                $this->dispatch('scroll-to-error');
+                return;
+            }
+
+            $this->dispatch('open-modal', ['name' => 'confirm-save-product']);
         } catch (\Illuminate\Validation\ValidationException $e) {
+            foreach ($this->duplicateOptionNameErrors() as $field => $message) {
+                $this->addError($field, $message);
+                $e->validator->errors()->add($field, $message);
+            }
             $this->switchToFailedTab($e->validator->errors()->keys());
             throw $e;
         }
@@ -662,7 +793,17 @@ public function getOwnerLabel(string $owner): string
 
          try {
             $this->validateSecure($this->getProductValidationRules(), ValidationHelper::commonMessages(), $this->getProductValidationAttributes());
+
+            if (!$this->validateUniqueOptionNames()) {
+                $this->activeTab = 'variants';
+                $this->dispatch('scroll-to-error');
+                return;
+            }
         } catch (\Illuminate\Validation\ValidationException $e) {
+            foreach ($this->duplicateOptionNameErrors() as $field => $message) {
+                $this->addError($field, $message);
+                $e->validator->errors()->add($field, $message);
+            }
             $this->switchToFailedTab($e->validator->errors()->keys());
             throw $e;
         }
@@ -710,9 +851,15 @@ public function getOwnerLabel(string $owner): string
                     $keepOptionIds = [];
                     foreach (($gData['options'] ?? []) as $oIdx => $oData) {
                         $option = !empty($oData['id']) ? $group->options()->find($oData['id']) : null;
+                        $ownerKeys = ["option:{$gIdx}_{$oIdx}"];
+                        if (!empty($oData['id'])) $ownerKeys[] = "option:{$oData['id']}";
+                        $optionCost = collect($this->recipeIngredients)
+                            ->filter(fn($ri) => in_array($ri['owner'] ?? null, $ownerKeys, true))
+                            ->sum(fn($ri) => (float)($ri['quantity'] ?? 0) * (float)($ri['cost'] ?? 0));
                         $optPayload = [
                             'name' => $oData['name'], 
                             'price' => (float)($oData['price'] ?: 0), 
+                            'cost' => round($optionCost, 2),
                             'is_default' => (bool)$oData['is_default'], 
                             'sort_order' => $oIdx
                         ];
@@ -843,6 +990,36 @@ public function getOwnerLabel(string $owner): string
         })->sortByDesc('cost')->values()->toArray();
     }
 
+    public function getOptionProfitBreakdown(): array
+    {
+        return collect($this->optionGroups)
+            ->flatMap(function ($group, $groupIndex) {
+                return collect($group['options'] ?? [])->map(function ($option, $optionIndex) use ($group, $groupIndex) {
+                    $owners = ["option:{$groupIndex}_{$optionIndex}"];
+                    if (!empty($option['id'])) {
+                        $owners[] = "option:{$option['id']}";
+                    }
+
+                    $cost = (bool)($group['no_recipe_required'] ?? false)
+                        ? 0
+                        : collect($this->recipeIngredients)
+                            ->filter(fn($ingredient) => in_array($ingredient['owner'] ?? null, $owners, true))
+                            ->sum(fn($ingredient) => (float)($ingredient['cost'] ?? 0) * (float)($ingredient['quantity'] ?? 0));
+                    $price = (float)($option['price'] ?? 0);
+
+                    return [
+                        'name' => trim((string)($group['name'] ?? 'Option Group')) . ': ' . trim((string)($option['name'] ?? 'Option')),
+                        'price' => $price,
+                        'cost' => round($cost, 2),
+                        'profit' => round($price - $cost, 2),
+                    ];
+                });
+            })
+            ->sortByDesc('profit')
+            ->values()
+            ->toArray();
+    }
+
     // ── Helpers ───────────────────────────────────────────────────
     private function resetProductForm()
     {
@@ -904,7 +1081,7 @@ public function getOwnerLabel(string $owner): string
             $query->where('category_id', $this->selectedCategoryId);
         }
         if ($this->statusFilter !== null && $this->statusFilter !== '') {
-            $query->whereRaw($this->effectiveActiveExpr() . ' = ?', [$this->statusFilter === '1' ? 1 : 0]);
+            $query->whereRaw($this->effectiveActiveExpr() . ' = ?', [(string)$this->statusFilter === '1' ? 1 : 0]);
         }
 
         $products = $query->leftJoin('product_categories', 'products.category_id', '=', 'product_categories.id')

@@ -30,7 +30,7 @@
         {{-- KPI Cards Section --}}
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-8">
             {{-- Total Notifications --}}
-            <div class="p-3 sm:p-4 bg-gradient-to-br from-{{ $primaryColor }}-500/10 via-{{ $primaryColor }}-500/5 to-white border border-{{ $primaryColor }}-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+            <div class="p-3 sm:p-4 bg-gradient-to-br from-{{ $primaryColor }}-500/10 via-{{ $primaryColor }}-500/5 to-white border border-{{ $primaryColor }}-500/10 rounded-2xl shadow-sm duration-300 relative overflow-hidden">
                 <div class="flex items-center justify-between mb-1 sm:mb-2">
                     <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Alerts</span>
                     <div class="w-7 h-7 rounded-lg bg-white border border-{{ $primaryColor }}-100 flex items-center justify-center {{ $primaryText }} shadow-sm shrink-0">
@@ -42,7 +42,7 @@
             </div>
 
             {{-- Unread Alerts --}}
-            <div class="p-3 sm:p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+            <div class="p-3 sm:p-4 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm duration-300 relative overflow-hidden">
                 <div class="flex items-center justify-between mb-1 sm:mb-2">
                     <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Unread Alerts</span>
                     <div class="w-7 h-7 rounded-lg bg-white border border-indigo-100 flex items-center justify-center text-indigo-500 shadow-sm shrink-0">
@@ -54,7 +54,7 @@
             </div>
 
             {{-- Critical Alerts --}}
-            <div class="p-3 sm:p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+            <div class="p-3 sm:p-4 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm duration-300 relative overflow-hidden">
                 <div class="flex items-center justify-between mb-1 sm:mb-2">
                     <span class="text-[10px] sm:text-[11px] font-bold text-rose-600/90 uppercase tracking-wider">Critical (Unread)</span>
                     <div class="w-7 h-7 rounded-lg bg-white border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm shrink-0">
@@ -66,7 +66,7 @@
             </div>
 
             {{-- Recent Activity --}}
-            <div class="p-3 sm:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden group">
+            <div class="p-3 sm:p-4 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm duration-300 relative overflow-hidden">
                 <div class="flex items-center justify-between mb-1 sm:mb-2">
                     <span class="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Recent (7 Days)</span>
                     <div class="w-7 h-7 rounded-lg bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm shrink-0">

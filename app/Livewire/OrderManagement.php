@@ -129,7 +129,7 @@ class OrderManagement extends Component
             $validStatuses = [Order::STATUS_COMPLETED, Order::STATUS_CANCELLED, Order::STATUS_VOID, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED];
         }
 
-        if ($value !== '' && !in_array($this->statusFilter, $validStatuses)) {
+        if ($value !== '' && $this->statusFilter !== 'active' && !in_array($this->statusFilter, $validStatuses)) {
             $this->statusFilter = ''; 
         }
 
@@ -250,17 +250,33 @@ class OrderManagement extends Component
 
         // Filter by status
         if (!empty($this->statusFilter)) {
-            $validStatuses = [];
-            if ($sourceTab === 'POS') {
-                $validStatuses = [Order::STATUS_PENDING, Order::STATUS_DRAFTED, Order::STATUS_COMPLETED];
-            } elseif ($sourceTab === 'App') {
-                $validStatuses = [Order::STATUS_PENDING, Order::STATUS_PREPARING, Order::STATUS_READY, Order::STATUS_HANDED_TO_RIDER, Order::STATUS_OUT_FOR_DELIVERY, Order::STATUS_COMPLETED, Order::STATUS_CANCELLED, Order::STATUS_VOID, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED];
-            } elseif ($sourceTab === 'History') {
-                $validStatuses = [Order::STATUS_COMPLETED, Order::STATUS_CANCELLED, Order::STATUS_VOID, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED];
-            }
+            if ($this->statusFilter === 'active') {
+                if ($sourceTab === 'POS') {
+                    $query->whereIn('status', [Order::STATUS_PENDING, Order::STATUS_DRAFTED]);
+                } elseif ($sourceTab === 'App') {
+                    $query->whereIn('status', [
+                        Order::STATUS_PENDING,
+                        Order::STATUS_PREPARING,
+                        Order::STATUS_READY,
+                        Order::STATUS_HANDED_TO_RIDER,
+                        Order::STATUS_OUT_FOR_DELIVERY,
+                    ]);
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
+            } else {
+                $validStatuses = [];
+                if ($sourceTab === 'POS') {
+                    $validStatuses = [Order::STATUS_PENDING, Order::STATUS_DRAFTED, Order::STATUS_COMPLETED];
+                } elseif ($sourceTab === 'App') {
+                    $validStatuses = [Order::STATUS_PENDING, Order::STATUS_PREPARING, Order::STATUS_READY, Order::STATUS_HANDED_TO_RIDER, Order::STATUS_OUT_FOR_DELIVERY, Order::STATUS_COMPLETED, Order::STATUS_CANCELLED, Order::STATUS_VOID, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED];
+                } elseif ($sourceTab === 'History') {
+                    $validStatuses = [Order::STATUS_COMPLETED, Order::STATUS_CANCELLED, Order::STATUS_VOID, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED];
+                }
 
-            if (in_array($this->statusFilter, $validStatuses)) {
-                $query->where('status', $this->statusFilter);
+                if (in_array($this->statusFilter, $validStatuses)) {
+                    $query->where('status', $this->statusFilter);
+                }
             }
         }
 

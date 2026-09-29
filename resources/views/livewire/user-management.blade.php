@@ -1,5 +1,5 @@
 <div
-    x-data="userManagementData($wire, @js($panel), @js($mode), @js($view), @js($roles->pluck('name', 'id')), @js($branches->pluck('branch_name', 'id')), @js($activeTab))"
+    x-data="userManagementData(@js($panel), @js($mode), @js($view), @js($roles->pluck('name', 'id')), @js($branches->pluck('branch_name', 'id')), @js($activeTab))"
     @trigger-edit.window="if ($event.detail.mode === 'view') { openViewProfile($event.detail.id); } else { $wire.showEdit($event.detail.id, $event.detail.mode || 'edit'); }"
     class="relative">
 
@@ -57,44 +57,104 @@
     {{-- Alpine Data Script --}}
     <script>
     (function() {
+        const STORE_KEY = 'um';
+
         const registerUserData = () => {
             if (!window.Alpine) return;
-            if (Alpine.data('userManagementData')) return;
+            if (window.__userManagementRegistered) return;
+            window.__userManagementRegistered = true;
 
-            Alpine.data('userManagementData', ($wire, initialPanel, initialMode, initialView, rolesMap, branchesMap, initialActiveTab) => {
-                const tabsState = (typeof slidingTabs === 'function')
-                    ? slidingTabs({ activeTab: $wire.entangle('activeTab').live, historyTab: @js($historyTab) }, ['activeTab', 'historyTab'])
-                    : { init() {} };
+            // ── Bootstrap the Alpine store for all reactive UI state ──────────
+            // The store is global and survives Livewire DOM morphing/cloneNode.
+            if (!Alpine.store(STORE_KEY)) {
+                Alpine.store(STORE_KEY, {
+                    panel:            @js($panel),
+                    mode:             @js($mode),
+                    activeTab:        @js($activeTab),
+                    historyTab:       @js($historyTab),
+                    tableView:        @js($view ?: 'table'),
+                    loadingProfileId: null,
+                    formRoleId:       @js($formRoleId ?? ''),
+                    formBranchId:     @js($formBranchId ?? ''),
+                    position:         @js($position ?? ''),
+                    addr_street:      @js($addr_street ?? ''),
+                    addr_region:      @js($addr_region ?? ''),
+                    addr_province:    @js($addr_province ?? ''),
+                    addr_city:        @js($addr_city ?? ''),
+                    addr_barangay:    @js($addr_barangay ?? ''),
+                    addr_lat:         @js($addr_lat ?? null),
+                    addr_lng:         @js($addr_lng ?? null),
+                    editUserId:       @js($editUserId ?? null),
+                    saving:           false,
+                    restoring:        false,
+                });
+            }
+
+            Alpine.data('userManagementData', (initialPanel, initialMode, initialView, rolesMap, branchesMap, initialActiveTab) => {
+                // ── All volatile state backed by the global Alpine store ───────────
+                // Store getters are evaluated on EVERY node including Livewire morph
+                // clones.  Because $wire is NOT passed to this factory, the factory
+                // body is safe to call on detached clones.  Real $wire.entangle()
+                // calls are deferred to init(), which only runs on live mounted nodes.
+                const S = () => Alpine.store(STORE_KEY) || {};
 
                 return {
-                    ...tabsState,
-                    activeTab: $wire.entangle('activeTab').live,
-                    historyTab: @js($historyTab),
-                    archivedView: 'table',
-                    panel: $wire.entangle('panel'),
-                    mode: $wire.entangle('mode'),
-                    tableView: initialView || 'table',
+                    // Panel / mode / tab state — always resolved from the store so
+                    // that x-show, x-text etc. never see undefined on cloned nodes.
+                    get panel()             { return S().panel            ?? initialPanel       ?? 'list'; },
+                    set panel(v)            { Alpine.store(STORE_KEY).panel = v; },
 
-                    // ── View Profile loading state ──
-                    loadingProfileId: null,
+                    get mode()              { return S().mode             ?? initialMode        ?? 'list'; },
+                    set mode(v)             { Alpine.store(STORE_KEY).mode = v; },
 
-                    // ── Entangled Form State (0ms deferred sync) ──
-                    editUserId: $wire.entangle('editUserId'),
-                    formRoleId: $wire.entangle('formRoleId'),
-                    formBranchId: $wire.entangle('formBranchId'),
-                    position: $wire.entangle('position'),
-                    addr_street: $wire.entangle('addr_street'),
-                    addr_region: $wire.entangle('addr_region'),
-                    addr_province: $wire.entangle('addr_province'),
-                    addr_city: $wire.entangle('addr_city'),
-                    addr_barangay: $wire.entangle('addr_barangay'),
-                    addr_lat: $wire.entangle('addr_lat'),
-                    addr_lng: $wire.entangle('addr_lng'),
+                    get activeTab()         { return S().activeTab        ?? initialActiveTab   ?? 'directory'; },
+                    set activeTab(v)        { Alpine.store(STORE_KEY).activeTab = v; },
 
-                    rolesMap: rolesMap || {},
+                    get historyTab()        { return S().historyTab       ?? 'overview'; },
+                    set historyTab(v)       { Alpine.store(STORE_KEY).historyTab = v; },
+
+                    get tableView()         { return S().tableView        ?? initialView        ?? 'table'; },
+                    set tableView(v)        { Alpine.store(STORE_KEY).tableView = v; },
+
+                    get loadingProfileId()  { return S().loadingProfileId ?? null; },
+                    set loadingProfileId(v) { Alpine.store(STORE_KEY).loadingProfileId = v; },
+
+                    get saving()            { return S().saving           ?? false; },
+                    set saving(v)           { Alpine.store(STORE_KEY).saving = v; },
+
+                    get restoring()         { return S().restoring        ?? false; },
+                    set restoring(v)        { Alpine.store(STORE_KEY).restoring = v; },
+
+                    // ── Form-field state — read from store until init() upgrades them ──
+                    // These start as plain store-backed values; init() replaces them with
+                    // real $wire.entangle() objects so two-way sync works correctly.
+                    get editUserId()    { return S().editUserId    ?? null; },
+                    set editUserId(v)   { Alpine.store(STORE_KEY).editUserId    = v; },
+                    get formRoleId()    { return S().formRoleId    ?? ''; },
+                    set formRoleId(v)   { Alpine.store(STORE_KEY).formRoleId    = v; },
+                    get formBranchId()  { return S().formBranchId  ?? ''; },
+                    set formBranchId(v) { Alpine.store(STORE_KEY).formBranchId  = v; },
+                    get position()      { return S().position      ?? ''; },
+                    set position(v)     { Alpine.store(STORE_KEY).position      = v; },
+                    get addr_street()   { return S().addr_street   ?? ''; },
+                    set addr_street(v)  { Alpine.store(STORE_KEY).addr_street   = v; },
+                    get addr_region()   { return S().addr_region   ?? ''; },
+                    set addr_region(v)  { Alpine.store(STORE_KEY).addr_region   = v; },
+                    get addr_province() { return S().addr_province ?? ''; },
+                    set addr_province(v){ Alpine.store(STORE_KEY).addr_province = v; },
+                    get addr_city()     { return S().addr_city     ?? ''; },
+                    set addr_city(v)    { Alpine.store(STORE_KEY).addr_city     = v; },
+                    get addr_barangay() { return S().addr_barangay ?? ''; },
+                    set addr_barangay(v){ Alpine.store(STORE_KEY).addr_barangay = v; },
+                    get addr_lat()      { return S().addr_lat      ?? null; },
+                    set addr_lat(v)     { Alpine.store(STORE_KEY).addr_lat      = v; },
+                    get addr_lng()      { return S().addr_lng      ?? null; },
+                    set addr_lng(v)     { Alpine.store(STORE_KEY).addr_lng      = v; },
+
+                    rolesMap:    rolesMap   || {},
                     branchesMap: branchesMap || {},
 
-                    // ── Location state ──
+                    // ── Location state (component-local, not morphed) ──
                     loc: {
                         noProvince: false,
                         region:   { items: [], search: '', loading: false },
@@ -103,6 +163,10 @@
                         barangay: { items: [], search: '', loading: false }
                     },
 
+                    // Stubs — overridden in init() for live nodes, but safe to call
+                    // on detached clones (no-ops that prevent ReferenceErrors).
+                    updateIndicator() {},
+                    syncToLivewire() {},
                     getCustomPinIcon() {
                         return L.divIcon({
                             html: `
@@ -144,11 +208,11 @@
 
                     filtered(type) {
                         const s = this.loc[type];
+                        if (!s) return [];
                         const q = s.search.toLowerCase();
                         return q ? s.items.filter(i => i.name.toLowerCase().includes(q)) : s.items;
                     },
 
-                    // ── PSGC loaders ──
                     async fetchWithRetry(url, retries = 2, delay = 1000) {
                         try {
                             const cached = sessionStorage.getItem(url);
@@ -158,15 +222,12 @@
                         for (let i = 0; i <= retries; i++) {
                             try {
                                 const res = await fetch(url);
-                                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                                if (!res.ok) throw new Error('HTTP error! status: ' + res.status);
                                 const data = await res.json();
-                                try {
-                                    sessionStorage.setItem(url, JSON.stringify(data));
-                                } catch (e) { console.error('Cache write failed:', e); }
+                                try { sessionStorage.setItem(url, JSON.stringify(data)); } catch (e) {}
                                 return data;
                             } catch (e) {
                                 if (i === retries) throw e;
-                                console.warn(`Fetch failed for ${url}, retrying (${i + 1}/${retries})...`, e);
                                 await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
                             }
                         }
@@ -178,11 +239,10 @@
                         try {
                             const data = await this.fetchWithRetry('https://psgc.cloud/api/regions');
                             this.loc.region.items = data.sort((a, b) => a.name.localeCompare(b.name));
-                        } catch (e) { 
+                        } catch (e) {
                             console.error('Regions fetch failed', e);
                             this.dispatchNotification('error', 'Failed to load regions. Please check your connection.');
-                        }
-                        finally { this.loc.region.loading = false; }
+                        } finally { this.loc.region.loading = false; }
                     },
 
                     async loadProvinces(regionCode) {
@@ -190,23 +250,20 @@
                         if (!regionCode) return;
                         this.loc.province.loading = true;
                         try {
-                            const data = await this.fetchWithRetry(`https://psgc.cloud/api/regions/${regionCode}/provinces`);
+                            const data = await this.fetchWithRetry('https://psgc.cloud/api/regions/' + regionCode + '/provinces');
                             this.loc.province.items = data.sort((a, b) => a.name.localeCompare(b.name));
-                            
                             this.loc.noProvince = this.loc.province.items.length === 0;
-
                             if (this.loc.noProvince) {
                                 this.loc.province.loading = false;
                                 this.loc.city.loading = true;
-                                const data2 = await this.fetchWithRetry(`https://psgc.cloud/api/regions/${regionCode}/cities-municipalities`);
+                                const data2 = await this.fetchWithRetry('https://psgc.cloud/api/regions/' + regionCode + '/cities-municipalities');
                                 this.loc.city.items = data2.sort((a, b) => a.name.localeCompare(b.name));
                                 this.loc.city.loading = false;
                             }
-                        } catch (e) { 
+                        } catch (e) {
                             console.error('Provinces fetch failed', e);
                             this.dispatchNotification('error', 'Failed to load provinces.');
-                        }
-                        finally { this.loc.province.loading = false; }
+                        } finally { this.loc.province.loading = false; }
                     },
 
                     async loadCities(provinceCode) {
@@ -214,13 +271,12 @@
                         if (!provinceCode) return;
                         this.loc.city.loading = true;
                         try {
-                            const data = await this.fetchWithRetry(`https://psgc.cloud/api/provinces/${provinceCode}/cities-municipalities`);
+                            const data = await this.fetchWithRetry('https://psgc.cloud/api/provinces/' + provinceCode + '/cities-municipalities');
                             this.loc.city.items = data.sort((a, b) => a.name.localeCompare(b.name));
-                        } catch (e) { 
+                        } catch (e) {
                             console.error('Cities fetch failed', e);
                             this.dispatchNotification('error', 'Failed to load cities.');
-                        }
-                        finally { this.loc.city.loading = false; }
+                        } finally { this.loc.city.loading = false; }
                     },
 
                     async loadBarangays(cityCode) {
@@ -228,22 +284,18 @@
                         if (!cityCode) return;
                         this.loc.barangay.loading = true;
                         try {
-                            const data = await this.fetchWithRetry(`https://psgc.cloud/api/cities-municipalities/${cityCode}/barangays`);
+                            const data = await this.fetchWithRetry('https://psgc.cloud/api/cities-municipalities/' + cityCode + '/barangays');
                             this.loc.barangay.items = data.sort((a, b) => a.name.localeCompare(b.name));
-                        } catch (e) { 
+                        } catch (e) {
                             console.error('Barangays fetch failed', e);
                             this.dispatchNotification('error', 'Failed to load barangays.');
-                        }
-                        finally { this.loc.barangay.loading = false; }
+                        } finally { this.loc.barangay.loading = false; }
                     },
 
                     dispatchNotification(type, message) {
-                        window.dispatchEvent(new CustomEvent('notify', {
-                            detail: { type, message }
-                        }));
+                        window.dispatchEvent(new CustomEvent('notify', { detail: { type, message } }));
                     },
 
-                    // ── Cascade handlers ──
                     async selectRegion(region, fromMap = false) {
                         this.addr_region = region.name;
                         this.addr_province = ''; this.addr_city = ''; this.addr_barangay = '';
@@ -270,175 +322,88 @@
                     async geocodeAddress() {
                         const parts = [];
                         if (this.addr_barangay) parts.push(this.addr_barangay);
-                        if (this.addr_city) parts.push(this.addr_city);
+                        if (this.addr_city)     parts.push(this.addr_city);
                         if (this.addr_province) parts.push(this.addr_province);
-                        if (this.addr_region) parts.push(this.addr_region);
-                        
+                        if (this.addr_region)   parts.push(this.addr_region);
                         if (parts.length === 0) return;
-                        
                         const query = parts.join(', ') + ', Philippines';
                         try {
-                            const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&countrycodes=ph`);
+                            const response = await fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&limit=1&countrycodes=ph');
                             const data = await response.json();
-                            
                             if (data && data.length > 0) {
                                 const lat = parseFloat(data[0].lat);
                                 const lng = parseFloat(data[0].lon);
-                                
                                 this.addr_lat = lat;
                                 this.addr_lng = lng;
-                                
                                 if (this.map) {
                                     let zoom = 11;
                                     if (this.addr_barangay) zoom = 16;
                                     else if (this.addr_city) zoom = 14;
                                     else if (this.addr_province) zoom = 12;
-                                    
                                     this.map.setView([lat, lng], zoom);
-                                    if (this.marker) {
-                                        this.marker.setLatLng([lat, lng]);
-                                    } else {
-                                        this.marker = L.marker([lat, lng], { icon: this.getCustomPinIcon() }).addTo(this.map);
-                                    }
+                                    if (this.marker) this.marker.setLatLng([lat, lng]);
+                                    else this.marker = L.marker([lat, lng], { icon: this.getCustomPinIcon() }).addTo(this.map);
                                 }
                             }
-                        } catch (e) {
-                            console.error('Forward geocoding failed:', e);
-                        }
+                        } catch (e) { console.error('Forward geocoding failed:', e); }
                     },
 
                     async autoMatchLocation(addr) {
-                        const clean = (str) => {
-                            if (!str) return '';
-                            return str.toLowerCase()
-                                .replace(/city of|province of|region|district|barangay|brgy\.?|municipality of/g, '')
-                                .replace(/[^a-z0-9]/g, '')
-                                .trim();
-                        };
-
-                        let rName = addr.region || '';
-                        let pName = addr.state || addr.province || addr.county || '';
+                        const clean = (str) => str ? str.toLowerCase().replace(/city of|province of|region|district|barangay|brgy\.?|municipality of/g,'').replace(/[^a-z0-9]/g,'').trim() : '';
+                        let rName = addr.region || '', pName = addr.state || addr.province || addr.county || '';
                         let cName = addr.city || addr.town || addr.municipality || '';
                         let bName = addr.quarter || addr.village || addr.suburb || addr.neighbourhood || '';
-
                         if (this.loc.region.items.length === 0) await this.loadRegions();
-
-                        let crName = clean(rName);
-                        let cpName = clean(pName);
+                        let crName = clean(rName), cpName = clean(pName);
                         let matchedR = this.loc.region.items.find(r => {
-                            const target = clean(r.name);
-                            return target === crName || 
-                                   (crName.includes('manila') && target.includes('ncr')) ||
-                                   (cpName.includes('manila') && target.includes('ncr'));
+                            const t = clean(r.name);
+                            return t === crName || (crName.includes('manila') && t.includes('ncr')) || (cpName.includes('manila') && t.includes('ncr'));
                         });
-
-                        if (!matchedR && crName) {
-                            matchedR = this.loc.region.items.find(r => clean(r.name).includes(crName) || crName.includes(clean(r.name)));
-                        }
-
+                        if (!matchedR && crName) matchedR = this.loc.region.items.find(r => clean(r.name).includes(crName) || crName.includes(clean(r.name)));
                         if (!matchedR) return;
                         await this.selectRegion(matchedR, true);
-
                         if (pName && this.loc.province.items.length > 0) {
-                            let cppName = clean(pName);
-                            let matchedP = this.loc.province.items.find(p => clean(p.name) === cppName);
-                            if (!matchedP) {
-                                matchedP = this.loc.province.items.find(p => {
-                                    const target = clean(p.name).replace('province', '');
-                                    const search = cppName.replace('province', '');
-                                    return target && search && (target === search || target.includes(search) || search.includes(target));
-                                });
-                            }
-                            if (matchedP) await this.selectProvince(matchedP, true);
+                            let cpp = clean(pName);
+                            let mP = this.loc.province.items.find(p => clean(p.name) === cpp) ||
+                                     this.loc.province.items.find(p => { const t = clean(p.name).replace('province',''); const s = cpp.replace('province',''); return t && s && (t===s||t.includes(s)||s.includes(t)); });
+                            if (mP) await this.selectProvince(mP, true);
                         }
-
                         if (cName && this.loc.city.items.length > 0) {
-                            let ccName = clean(cName);
-                            let matchedC = this.loc.city.items.find(c => clean(c.name) === ccName);
-                            if (!matchedC) {
-                                matchedC = this.loc.city.items.find(c => {
-                                    const target = clean(c.name).replace('city', '').replace('municipality', '').replace('city of', '');
-                                    const search = ccName.replace('city', '').replace('municipality', '').replace('city of', '');
-                                    return target && search && (target === search || target.includes(search) || search.includes(target));
-                                });
-                            }
-                            if (matchedC) await this.selectCity(matchedC, true);
+                            let cc = clean(cName);
+                            let mC = this.loc.city.items.find(c => clean(c.name) === cc) ||
+                                     this.loc.city.items.find(c => { const t = clean(c.name).replace('city','').replace('municipality','').replace('city of',''); const s = cc.replace('city','').replace('municipality','').replace('city of',''); return t && s && (t===s||t.includes(s)||s.includes(t)); });
+                            if (mC) await this.selectCity(mC, true);
                         }
-
                         if (bName && this.loc.barangay.items.length > 0) {
-                            let cbName = clean(bName);
-                            let matchedB = this.loc.barangay.items.find(b => clean(b.name) === cbName);
-                            if (!matchedB) {
-                                matchedB = this.loc.barangay.items.find(b => {
-                                    const target = clean(b.name).replace('barangay', '').replace('brgy', '').replace('poblacion', '').replace('pob', '');
-                                    const search = cbName.replace('barangay', '').replace('brgy', '').replace('poblacion', '').replace('pob', '');
-                                    return target && search && (target === search || target.includes(search) || search.includes(target));
-                                });
-                            }
-                            if (matchedB) this.selectBarangay(matchedB, true);
+                            let cb = clean(bName);
+                            let mB = this.loc.barangay.items.find(b => clean(b.name) === cb) ||
+                                     this.loc.barangay.items.find(b => { const t = clean(b.name).replace('barangay','').replace('brgy','').replace('poblacion','').replace('pob',''); const s = cb.replace('barangay','').replace('brgy','').replace('poblacion','').replace('pob',''); return t && s && (t===s||t.includes(s)||s.includes(t)); });
+                            if (mB) this.selectBarangay(mB, true);
                         }
                     },
 
-                    map: null,
-                    marker: null,
-                    mapTimeout: null,
+                    map: null, marker: null, mapTimeout: null,
 
                     patchLeaflet() {
                         if (typeof L === 'undefined' || L._patched) return;
                         L._patched = true;
-
-                        const originalResetGrid = L.GridLayer.prototype._resetGrid;
-                        if (originalResetGrid) {
-                            L.GridLayer.prototype._resetGrid = function() {
-                                if (!this._map) return;
-                                return originalResetGrid.apply(this, arguments);
-                            };
-                        }
-
-                        const originalSetView = L.GridLayer.prototype._setView;
-                        if (originalSetView) {
-                            L.GridLayer.prototype._setView = function() {
-                                if (!this._map) return;
-                                return originalSetView.apply(this, arguments);
-                            };
-                        }
-
-                        const originalUpdate = L.GridLayer.prototype._update;
-                        if (originalUpdate) {
-                            L.GridLayer.prototype._update = function() {
-                                if (!this._map) return;
-                                return originalUpdate.apply(this, arguments);
-                            };
-                        }
-
-                        const originalResetView = L.GridLayer.prototype._resetView;
-                        if (originalResetView) {
-                            L.GridLayer.prototype._resetView = function() {
-                                if (!this._map) return;
-                                return originalResetView.apply(this, arguments);
-                            };
-                        }
+                        ['_resetGrid','_setView','_update','_resetView'].forEach(fn => {
+                            const orig = L.GridLayer.prototype[fn];
+                            if (orig) L.GridLayer.prototype[fn] = function() { if (!this._map) return; return orig.apply(this, arguments); };
+                        });
                     },
 
                     initMap() {
-                        if (typeof L === 'undefined') {
-                            if (this.mapTimeout) clearTimeout(this.mapTimeout);
-                            this.mapTimeout = setTimeout(() => this.initMap(), 100);
-                            return;
-                        }
+                        if (typeof L === 'undefined') { if (this.mapTimeout) clearTimeout(this.mapTimeout); this.mapTimeout = setTimeout(() => this.initMap(), 100); return; }
                         this.patchLeaflet();
                         if (this.map) {
                             if (this.mapTimeout) clearTimeout(this.mapTimeout);
                             this.mapTimeout = setTimeout(() => {
                                 const container = document.getElementById('userMap');
                                 if (!container) return;
-                                this.map.invalidateSize(); 
-                                let lat = this.addr_lat;
-                                let lng = this.addr_lng;
-                                if (lat && lng) {
-                                    this.map.setView([lat, lng], 16);
-                                    if (this.marker) this.marker.setLatLng([lat, lng]);
-                                }
+                                this.map.invalidateSize();
+                                const lat = this.addr_lat, lng = this.addr_lng;
+                                if (lat && lng) { this.map.setView([lat, lng], 16); if (this.marker) this.marker.setLatLng([lat, lng]); }
                                 setTimeout(() => { if (this.map) this.map.invalidateSize(); }, 250);
                                 setTimeout(() => { if (this.map) this.map.invalidateSize(); }, 500);
                             }, 50);
@@ -448,65 +413,28 @@
                         this.mapTimeout = setTimeout(() => {
                             let container = document.getElementById('userMap');
                             if (!container) return;
-
-                            if (container._leaflet_id) {
-                                const clone = container.cloneNode(false);
-                                clone.removeAttribute('class');
-                                container.parentNode.replaceChild(clone, container);
-                                container = clone;
-                            }
-
-                            let lat = this.addr_lat;
-                            let lng = this.addr_lng;
-                            let startLat = lat || 14.2189;
-                            let startLng = lng || 121.1672;
-                            let startZoom = lat ? 15 : 11;
-                            
-                            const street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                                maxZoom: 19,
-                                minZoom: 10,
-                                attribution: '© OpenStreetMap'
-                            });
-                            const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-                            });
-
-                            const lagunaBounds = L.latLngBounds([13.9, 120.9], [14.5, 121.6]);
-
-                            this.map = L.map(container, {
-                                maxBounds: lagunaBounds,
-                                maxBoundsViscosity: 1.0,
-                                layers: [street]
-                            }).setView([startLat, startLng], startZoom);
-
-                            L.control.layers({ 'Street': street, 'Satellite': satellite }).addTo(this.map);                        
-                            if (lat && lng) {
-                                this.marker = L.marker([lat, lng], { icon: this.getCustomPinIcon() }).addTo(this.map);
-                            }
-
+                            if (container._leaflet_id) { const c = container.cloneNode(false); c.removeAttribute('class'); container.parentNode.replaceChild(c, container); container = c; }
+                            const lat = this.addr_lat, lng = this.addr_lng;
+                            const street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, minZoom: 10, attribution: '© OpenStreetMap' });
+                            const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' });
+                            this.map = L.map(container, { maxBounds: L.latLngBounds([13.9,120.9],[14.5,121.6]), maxBoundsViscosity: 1.0, layers: [street] }).setView([lat||14.2189, lng||121.1672], lat ? 15 : 11);
+                            L.control.layers({ 'Street': street, 'Satellite': satellite }).addTo(this.map);
+                            if (lat && lng) this.marker = L.marker([lat, lng], { icon: this.getCustomPinIcon() }).addTo(this.map);
                             this.map.on('click', async (e) => {
-                                const lat = e.latlng.lat;
-                                const lng = e.latlng.lng;
+                                const lt = e.latlng.lat, ln = e.latlng.lng;
                                 if (this.marker) this.marker.setLatLng(e.latlng);
                                 else this.marker = L.marker(e.latlng, { icon: this.getCustomPinIcon() }).addTo(this.map);
-                                
-                                this.addr_lat = lat;
-                                this.addr_lng = lng;
-                                
+                                this.addr_lat = lt; this.addr_lng = ln;
                                 try {
-                                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&countrycodes=ph`);
-                                    const data = await response.json();
-                                    if (data && data.address) {
-                                        let st = data.address.road || data.address.pedestrian || '';
-                                        let num = data.address.house_number || '';
-                                        let fst = (num + ' ' + st).trim();
-                                        if(fst) this.addr_street = fst;
-                                        
-                                        await this.autoMatchLocation(data.address);
+                                    const r = await fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lt + '&lon=' + ln + '&countrycodes=ph');
+                                    const d = await r.json();
+                                    if (d && d.address) {
+                                        const st = (d.address.house_number || '') + ' ' + (d.address.road || d.address.pedestrian || '');
+                                        if (st.trim()) this.addr_street = st.trim();
+                                        await this.autoMatchLocation(d.address);
                                     }
-                                } catch (error) { console.error(error); }
+                                } catch (err) { console.error(err); }
                             });
-
                             setTimeout(() => { if (this.map) this.map.invalidateSize(); }, 250);
                             setTimeout(() => { if (this.map) this.map.invalidateSize(); }, 500);
                         }, 50);
@@ -515,118 +443,97 @@
                     async initializeExistingAddress() {
                         if (this.loc.region.items.length === 0) await this.loadRegions();
                         if (!this.addr_region) return;
-
                         const region = this.loc.region.items.find(r => r.name === this.addr_region);
                         if (!region) return;
-
                         try {
-                            const data = await this.fetchWithRetry(`https://psgc.cloud/api/regions/${region.code}/provinces`);
+                            const data = await this.fetchWithRetry('https://psgc.cloud/api/regions/' + region.code + '/provinces');
                             this.loc.province.items = data.sort((a, b) => a.name.localeCompare(b.name));
                             if (this.loc.province.items.length === 0) {
                                 this.loc.noProvince = true;
-                                const data2 = await this.fetchWithRetry(`https://psgc.cloud/api/regions/${region.code}/cities-municipalities`);
-                                this.loc.city.items = data2.sort((a, b) => a.name.localeCompare(b.name));
+                                const d2 = await this.fetchWithRetry('https://psgc.cloud/api/regions/' + region.code + '/cities-municipalities');
+                                this.loc.city.items = d2.sort((a, b) => a.name.localeCompare(b.name));
                             }
                         } catch (e) { console.error('Preload provinces failed', e); }
-
                         if (this.addr_province && this.loc.province.items.length > 0) {
-                            const province = this.loc.province.items.find(p => p.name === this.addr_province);
-                            if (province) {
-                                try {
-                                    const data = await this.fetchWithRetry(`https://psgc.cloud/api/provinces/${province.code}/cities-municipalities`);
-                                    this.loc.city.items = data.sort((a, b) => a.name.localeCompare(b.name));
-                                } catch (e) { console.error('Preload cities failed', e); }
-                            }
+                            const prov = this.loc.province.items.find(p => p.name === this.addr_province);
+                            if (prov) try {
+                                const d = await this.fetchWithRetry('https://psgc.cloud/api/provinces/' + prov.code + '/cities-municipalities');
+                                this.loc.city.items = d.sort((a, b) => a.name.localeCompare(b.name));
+                            } catch (e) { console.error('Preload cities failed', e); }
                         }
-
                         if (this.addr_city && this.loc.city.items.length > 0) {
                             const city = this.loc.city.items.find(c => c.name === this.addr_city);
-                            if (city) {
-                                try {
-                                    const data = await this.fetchWithRetry(`https://psgc.cloud/api/cities-municipalities/${city.code}/barangays`);
-                                    this.loc.barangay.items = data.sort((a, b) => a.name.localeCompare(b.name));
-                                } catch (e) { console.error('Preload barangays failed', e); }
-                            }
+                            if (city) try {
+                                const d = await this.fetchWithRetry('https://psgc.cloud/api/cities-municipalities/' + city.code + '/barangays');
+                                this.loc.barangay.items = d.sort((a, b) => a.name.localeCompare(b.name));
+                            } catch (e) { console.error('Preload barangays failed', e); }
                         }
                     },
 
                     init() {
-                        if (tabsState.init) tabsState.init.call(this);
+                        // ── Set up real Livewire entangles now that we are on a live node ──
+                        // $wire.entangle() returns a reactive proxy that must be assigned ONCE
+                        // as a property value (not via a getter). Object.assign injects these
+                        // over the store-backed get/set pairs defined at the factory level.
+                        const $wire = this.$wire;
+                        Object.assign(this, {
+                            editUserId:    $wire.entangle('editUserId'),
+                            formRoleId:    $wire.entangle('formRoleId'),
+                            formBranchId:  $wire.entangle('formBranchId'),
+                            position:      $wire.entangle('position'),
+                            addr_street:   $wire.entangle('addr_street'),
+                            addr_region:   $wire.entangle('addr_region'),
+                            addr_province: $wire.entangle('addr_province'),
+                            addr_city:     $wire.entangle('addr_city'),
+                            addr_barangay: $wire.entangle('addr_barangay'),
+                            addr_lat:      $wire.entangle('addr_lat'),
+                            addr_lng:      $wire.entangle('addr_lng'),
+                        });
+
+                        // ── Sliding tabs ──
+                        if (typeof slidingTabs === 'function') {
+                            const tabsState = slidingTabs(
+                                { activeTab: $wire.entangle('activeTab').live, historyTab: @js($historyTab) },
+                                ['activeTab', 'historyTab']
+                            );
+                            if (tabsState.init) tabsState.init.call(this);
+                            if (tabsState.updateIndicator) this.updateIndicator = tabsState.updateIndicator.bind(this);
+                            if (tabsState.syncToLivewire)  this.syncToLivewire  = tabsState.syncToLivewire.bind(this);
+                        }
 
                         this.loadRegions();
                         this.initializeExistingAddress();
 
-                        this.$watch('editUserId', (val) => {
-                            if (val && (this.mode === 'edit' || this.mode === 'view')) {
-                                this.loc.province.items = [];
-                                this.loc.city.items     = [];
-                                this.loc.barangay.items = [];
-                                this.loc.noProvince     = false;
-                                this.initializeExistingAddress();
-                            }
-                        });
+                        // Keep store in sync when entangled values change
+                        this.$watch('editUserId',    (v) => { Alpine.store(STORE_KEY).editUserId    = v; if (v && (this.mode==='edit'||this.mode==='view')) { this.loc.province.items=[]; this.loc.city.items=[]; this.loc.barangay.items=[]; this.loc.noProvince=false; this.initializeExistingAddress(); } });
+                        this.$watch('formRoleId',    (v) => { Alpine.store(STORE_KEY).formRoleId    = v; });
+                        this.$watch('formBranchId',  (v) => { Alpine.store(STORE_KEY).formBranchId  = v; });
+                        this.$watch('position',      (v) => { Alpine.store(STORE_KEY).position      = v; });
+                        this.$watch('addr_street',   (v) => { Alpine.store(STORE_KEY).addr_street   = v; });
+                        this.$watch('addr_region',   (v) => { Alpine.store(STORE_KEY).addr_region   = v; });
+                        this.$watch('addr_province', (v) => { Alpine.store(STORE_KEY).addr_province = v; });
+                        this.$watch('addr_city',     (v) => { Alpine.store(STORE_KEY).addr_city     = v; });
+                        this.$watch('addr_barangay', (v) => { Alpine.store(STORE_KEY).addr_barangay = v; });
+                        this.$watch('addr_lat',      (v) => { Alpine.store(STORE_KEY).addr_lat      = v; });
+                        this.$watch('addr_lng',      (v) => { Alpine.store(STORE_KEY).addr_lng      = v; });
 
                         this.$watch('mode', (val) => {
-                            if (val === 'view') {
-                                this.$nextTick(() => {
-                                    setTimeout(() => this.updateIndicator('historyTab'), 50);
-                                    setTimeout(() => this.updateIndicator('historyTab'), 250);
-                                });
-                            }
-                            if (val === 'create') {
-                                this.loc.province.items = [];
-                                this.loc.city.items     = [];
-                                this.loc.barangay.items = [];
-                                this.loc.noProvince     = false;
-                            } else if (val === 'edit' || val === 'view') {
-                                this.loc.province.items = [];
-                                this.loc.city.items     = [];
-                                this.loc.barangay.items = [];
-                                this.loc.noProvince     = false;
-                                this.initializeExistingAddress();
-                            }
+                            if (val === 'view') { this.$nextTick(() => { setTimeout(() => this.updateIndicator('historyTab'), 50); setTimeout(() => this.updateIndicator('historyTab'), 250); }); }
+                            if (val === 'create') { this.loc.province.items=[]; this.loc.city.items=[]; this.loc.barangay.items=[]; this.loc.noProvince=false; }
+                            else if (val === 'edit' || val === 'view') { this.loc.province.items=[]; this.loc.city.items=[]; this.loc.barangay.items=[]; this.loc.noProvince=false; this.initializeExistingAddress(); }
                         });
 
                         this.$watch('panel', (val) => {
-                            if (val === 'form') {
-                                this.$nextTick(() => {
-                                    setTimeout(() => this.updateIndicator('historyTab'), 50);
-                                    setTimeout(() => this.updateIndicator('historyTab'), 250);
-                                });
-                            } else {
-                                this.$nextTick(() => {
-                                    setTimeout(() => this.updateIndicator('activeTab'), 50);
-                                    setTimeout(() => this.updateIndicator('activeTab'), 200);
-                                    setTimeout(() => this.updateIndicator('activeTab'), 350);
-                                });
-                                if (this.marker && this.map && this.mode === 'create') {
-                                    this.map.removeLayer(this.marker);
-                                    this.marker = null;
-                                }
-                            }
+                            if (val === 'form') { this.$nextTick(() => { setTimeout(() => this.updateIndicator('historyTab'), 50); setTimeout(() => this.updateIndicator('historyTab'), 250); }); }
+                            else { this.$nextTick(() => { setTimeout(() => this.updateIndicator('activeTab'), 50); setTimeout(() => this.updateIndicator('activeTab'), 200); setTimeout(() => this.updateIndicator('activeTab'), 350); }); if (this.marker && this.map && this.mode === 'create') { this.map.removeLayer(this.marker); this.marker = null; } }
                         });
 
-                        this.$watch('tableView', (val) => {
-                            if (this.$wire && this.$wire.get('view') !== val) {
-                                this.$wire.set('view', val);
-                            }
-                        });
+                        this.$watch('tableView', (val) => { if ($wire && $wire.get('view') !== val) $wire.set('view', val); });
 
-                        // Invalidate cache if a user mutation occurs
-                        window.addEventListener('notify', () => {
-                            this.invalidateUserCache();
-                        });
+                        window.addEventListener('notify', () => this.invalidateUserCache());
 
-                        // Initial indicator positioning
-                        setTimeout(() => {
-                            this.updateIndicator('activeTab');
-                            if (this.panel === 'form') {
-                                this.updateIndicator('historyTab');
-                            }
-                        }, 50);
-                        setTimeout(() => {
-                            this.updateIndicator('activeTab');
-                        }, 250);
+                        setTimeout(() => { this.updateIndicator('activeTab'); if (this.panel === 'form') this.updateIndicator('historyTab'); }, 50);
+                        setTimeout(() => this.updateIndicator('activeTab'), 250);
                     }
                 };
             });
@@ -634,6 +541,17 @@
 
         if (window.Alpine) registerUserData();
         else document.addEventListener('alpine:init', registerUserData);
+
+        // Re-sync store from PHP state after every Livewire morph
+        document.addEventListener('livewire:morph', () => {
+            if (!window.Alpine || !Alpine.store) return;
+            const s = Alpine.store(STORE_KEY);
+            if (!s) return;
+            s.panel      = @js($panel);
+            s.mode       = @js($mode);
+            s.activeTab  = @js($activeTab);
+            s.historyTab = @js($historyTab);
+        });
     })();
     </script>
 </div>

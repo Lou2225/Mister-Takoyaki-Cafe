@@ -8,6 +8,7 @@ use App\Models\OptionTemplate;
 use App\Models\OptionTemplateItem;
 use App\Models\Ingredient;
 use App\Helpers\StockHelper;
+use App\Helpers\ValidationHelper;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -220,37 +221,60 @@ class OptionLibraryManagement extends Component
         // ValidationException, which Livewire intercepts before our JS ever sees
         // a return value. We need a plain array back so $wire.saveTemplate()
         // can resolve with {success:false, errors:{...}}.
-        $validator = \Illuminate\Support\Facades\Validator::make(
-            [
+        $validationData = [
                 'name' => $this->name,
                 'priceMode' => $this->priceMode,
                 'maxSelect' => $this->maxSelect,
                 'templateItems' => $this->templateItems,
-            ],
-            [
+        ];
+        $validationRules = [
                 'name' => 'required|string|max:255',
                 'priceMode' => 'required|in:fixed,additive',
                 'maxSelect' => 'nullable|integer|min:1',
                 'templateItems' => 'required|array|min:1',
                 'templateItems.*.name' => 'required|string|max:100',
-                'templateItems.*.price' => 'nullable|numeric|min:0',
-            ],
+        ];
+foreach ($this->templateItems as $index => $item) {
+    $validationRules["templateItems.{$index}.price"] = $this->noRecipeRequired
+        ? 'nullable|numeric|min:0|max:999999.99'
+        : 'required|numeric|min:0.01|max:999999.99';
+}
+
+        $validator = \Illuminate\Support\Facades\Validator::make(
+            $validationData,
+            $validationRules,
             [
                 'name.required' => 'Template name is required.',
                 'maxSelect.min' => 'Maximum selections must be at least 1.',
                 'templateItems.required' => 'At least one variation option is required.',
                 'templateItems.min' => 'At least one variation option is required.',
                 'templateItems.*.name.required' => 'Every option must have a name.',
+                'templateItems.*.price.required' => 'Option price is required.',
                 'templateItems.*.price.numeric' => 'Option price must be a valid number.',
-                'templateItems.*.price.min' => 'Option price cannot be negative.',
+                'templateItems.*.price.min' => 'Option price must be greater than 0 unless No Recipe Required is enabled.',
             ]
         );
+
+        $validator->after(function ($validator) {
+            $seen = [];
+            foreach ($this->templateItems as $index => $item) {
+                $normalized = mb_strtolower(trim((string)($item['name'] ?? '')));
+                if ($normalized === '') continue;
+                if (isset($seen[$normalized])) {
+                    $message = 'Option name must be unique within this template.';
+                    $validator->errors()->add("templateItems.{$seen[$normalized]}.name", $message);
+                    $validator->errors()->add("templateItems.{$index}.name", $message);
+                } else {
+                    $seen[$normalized] = $index;
+                }
+            }
+        });
 
         if ($validator->fails()) {
             return ['success' => false, 'errors' => $validator->errors()->toArray()];
         }
 
-        $exists = OptionTemplate::where('name', $this->name)
+        $exists = OptionTemplate::whereRaw('LOWER(TRIM(name)) = ?', [mb_strtolower(trim($this->name))])
             ->when($this->editTemplateId, fn($q) => $q->where('id', '!=', $this->editTemplateId))
             ->exists();
 
@@ -301,6 +325,37 @@ class OptionLibraryManagement extends Component
             });
 
             $template->load('items.ingredients.ingredient');
+
+            // Push the authoritative, fresh list straight to the browser —
+            // don't rely on the hidden x-effect div re-firing on DOM morph,
+            // which is unreliable for raw @js() attribute diffs.
+            $freshTemplates = OptionTemplate::with(['items.ingredients.ingredient'])
+                ->orderBy('name', 'asc')
+                ->get()
+                ->map(fn($t) => [
+                    'id' => (int) $t->id,
+                    'name' => (string) $t->name,
+                    'price_mode' => (string) $t->price_mode,
+                    'max_select' => $t->max_select !== null ? (int) $t->max_select : null,
+                    'is_required' => (bool) $t->is_required,
+                    'no_recipe_required' => (bool) $t->no_recipe_required,
+                    'items_count' => $t->items->count(),
+                    'items' => $t->items->map(fn($i) => [
+                        'id' => (int) $i->id,
+                        'name' => (string) $i->name,
+                        'price' => (float) $i->price == 0 ? '' : (float) $i->price,
+                        'is_default' => (bool) $i->is_default,
+                        'ingredients' => $i->ingredients->map(fn($ri) => [
+                            'id' => (int) $ri->ingredient_id,
+                            'name' => $ri->ingredient ? (string) $ri->ingredient->name : 'Unknown',
+                            'unit' => $ri->ingredient ? (string) StockHelper::getAbbreviation($ri->ingredient->unit) : '',
+                            'quantity' => (float) $ri->quantity,
+                            'cost' => (float) ($ri->ingredient?->cost ?? 0),
+                        ])->values(),
+                    ])->values(),
+                ])->values()->toArray();
+
+            $this->dispatch('templates-updated', templates: $freshTemplates);
 
             return [
                 'success' => true,
