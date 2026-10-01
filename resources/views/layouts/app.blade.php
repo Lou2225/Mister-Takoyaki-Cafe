@@ -252,25 +252,235 @@
             <div class="h-8 w-[1px] bg-gray-100 hidden xl:block"></div>
         </div>
 
-        {{-- Professional 4-Bar Signal Telemetry Widget (Matches Clock Line Height) --}}
-        {{--
-            Latency is measured ONLY via ping.txt (true network RTT).
-            PerformanceObserver is NOT used — it captures Livewire XHR total time
-            (including PHP processing) which is not a network quality metric.
-            A rolling median of the last 3 samples smooths jitter.
-            The "Unstable" banner requires 2 consecutive slow pings before showing.
-            State is stored in window.__mtcTelemetry so navigation never re-inits.
-        --}}
+        {{-- Professional 4-Bar Signal Telemetry Engine & Widget --}}
+        <script>
+            (function() {
+                if (window.MtcTelemetry) return;
+
+                window.MtcTelemetry = {
+                    ping: null,
+                    bars: 4,
+                    status: 'online',
+                    appLatency: null,
+                    networkType: 'WiFi/LAN',
+                    downlink: null,
+                    _pingHistory: [],
+                    _consecutiveSlow: 0,
+                    _consecutiveFails: 0,
+                    _isChecking: false,
+                    _timer: null,
+
+                    detectNetworkType() {
+                        const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                        if (conn) {
+                            if (conn.effectiveType) this.networkType = conn.effectiveType.toUpperCase();
+                            if (conn.downlink) this.downlink = conn.downlink + ' Mbps';
+                            if (!conn.__listenerAttached) {
+                                conn.__listenerAttached = true;
+                                conn.addEventListener('change', () => {
+                                    if (conn.effectiveType) this.networkType = conn.effectiveType.toUpperCase();
+                                    if (conn.downlink) this.downlink = conn.downlink + ' Mbps';
+                                    this._broadcast();
+                                });
+                            }
+                        }
+                    },
+
+                    _rollingMedian(ms) {
+                        this._pingHistory.push(ms);
+                        if (this._pingHistory.length > 3) this._pingHistory.shift();
+                        const sorted = [...this._pingHistory].sort((a, b) => a - b);
+                        return sorted[Math.floor(sorted.length / 2)];
+                    },
+
+                    _broadcast() {
+                        const detail = {
+                            ping: this.ping,
+                            bars: this.bars,
+                            status: this.status,
+                            appLatency: this.appLatency,
+                            networkType: this.networkType,
+                            downlink: this.downlink,
+                        };
+                        window.dispatchEvent(new CustomEvent('telemetry-updated', { detail }));
+                        window.dispatchEvent(new CustomEvent('network-status', { detail: { status: this.status } }));
+                    },
+
+                    calculateBars(ms) {
+                        if (ms === null) {
+                            this.bars = 0;
+                            this.status = 'offline';
+                            this.ping = null;
+                            this._consecutiveSlow = 0;
+                            this._pingHistory = [];
+                            this._broadcast();
+                            return;
+                        }
+
+                        this._consecutiveFails = 0;
+                        const smoothed = this._rollingMedian(ms);
+                        this.ping = smoothed;
+
+                        let newStatus;
+                        if (smoothed < 150) {
+                            this.bars = 4;
+                            newStatus = 'online';
+                        } else if (smoothed < 300) {
+                            this.bars = 3;
+                            newStatus = 'online';
+                        } else if (smoothed < 500) {
+                            this.bars = 2;
+                            newStatus = 'fair';
+                        } else {
+                            this.bars = 1;
+                            newStatus = 'slow';
+                        }
+
+                        this.status = newStatus;
+                        this._broadcast();
+
+                        if (newStatus === 'slow') {
+                            this._consecutiveSlow++;
+                            if (this._consecutiveSlow >= 2) {
+                                window.dispatchEvent(new CustomEvent('network-slow-confirmed'));
+                            }
+                        } else {
+                            this._consecutiveSlow = 0;
+                        }
+                    },
+
+                    recordAppLatency(ms) {
+                        if (typeof ms === 'number' && ms >= 0) {
+                            this.appLatency = ms;
+                            this._broadcast();
+                        }
+                    },
+
+                    async checkPing() {
+                        if (this._isChecking) return;
+
+                        if (!navigator.onLine) {
+                            this.calculateBars(null);
+                            this._scheduleNext(2500);
+                            return;
+                        }
+
+                        this._isChecking = true;
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 3500);
+                        const start = performance.now();
+                        let success = false;
+
+                        try {
+                            const pingUrl = window.location.origin + '/ping.txt?_=' + Date.now();
+                            const response = await fetch(pingUrl, {
+                                method: 'HEAD',
+                                cache: 'no-store',
+                                signal: controller.signal
+                            });
+                            clearTimeout(timeoutId);
+
+                            if (response.ok) {
+                                let rtt = null;
+                                const perfEntries = performance.getEntriesByName ? performance.getEntriesByName(pingUrl) : [];
+                                if (perfEntries.length > 0) {
+                                    const entry = perfEntries[perfEntries.length - 1];
+                                    if (entry.duration && entry.duration > 0) {
+                                        rtt = Math.max(1, Math.round(entry.duration));
+                                    }
+                                }
+                                if (rtt === null) {
+                                    rtt = Math.max(1, Math.round(performance.now() - start));
+                                }
+                                this.calculateBars(rtt);
+                                success = true;
+                            } else {
+                                this._consecutiveFails++;
+                            }
+                        } catch (e) {
+                            clearTimeout(timeoutId);
+                            this._consecutiveFails++;
+                            if (e.name === 'AbortError' && this._consecutiveFails < 2) {
+                                this.calculateBars(3500);
+                            }
+                        } finally {
+                            this._isChecking = false;
+                        }
+
+                        if (!success) {
+                            if (this._consecutiveFails >= 2) {
+                                this.calculateBars(null);
+                            } else if (this.status !== 'offline') {
+                                this.calculateBars(1500);
+                            }
+                        }
+
+                        const nextDelay = (this.status === 'online' && this._consecutiveFails === 0) ? 6000 : 2500;
+                        this._scheduleNext(nextDelay);
+                    },
+
+                    _scheduleNext(delay) {
+                        clearTimeout(this._timer);
+                        if (document.hidden) return;
+                        this._timer = setTimeout(() => {
+                            this.checkPing();
+                        }, delay);
+                    },
+
+                    init() {
+                        this.detectNetworkType();
+                        this.checkPing();
+
+                        window.addEventListener('online', () => {
+                            this._consecutiveFails = 0;
+                            this._consecutiveSlow = 0;
+                            this.checkPing();
+                        });
+
+                        window.addEventListener('offline', () => {
+                            this.calculateBars(null);
+                        });
+
+                        document.addEventListener('visibilitychange', () => {
+                            if (!document.hidden) {
+                                this.checkPing();
+                            } else {
+                                clearTimeout(this._timer);
+                            }
+                        });
+
+                        const attachLivewireHook = () => {
+                            if (window.Livewire && typeof window.Livewire.hook === 'function' && !window.__mtcLivewireHooked) {
+                                window.__mtcLivewireHooked = true;
+                                window.Livewire.hook('commit', ({ succeed }) => {
+                                    const start = performance.now();
+                                    succeed(() => {
+                                        const duration = Math.max(1, Math.round(performance.now() - start));
+                                        window.MtcTelemetry.recordAppLatency(duration);
+                                    });
+                                });
+                            }
+                        };
+
+                        attachLivewireHook();
+                        document.addEventListener('livewire:init', attachLivewireHook);
+                        document.addEventListener('livewire:navigated', attachLivewireHook);
+                    }
+                };
+
+                window.MtcTelemetry.init();
+            })();
+        </script>
+
         <div wire:ignore wire:key="topbar-telemetry-widget" x-data="{
-                ping: null,
-                bars: 4,
-                status: 'online',
+                ping: window.MtcTelemetry?.ping ?? null,
+                bars: window.MtcTelemetry?.bars ?? 4,
+                status: window.MtcTelemetry?.status ?? 'online',
+                appLatency: window.MtcTelemetry?.appLatency ?? null,
+                networkType: window.MtcTelemetry?.networkType ?? 'WiFi/LAN',
+                downlink: window.MtcTelemetry?.downlink ?? null,
                 popoverOpen: false,
-                networkType: 'WiFi/LAN',
-                downlink: null,
-                isChecking: false,
-                _pingHistory: [],
-                _consecutiveSlow: 0,
+                _listener: null,
 
                 get activeBarFill() {
                     if (this.status === 'offline') return '#E5E7EB';
@@ -296,141 +506,35 @@
                     return 'text-orange-500';
                 },
 
-                // Median of last N samples - immune to single-spike outliers.
-                _rollingMedian(ms) {
-                    this._pingHistory.push(ms);
-                    if (this._pingHistory.length > 3) this._pingHistory.shift();
-                    const sorted = [...this._pingHistory].sort((a, b) => a - b);
-                    return sorted[Math.floor(sorted.length / 2)];
-                },
-
-                calculateBars(ms) {
-                    if (ms === null || !navigator.onLine) {
-                        this.bars = 0;
-                        this.status = 'offline';
-                        this._consecutiveSlow = 0;
-                        this._pingHistory = [];
-                        window.dispatchEvent(new CustomEvent('network-status', { detail: { status: 'offline' } }));
-                        return;
-                    }
-
-                    const smoothed = this._rollingMedian(ms);
-                    this.ping = smoothed;
-
-                    let newStatus;
-                    if (smoothed < 150) {
-                        this.bars = 4;
-                        newStatus = 'online';
-                    } else if (smoothed < 300) {
-                        this.bars = 3;
-                        newStatus = 'online';
-                    } else if (smoothed < 500) {
-                        this.bars = 2;
-                        newStatus = 'fair';
-                    } else {
-                        this.bars = 1;
-                        newStatus = 'slow';
-                    }
-
-                    this.status = newStatus;
-                    window.dispatchEvent(new CustomEvent('network-status', { detail: { status: newStatus } }));
-
-                    // Require 2 consecutive slow readings before firing the 'Unstable' banner.
-                    // Any non-slow reading resets the counter immediately.
-                    if (newStatus === 'slow') {
-                        this._consecutiveSlow++;
-                        if (this._consecutiveSlow >= 2) {
-                            window.dispatchEvent(new CustomEvent('network-slow-confirmed'));
-                        }
-                    } else {
-                        this._consecutiveSlow = 0;
-                    }
-                },
-
-                detectNetworkType() {
-                    const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-                    if (conn) {
-                        if (conn.effectiveType) this.networkType = conn.effectiveType.toUpperCase();
-                        if (conn.downlink) this.downlink = conn.downlink + ' Mbps';
-                    }
-                },
-
-                async checkPing() {
-                    if (this.isChecking) return;
-                    if (!navigator.onLine) {
-                        this.ping = null;
-                        this.calculateBars(null);
-                        return;
-                    }
-
-                    this.isChecking = true;
-                    // Record start AFTER acquiring the lock to avoid counting queue wait time.
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 3000);
-                    const start = performance.now();
-                    try {
-                        const pingUrl = window.location.origin + '/ping.txt?_=' + Date.now();
-                        const response = await fetch(pingUrl, {
-                            method: 'HEAD', // HEAD avoids body download overhead - pure RTT
-                            cache: 'no-store',
-                            signal: controller.signal
-                        });
-                        clearTimeout(timeoutId);
-                        if (response.ok) {
-                            const rtt = Math.max(1, Math.round(performance.now() - start));
-                            this.calculateBars(rtt);
-                        }
-                        // Non-200 from local server: likely dev server hiccup, ignore.
-                    } catch (e) {
-                        clearTimeout(timeoutId);
-                        // AbortError = timeout, not a real network failure - ignore.
-                        if (e.name !== 'AbortError' && !navigator.onLine) {
-                            this.ping = null;
-                            this.calculateBars(null);
-                        }
-                    } finally {
-                        this.isChecking = false;
-                    }
-                },
-
                 init() {
-                    this.detectNetworkType();
-
-                    // Restore state from previous init (survive wire:navigate without flicker).
-                    if (window.__mtcTelemetry) {
-                        const t = window.__mtcTelemetry;
-                        this.ping = t.ping;
-                        this.bars = t.bars;
-                        this.status = t.status;
-                        this._pingHistory = t.pingHistory || [];
-                        this._consecutiveSlow = t.consecutiveSlow || 0;
+                    if (window.MtcTelemetry) {
+                        this.ping = window.MtcTelemetry.ping;
+                        this.bars = window.MtcTelemetry.bars;
+                        this.status = window.MtcTelemetry.status;
+                        this.appLatency = window.MtcTelemetry.appLatency;
+                        this.networkType = window.MtcTelemetry.networkType;
+                        this.downlink = window.MtcTelemetry.downlink;
                     }
 
-                    // Keep state in sync so navigate restores it.
-                    this.$watch('ping',   v => { if (window.__mtcTelemetry) window.__mtcTelemetry.ping = v; });
-                    this.$watch('bars',   v => { if (window.__mtcTelemetry) window.__mtcTelemetry.bars = v; });
-                    this.$watch('status', v => { if (window.__mtcTelemetry) window.__mtcTelemetry.status = v; });
+                    this._listener = (e) => {
+                        const d = e.detail;
+                        if (!d) return;
+                        this.ping = d.ping;
+                        this.bars = d.bars;
+                        this.status = d.status;
+                        if (d.appLatency !== undefined) this.appLatency = d.appLatency;
+                        if (d.networkType) this.networkType = d.networkType;
+                        if (d.downlink !== undefined) this.downlink = d.downlink;
+                    };
 
-                    // Only start the global interval once - survive navigation.
-                    if (!window.__mtcPingInterval) {
-                        window.__mtcTelemetry = { ping: this.ping, bars: this.bars, status: this.status, pingHistory: this._pingHistory, consecutiveSlow: this._consecutiveSlow };
-                        this.checkPing();
-                        window.__mtcPingInterval = setInterval(() => {
-                            if (!document.hidden && navigator.onLine) this.checkPing();
-                        }, 6000);
-                    }
-
-                    window.addEventListener('online',  () => { this._pingHistory = []; this._consecutiveSlow = 0; this.checkPing(); });
-                    window.addEventListener('offline', () => { this.ping = null; this.calculateBars(null); });
-                    document.addEventListener('visibilitychange', () => {
-                        if (!document.hidden && navigator.onLine) this.checkPing();
-                    });
+                    window.addEventListener('telemetry-updated', this._listener);
                 },
 
                 destroy() {
-                    // Do NOT clear __mtcPingInterval on destroy - navigation re-inits this
-                    // component and we want the interval to survive. It is only cleared if the
-                    // user actually leaves the app entirely (page unload).
+                    if (this._listener) {
+                        window.removeEventListener('telemetry-updated', this._listener);
+                        this._listener = null;
+                    }
                 }
             }"
             @click.outside="popoverOpen = false"
@@ -500,8 +604,12 @@
                 
                 <div class="space-y-1.5 pt-2 text-[11px]">
                     <div class="flex justify-between items-center">
-                        <span class="text-gray-500">Roundtrip Latency:</span>
+                        <span class="text-gray-500">Network Latency:</span>
                         <span class="font-bold tabular-nums" x-text="ping ? ping + ' ms' : 'N/A'"></span>
+                    </div>
+                    <div class="flex justify-between items-center" x-show="appLatency !== null">
+                        <span class="text-gray-500">Server Response:</span>
+                        <span class="font-bold tabular-nums" x-text="appLatency ? appLatency + ' ms' : 'N/A'"></span>
                     </div>
                     <div class="flex justify-between items-center">
                         <span class="text-gray-500">Connection Speed:</span>
