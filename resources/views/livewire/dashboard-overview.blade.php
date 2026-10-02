@@ -155,8 +155,8 @@
                             <span class="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 transition-colors">View breakdown &rarr;</span>
                         </div>
                         <div class="flex items-center justify-between gap-4">
-                            <div class="flex-grow">
-                                <h3 class="text-3xl font-black text-slate-900 tracking-tight leading-tight">₱ {{ number_format($kpi['gross_sales'], 2) }}</h3>
+                            <div class="flex-grow min-w-0">
+                                <h3 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-tight whitespace-nowrap">₱ {{ number_format($kpi['gross_sales'], 2) }}</h3>
                                 <div class="flex items-center gap-2 mt-2">
                                     <span class="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
                                     <p class="text-[11px] sm:text-[12px] font-semibold text-slate-500">₱{{ number_format($kpi['total_discounts'], 2) }} Discounts Applied</p>
