@@ -150,22 +150,21 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {{-- Card 1: Gross Sales (Hero Card) --}}
                     <div wire:click="openBreakdown('Revenue')" class="p-5 sm:p-6 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between relative overflow-hidden group">
-                        <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center justify-between mb-3">
                             <span class="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Gross Revenue</span>
                             <span class="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 transition-colors">View breakdown &rarr;</span>
                         </div>
-                        <div class="flex items-center justify-between gap-4">
-                            <div class="flex-grow min-w-0">
-                                <h3 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-tight whitespace-nowrap">₱ {{ number_format($kpi['gross_sales'], 2) }}</h3>
-                                <div class="flex items-center gap-2 mt-2">
-                                    <span class="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                    <p class="text-[11px] sm:text-[12px] font-semibold text-slate-500">₱{{ number_format($kpi['total_discounts'], 2) }} Discounts Applied</p>
-                                </div>
+                        {{-- Amount + Discount centered --}}
+                        <div class="text-center mb-3">
+                            <h3 class="text-3xl font-black text-slate-900 tracking-tight leading-tight whitespace-nowrap">₱ {{ number_format($kpi['gross_sales'], 2) }}</h3>
+                            <div class="flex items-center justify-center gap-2 mt-2">
+                                <span class="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <p class="text-[11px] sm:text-[12px] font-semibold text-slate-500">₱{{ number_format($kpi['total_discounts'], 2) }} Discounts Applied</p>
                             </div>
-                            {{-- Sparkline chart --}}
-                            <div class="w-[140px] sm:w-[160px] h-[55px] shrink-0" wire:ignore>
-                                <div x-ref="sparklineSales" data-height="55"></div>
-                            </div>
+                        </div>
+                        {{-- Sparkline chart below --}}
+                        <div class="w-full h-[45px]" wire:ignore>
+                            <div x-ref="sparklineSales" data-height="45"></div>
                         </div>
                     </div>
 
