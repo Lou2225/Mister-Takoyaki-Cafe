@@ -13,10 +13,8 @@ use App\Models\IngredientCost;
 use App\Models\Recipe;
 use App\Models\StockBatch;
 use App\Models\StockMovement;
-use App\Models\DailyBranchSummary;
 use App\Models\User;
 use App\Services\ConfigurationService;
-use App\Services\DashboardRollupService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -540,56 +538,40 @@ if ($refunds > 0) {
             'posConfig'       => ConfigurationService::getPosConfig(),
         ])->layout('layouts.app');
     }
-
     /**
-     * Consolidate Financial Intelligence
-     * Fetches orders once and calculates Revenue, AOV, COGS, and Profit.
+     * Financial Intelligence — uses the SAME live SQL computation as BusinessIntelligence::getAnalytics()
+     * to guarantee identical KPI numbers on both the Dashboard and Business Reports pages.
      *
-     * HYBRID MODE: Uses pre-aggregated daily_branch_summaries for all past days
-     * and live indexed SQL for today, avoiding PHP-loop COGS scans on historical
-     * data. Falls back to the full PHP-loop scan only when rollup data does not
-     * yet exist for the selected range (before the first backfill has run).
+     * Formula alignment (matches BusinessIntelligence exactly):
+     *   Gross Revenue  = SUM(total_amount) — all orders (completed + refunded + partially refunded)
+     *   Net Sales      = Gross Revenue − delivery_fees − refunded_amount
+     *   Gross Sales    = Net Sales + discounts (pre-discount revenue)
+     *   Avg. Ticket    = SUM(total_amount of completed orders) / completed order count
+     *   COGS           = SUM(products.cost × quantity) + SUM(product_options.cost × quantity)  [SQL JOIN]
+     *   Gross Profit   = Net Sales − COGS − Waste Cost
      */
     private function getFinancialIntelligence(): array
     {
         return $this->cachedDashboardSegment('financial-intelligence', 5, function () {
-            $branchId = $this->selectedBranchId;
-
-            // ── Hybrid path ──────────────────────────────────────────────────
-            // Check whether the rollup table has at least one completed row for
-            // the relevant branch+date range. If yes, use the fast service.
-            // If no rows at all exist (pre-backfill), fall through to legacy scan.
-            $effectiveBranchId = $this->isSuperAdmin
-                ? $branchId
+            $branchId = $this->isSuperAdmin
+                ? $this->selectedBranchId
                 : auth()->user()?->branch_id;
 
-            $hasRollup = DailyBranchSummary::query()
-                ->forBranch($effectiveBranchId)
-                ->pastDaysOnly()
-                ->when($this->startDate, fn($q) => $q->where('summary_date', '>=', $this->startDate))
-                ->when($this->endDate,   fn($q) => $q->where('summary_date', '<=', $this->endDate))
-                ->where('is_partial', false)
-                ->exists();
+            // ── 1. Fetch orders (same scope as BusinessIntelligence::getAnalytics) ──
+            $orders = Order::select([
+                    'id', 'branch_id', 'created_at', 'status',
+                    'total_amount', 'delivery_fee', 'discount_amount', 'refunded_amount',
+                ])
+                ->whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
+                ->when($this->startDate, fn($q) => $q->where('created_at', '>=', $this->startDate . ' 00:00:00'))
+                ->when($this->endDate,   fn($q) => $q->where('created_at', '<=', $this->endDate   . ' 23:59:59'))
+                ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
+                ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
+                ->get();
 
-            if ($hasRollup) {
-                return app(DashboardRollupService::class)->getFinancialIntelligence(
-                    branchId:       $branchId,
-                    startDate:      $this->startDate ?: null,
-                    endDate:        $this->endDate   ?: null,
-                    isSuperAdmin:   $this->isSuperAdmin,
-                    userBranchId:   auth()->user()?->branch_id,
-                );
-            }
-
-            // ── Legacy full-scan fallback ────────────────────────────────────
-            // Used on first deploy before dashboard:rollup --backfill has run.
-            $orders = $this->fetchFinancialOrders($branchId);
             $completedOrders = $orders->where('status', Order::STATUS_COMPLETED);
 
-            $branchCosts   = $this->buildBranchCostMap($branchId);
-            $purchaseCosts = $this->fetchPurchasePrices($branchId);
-            $globalCosts   = Ingredient::pluck('cost', 'id');
-
+            // ── 2. Revenue metrics (identical formulas to BusinessIntelligence) ──
             $totalCollected = $orders->sum('total_amount');
             $deliveryFees   = $orders->sum('delivery_fee');
             $totalDiscounts = $orders->sum('discount_amount');
@@ -597,31 +579,38 @@ if ($refunds > 0) {
             $netSales       = $totalCollected - $deliveryFees - $refunds;
             $grossSales     = $netSales + $totalDiscounts;
             $orderCount     = $completedOrders->count();
-            $totalCogs      = 0;
+            $aov            = $orderCount > 0 ? ($completedOrders->sum('total_amount') / $orderCount) : 0;
 
-            $productCostMap  = [];
-            $optionCostMap   = [];
-            $modifierCostMap = [];
+            // ── 3. COGS via SQL JOIN on products.cost (same as BusinessIntelligence::computeCogs) ──
+            $totalCogs = 0.0;
+            if ($completedOrders->isNotEmpty()) {
+                $orderIds = $completedOrders->pluck('id');
 
-            foreach ($completedOrders as $order) {
-                $bid = $order->branch_id;
-                foreach ($order->items as $item) {
-                    $itemCost = $this->calculateItemCogs($item, $branchCosts, $globalCosts, $purchaseCosts, $productCostMap, $optionCostMap, $modifierCostMap, $bid);
-                    $totalCogs += ($itemCost * $item->quantity);
-                }
+                $baseCogs = (float) DB::table('order_items')
+                    ->join('products', 'order_items.product_id', '=', 'products.id')
+                    ->whereIn('order_items.order_id', $orderIds)
+                    ->sum(DB::raw('order_items.quantity * COALESCE(products.cost, 0)'));
+
+                $optionCogs = (float) DB::table('order_item_options')
+                    ->join('order_items', 'order_item_options.order_item_id', '=', 'order_items.id')
+                    ->join('product_options', 'order_item_options.product_option_id', '=', 'product_options.id')
+                    ->whereIn('order_items.order_id', $orderIds)
+                    ->sum(DB::raw('order_items.quantity * COALESCE(product_options.cost, 0)'));
+
+                $totalCogs = $baseCogs + $optionCogs;
             }
 
+            // ── 4. Waste cost (same as BusinessIntelligence) ──
             $start = $this->startDate ? Carbon::parse($this->startDate)->startOfDay() : null;
             $end   = $this->endDate   ? Carbon::parse($this->endDate)->endOfDay()     : null;
 
-            $wasteCost = StockMovement::whereIn('type', ['waste', 'waste_expired', 'out', 'return_to_supplier'])
+            $wasteCost = (float) StockMovement::whereIn('type', ['waste', 'waste_expired', 'out', 'return_to_supplier'])
                 ->when($start, fn($q) => $q->where('created_at', '>=', $start))
                 ->when($end,   fn($q) => $q->where('created_at', '<=', $end))
                 ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
-                ->get()
-                ->sum(fn($movement) => abs($movement->quantity) * ($movement->unit_cost ?? 0));
+                ->sum(DB::raw('ABS(quantity) * COALESCE(unit_cost, 0)'));
 
-            $aov         = $orderCount > 0 ? ($completedOrders->sum('total_amount') / $orderCount) : 0;
+            // ── 5. Derived metrics ──
             $grossProfit = $netSales - $totalCogs - $wasteCost;
             $margin      = $netSales > 0 ? ($grossProfit / $netSales) * 100 : 0;
 

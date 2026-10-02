@@ -29,14 +29,6 @@ class Kernel extends ConsoleKernel
             ->everyMinute()
             ->withoutOverlapping();
 
-        // Nightly financial rollup — aggregates yesterday's orders per branch
-        // into daily_branch_summaries so the dashboard doesn't re-scan all rows.
-        // Hostinger hPanel cron: "* * * * * php /path/to/artisan schedule:run"
-        $schedule->command('dashboard:rollup', ['--date' => 'yesterday'])
-            ->dailyAt('00:05')
-            ->withoutOverlapping()
-            ->appendOutputTo(storage_path('logs/dashboard-rollup.log'));
-
         // Background queue worker — processes all pending database queue jobs
         // (e.g. email receipts, notifications, stock tasks) every minute.
         // --stop-when-empty: exits cleanly once the queue is drained.
