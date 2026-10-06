@@ -673,9 +673,17 @@ class BusinessIntelligence extends Component
             ];
         }
 
+        // If the latest order in the lookback window is more than 2 days before yesterday
+        // (e.g. data hasn't synced or store was closed), anchor training to the last active date
+        // so trailing artificial zeros don't distort evaluation.
+        $lastActiveDate = Carbon::parse($rawDaily->keys()->last());
+        $trainingEnd = ($lastActiveDate->diffInDays($periodEnd) > 2)
+            ? $lastActiveDate->copy()->endOfDay()
+            : $periodEnd->copy();
+
         // Fill gap days with 0 to maintain consistent calendar daily intervals
         $start = Carbon::parse($rawDaily->keys()->first());
-        $end = $periodEnd->copy();
+        $end = $trainingEnd->copy();
         $series = collect();
         $cursor = $start->copy();
         while ($cursor->lte($end)) {
@@ -716,20 +724,21 @@ class BusinessIntelligence extends Component
         }
         $nCleanTrain = $cleanTrain->count();
 
-        // 2. Day-of-week seasonality indices computed from training window
+        // 2. Day-of-week seasonality indices computed from training window with shrinkage
         $dowIndices = array_fill(1, 7, 1.0);
-        if ($nCleanTrain >= 14) {
+        if ($nCleanTrain >= 7) {
             $dowSums = array_fill(1, 7, 0.0);
             $dowCounts = array_fill(1, 7, 0);
-            $trainAvg = $cleanTrain->avg('total') ?: 1.0;
             foreach ($cleanTrain as $row) {
+                if ($row->total <= 0) continue;
                 $dow = (int)Carbon::parse($row->label)->dayOfWeekIso;
                 $dowSums[$dow] += (float)$row->total;
                 $dowCounts[$dow]++;
             }
+            $activeTrainAvg = $cleanTrain->where('total', '>', 0)->avg('total') ?: ($cleanTrain->avg('total') ?: 1.0);
             foreach ($dowIndices as $d => $_) {
-                $avgD = $dowCounts[$d] > 0 ? $dowSums[$d] / $dowCounts[$d] : $trainAvg;
-                $dowIndices[$d] = $trainAvg > 0 ? $avgD / $trainAvg : 1.0;
+                $smoothed = ($dowSums[$d] + 2.0 * $activeTrainAvg) / ($dowCounts[$d] + 2.0);
+                $dowIndices[$d] = $activeTrainAvg > 0 ? $smoothed / $activeTrainAvg : 1.0;
             }
             // Normalize so weekly average multiplier across 7 days is 1.0
             $avgDow = array_sum($dowIndices) / 7;
@@ -761,13 +770,15 @@ class BusinessIntelligence extends Component
             $intercept = ($sumWY - ($slope * $sumWX)) / $sumW;
         }
 
+        // Cap daily slope drift to max ±8% of mean
+        $slopeCap = $meanY * 0.08;
+        $slope = max(-$slopeCap, min($slopeCap, $slope));
+
         $minPeriodsForTrend = 5;
         $hasReliableTrend = $nCleanTrain >= $minPeriodsForTrend;
         $recentTrainAvg = $cleanTrain->take(-7)->avg('total') ?: $meanY;
         $endFittedLevel = $hasReliableTrend ? ($intercept + ($slope * $nCleanTrain)) : $recentTrainAvg;
-        $currentLevel = $hasReliableTrend
-            ? max($meanY * 0.3, ($endFittedLevel * 0.6) + ($recentTrainAvg * 0.4))
-            : $recentTrainAvg;
+        $currentLevel = max($meanY * 0.5, ($endFittedLevel * 0.5) + ($recentTrainAvg * 0.5));
 
         // 4. Model projection on held-out 7 days with damped trend + seasonality
         $phi = 0.98;
@@ -775,10 +786,10 @@ class BusinessIntelligence extends Component
         $trendCumulative = 0.0;
         for ($i = 0; $i < $holdout; $i++) {
             $trendCumulative += pow($phi, $i + 1) * $slope;
-            $baselinePred = $currentLevel + $trendCumulative;
+            $baselinePred = max($meanY * 0.4, $currentLevel + $trendCumulative);
             $dow = (int)Carbon::parse($actual[$i]->label)->dayOfWeekIso;
             $seasonalMultiplier = $dowIndices[$dow] ?? 1.0;
-            $modelPredicted[] = max($baselinePred * $seasonalMultiplier, $meanY * 0.3);
+            $modelPredicted[] = max(10.0, round($baselinePred * $seasonalMultiplier, 2));
         }
 
         // 5. Naive baseline: average of the train window's last 7 days
@@ -847,11 +858,15 @@ class BusinessIntelligence extends Component
                 ->pluck('total', 'label')
                 ->map(fn($v) => (float)$v);
 
+            $lastActiveDate = $rawPoints->isNotEmpty() ? Carbon::parse($rawPoints->keys()->last()) : $periodEnd;
+            $trainingEnd = ($lastActiveDate->diffInDays($periodEnd) > 2)
+                ? $lastActiveDate->copy()->endOfDay()
+                : $periodEnd->copy();
+
             $data = collect();
             if ($rawPoints->isNotEmpty()) {
                 $cursor = Carbon::parse($rawPoints->keys()->first());
-                $endCursor = $periodEnd->copy();
-                while ($cursor->lte($endCursor)) {
+                while ($cursor->lte($trainingEnd)) {
                     $lbl = $cursor->format('Y-m-d');
                     $data->push((object)[
                         'label' => $lbl,
@@ -914,21 +929,22 @@ class BusinessIntelligence extends Component
             }
         }
 
-        // ── Step 3: Day-of-week seasonality indices (daily only) ──────
-        // Calculated from clean data so extreme single-day outliers do not skew weekdays
+        // ── Step 3: Day-of-week seasonality indices with Bayesian shrinkage (daily only) ──────
         $dowIndices = array_fill(1, 7, 1.0);
-        if ($type === 'daily' && $nClean >= 14) {
+        if ($type === 'daily' && $nClean >= 7) {
             $dowSums   = array_fill(1, 7, 0.0);
             $dowCounts = array_fill(1, 7, 0);
-            $cleanAvg  = $cleanData->avg('total') ?: 1;
             foreach ($cleanData as $row) {
+                if ($row->total <= 0) continue;
                 $dow = (int)Carbon::parse($row->label)->dayOfWeekIso; // 1=Mon..7=Sun
                 $dowSums[$dow]   += (float)$row->total;
                 $dowCounts[$dow] += 1;
             }
+            $activeAvg = $cleanData->where('total', '>', 0)->avg('total') ?: $meanY;
             foreach ($dowIndices as $d => $_) {
-                $avg = $dowCounts[$d] > 0 ? $dowSums[$d] / $dowCounts[$d] : $cleanAvg;
-                $dowIndices[$d] = $cleanAvg > 0 ? $avg / $cleanAvg : 1.0;
+                // Shrink small-sample DOW estimates toward neutral 1.0
+                $smoothed = ($dowSums[$d] + 2.0 * $activeAvg) / ($dowCounts[$d] + 2.0);
+                $dowIndices[$d] = $activeAvg > 0 ? $smoothed / $activeAvg : 1.0;
             }
             // Normalize so weekly average multiplier across 7 days is 1.0
             $avgDow = array_sum($dowIndices) / 7;
@@ -940,15 +956,15 @@ class BusinessIntelligence extends Component
         }
 
         // ── Step 4: Generate forecast with damped trend + seasonality ──
-        // Damped trend (Gardner & McKenzie): starts from current run-rate level
-        // and accumulates damped trend forward, bending gracefully rather than snapping back.
         $phi = $type === 'daily' ? 0.98 : 0.85;
+
+        // Cap daily slope drift to max ±8% of mean
+        $slopeCap = $meanY * 0.08;
+        $slope = max(-$slopeCap, min($slopeCap, $slope));
 
         $avgDailySales = $cleanData->take(-7)->avg('total') ?: $meanY;
         $endFittedLevel = $hasReliableTrend ? ($intercept + ($slope * $nClean)) : $avgDailySales;
-        $currentLevel = $hasReliableTrend
-            ? max($meanY * 0.3, ($endFittedLevel * 0.6) + ($avgDailySales * 0.4))
-            : $avgDailySales;
+        $currentLevel = max($meanY * 0.5, ($endFittedLevel * 0.5) + ($avgDailySales * 0.5));
 
         $forecast = [];
         $startDate = $type === 'daily' ? Carbon::tomorrow() : Carbon::now()->addMonth()->startOfMonth();
@@ -960,7 +976,7 @@ class BusinessIntelligence extends Component
                 : $startDate->copy()->addMonths($i);
 
             $trendCumulative += pow($phi, $i + 1) * $slope;
-            $baselinePrediction = $currentLevel + $trendCumulative;
+            $baselinePrediction = max($meanY * 0.4, $currentLevel + $trendCumulative);
 
             $seasonalIndex = 1.0;
             if ($type === 'daily') {
@@ -968,14 +984,13 @@ class BusinessIntelligence extends Component
                 $seasonalIndex = $dowIndices[$dow] ?? 1.0;
             }
 
-            $adjusted = $baselinePrediction * $seasonalIndex;
-            // Floor at 30% of the recent mean to avoid collapsing to zero while active
-            $adjusted = max($adjusted, $meanY * 0.3);
+            $adjusted = round($baselinePrediction * $seasonalIndex, 2);
+            $adjusted = max(10.0, $adjusted);
 
             $forecast[] = [
                 'date'      => $type === 'daily' ? $predictedDate->format('M d') : $predictedDate->format('M Y'),
                 'day'       => strtoupper($predictedDate->format('D')),
-                'predicted' => round($adjusted, 2),
+                'predicted' => $adjusted,
             ];
         }
 
