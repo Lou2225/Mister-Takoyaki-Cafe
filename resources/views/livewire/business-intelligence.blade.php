@@ -384,13 +384,17 @@
         @endphp
 
                 <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            @php
+                $impVal = (float)($accuracy['model_improvement_pct'] ?? 0);
+                $isBetter = $impVal >= 0;
+            @endphp
             <div class="flex items-center justify-between gap-3 mb-4">
                 <div>
                     <p class="text-[10px] font-black uppercase tracking-[0.22em] text-gray-400">Benchmarking</p>
                     <h4 class="mt-1 text-[15px] font-bold text-gray-900 tracking-tight">Forecast accuracy vs. baseline</h4>
                 </div>
-                <div class="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700">
-                    {{ number_format($accuracy['model_improvement_pct'] ?? 0, 1) }}% better
+                <div class="rounded-full border {{ $isBetter ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : 'border-amber-100 bg-amber-50 text-amber-700' }} px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em]">
+                    {{ $isBetter ? '+' : '' }}{{ number_format($impVal, 1) }}% {{ $isBetter ? 'better' : 'vs baseline' }}
                 </div>
             </div>
 
@@ -407,9 +411,9 @@
                     <p class="text-[10px] font-black uppercase tracking-[0.18em] text-amber-600">Model MAPE</p>
                     <p class="mt-2 text-[24px] font-black text-amber-900">{{ number_format($accuracy['mape'] ?? 0, 2) }}%</p>
                 </div>
-                <div class="rounded-2xl border border-gray-100 bg-emerald-50 p-4">
-                    <p class="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-600">Improvement</p>
-                    <p class="mt-2 text-[24px] font-black text-emerald-900">{{ number_format($accuracy['model_improvement_pct'] ?? 0, 1) }}%</p>
+                <div class="rounded-2xl border border-gray-100 {{ $isBetter ? 'bg-emerald-50' : 'bg-amber-50' }} p-4">
+                    <p class="text-[10px] font-black uppercase tracking-[0.18em] {{ $isBetter ? 'text-emerald-600' : 'text-amber-600' }}">Improvement</p>
+                    <p class="mt-2 text-[24px] font-black {{ $isBetter ? 'text-emerald-900' : 'text-amber-900' }}">{{ $isBetter ? '+' : '' }}{{ number_format($impVal, 1) }}%</p>
                 </div>
             </div>
 
@@ -1245,57 +1249,180 @@
         </div>
 
         {{-- Branch Comparison (Admin Only) --}}
-        @if(auth()->user()->role_id === 1)
-        <div class="mx-1 max-h-[26rem] overflow-y-auto custom-scrollbar pr-2">
-            <div class="flex items-center justify-between mb-3 px-1">
-                <div class="flex items-center gap-2">
-                    <h4 class="text-[14px] font-bold text-gray-900 tracking-tight">Network Performance</h4>
-                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-emerald-50 text-[9px] font-black text-emerald-600 uppercase tracking-widest border border-emerald-100 italic">
-                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                        Live Data Sync
-                    </span>
-                </div>
-                <span class="text-[10px] font-black uppercase text-gray-400 tracking-widest leading-none">By Branch Matrix</span>
-            </div>
+        @if(auth()->user()->role_id === 1 || auth()->user()->isSuperAdmin())
+        <div class="mx-1">
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6"
+                 wire:key="network-perf-card-{{ $selectedBranchId }}-{{ $startDate }}-{{ $endDate }}-{{ str_replace(' ', '-', $activeFilter) }}"
+                 x-data="networkPerformanceComponent(
+                     JSON.parse(document.getElementById('branch-chart-data-payload') ? document.getElementById('branch-chart-data-payload').textContent : '{}'),
+                     '#6366F1'
+                 )"
+                 x-init="init()">
+                
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h4 class="text-[15px] font-bold text-gray-900 tracking-tight">Network Performance</h4>
+                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-emerald-50 text-[9px] font-black text-emerald-600 uppercase tracking-widest border border-emerald-100 italic">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                Live Data Sync
+                            </span>
+                        </div>
+                        <p class="text-[11px] text-gray-400 font-medium mt-0.5">Comparative branch benchmark and network distribution.</p>
+                    </div>
 
-            <x-data-table>
-                <x-slot name="header">
-                    <th class="py-3 px-6 border-r border-gray-100 text-[12px] font-medium text-gray-500 tracking-wide uppercase">Branch Entity</th>
-                    <th class="py-3 px-6 border-r border-gray-100 text-[12px] font-medium text-gray-500 tracking-wide text-right uppercase">Revenue</th>
-                    <th class="py-3 px-6 border-r border-gray-100 text-[12px] font-medium text-gray-500 tracking-wide text-center uppercase">Orders</th>
-                    <th class="py-3 px-6 text-[12px] font-medium text-gray-500 tracking-wide text-right uppercase">Share</th>
-                </x-slot>
+                    {{-- Controls: Metric, Timeframe Comparison, & View Toggles --}}
+                    <div class="flex items-center gap-2 flex-wrap">
+                        {{-- Metric Toggle (Revenue vs Orders) --}}
+                        <div x-show="viewMode === 'chart'" class="inline-flex p-0.5 bg-gray-100 rounded-xl text-[11px] font-bold">
+                            <button type="button" 
+                                    @click="setMetric('revenue')" 
+                                    :class="metric === 'revenue' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'"
+                                    class="px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                ₱ Revenue
+                            </button>
+                            <button type="button" 
+                                    @click="setMetric('orders')" 
+                                    :class="metric === 'orders' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'"
+                                    class="px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                                Orders
+                            </button>
+                        </div>
+
+                        {{-- Timeframe Comparison: Daily, Weekly, Monthly --}}
+                        <div x-show="viewMode === 'chart'" class="inline-flex p-0.5 bg-gray-100 rounded-xl text-[11px] font-bold">
+                            <button type="button" 
+                                    @click="setTimeframe('daily')" 
+                                    :class="timeframe === 'daily' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'"
+                                    class="px-2.5 py-1 rounded-lg transition-all"
+                                    title="Compare Daily performance (dates on x-axis)">
+                                Daily
+                            </button>
+                            <button type="button" 
+                                    @click="setTimeframe('weekly')" 
+                                    :class="timeframe === 'weekly' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'"
+                                    class="px-2.5 py-1 rounded-lg transition-all"
+                                    title="Compare Weekly performance (weeks on x-axis)">
+                                Weekly
+                            </button>
+                            <button type="button" 
+                                    @click="setTimeframe('monthly')" 
+                                    :class="timeframe === 'monthly' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'"
+                                    class="px-2.5 py-1 rounded-lg transition-all"
+                                    title="Compare Monthly performance (months on x-axis)">
+                                Monthly
+                            </button>
+                        </div>
+
+                        {{-- View Toggle (Column Chart vs Table) --}}
+                        <div class="inline-flex p-0.5 bg-gray-100 rounded-xl text-[11px] font-bold">
+                            <button type="button" 
+                                    @click="switchView('chart')" 
+                                    :class="viewMode === 'chart' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'"
+                                    class="px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                                Chart
+                            </button>
+                            <button type="button" 
+                                    @click="switchView('table')" 
+                                    :class="viewMode === 'table' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'"
+                                    class="px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                Matrix Table
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 @php 
+                    $branchChart = $operations['branch_chart'] ?? ['branches' => [], 'revenue' => [], 'orders' => [], 'shares' => [], 'has_data' => false];
                     $networkTotal = $operations['global_network_total'];
                 @endphp
-                @forelse($operations['branch_performance'] as $branch)
-                <tr class="hover:bg-gray-50/50 transition-colors">
-                    <td class="py-3 px-6 border-r border-gray-100 whitespace-nowrap">
-                        <span class="block text-[13px] font-bold text-gray-900 leading-none">{{ $branch->branch->branch_name }}</span>
-                        <span class="block text-[10px] text-gray-400 font-medium italic mt-1">{{ $branch->branch->branch_code }}</span>
-                    </td>
-                    <td class="py-3 px-6 border-r border-gray-100 text-right font-black text-[13px] text-gray-900 font-mono whitespace-nowrap">&#8369;{{ number_format($branch->revenue, 2) }}</td>
-                    <td class="py-3 px-6 border-r border-gray-100 text-center text-[12px] font-bold text-gray-600 whitespace-nowrap">{{ $branch->count }}</td>
-                    <td class="py-3 px-6 text-right whitespace-nowrap">
-                        <div class="flex items-center justify-end gap-3">
-                            <span class="text-[11px] font-black text-{{ $primaryColor }}-600 tabular-nums">{{ number_format(($branch->revenue / $networkTotal) * 100, 1) }}%</span>
-                            <div class="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                <div class="h-full bg-{{ $primaryColor }}-500 rounded-full" style="width: {{ ($branch->revenue / $networkTotal) * 100 }}%"></div>
-                            </div>
-                        </div>
-                    </td>
-                </tr>
-                @empty
-                <tr>
-                    <td colspan="4" class="py-0">
-                        <x-empty-state title="No Branch Data" description="No multi-branch sales data available for this range." />
-                    </td>
-                </tr>
-                @endforelse
-            </x-data-table>
 
-            <div class="mt-4">
-                <x-pagination :paginator="$operations['branch_performance']" keyPrefix="bi-branches" />
+                @if($branchChart['has_data'])
+                    <script type="application/json" id="branch-chart-data-payload">
+                    {!! json_encode($branchChart, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!}
+                    </script>
+
+                    {{-- Summary KPI Cards for Branches --}}
+                    <div x-show="viewMode === 'chart'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
+                        <template x-for="(bName, idx) in (data.branches || [])" :key="idx">
+                            <div class="p-3 bg-slate-50/80 rounded-xl border border-slate-200/60 flex items-center justify-between gap-3">
+                                <div class="flex items-center gap-2.5 min-w-0">
+                                    <span class="w-3 h-3 rounded-full shrink-0" :style="'background-color: ' + getBranchColor(idx)"></span>
+                                    <div class="min-w-0">
+                                        <span class="block text-[13px] font-black text-slate-800 truncate" x-text="bName"></span>
+                                        <div class="flex items-center gap-2 mt-0.5">
+                                            <span class="text-[14px] font-black font-mono text-slate-900" 
+                                                  x-text="metric === 'revenue' ? ('₱' + Number(getBranchTotalRev(idx)).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})) : (getBranchTotalOrders(idx).toLocaleString() + ' orders')"></span>
+                                            <span class="text-[10px] text-slate-400 font-semibold"
+                                                  x-text="metric === 'revenue' ? ('(' + getBranchTotalOrders(idx) + ' orders)') : ('₱' + Number(getBranchTotalRev(idx)).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0}))"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="text-right shrink-0">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-100" 
+                                          x-text="(getBranchShare(idx)) + '% share'"></span>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    {{-- Bar Chart Container --}}
+                    <div x-show="viewMode === 'chart'"
+                         wire:ignore
+                         wire:key="branch-comparison-barchart-{{ $selectedBranchId }}-{{ $startDate }}-{{ $endDate }}-{{ str_replace(' ', '-', $activeFilter) }}"
+                         class="w-full">
+                        <div x-ref="branchChartRef" class="w-full"></div>
+                    </div>
+                @else
+                    <div x-show="viewMode === 'chart'" class="p-6">
+                        <x-empty-state title="No Branch Data" description="No multi-branch sales data available for this range." />
+                    </div>
+                @endif
+
+                {{-- Table View Container --}}
+                <div x-show="viewMode === 'table'" class="overflow-y-auto custom-scrollbar">
+                    <x-data-table>
+                        <x-slot name="header">
+                            <th class="py-3 px-6 border-r border-gray-100 text-[12px] font-medium text-gray-500 tracking-wide uppercase">Branch Entity</th>
+                            <th class="py-3 px-6 border-r border-gray-100 text-[12px] font-medium text-gray-500 tracking-wide text-right uppercase">Revenue</th>
+                            <th class="py-3 px-6 border-r border-gray-100 text-[12px] font-medium text-gray-500 tracking-wide text-center uppercase">Orders</th>
+                            <th class="py-3 px-6 text-[12px] font-medium text-gray-500 tracking-wide text-right uppercase">Share</th>
+                        </x-slot>
+                        @forelse($operations['branch_performance'] as $branch)
+                        <tr class="hover:bg-gray-50/50 transition-colors">
+                            <td class="py-3 px-6 border-r border-gray-100 whitespace-nowrap">
+                                <span class="block text-[13px] font-bold text-gray-900 leading-none">{{ $branch->branch->branch_name }}</span>
+                                <span class="block text-[10px] text-gray-400 font-medium italic mt-1">{{ $branch->branch->branch_code }}</span>
+                            </td>
+                            <td class="py-3 px-6 border-r border-gray-100 text-right font-black text-[13px] text-gray-900 font-mono whitespace-nowrap">&#8369;{{ number_format($branch->revenue, 2) }}</td>
+                            <td class="py-3 px-6 border-r border-gray-100 text-center text-[12px] font-bold text-gray-600 whitespace-nowrap">{{ $branch->count }}</td>
+                            <td class="py-3 px-6 text-right whitespace-nowrap">
+                                <div class="flex items-center justify-end gap-3">
+                                    <span class="text-[11px] font-black text-{{ $primaryColor }}-600 tabular-nums">{{ number_format(($branch->revenue / $networkTotal) * 100, 1) }}%</span>
+                                    <div class="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                        <div class="h-full bg-{{ $primaryColor }}-500 rounded-full" style="width: {{ ($branch->revenue / $networkTotal) * 100 }}%"></div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        @empty
+                        <tr>
+                            <td colspan="4" class="py-0">
+                                <x-empty-state title="No Branch Data" description="No multi-branch sales data available for this range." />
+                            </td>
+                        </tr>
+                        @endforelse
+                    </x-data-table>
+
+                    <div class="mt-4">
+                        <x-pagination :paginator="$operations['branch_performance']" keyPrefix="bi-branches" />
+                    </div>
+                </div>
+
             </div>
         </div>
         @endif
@@ -1953,6 +2080,242 @@
 
                     self.chartRef = new ApexCharts(self.$refs.forecastChart, options);
                     self.chartRef.render();
+                }
+            };
+        }
+
+        function networkPerformanceComponent(initialData, primaryColor) {
+            const branchPalette = ['#6366F1', '#10B981', '#F59E0B', '#EC4899', '#3B82F6', '#8B5CF6', '#14B8A6'];
+
+            return {
+                chart: null,
+                data: initialData || { branches: [], periods: {}, branch_totals: {}, has_data: false },
+                metric: 'revenue',
+                timeframe: 'daily',
+                viewMode: 'chart',
+
+                getBranchColor(idx) {
+                    return branchPalette[idx % branchPalette.length];
+                },
+
+                getBranchTotalRev(idx) {
+                    return Number(this.data.branch_totals?.revenue?.[idx] ?? this.data.revenue?.[idx] ?? 0);
+                },
+
+                getBranchTotalOrders(idx) {
+                    return Number(this.data.branch_totals?.orders?.[idx] ?? this.data.orders?.[idx] ?? 0);
+                },
+
+                getBranchShare(idx) {
+                    return Number(this.data.branch_totals?.shares?.[idx] ?? this.data.shares?.[idx] ?? 0);
+                },
+
+                init() {
+                    if (typeof window.ApexCharts === 'undefined') return;
+
+                    if (this.$watch) {
+                        this.$watch('activeTab', (tab) => {
+                            if (tab === 'diagnostic' && this.viewMode === 'chart') {
+                                this.$nextTick(() => {
+                                    setTimeout(() => this.render(), 80);
+                                });
+                            }
+                        });
+                        this.$watch('viewMode', (mode) => {
+                            if (mode === 'chart') {
+                                this.$nextTick(() => {
+                                    setTimeout(() => this.render(), 80);
+                                });
+                            }
+                        });
+                    }
+
+                    if (this.activeTab === 'diagnostic' && this.viewMode === 'chart') {
+                        this.$nextTick(() => {
+                            setTimeout(() => this.render(), 80);
+                        });
+                    }
+
+                    if (this.$cleanup) {
+                        this.$cleanup(() => this.destroy());
+                    }
+                },
+
+                destroy() {
+                    if (this.chart) {
+                        try { this.chart.destroy(); } catch (e) {}
+                        this.chart = null;
+                    }
+                },
+
+                switchView(mode) {
+                    this.viewMode = mode;
+                    if (mode === 'chart') {
+                        this.$nextTick(() => {
+                            setTimeout(() => this.render(), 60);
+                        });
+                    }
+                },
+
+                setTimeframe(tf) {
+                    if (this.timeframe !== tf) {
+                        this.timeframe = tf;
+                        this.$nextTick(() => {
+                            this.render();
+                        });
+                    }
+                },
+
+                setMetric(m) {
+                    if (this.metric !== m) {
+                        this.metric = m;
+                        this.$nextTick(() => {
+                            this.render();
+                        });
+                    }
+                },
+
+                render(retryCount = 0) {
+                    if (typeof window.ApexCharts === 'undefined') return;
+                    const el = this.$refs.branchChartRef;
+                    if (!el) return;
+                    if (el.offsetWidth === 0) {
+                        if (retryCount < 5) {
+                            setTimeout(() => this.render(retryCount + 1), 80);
+                        }
+                        return;
+                    }
+
+                    if (this.chart) {
+                        try { this.chart.destroy(); } catch (e) {}
+                        this.chart = null;
+                    }
+
+                    const periodData = this.data.periods?.[this.timeframe] || { categories: [], revenue_series: [], orders_series: [] };
+                    const isRev = this.metric === 'revenue';
+                    const series = isRev ? (periodData.revenue_series || []) : (periodData.orders_series || []);
+                    const categories = periodData.categories || [];
+
+                    let maxVal = 0;
+                    series.forEach(s => {
+                        if (Array.isArray(s.data)) {
+                            s.data.forEach(v => {
+                                const num = Number(v) || 0;
+                                if (num > maxVal) maxVal = num;
+                            });
+                        }
+                    });
+
+                    const showDataLabels = categories.length <= 8;
+
+                    const options = {
+                        series: series,
+                        chart: {
+                            type: 'bar',
+                            height: 340,
+                            toolbar: { show: false },
+                            animations: { enabled: true, speed: 250 }
+                        },
+                        colors: branchPalette.slice(0, Math.max(series.length, 1)),
+                        plotOptions: {
+                            bar: {
+                                horizontal: false, // Strictly vertical columns
+                                borderRadius: 5,
+                                borderRadiusApplication: 'end',
+                                columnWidth: categories.length <= 4 ? '35%' : (categories.length <= 10 ? '48%' : '65%'),
+                                dataLabels: {
+                                    position: 'top'
+                                }
+                            }
+                        },
+                        dataLabels: {
+                            enabled: showDataLabels,
+                            offsetY: -20,
+                            style: {
+                                colors: ['#0F172A'],
+                                fontSize: '11px',
+                                fontWeight: 800
+                            },
+                            formatter: (val) => {
+                                if (!val || Number(val) <= 0) return '';
+                                const num = Number(val);
+                                if (isRev) {
+                                    return num >= 1000 ? '\u20B1' + (num / 1000).toFixed(1) + 'k' : '\u20B1' + Math.round(num);
+                                }
+                                return Math.round(num).toLocaleString();
+                            }
+                        },
+                        legend: {
+                            show: true,
+                            position: 'top',
+                            horizontalAlign: 'right',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            labels: {
+                                colors: '#334155'
+                            },
+                            markers: {
+                                width: 10,
+                                height: 10,
+                                radius: 4
+                            },
+                            itemMargin: {
+                                horizontal: 10,
+                                vertical: 2
+                            }
+                        },
+                        xaxis: {
+                            categories: categories,
+                            labels: {
+                                rotate: categories.length > 10 ? -45 : 0,
+                                rotateAlways: false,
+                                style: {
+                                    colors: '#64748B',
+                                    fontSize: '11px',
+                                    fontWeight: 600
+                                }
+                            },
+                            axisBorder: { show: false },
+                            axisTicks: { show: false }
+                        },
+                        yaxis: {
+                            min: 0,
+                            max: maxVal > 0 ? (showDataLabels ? maxVal * 1.25 : maxVal * 1.15) : 100,
+                            labels: {
+                                style: { colors: '#64748B', fontSize: '11px', fontWeight: 600 },
+                                formatter: (val) => {
+                                    const num = Math.max(0, Number(val) || 0);
+                                    if (isRev) {
+                                        return num >= 1000 ? '\u20B1' + (num / 1000).toFixed(0) + 'k' : '\u20B1' + Math.round(num);
+                                    }
+                                    return Math.round(num).toLocaleString();
+                                }
+                            }
+                        },
+                        grid: {
+                            borderColor: '#F1F5F9',
+                            strokeDashArray: 4,
+                            xaxis: { lines: { show: false } },
+                            yaxis: { lines: { show: true } }
+                        },
+                        tooltip: {
+                            shared: true,
+                            intersect: false,
+                            theme: 'dark',
+                            y: {
+                                formatter: (val) => {
+                                    const num = Number(val) || 0;
+                                    if (isRev) {
+                                        return '\u20B1' + num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                    }
+                                    return num.toLocaleString() + ' orders';
+                                }
+                            }
+                        }
+                    };
+
+                    this.chart = new ApexCharts(el, options);
+                    this.chart.render();
                 }
             };
         }

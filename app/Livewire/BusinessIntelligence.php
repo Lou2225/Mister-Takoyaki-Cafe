@@ -640,18 +640,22 @@ class BusinessIntelligence extends Component
     }
 
         /**
-     * Proper walk-forward backtest: train on all days EXCEPT the most recent 7,
-     * predict those 7 held-out days, then compare against what actually happened.
-     * The naive baseline uses only pre-test data too (last 7 days of the TRAIN
-     * window) so neither side gets to peek at the answer it's being scored against.
+     * Walk-forward backtest: train on all historical days EXCEPT the most recent 7 complete days,
+     * predict those 7 held-out days using the production model pipeline (weighted trend +
+     * day-of-week seasonality + current level projection), and compare against what actually happened.
+     * Evaluated against a naive 7-day trailing baseline.
      */
     private function calculateForecastAccuracy(array $forecastSeries): array
     {
+        $lookbackStart = Carbon::now()->subDays(60)->startOfDay();
+        $periodEnd = Carbon::yesterday()->endOfDay(); // exclude today (incomplete day)
+
         $query = Order::whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
             ->when($this->selectedBranchId !== 'all', fn($q) => $q->where('branch_id', (int)$this->selectedBranchId))
-            ->where('created_at', '>=', Carbon::now()->subDays(60)->startOfDay());
+            ->where('created_at', '>=', $lookbackStart)
+            ->where('created_at', '<=', $periodEnd);
 
-        $daily = $query
+        $rawDaily = $query
             ->selectRaw('DATE(created_at) as label, SUM(total_amount) as total')
             ->groupBy('label')
             ->orderBy('label', 'asc')
@@ -659,14 +663,28 @@ class BusinessIntelligence extends Component
             ->pluck('total', 'label')
             ->map(fn($value) => (float)$value);
 
-        // Fill any gap days with 0 so the series has no missing dates
-        $start = $daily->keys()->first() ? Carbon::parse($daily->keys()->first()) : Carbon::now()->subDays(30);
-        $end = Carbon::now()->subDay(); // exclude today (incomplete day)
+        if ($rawDaily->isEmpty()) {
+            return [
+                'mae' => 0.0, 'rmse' => 0.0, 'mape' => 0.0,
+                'benchmark_mae' => 0.0, 'benchmark_mape' => 0.0,
+                'model_improvement_pct' => 0.0,
+                'baseline' => 'Not enough data',
+                'model' => 'Not enough data',
+            ];
+        }
+
+        // Fill gap days with 0 to maintain consistent calendar daily intervals
+        $start = Carbon::parse($rawDaily->keys()->first());
+        $end = $periodEnd->copy();
         $series = collect();
         $cursor = $start->copy();
         while ($cursor->lte($end)) {
             $key = $cursor->format('Y-m-d');
-            $series->push((float)($daily[$key] ?? 0));
+            $series->push((object)[
+                'label' => $key,
+                'dow' => (int)$cursor->dayOfWeekIso,
+                'total' => (float)($rawDaily[$key] ?? 0.0),
+            ]);
             $cursor->addDay();
         }
 
@@ -685,19 +703,56 @@ class BusinessIntelligence extends Component
         $actual = $series->slice(-$holdout)->values();
         $nTrain = $train->count();
 
-        // Fit the same weighted regression style used for the real forecast,
-        // but ONLY on the train slice, then project forward $holdout days.
+        // 1. Outlier filtering on training set (IQR)
+        $trainTotals = $train->pluck('total')->map(fn($v) => (float)$v)->sort()->values();
+        $q1 = $trainTotals[(int)floor($nTrain * 0.25)];
+        $q3 = $trainTotals[(int)floor($nTrain * 0.75)];
+        $iqr = $q3 - $q1;
+        $lowerFence = $q1 - 1.5 * $iqr;
+        $upperFence = $q3 + 1.5 * $iqr;
+        $cleanTrain = $train->filter(fn($row) => (float)$row->total >= $lowerFence && (float)$row->total <= $upperFence)->values();
+        if ($cleanTrain->count() < 2) {
+            $cleanTrain = $train;
+        }
+        $nCleanTrain = $cleanTrain->count();
+
+        // 2. Day-of-week seasonality indices computed from training window
+        $dowIndices = array_fill(1, 7, 1.0);
+        if ($nCleanTrain >= 14) {
+            $dowSums = array_fill(1, 7, 0.0);
+            $dowCounts = array_fill(1, 7, 0);
+            $trainAvg = $cleanTrain->avg('total') ?: 1.0;
+            foreach ($cleanTrain as $row) {
+                $dow = (int)Carbon::parse($row->label)->dayOfWeekIso;
+                $dowSums[$dow] += (float)$row->total;
+                $dowCounts[$dow]++;
+            }
+            foreach ($dowIndices as $d => $_) {
+                $avgD = $dowCounts[$d] > 0 ? $dowSums[$d] / $dowCounts[$d] : $trainAvg;
+                $dowIndices[$d] = $trainAvg > 0 ? $avgD / $trainAvg : 1.0;
+            }
+            // Normalize so weekly average multiplier across 7 days is 1.0
+            $avgDow = array_sum($dowIndices) / 7;
+            if ($avgDow > 0) {
+                foreach ($dowIndices as $d => $val) {
+                    $dowIndices[$d] = $val / $avgDow;
+                }
+            }
+        }
+
+        // 3. Weighted linear regression on clean training set
         $sumW = $sumWX = $sumWY = $sumWXX = $sumWXY = 0.0;
-        foreach ($train as $index => $y) {
+        foreach ($cleanTrain as $index => $row) {
             $x = $index + 1;
-            $w = exp($index / max($nTrain, 1));
+            $y = (float)$row->total;
+            $w = exp($index / max($nCleanTrain, 1));
             $sumW   += $w;
             $sumWX  += $w * $x;
             $sumWY  += $w * $y;
             $sumWXX += $w * $x * $x;
             $sumWXY += $w * $x * $y;
         }
-        $meanY = $train->avg() ?: 0.0;
+        $meanY = $cleanTrain->avg('total') ?: 0.0;
         $slope = 0.0;
         $intercept = $meanY;
         $denominator = ($sumW * $sumWXX) - ($sumWX * $sumWX);
@@ -706,24 +761,37 @@ class BusinessIntelligence extends Component
             $intercept = ($sumWY - ($slope * $sumWX)) / $sumW;
         }
 
-        $phi = 0.98; // same damping factor as the live daily forecast
+        $minPeriodsForTrend = 5;
+        $hasReliableTrend = $nCleanTrain >= $minPeriodsForTrend;
+        $recentTrainAvg = $cleanTrain->take(-7)->avg('total') ?: $meanY;
+        $endFittedLevel = $hasReliableTrend ? ($intercept + ($slope * $nCleanTrain)) : $recentTrainAvg;
+        $currentLevel = $hasReliableTrend
+            ? max($meanY * 0.3, ($endFittedLevel * 0.6) + ($recentTrainAvg * 0.4))
+            : $recentTrainAvg;
+
+        // 4. Model projection on held-out 7 days with damped trend + seasonality
+        $phi = 0.98;
         $modelPredicted = [];
         $trendCumulative = 0.0;
         for ($i = 0; $i < $holdout; $i++) {
             $trendCumulative += pow($phi, $i + 1) * $slope;
-            $modelPredicted[] = max($meanY + $trendCumulative, $meanY * 0.3);
+            $baselinePred = $currentLevel + $trendCumulative;
+            $dow = (int)Carbon::parse($actual[$i]->label)->dayOfWeekIso;
+            $seasonalMultiplier = $dowIndices[$dow] ?? 1.0;
+            $modelPredicted[] = max($baselinePred * $seasonalMultiplier, $meanY * 0.3);
         }
 
-        // True naive baseline: average of the train window's last 7 days —
-        // built entirely from data that predates the test window.
-        $naiveValue = $train->slice(-7)->avg() ?: $meanY;
+        // 5. Naive baseline: average of the train window's last 7 days
+        $naiveValue = $train->take(-7)->avg('total') ?: $meanY;
         $benchmarkPredicted = array_fill(0, $holdout, (float)$naiveValue);
 
+        // 6. Compute evaluation metrics
         $modelErrors = $benchmarkErrors = $modelAbsPct = $benchmarkAbsPct = [];
-        foreach ($actual as $idx => $value) {
+        foreach ($actual as $idx => $row) {
+            $value = (float)$row->total;
             $modelErrors[] = abs($value - $modelPredicted[$idx]);
             $benchmarkErrors[] = abs($value - $benchmarkPredicted[$idx]);
-            if ($value != 0) {
+            if ($value > 0) {
                 $modelAbsPct[] = abs(($value - $modelPredicted[$idx]) / $value) * 100;
                 $benchmarkAbsPct[] = abs(($value - $benchmarkPredicted[$idx]) / $value) * 100;
             }
@@ -743,9 +811,9 @@ class BusinessIntelligence extends Component
             'mape' => round($mape, 2),
             'benchmark_mae' => round($benchmarkMae, 2),
             'benchmark_mape' => round($benchmarkMape, 2),
-            'model_improvement_pct' => round($improvement, 2), // can now go negative — that's honest
+            'model_improvement_pct' => round($improvement, 2),
             'baseline' => 'Last 7 days of training window (naive)',
-            'model' => 'Weighted regression, backtested on held-out week',
+            'model' => 'Weighted regression + seasonality, backtested on held-out week',
         ];
     }
 
@@ -757,11 +825,10 @@ class BusinessIntelligence extends Component
             ? Carbon::now()->subDays($historyCount)->startOfDay()
             : Carbon::now()->subMonths($historyCount)->startOfMonth();
 
-                // Exclude the current, still-in-progress period. Its total is
+        // Exclude the current, still-in-progress period. Its total is
         // artificially low (day/month isn't over yet) and, since the
         // regression weights recent periods exponentially higher, an
-        // incomplete period would systematically drag the forecast down —
-        // the same issue calculateForecastAccuracy() already guards against.
+        // incomplete period would systematically drag the forecast down.
         $periodEnd = $type === 'daily'
             ? Carbon::yesterday()->endOfDay()
             : Carbon::now()->startOfMonth()->subSecond(); // end of last full month
@@ -772,11 +839,27 @@ class BusinessIntelligence extends Component
             ->where('created_at', '<=', $periodEnd);
 
         if ($type === 'daily') {
-            $data = (clone $query)
+            $rawPoints = (clone $query)
                 ->selectRaw('DATE(created_at) as label, SUM(total_amount) as total')
                 ->groupBy('label')
                 ->orderBy('label', 'asc')
-                ->get();
+                ->get()
+                ->pluck('total', 'label')
+                ->map(fn($v) => (float)$v);
+
+            $data = collect();
+            if ($rawPoints->isNotEmpty()) {
+                $cursor = Carbon::parse($rawPoints->keys()->first());
+                $endCursor = $periodEnd->copy();
+                while ($cursor->lte($endCursor)) {
+                    $lbl = $cursor->format('Y-m-d');
+                    $data->push((object)[
+                        'label' => $lbl,
+                        'total' => (float)($rawPoints[$lbl] ?? 0.0),
+                    ]);
+                    $cursor->addDay();
+                }
+            }
         } else {
             $data = (clone $query)
                 ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') as label, SUM(total_amount) as total")
@@ -804,11 +887,7 @@ class BusinessIntelligence extends Component
 
         $meanY = $cleanData->avg('total') ?: 0.0;
 
-        // A trend line fitted on only a couple of data points is not
-        // trustworthy to extrapolate — that's exactly what produced the
-        // ₱0 6-month forecast (a 2-point line extrapolated 6 steps out,
-        // hit zero, and got clamped there). Below this threshold we skip
-        // the trend and forecast off the recent average instead.
+        // Below threshold we skip the trend and forecast off the recent average instead.
         $minPeriodsForTrend = $type === 'daily' ? 5 : 3;
         $hasReliableTrend = $nClean >= $minPeriodsForTrend;
 
@@ -836,33 +915,41 @@ class BusinessIntelligence extends Component
         }
 
         // ── Step 3: Day-of-week seasonality indices (daily only) ──────
+        // Calculated from clean data so extreme single-day outliers do not skew weekdays
         $dowIndices = array_fill(1, 7, 1.0);
-        if ($type === 'daily' && $n >= 14) {
+        if ($type === 'daily' && $nClean >= 14) {
             $dowSums   = array_fill(1, 7, 0.0);
             $dowCounts = array_fill(1, 7, 0);
-            $grandAvg  = $data->avg('total') ?: 1;
-            foreach ($data as $row) {
+            $cleanAvg  = $cleanData->avg('total') ?: 1;
+            foreach ($cleanData as $row) {
                 $dow = (int)Carbon::parse($row->label)->dayOfWeekIso; // 1=Mon..7=Sun
                 $dowSums[$dow]   += (float)$row->total;
                 $dowCounts[$dow] += 1;
             }
             foreach ($dowIndices as $d => $_) {
-                $avg = $dowCounts[$d] > 0 ? $dowSums[$d] / $dowCounts[$d] : $grandAvg;
-                $dowIndices[$d] = $grandAvg > 0 ? $avg / $grandAvg : 1.0;
+                $avg = $dowCounts[$d] > 0 ? $dowSums[$d] / $dowCounts[$d] : $cleanAvg;
+                $dowIndices[$d] = $cleanAvg > 0 ? $avg / $cleanAvg : 1.0;
+            }
+            // Normalize so weekly average multiplier across 7 days is 1.0
+            $avgDow = array_sum($dowIndices) / 7;
+            if ($avgDow > 0) {
+                foreach ($dowIndices as $d => $val) {
+                    $dowIndices[$d] = $val / $avgDow;
+                }
             }
         }
 
         // ── Step 4: Generate forecast with damped trend + seasonality ──
-        // Damped trend (Gardner & McKenzie): each successive period's
-        // trend contribution is discounted by phi^step and accumulated
-        // around the recent mean, so the curve bends back toward normal
-        // the further out it forecasts instead of diverging to 0 or
-        // running away indefinitely. phi is lower for the 6-month model
-        // since a short trend has even less business being projected
-        // that far out at full strength.
+        // Damped trend (Gardner & McKenzie): starts from current run-rate level
+        // and accumulates damped trend forward, bending gracefully rather than snapping back.
         $phi = $type === 'daily' ? 0.98 : 0.85;
 
-        $avgDailySales = $data->take(-7)->avg('total') ?: 0;
+        $avgDailySales = $cleanData->take(-7)->avg('total') ?: $meanY;
+        $endFittedLevel = $hasReliableTrend ? ($intercept + ($slope * $nClean)) : $avgDailySales;
+        $currentLevel = $hasReliableTrend
+            ? max($meanY * 0.3, ($endFittedLevel * 0.6) + ($avgDailySales * 0.4))
+            : $avgDailySales;
+
         $forecast = [];
         $startDate = $type === 'daily' ? Carbon::tomorrow() : Carbon::now()->addMonth()->startOfMonth();
 
@@ -873,7 +960,7 @@ class BusinessIntelligence extends Component
                 : $startDate->copy()->addMonths($i);
 
             $trendCumulative += pow($phi, $i + 1) * $slope;
-            $baselinePrediction = $meanY + $trendCumulative;
+            $baselinePrediction = $currentLevel + $trendCumulative;
 
             $seasonalIndex = 1.0;
             if ($type === 'daily') {
@@ -882,8 +969,7 @@ class BusinessIntelligence extends Component
             }
 
             $adjusted = $baselinePrediction * $seasonalIndex;
-            // Never let a forecast collapse to 0 while the business is
-            // clearly still selling — floor it at 30% of the recent mean.
+            // Floor at 30% of the recent mean to avoid collapsing to zero while active
             $adjusted = max($adjusted, $meanY * 0.3);
 
             $forecast[] = [
@@ -910,10 +996,8 @@ class BusinessIntelligence extends Component
             default                      => 'Insufficient Data',
         };
 
-        // Relative to the recent average rather than a fixed peso amount,
-        // so this classification makes sense whether daily sales run in
-        // the hundreds or the hundred-thousands.
-        $relativeSlope = $meanY > 0 ? ($slope / $meanY) : 0;
+        // Relative to current run-rate average
+        $relativeSlope = $currentLevel > 0 ? ($slope / $currentLevel) : 0;
         $trendLabel = match(true) {
             !$hasReliableTrend    => 'Insufficient Data',
             $relativeSlope > 0.03  => 'Upward',
@@ -932,7 +1016,7 @@ class BusinessIntelligence extends Component
         ];
     }
 
-        private function getIngredientDemandForecast(?array $shortTermForecast = null)
+    private function getIngredientDemandForecast(?array $shortTermForecast = null)
     {
         $start = $this->startDate ? Carbon::parse($this->startDate)->startOfDay() : null;
         $end = $this->endDate ? Carbon::parse($this->endDate)->endOfDay() : null;
@@ -948,7 +1032,6 @@ class BusinessIntelligence extends Component
         $daysInRange = max(1, $start->diffInDays($end) + 1);
 
         // Reuse the short-term forecast already computed in getForecastingData()
-        // instead of re-running the same regression query a second time.
         $forecast = $shortTermForecast ?? $this->calculateRegression('daily', 60, 7);
         $forecastedTotal = collect($forecast['forecast'])->sum('predicted');
         $baselineTotal = max(1, ($forecast['baseline_avg'] ?? 0) * 7);
@@ -971,7 +1054,8 @@ class BusinessIntelligence extends Component
         foreach ($topProducts as $tp) {
             if (!$tp->product || !$tp->product->recipes) continue;
 
-            $projectedUnits = $tp->daily_avg * 14 * $forecastGrowthFactor * 1.15;
+            // Projected 14-day ingredient consumption based on forecasted growth factor
+            $projectedUnits = $tp->daily_avg * 14 * $forecastGrowthFactor;
 
             foreach ($tp->product->recipes as $recipe) {
                 if (!$recipe->ingredient) continue;
@@ -1446,14 +1530,196 @@ foreach ($topProductIds as $pid) {
 
 
                 $branchPerformance = [];
+        $branchChartData = [
+            'branches' => [],
+            'revenue' => [],
+            'orders' => [],
+            'shares' => [],
+            'has_data' => false,
+        ];
         $globalNetworkTotal = 0;
 
-        if (auth()->user()->role_id === 1) {
+        if (auth()->user()->role_id === 1 || auth()->user()->isSuperAdmin()) {
             // Match the Performance tab's branch comparison, which counts
             // Completed + Refunded + Partially Refunded orders as revenue.
             $allOrders = $analytics['orders'] ?? $completedOrders;
             $globalNetworkTotal = $allOrders->sum('total_amount');
             
+            // Full branch comparison dataset for the Column Chart (unpaginated)
+            $allBranchStats = Order::whereIn('id', $allOrders->pluck('id'))
+                ->selectRaw('branch_id, SUM(total_amount) as revenue, COUNT(*) as count')
+                ->groupBy('branch_id')
+                ->with('branch')
+                ->get()
+                ->sortByDesc('revenue')
+                ->values();
+
+            $minDate = $allOrders->min('created_at');
+            $maxDate = $allOrders->max('created_at');
+
+            if ($this->startDate && $this->endDate) {
+                $start = Carbon::parse($this->startDate)->startOfDay();
+                $end = Carbon::parse($this->endDate)->endOfDay();
+            } elseif ($minDate && $maxDate) {
+                $start = Carbon::parse($minDate)->startOfDay();
+                $end = Carbon::parse($maxDate)->endOfDay();
+            } else {
+                $start = Carbon::now()->subDays(29)->startOfDay();
+                $end = Carbon::now()->endOfDay();
+            }
+
+            $branches = [];
+            $branchIds = [];
+            $totalRev = [];
+            $totalOrders = [];
+
+            foreach ($allBranchStats as $bs) {
+                $bId = $bs->branch_id;
+                $rawName = $bs->branch->branch_name ?? ('Branch #' . $bId);
+                $cleanName = preg_replace('/^Mister\s+Takoyaki(?:\s+Cafe)?\s*[-–]\s*/i', '', $rawName);
+                $branches[] = $cleanName ?: $rawName;
+                $branchIds[] = $bId;
+                $totalRev[] = round((float)$bs->revenue, 2);
+                $totalOrders[] = (int)$bs->count;
+            }
+
+            $sumTotalRev = array_sum($totalRev) ?: 1;
+            $totalShares = array_map(fn($r) => round(($r / $sumTotalRev) * 100, 1), $totalRev);
+
+            // Pre-aggregate all orders by date (Y-m-d) and month (Y-m) per branch
+            $dailyGroups = [];
+            $monthlyGroups = [];
+
+            foreach ($allOrders as $order) {
+                $d = $order->created_at->format('Y-m-d');
+                $m = $order->created_at->format('Y-m');
+                $bId = $order->branch_id;
+                
+                if (!isset($dailyGroups[$d][$bId])) {
+                    $dailyGroups[$d][$bId] = ['rev' => 0.0, 'count' => 0];
+                }
+                $dailyGroups[$d][$bId]['rev'] += (float)$order->total_amount;
+                $dailyGroups[$d][$bId]['count']++;
+
+                if (!isset($monthlyGroups[$m][$bId])) {
+                    $monthlyGroups[$m][$bId] = ['rev' => 0.0, 'count' => 0];
+                }
+                $monthlyGroups[$m][$bId]['rev'] += (float)$order->total_amount;
+                $monthlyGroups[$m][$bId]['count']++;
+            }
+
+            // 1. Daily Series (Date for each day on x-axis)
+            $dailyCategories = [];
+            $dailyRevSeries = array_fill(0, count($branchIds), []);
+            $dailyOrdersSeries = array_fill(0, count($branchIds), []);
+
+            $dailyStart = ($start->diffInDays($end) > 45) ? $end->copy()->subDays(44)->startOfDay() : $start->copy();
+            $dCur = $dailyStart->copy();
+            while ($dCur->lte($end)) {
+                $dKey = $dCur->format('Y-m-d');
+                $dailyCategories[] = $dCur->format('M d');
+
+                foreach ($branchIds as $idx => $bId) {
+                    $dailyRevSeries[$idx][] = round((float)($dailyGroups[$dKey][$bId]['rev'] ?? 0), 2);
+                    $dailyOrdersSeries[$idx][] = (int)($dailyGroups[$dKey][$bId]['count'] ?? 0);
+                }
+                $dCur->addDay();
+            }
+
+            // 2. Weekly Series (Week date ranges on x-axis)
+            $weeklyCategories = [];
+            $weeklyRevSeries = array_fill(0, count($branchIds), []);
+            $weeklyOrdersSeries = array_fill(0, count($branchIds), []);
+
+            $wCur = $start->copy()->startOfWeek();
+            $wEndLimit = $end->copy()->endOfWeek();
+
+            while ($wCur->lte($wEndLimit)) {
+                $wStart = $wCur->copy();
+                $wEnd = $wCur->copy()->endOfWeek();
+                $weeklyCategories[] = $wStart->format('M d') . ' - ' . $wEnd->format('M d');
+
+                foreach ($branchIds as $idx => $bId) {
+                    $wRev = 0.0;
+                    $wCount = 0;
+                    $dIter = $wStart->copy();
+                    while ($dIter->lte($wEnd)) {
+                        $dKey = $dIter->format('Y-m-d');
+                        $wRev += (float)($dailyGroups[$dKey][$bId]['rev'] ?? 0);
+                        $wCount += (int)($dailyGroups[$dKey][$bId]['count'] ?? 0);
+                        $dIter->addDay();
+                    }
+                    $weeklyRevSeries[$idx][] = round($wRev, 2);
+                    $weeklyOrdersSeries[$idx][] = $wCount;
+                }
+                $wCur->addWeek();
+            }
+
+            // 3. Monthly Series (Months on x-axis)
+            $monthlyCategories = [];
+            $monthlyRevSeries = array_fill(0, count($branchIds), []);
+            $monthlyOrdersSeries = array_fill(0, count($branchIds), []);
+
+            $mCur = $start->copy()->startOfMonth();
+            $mEndLimit = $end->copy()->endOfMonth();
+
+            while ($mCur->lte($mEndLimit)) {
+                $mKey = $mCur->format('Y-m');
+                $monthlyCategories[] = $mCur->format('M Y');
+
+                foreach ($branchIds as $idx => $bId) {
+                    $monthlyRevSeries[$idx][] = round((float)($monthlyGroups[$mKey][$bId]['rev'] ?? 0), 2);
+                    $monthlyOrdersSeries[$idx][] = (int)($monthlyGroups[$mKey][$bId]['count'] ?? 0);
+                }
+                $mCur->addMonth();
+            }
+
+            // Format series arrays for multi-series grouped column ApexCharts
+            $formatSeries = function(array $valuesSeries) use ($branches) {
+                $res = [];
+                foreach ($branches as $idx => $bName) {
+                    $res[] = [
+                        'name' => $bName,
+                        'data' => $valuesSeries[$idx] ?? [],
+                    ];
+                }
+                return $res;
+            };
+
+            $branchChartData = [
+                'branches' => $branches,
+                'branch_totals' => [
+                    'revenue' => $totalRev,
+                    'orders' => $totalOrders,
+                    'shares' => $totalShares,
+                ],
+                'has_data' => count($branches) > 0,
+                'periods' => [
+                    'daily' => [
+                        'label' => 'Daily Comparison',
+                        'categories' => $dailyCategories,
+                        'revenue_series' => $formatSeries($dailyRevSeries),
+                        'orders_series' => $formatSeries($dailyOrdersSeries),
+                    ],
+                    'weekly' => [
+                        'label' => 'Weekly Comparison',
+                        'categories' => $weeklyCategories,
+                        'revenue_series' => $formatSeries($weeklyRevSeries),
+                        'orders_series' => $formatSeries($weeklyOrdersSeries),
+                    ],
+                    'monthly' => [
+                        'label' => 'Monthly Comparison',
+                        'categories' => $monthlyCategories,
+                        'revenue_series' => $formatSeries($monthlyRevSeries),
+                        'orders_series' => $formatSeries($monthlyOrdersSeries),
+                    ],
+                ],
+                // Backward-compatible fallbacks
+                'revenue' => $totalRev,
+                'orders' => $totalOrders,
+                'shares' => $totalShares,
+            ];
+
             $branchPerformance = Order::whereIn('id', $allOrders->pluck('id'))
                 ->selectRaw('branch_id, SUM(total_amount) as revenue, COUNT(*) as count')
                 ->groupBy('branch_id')
@@ -1465,6 +1731,7 @@ foreach ($topProductIds as $pid) {
             'hourly_sales' => $hourlySales,
             'hours_intensity' => $hoursIntensity,
             'branch_performance' => $branchPerformance,
+            'branch_chart' => $branchChartData,
             'global_network_total' => $globalNetworkTotal ?: 1,
         ];
     }
