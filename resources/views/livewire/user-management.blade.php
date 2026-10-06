@@ -1,6 +1,8 @@
 <div
     x-data="userManagementData(@js($panel), @js($mode), @js($view), @js($roles->pluck('name', 'id')), @js($branches->pluck('branch_name', 'id')), @js($activeTab))"
-    @trigger-edit.window="if ($event.detail.mode === 'view') { openViewProfile($event.detail.id); } else { $wire.showEdit($event.detail.id, $event.detail.mode || 'edit'); }"
+    @trigger-edit.window="if ($event.detail.mode === 'view') { openViewProfile($event.detail.id); } else { openEditProfile($event.detail.id); }"
+    @user-mode-changed.window="panel = $event.detail.panel; mode = $event.detail.mode;"
+    @user-profile-loaded.window="if (typeof loadUserProfile === 'function') { loadUserProfile($event.detail); } else if (typeof $data !== 'undefined' && typeof $data.loadUserProfile === 'function') { $data.loadUserProfile($event.detail); } else if (window.loadUserProfile) { window.loadUserProfile($event.detail); }"
     class="relative">
 
     <div class="relative min-h-[600px]">
@@ -59,10 +61,35 @@
     (function() {
         const STORE_KEY = 'um';
 
+        window.loadUserProfile = function(detail) {
+            if (!detail) return;
+            const data = (detail && detail.id !== undefined)
+                ? detail
+                : (detail && detail.data ? detail.data
+                : (detail && detail[0] ? detail[0]
+                : (detail && typeof detail === 'object' && Object.values(detail)[0]?.id !== undefined ? Object.values(detail)[0]
+                : detail)));
+            if (!data) return;
+            const S = Alpine.store(STORE_KEY);
+            if (S) {
+                S.editUserId    = data.id || null;
+                S.formRoleId    = String(data.roleId || '');
+                S.formBranchId  = String(data.branchId || '');
+                S.position      = data.position || '';
+                S.addr_region   = data.region || '';
+                S.addr_province = data.province || '';
+                S.addr_city     = data.city || '';
+                S.addr_barangay = data.barangay || '';
+                S.addr_street   = data.street || '';
+                const rLat = parseFloat(data.lat);
+                const rLng = parseFloat(data.lng);
+                S.addr_lat = (!isNaN(rLat) && rLat !== 0) ? rLat : null;
+                S.addr_lng = (!isNaN(rLng) && rLng !== 0) ? rLng : null;
+            }
+        };
+
         const registerUserData = () => {
             if (!window.Alpine) return;
-            if (window.__userManagementRegistered) return;
-            window.__userManagementRegistered = true;
 
             // ── Bootstrap the Alpine store for all reactive UI state ──────────
             // The store is global and survives Livewire DOM morphing/cloneNode.
@@ -88,6 +115,10 @@
                     saving:           false,
                     restoring:        false,
                 });
+            } else {
+                const s = Alpine.store(STORE_KEY);
+                if (typeof s.panel !== 'string') s.panel = @js($panel) || 'list';
+                if (typeof s.mode !== 'string') s.mode = @js($mode) || 'list';
             }
 
             Alpine.data('userManagementData', (initialPanel, initialMode, initialView, rolesMap, branchesMap, initialActiveTab) => {
@@ -125,31 +156,51 @@
                     get restoring()         { return S().restoring        ?? false; },
                     set restoring(v)        { Alpine.store(STORE_KEY).restoring = v; },
 
-                    // ── Form-field state — read from store until init() upgrades them ──
-                    // These start as plain store-backed values; init() replaces them with
-                    // real $wire.entangle() objects so two-way sync works correctly.
-                    get editUserId()    { return S().editUserId    ?? null; },
-                    set editUserId(v)   { Alpine.store(STORE_KEY).editUserId    = v; },
-                    get formRoleId()    { return S().formRoleId    ?? ''; },
-                    set formRoleId(v)   { Alpine.store(STORE_KEY).formRoleId    = v; },
-                    get formBranchId()  { return S().formBranchId  ?? ''; },
-                    set formBranchId(v) { Alpine.store(STORE_KEY).formBranchId  = v; },
-                    get position()      { return S().position      ?? ''; },
-                    set position(v)     { Alpine.store(STORE_KEY).position      = v; },
-                    get addr_street()   { return S().addr_street   ?? ''; },
-                    set addr_street(v)  { Alpine.store(STORE_KEY).addr_street   = v; },
-                    get addr_region()   { return S().addr_region   ?? ''; },
-                    set addr_region(v)  { Alpine.store(STORE_KEY).addr_region   = v; },
-                    get addr_province() { return S().addr_province ?? ''; },
-                    set addr_province(v){ Alpine.store(STORE_KEY).addr_province = v; },
-                    get addr_city()     { return S().addr_city     ?? ''; },
-                    set addr_city(v)    { Alpine.store(STORE_KEY).addr_city     = v; },
-                    get addr_barangay() { return S().addr_barangay ?? ''; },
-                    set addr_barangay(v){ Alpine.store(STORE_KEY).addr_barangay = v; },
-                    get addr_lat()      { return S().addr_lat      ?? null; },
-                    set addr_lat(v)     { Alpine.store(STORE_KEY).addr_lat      = v; },
-                    get addr_lng()      { return S().addr_lng      ?? null; },
-                    set addr_lng(v)     { Alpine.store(STORE_KEY).addr_lng      = v; },
+                    // ── Form-field state — backed directly by Livewire's $wire ──
+                    // Reads are reactive; writes are deferred (sent with the next
+                    // Livewire request), matching non-live entangle semantics.
+                    // Falls back to the store on detached morph clones where $wire
+                    // is unavailable. Never assign entangle() objects to these.
+                    _w() { try { return this.$wire || null; } catch (e) { return null; } },
+                    _get(key, fallback) {
+                        const sVal = S()[key];
+                        if (sVal !== undefined && sVal !== null && sVal !== '') {
+                            return sVal;
+                        }
+                        const w = this._w();
+                        let v = w ? w[key] : undefined;
+                        if (v !== null && typeof v === 'object') v = undefined;
+                        return (v !== undefined && v !== null && v !== '') ? v : (sVal ?? fallback);
+                    },
+                    _set(key, v) {
+                        Alpine.store(STORE_KEY)[key] = v;
+                        const w = this._w();
+                        if (w) {
+                            try { w[key] = v; } catch (e) {}
+                        }
+                    },
+                    get editUserId()    { return this._get('editUserId', null); },
+                    set editUserId(v)   { this._set('editUserId', v); },
+                    get formRoleId()    { return this._get('formRoleId', ''); },
+                    set formRoleId(v)   { this._set('formRoleId', v); },
+                    get formBranchId()  { return this._get('formBranchId', ''); },
+                    set formBranchId(v) { this._set('formBranchId', v); },
+                    get position()      { return this._get('position', ''); },
+                    set position(v)     { this._set('position', v); },
+                    get addr_street()   { return this._get('addr_street', ''); },
+                    set addr_street(v)  { this._set('addr_street', v); },
+                    get addr_region()   { return this._get('addr_region', ''); },
+                    set addr_region(v)  { this._set('addr_region', v); },
+                    get addr_province() { return this._get('addr_province', ''); },
+                    set addr_province(v){ this._set('addr_province', v); },
+                    get addr_city()     { return this._get('addr_city', ''); },
+                    set addr_city(v)    { this._set('addr_city', v); },
+                    get addr_barangay() { return this._get('addr_barangay', ''); },
+                    set addr_barangay(v){ this._set('addr_barangay', v); },
+                    get addr_lat()      { const v = parseFloat(this._get('addr_lat', null)); return isNaN(v) ? null : v; },
+                    set addr_lat(v)     { this._set('addr_lat', v); },
+                    get addr_lng()      { const v = parseFloat(this._get('addr_lng', null)); return isNaN(v) ? null : v; },
+                    set addr_lng(v)     { this._set('addr_lng', v); },
 
                     rolesMap:    rolesMap   || {},
                     branchesMap: branchesMap || {},
@@ -192,17 +243,147 @@
                     },
 
                     async openViewProfile(userId) {
-                        this.loadingProfileId = userId;
+                        const targetId = (userId !== undefined && userId !== null && userId !== '')
+                            ? userId
+                            : (this.editUserId || (this.$wire ? this.$wire.editUserId : null) || Alpine.store(STORE_KEY).editUserId);
+                        if (!targetId) return;
+                        this.loadingProfileId = targetId;
                         try {
-                            await this.$wire.showEdit(userId, 'view');
+                            await this.$wire.showEdit(targetId, 'view');
                             this.panel = 'form';
                             this.mode = 'view';
                             this.$nextTick(() => {
                                 setTimeout(() => this.updateIndicator('historyTab'), 50);
                                 setTimeout(() => this.updateIndicator('historyTab'), 200);
                             });
+                        } catch (err) {
+                            console.error('Failed to open view profile:', err);
                         } finally {
                             this.loadingProfileId = null;
+                        }
+                    },
+
+                    async openEditProfile(userId) {
+                        const targetId = (userId !== undefined && userId !== null && userId !== '')
+                            ? userId
+                            : (this.editUserId || (this.$wire ? this.$wire.editUserId : null) || Alpine.store(STORE_KEY).editUserId);
+                        if (!targetId) {
+                            console.warn('openEditProfile: No targetId found');
+                            return;
+                        }
+                        this.loadingProfileId = targetId;
+                        try {
+                            await this.$wire.showEdit(targetId, 'edit');
+                            this.panel = 'form';
+                            this.mode = 'edit';
+                            this.$nextTick(() => {
+                                if (typeof this.initMap === 'function') {
+                                    this.initMap();
+                                }
+                            });
+                        } catch (err) {
+                            console.error('Failed to open edit profile:', err);
+                        } finally {
+                            this.loadingProfileId = null;
+                        }
+                    },
+
+                    cancelForm() {
+                        const uid = (typeof this.editUserId === 'number' || typeof this.editUserId === 'string') ? this.editUserId : null;
+                        if (this.mode === 'edit' && uid) {
+                            this.openViewProfile(uid);
+                        } else {
+                            this.panel = 'list';
+                            this.mode = 'list';
+                            this.$wire.backToList();
+                        }
+                    },
+
+                    loadUserProfile(detail) {
+                        if (!detail) return;
+                        const data = (detail && detail.id !== undefined)
+                            ? detail
+                            : (detail && detail.data ? detail.data
+                            : (detail && detail[0] ? detail[0]
+                            : (detail && typeof detail === 'object' && Object.values(detail)[0]?.id !== undefined ? Object.values(detail)[0]
+                            : detail)));
+                        if (!data) return;
+                        this.editUserId    = data.id || null;
+                        this.formRoleId    = String(data.roleId || '');
+                        this.formBranchId  = String(data.branchId || '');
+                        this.position      = data.position || '';
+                        this.addr_region   = data.region || '';
+                        this.addr_province = data.province || '';
+                        this.addr_city     = data.city || '';
+                        this.addr_barangay = data.barangay || '';
+                        this.addr_street   = data.street || '';
+                        const rLat = parseFloat(data.lat);
+                        const rLng = parseFloat(data.lng);
+                        this.addr_lat = (!isNaN(rLat) && rLat !== 0) ? rLat : null;
+                        this.addr_lng = (!isNaN(rLng) && rLng !== 0) ? rLng : null;
+
+                        const S = Alpine.store(STORE_KEY);
+                        if (S) {
+                            S.editUserId    = this.editUserId;
+                            S.formRoleId    = this.formRoleId;
+                            S.formBranchId  = this.formBranchId;
+                            S.position      = this.position;
+                            S.addr_region   = this.addr_region;
+                            S.addr_province = this.addr_province;
+                            S.addr_city     = this.addr_city;
+                            S.addr_barangay = this.addr_barangay;
+                            S.addr_street   = this.addr_street;
+                            S.addr_lat      = this.addr_lat;
+                            S.addr_lng      = this.addr_lng;
+                        }
+
+                        this.loc.province.items = [];
+                        this.loc.city.items = [];
+                        this.loc.barangay.items = [];
+                        this.loc.noProvince = false;
+                        this.initializeExistingAddress();
+
+                        this.$nextTick(() => {
+                            if (this.mode === 'edit' && typeof this.initMap === 'function') {
+                                this.initMap();
+                            }
+                        });
+                    },
+
+                    setRole(roleId) {
+                        this.formRoleId = String(roleId);
+                        if (this.formRoleId !== '3') this.position = '';
+                        this.syncToLivewire();
+                    },
+
+                    setBranch(branchId) {
+                        this.formBranchId = String(branchId);
+                        this.syncToLivewire();
+                    },
+
+                    setPosition(pos) {
+                        this.position = pos;
+                        this.syncToLivewire();
+                    },
+
+                    syncToLivewire() {
+                        if (!this.$wire) return;
+                        this.$wire.set('formRoleId', this.formRoleId);
+                        this.$wire.set('formBranchId', this.formBranchId);
+                        this.$wire.set('position', this.position);
+                        this.$wire.set('addr_region', this.addr_region);
+                        this.$wire.set('addr_province', this.addr_province);
+                        this.$wire.set('addr_city', this.addr_city);
+                        this.$wire.set('addr_barangay', this.addr_barangay);
+                        this.$wire.set('addr_street', this.addr_street);
+                        this.$wire.set('addr_lat', this.addr_lat);
+                        this.$wire.set('addr_lng', this.addr_lng);
+                    },
+
+                    async submitSave() {
+                        this.syncToLivewire();
+                        if (this.$wire) {
+                            await this.$wire.runPreSaveValidation();
                         }
                     },
 
@@ -402,8 +583,13 @@
                                 const container = document.getElementById('userMap');
                                 if (!container) return;
                                 this.map.invalidateSize();
-                                const lat = this.addr_lat, lng = this.addr_lng;
-                                if (lat && lng) { this.map.setView([lat, lng], 16); if (this.marker) this.marker.setLatLng([lat, lng]); }
+                                const rLat = parseFloat(this.addr_lat), rLng = parseFloat(this.addr_lng);
+                                const hasCoords = !isNaN(rLat) && !isNaN(rLng) && rLat !== 0 && rLng !== 0;
+                                if (hasCoords) {
+                                    this.map.setView([rLat, rLng], 16);
+                                    if (this.marker) this.marker.setLatLng([rLat, rLng]);
+                                    else this.marker = L.marker([rLat, rLng], { icon: this.getCustomPinIcon() }).addTo(this.map);
+                                }
                                 setTimeout(() => { if (this.map) this.map.invalidateSize(); }, 250);
                                 setTimeout(() => { if (this.map) this.map.invalidateSize(); }, 500);
                             }, 50);
@@ -414,12 +600,16 @@
                             let container = document.getElementById('userMap');
                             if (!container) return;
                             if (container._leaflet_id) { const c = container.cloneNode(false); c.removeAttribute('class'); container.parentNode.replaceChild(c, container); container = c; }
-                            const lat = this.addr_lat, lng = this.addr_lng;
-                            const street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, minZoom: 10, attribution: '© OpenStreetMap' });
+                            const rLat = parseFloat(this.addr_lat), rLng = parseFloat(this.addr_lng);
+                            const hasCoords = !isNaN(rLat) && !isNaN(rLng) && rLat !== 0 && rLng !== 0;
+                            const centerLat = hasCoords ? rLat : 14.2189;
+                            const centerLng = hasCoords ? rLng : 121.1672;
+                            const zoom = hasCoords ? 15 : 11;
+                            const street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, minZoom: 5, attribution: '© OpenStreetMap' });
                             const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { attribution: 'Tiles &copy; Esri' });
-                            this.map = L.map(container, { maxBounds: L.latLngBounds([13.9,120.9],[14.5,121.6]), maxBoundsViscosity: 1.0, layers: [street] }).setView([lat||14.2189, lng||121.1672], lat ? 15 : 11);
+                            this.map = L.map(container, { layers: [street] }).setView([centerLat, centerLng], zoom);
                             L.control.layers({ 'Street': street, 'Satellite': satellite }).addTo(this.map);
-                            if (lat && lng) this.marker = L.marker([lat, lng], { icon: this.getCustomPinIcon() }).addTo(this.map);
+                            if (hasCoords) this.marker = L.marker([rLat, rLng], { icon: this.getCustomPinIcon() }).addTo(this.map);
                             this.map.on('click', async (e) => {
                                 const lt = e.latlng.lat, ln = e.latlng.lng;
                                 if (this.marker) this.marker.setLatLng(e.latlng);
@@ -471,24 +661,20 @@
                     },
 
                     init() {
-                        // ── Set up real Livewire entangles now that we are on a live node ──
-                        // $wire.entangle() returns a reactive proxy that must be assigned ONCE
-                        // as a property value (not via a getter). Object.assign injects these
-                        // over the store-backed get/set pairs defined at the factory level.
+                        // Ensure store values are primitives (purge any stale proxy objects)
+                        const s = Alpine.store(STORE_KEY);
+                        if (s) {
+                            if (typeof s.panel !== 'string') s.panel = initialPanel || 'list';
+                            if (typeof s.mode !== 'string') s.mode = initialMode || 'list';
+                            ['editUserId','formRoleId','formBranchId','position','addr_street','addr_region',
+                             'addr_province','addr_city','addr_barangay','addr_lat','addr_lng'].forEach(k => {
+                                if (s[k] !== null && typeof s[k] === 'object') s[k] = null;
+                            });
+                        }
+
+                        // Form fields read/write $wire directly via the getters above,
+                        // so no entangle() wiring is needed here.
                         const $wire = this.$wire;
-                        Object.assign(this, {
-                            editUserId:    $wire.entangle('editUserId'),
-                            formRoleId:    $wire.entangle('formRoleId'),
-                            formBranchId:  $wire.entangle('formBranchId'),
-                            position:      $wire.entangle('position'),
-                            addr_street:   $wire.entangle('addr_street'),
-                            addr_region:   $wire.entangle('addr_region'),
-                            addr_province: $wire.entangle('addr_province'),
-                            addr_city:     $wire.entangle('addr_city'),
-                            addr_barangay: $wire.entangle('addr_barangay'),
-                            addr_lat:      $wire.entangle('addr_lat'),
-                            addr_lng:      $wire.entangle('addr_lng'),
-                        });
 
                         // ── Sliding tabs ──
                         if (typeof slidingTabs === 'function') {
@@ -504,23 +690,15 @@
                         this.loadRegions();
                         this.initializeExistingAddress();
 
-                        // Keep store in sync when entangled values change
-                        this.$watch('editUserId',    (v) => { Alpine.store(STORE_KEY).editUserId    = v; if (v && (this.mode==='edit'||this.mode==='view')) { this.loc.province.items=[]; this.loc.city.items=[]; this.loc.barangay.items=[]; this.loc.noProvince=false; this.initializeExistingAddress(); } });
-                        this.$watch('formRoleId',    (v) => { Alpine.store(STORE_KEY).formRoleId    = v; });
-                        this.$watch('formBranchId',  (v) => { Alpine.store(STORE_KEY).formBranchId  = v; });
-                        this.$watch('position',      (v) => { Alpine.store(STORE_KEY).position      = v; });
-                        this.$watch('addr_street',   (v) => { Alpine.store(STORE_KEY).addr_street   = v; });
-                        this.$watch('addr_region',   (v) => { Alpine.store(STORE_KEY).addr_region   = v; });
-                        this.$watch('addr_province', (v) => { Alpine.store(STORE_KEY).addr_province = v; });
-                        this.$watch('addr_city',     (v) => { Alpine.store(STORE_KEY).addr_city     = v; });
-                        this.$watch('addr_barangay', (v) => { Alpine.store(STORE_KEY).addr_barangay = v; });
-                        this.$watch('addr_lat',      (v) => { Alpine.store(STORE_KEY).addr_lat      = v; });
-                        this.$watch('addr_lng',      (v) => { Alpine.store(STORE_KEY).addr_lng      = v; });
+                        this.$watch('editUserId', (v) => { if (v && (this.mode==='edit'||this.mode==='view')) { this.loc.province.items=[]; this.loc.city.items=[]; this.loc.barangay.items=[]; this.loc.noProvince=false; this.initializeExistingAddress(); } });
 
                         this.$watch('mode', (val) => {
                             if (val === 'view') { this.$nextTick(() => { setTimeout(() => this.updateIndicator('historyTab'), 50); setTimeout(() => this.updateIndicator('historyTab'), 250); }); }
                             if (val === 'create') { this.loc.province.items=[]; this.loc.city.items=[]; this.loc.barangay.items=[]; this.loc.noProvince=false; }
-                            else if (val === 'edit' || val === 'view') { this.loc.province.items=[]; this.loc.city.items=[]; this.loc.barangay.items=[]; this.loc.noProvince=false; this.initializeExistingAddress(); }
+                            else if (val === 'edit' || val === 'view') {
+                                this.loc.province.items=[]; this.loc.city.items=[]; this.loc.barangay.items=[]; this.loc.noProvince=false; this.initializeExistingAddress();
+                                if (val === 'edit') { this.$nextTick(() => { if (typeof this.initMap === 'function') this.initMap(); }); }
+                            }
                         });
 
                         this.$watch('panel', (val) => {
@@ -541,17 +719,6 @@
 
         if (window.Alpine) registerUserData();
         else document.addEventListener('alpine:init', registerUserData);
-
-        // Re-sync store from PHP state after every Livewire morph
-        document.addEventListener('livewire:morph', () => {
-            if (!window.Alpine || !Alpine.store) return;
-            const s = Alpine.store(STORE_KEY);
-            if (!s) return;
-            s.panel      = @js($panel);
-            s.mode       = @js($mode);
-            s.activeTab  = @js($activeTab);
-            s.historyTab = @js($historyTab);
-        });
     })();
     </script>
 </div>

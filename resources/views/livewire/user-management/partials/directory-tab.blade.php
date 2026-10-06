@@ -262,17 +262,28 @@
                         {{ $user->date_hired ? date('d M Y', strtotime($user->date_hired)) : date('d M Y', strtotime($user->created_at)) }}
                     </td>
                     <td class="py-3 px-4 whitespace-nowrap text-right">
-                        <x-secondary-button @click="openViewProfile({{ $user->id }})" class="h-8 px-3 inline-flex items-center gap-1.5 text-xs shadow-none border-slate-200" x-bind:class="loadingProfileId !== null ? 'opacity-60 pointer-events-none' : ''">
-                            <svg x-show="loadingProfileId == {{ $user->id }}" class="w-3.5 h-3.5 text-indigo-500 animate-spin shrink-0" fill="none" viewBox="0 0 24 24" x-cloak>
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"></path>
-                            </svg>
-                            <svg x-show="loadingProfileId != {{ $user->id }}" class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                            <span x-text="loadingProfileId == {{ $user->id }} ? 'Loading…' : 'View Profile'">View Profile</span>
-                        </x-secondary-button>
+                        <div class="inline-flex items-center justify-end gap-1.5">
+                            <x-secondary-button @click="openViewProfile({{ $user->id }})" class="h-8 px-2.5 sm:px-3 inline-flex items-center gap-1.5 text-xs shadow-none border-slate-200" x-bind:class="loadingProfileId !== null ? 'opacity-60 pointer-events-none' : ''">
+                                <svg x-show="loadingProfileId == {{ $user->id }}" class="w-3.5 h-3.5 text-indigo-500 animate-spin shrink-0" fill="none" viewBox="0 0 24 24" x-cloak>
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"></path>
+                                </svg>
+                                <svg x-show="loadingProfileId != {{ $user->id }}" class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                                <span x-text="loadingProfileId == {{ $user->id }} ? 'Loading…' : 'View Profile'">View Profile</span>
+                            </x-secondary-button>
+                            <button type="button" @click="openEditProfile({{ $user->id }})"
+                                title="Edit Profile"
+                                :disabled="loadingProfileId !== null"
+                                class="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50/50 transition-colors focus:outline-none"
+                                :class="loadingProfileId == {{ $user->id }} ? 'opacity-60 pointer-events-none' : ''">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </button>
+                        </div>
                     </td>
                 </tr>
             @empty
@@ -343,10 +354,16 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                 </svg>
                             </button>
-                            <button wire:click.prevent="showEdit({{ $user->id }})"
+                            <button type="button" @click="openEditProfile({{ $user->id }})"
                                 title="Edit Profile"
-                                class="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all focus:outline-none">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                :disabled="loadingProfileId !== null"
+                                class="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all focus:outline-none"
+                                :class="loadingProfileId == {{ $user->id }} ? 'text-indigo-500 bg-indigo-50' : ''">
+                                <svg x-show="loadingProfileId == {{ $user->id }}" class="w-3.5 h-3.5 animate-spin text-indigo-600 shrink-0" fill="none" viewBox="0 0 24 24" x-cloak>
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"></path>
+                                </svg>
+                                <svg x-show="loadingProfileId != {{ $user->id }}" class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                                 </svg>
                             </button>

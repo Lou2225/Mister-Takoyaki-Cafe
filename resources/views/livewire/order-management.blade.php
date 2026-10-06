@@ -835,6 +835,7 @@
                     <x-input-label for="reject_reason" value="Reason for Rejection (Optional)" />
                     <textarea id="reject_reason" wire:model="rejectReason" rows="2" placeholder="e.g., Out of stock, branch closing..."
                         class="mt-1.5 block w-full border border-gray-200 rounded-xl px-3 py-2 text-[13px] focus:border-red-300 focus:ring-0 resize-none transition-all"></textarea>
+                    <x-input-error :messages="$errors->get('rejectReason')" class="mt-1" />
                 </div>
             </div>
         @endif
@@ -843,7 +844,7 @@
             <x-secondary-button @click="$dispatch('close-modal', 'reject-modal')" wire:click="$set('rejectReason', '')" class="h-11">
                 Cancel
             </x-secondary-button>
-            <x-danger-button wire:click="rejectOrder" class="h-11">
+            <x-danger-button wire:click="submitRejectOrder" class="h-11">
                 Reject Order
             </x-danger-button>
         </div>

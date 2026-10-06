@@ -336,9 +336,26 @@ class BranchStockOrderAdmin extends Component
 
     public function rejectOrder(): void
     {
-        $this->validate(['rejectionReason' => 'required|string|min:5']);
+        $this->validate([
+            'rejectionReason' => 'required|string|min:3|max:255',
+        ], [
+            'rejectionReason.required' => 'Please provide a reason for rejecting this request.',
+            'rejectionReason.min'      => 'The rejection reason must be at least 3 characters.',
+        ]);
 
-        $order = StockOrder::findOrFail($this->selectedOrderId);
+        $order = StockOrder::find($this->selectedOrderId);
+        if (!$order) {
+            $this->notify('error', 'Request not found.');
+            $this->dispatch('close-modal', 'confirm-reject-order');
+            return;
+        }
+
+        if ($order->status !== 'pending') {
+            $this->notify('error', "Only pending requests can be rejected (Current status: {$order->status}).");
+            $this->dispatch('close-modal', 'confirm-reject-order');
+            return;
+        }
+
         $order->update([
             'status'           => 'rejected',
             'rejection_reason' => $this->rejectionReason,

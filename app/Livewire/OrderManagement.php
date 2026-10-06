@@ -624,20 +624,38 @@ class OrderManagement extends Component
     public function submitRejectOrder()
     {
         $order = $this->selectedOrder;
-        if (!$order || !auth()->user()->can('manage', $order)) return;
+        if (!$order) {
+            $this->dispatch('notify', type: 'error', message: 'No order selected.');
+            return;
+        }
+
+        if (!auth()->user()->can('manage', $order)) {
+            $this->dispatch('notify', type: 'warning', message: 'Access Restricted: Unauthorized to reject this order.');
+            return;
+        }
+
+        if ($order->status !== Order::STATUS_PENDING) {
+            $this->dispatch('notify', type: 'error', message: "Only pending orders can be rejected (Current status: {$order->status}).");
+            $this->dispatch('close-modal', 'reject-modal');
+            return;
+        }
 
         $this->validate([
-            'rejectReason' => 'required|string|min:3|max:255',
-        ], [
-            'rejectReason.required' => 'Please provide a reason for rejecting this order.',
-            'rejectReason.min'      => 'The rejection reason must be at least 3 characters.',
+            'rejectReason' => 'nullable|string|max:255',
         ]);
 
-        $order->reject($this->rejectReason);
+        $reason = trim($this->rejectReason) ?: 'Rejected by staff';
+        $order->reject($reason);
 
         $this->dispatch('notify', type: 'success', message: "Order #{$order->reference_no} rejected.");
         $this->dispatch('close-modal', 'reject-modal');
+        $this->rejectReason = '';
         $this->backToList();
+    }
+
+    public function rejectOrder()
+    {
+        $this->submitRejectOrder();
     }
 
     public function restoreDraft(Order $order)

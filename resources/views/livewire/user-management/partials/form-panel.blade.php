@@ -1,19 +1,19 @@
 {{-- ════════════════ PANEL 2 — FORM (CREATE/EDIT) ════════════════ --}}
-<div x-show="panel === 'form'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="px-1">
+<div x-show="panel === 'form' && mode !== 'view'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0" x-cloak class="px-1">
     <div class="mb-5 flex items-center justify-between">
         <div>
-            <h2 class="text-[17px] font-bold text-gray-900 tracking-tight" x-text="mode === 'create' ? 'Register New User' : (mode === 'edit' ? 'Update Profile' : 'View Profile')"></h2>
-            <p class="text-[12px] text-gray-500 font-medium" x-text="mode === 'create' ? 'New team member entry' : (mode === 'edit' ? 'Employee reference configuration' : 'Read-only profile view')"></p>
+            <h2 class="text-[17px] font-bold text-gray-900 tracking-tight" x-text="mode === 'create' ? 'Register New User' : 'Update Profile'"></h2>
+            <p class="text-[12px] text-gray-500 font-medium" x-text="mode === 'create' ? 'New team member entry' : 'Employee reference configuration'"></p>
         </div>
-        <x-secondary-button @click="panel = 'list'; mode = 'list'; $wire.backToList()" class="h-10">
+        <x-secondary-button @click="cancelForm()" class="h-10">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-            Back to List
+            <span x-text="mode === 'edit' ? 'Back to Profile' : 'Back to List'">Back to List</span>
         </x-secondary-button>
     </div>
 
-    <div x-show="mode !== 'view'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
+    <div>
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {{-- Left: profile + work records --}}
             <div class="lg:col-span-2 space-y-6">
@@ -108,7 +108,7 @@
                                     </x-slot>
                                     <x-slot name="content" class="max-h-60 overflow-y-auto">
                                         @forelse($availablePositions as $pos)
-                                            <x-dropdown-link href="#" @click.prevent="position = '{{ $pos }}'; dropdownOpen = false;">
+                                            <x-dropdown-link href="#" @click.prevent="setPosition('{{ $pos }}'); dropdownOpen = false;">
                                                 {{ $pos }}
                                             </x-dropdown-link>
                                         @empty
@@ -478,7 +478,7 @@
                                 </x-slot>
                                 <x-slot name="content">
                                     @forelse($roles as $r)
-                                        <x-dropdown-link href="#" @click.prevent="formRoleId = '{{ $r->id }}'; if (formRoleId != 3) position = ''; dropdownOpen = false;">
+                                        <x-dropdown-link href="#" @click.prevent="setRole('{{ $r->id }}'); dropdownOpen = false;">
                                             {{ ucfirst($r->name) }}
                                         </x-dropdown-link>
                                     @empty
@@ -504,7 +504,7 @@
                                 </x-slot>
                                 <x-slot name="content" class="max-h-60 overflow-y-auto">
                                     @forelse($branches as $branch)
-                                        <x-dropdown-link href="#" @click.prevent="formBranchId = '{{ $branch->id }}'; dropdownOpen = false;">
+                                        <x-dropdown-link href="#" @click.prevent="setBranch('{{ $branch->id }}'); dropdownOpen = false;">
                                             {{ $branch->branch_name }}
                                         </x-dropdown-link>
                                     @empty
@@ -548,10 +548,10 @@
                 </div>
 
                 <div class="flex flex-col gap-2">
-                    <x-primary-button type="button" wire:click="runPreSaveValidation"
+                    <x-primary-button type="button" @click="submitSave()"
                         :disabled="auth()->user()->isAdmin() && !auth()->user()->branch_id"
                         class="w-full justify-center" x-text="mode === 'edit' ? 'Save Changes' : 'Register User'"></x-primary-button>
-                    <x-secondary-button @click="if(mode === 'edit') { mode = 'view'; $wire.showEdit($wire.get('editUserId'), 'view') } else { panel = 'list'; mode = 'list'; $wire.backToList() }" class="w-full justify-center">
+                    <x-secondary-button @click="cancelForm()" class="w-full justify-center">
                         <span>Cancel</span>
                     </x-secondary-button>
 

@@ -156,7 +156,7 @@
 {{-- ── Save Confirmation Modal ── --}}
 <x-modal name="confirm-save-user" maxWidth="sm" focusable>
     <div class="h-1 w-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-t-lg"></div>
-    <div class="p-6" x-data="{ saving: false }" @open-modal.window="if ($event.detail === 'confirm-save-user') saving = false">
+    <div class="p-6" x-data="{ saving: false }" @open-modal.window="saving = false">
         <div class="flex items-start gap-4 mb-4">
             <div class="flex-shrink-0 w-10 h-10 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center">
                 <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -174,7 +174,7 @@
             <x-primary-button
                 type="button"
                 x-bind:disabled="saving"
-                @click="saving = true; $wire.{{ $editUserId ? 'updateUser' : 'saveUser' }}().then(() => { saving = false })"
+                @click="saving = true; $wire.saveUserChanges().then(() => { saving = false })"
                 class="h-10 min-w-[150px] flex justify-center">
                 <span x-show="!saving">Confirm & Save</span>
                 <span x-show="saving" x-cloak>

@@ -689,11 +689,14 @@
         <div class="p-6 text-center">
             <div class="w-16 h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4"><svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></div>
             <h3 class="text-lg font-black text-red-600 uppercase">Reject Request?</h3>
-            <div class="mt-6"><x-textarea wire:model.live="rejectionReason" rows="3" class="w-full text-xs resize-none" placeholder="Reason..."></x-textarea></div>
+            <div class="mt-6">
+                <x-textarea wire:model.live="rejectionReason" rows="3" class="w-full text-xs resize-none" placeholder="Reason..."></x-textarea>
+                <x-input-error :messages="$errors->get('rejectionReason')" class="mt-1 text-left" />
+            </div>
             <div class="flex items-center gap-3 mt-8">
                 <x-secondary-button @click="$dispatch('close-modal', 'confirm-reject-order')" class="flex-1 justify-center h-11">Cancel</x-secondary-button>
                 <x-primary-button 
-                    @click="$dispatch('close-modal', 'confirm-reject-order'); $wire.rejectOrder()" 
+                    wire:click="rejectOrder" 
                     class="flex-1 justify-center h-11 !bg-red-600 shadow-red-100"
                 >
                     Reject Now

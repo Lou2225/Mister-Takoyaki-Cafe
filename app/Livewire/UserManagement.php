@@ -151,6 +151,20 @@ class UserManagement extends Component
         $this->mode = 'create';
         $this->resetForm();
         $this->updateGlobalHeader('create');
+        $this->dispatch('user-mode-changed', panel: 'form', mode: 'create');
+        $this->dispatch('user-profile-loaded', [
+            'id' => null,
+            'roleId' => '',
+            'branchId' => auth()->user()->isSuperAdmin() ? '' : (string) auth()->user()->branch_id,
+            'position' => '',
+            'region' => '',
+            'province' => '',
+            'city' => '',
+            'barangay' => '',
+            'street' => '',
+            'lat' => null,
+            'lng' => null,
+        ]);
     }
 
     // ── Show view form ────────────────────────────────────────────
@@ -160,30 +174,38 @@ class UserManagement extends Component
     }
 
     // ── Show edit form ────────────────────────────────────────────
-    public function showEdit($userId, $mode = 'edit')
-{
-    $user = User::findOrFail($userId);
+    public function showEdit($userId = null, $mode = 'edit')
+    {
+        $targetId = $userId ?: $this->editUserId;
+        if (!$targetId) {
+            return;
+        }
 
-    // Admins may only view/edit Staff accounts within their own branch —
-    // without this, showEdit() is directly callable via $wire.call() with
-    // any user ID, letting an Admin load (and, via updateUser(), silently
-    // demote) a Super Admin or another branch's staff.
-    if (auth()->user()->isAdmin() && ($user->role_id !== 3 || $user->branch_id !== auth()->user()->branch_id)) {
-        abort(403, 'Unauthorized to access this profile.');
-    }
+        $user = User::find($targetId);
+        if (!$user) {
+            return;
+        }
 
-    $this->skipValidation = true; // suppress live validation while populating fields
+        // Admins may only view/edit Staff accounts within their own branch —
+        // without this, showEdit() is directly callable via $wire.call() with
+        // any user ID, letting an Admin load (and, via updateUser(), silently
+        // demote) a Super Admin or another branch's staff.
+        if (auth()->user()->isAdmin() && ($user->role_id !== 3 || $user->branch_id !== auth()->user()->branch_id)) {
+            abort(403, 'Unauthorized to access this profile.');
+        }
 
-    $this->resetForm();
+        $this->skipValidation = true; // suppress live validation while populating fields
 
-    $this->panel = 'form';
-    $this->mode = $mode;
-    $this->editUserId = $user->id;
+        $this->resetForm();
+
+        $this->panel = 'form';
+        $this->mode = $mode;
+        $this->editUserId = $user->id;
         $this->firstName = $user->first_name;
         $this->middleName = $user->middle_name ?? '';
         $this->lastName = $user->last_name;
         $this->email = $user->email;
-        $this->phone = $user->phone ? str_replace('+63', '', $user->phone) : '';
+        $this->phone = $user->phone ? $this->normalizePhMobile($user->phone) : '';
         $this->formRoleId = $user->role_id;
         $this->formBranchId = $user->branch_id ?? '';
         if ($this->formRoleId == 5) {
@@ -193,7 +215,7 @@ class UserManagement extends Component
             $this->position = $user->position ?? '';
         }
         $this->employeeId = $user->employee_id ?? '';
-        $this->dateHired = $user->date_hired ?? '';
+        $this->dateHired = $user->date_hired ? date('Y-m-d', strtotime($user->date_hired)) : '';
         $this->formIsActive = (bool) $user->is_active;
         $this->editUserArchived = (bool) $user->archived_at;
         $this->archiveReason = $user->archive_reason ?? '';
@@ -221,9 +243,23 @@ class UserManagement extends Component
             $this->addr_lng = $user->longitude;
         }
 
-         $this->skipValidation = false;
+        $this->skipValidation = false;
         $this->resetValidation();
         $this->updateGlobalHeader($mode);
+        $this->dispatch('user-mode-changed', panel: 'form', mode: $mode);
+        $this->dispatch('user-profile-loaded', [
+            'id' => $user->id,
+            'roleId' => (string) $this->formRoleId,
+            'branchId' => (string) $this->formBranchId,
+            'position' => $this->position,
+            'region' => $this->addr_region,
+            'province' => $this->addr_province,
+            'city' => $this->addr_city,
+            'barangay' => $this->addr_barangay,
+            'street' => $this->addr_street,
+            'lat' => $this->addr_lat,
+            'lng' => $this->addr_lng,
+        ]);
     }
 
     // ── History Computed Properties ───────────────────────────────
@@ -517,6 +553,7 @@ class UserManagement extends Component
         $this->mode = 'list';
         $this->resetForm();
         $this->updateGlobalHeader('list');
+        $this->dispatch('user-mode-changed', panel: 'list', mode: 'list');
     }
 
     protected function sanitizeInput(): void
@@ -525,7 +562,7 @@ class UserManagement extends Component
         $this->middleName = ucwords($this->normalizeString($this->middleName));
         $this->lastName   = ucwords($this->normalizeString($this->lastName));
         $this->email      = trim(strtolower($this->email));
-        $this->phone      = trim($this->phone);
+        $this->phone      = $this->phone ? $this->normalizePhMobile($this->phone) : '';
         $this->position   = $this->normalizeString($this->position);
         if ($this->editUserId) {
             $this->employeeId = trim($this->employeeId);
@@ -547,7 +584,7 @@ class UserManagement extends Component
             'email'        => $emailRules,
             'phone'        => ['nullable', 'string', 'regex:' . ValidationHelper::REGEX_PH_MOBILE],
             'formRoleId'   => ['required', 'exists:roles,id', 'in:1,2,3'],
-            'formBranchId' => ['required', 'exists:branches,id'],
+            'formBranchId' => ($this->formRoleId == 1) ? ['nullable', 'exists:branches,id'] : ['required', 'exists:branches,id'],
             'position'     => $this->formRoleId == 3
                 ? ['required', 'string', 'max:100', Rule::in($this->availablePositions)]
                 : ['nullable', 'string', 'max:100'],
@@ -789,10 +826,27 @@ class UserManagement extends Component
 
         $this->syncBranchManager($user, $oldBranchId, $oldRoleId);
 
+        // Log the profile update event
+        UserActivityLog::create([
+            'user_id'      => $user->id,
+            'performed_by' => auth()->id(),
+            'event_type'   => 'updated',
+            'description'  => 'Profile details updated.',
+        ]);
+
         $this->dispatch('notify', type: 'success', message: 'User updated successfully.');
         $this->dispatch('close-modal', name: 'confirm-save-user');
         $this->dispatch('close-modal', name: 'confirm-manager-replace');
         $this->backToList();
+    }
+
+    // ── Unified save / update dispatcher ─────────────────────────
+    public function saveUserChanges()
+    {
+        if ($this->editUserId) {
+            return $this->updateUser();
+        }
+        return $this->saveUser();
     }
 
     // ── Force Replace Manager ─────────────────────────────────────
