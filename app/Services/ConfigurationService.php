@@ -71,7 +71,7 @@ class ConfigurationService
             return [
                 'business_name' => SystemSetting::get('pos_business_name', 'Mister Takoyaki', $branchId),
                 'order_types' => SystemSetting::get('pos_order_types', ['Dine-in', 'Take-out'], $branchId),
-                'payment_methods' => SystemSetting::get('pos_payment_methods', ['Cash', 'GCash'], $branchId),
+                'payment_methods' => SystemSetting::get('pos_payment_methods', ['Cash', 'GCash', 'Cash on Delivery'], $branchId),
                 'logo_enabled' => SystemSetting::get('receipt_logo_enabled', true, $branchId),
                 'show_vat' => false,
                 'footer_message' => SystemSetting::get('receipt_footer_message', 'Thank you for your visit!', $branchId),

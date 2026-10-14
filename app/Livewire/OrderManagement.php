@@ -18,6 +18,7 @@ class OrderManagement extends Component
     // View Query & State
     public $search = '';
     public $statusFilter = '';
+    public $userIdFilter = '';
     public $startDate, $endDate;
     public $activeFilter = 'All Time';
     public $sourceFilter = 'App'; // 'App' | 'POS'
@@ -39,6 +40,7 @@ class OrderManagement extends Component
     protected $queryString = [
         'search'       => ['except' => '', 'as' => 'o_search'],
         'statusFilter' => ['except' => '', 'as' => 'o_status'],
+        'userIdFilter' => ['except' => '', 'as' => 'o_usr'],
         'startDate'    => ['except' => '', 'as' => 'o_start'],
         'endDate'      => ['except' => '', 'as' => 'o_end'],
         'sourceFilter' => ['except' => '', 'as' => 'o_src'],
@@ -153,6 +155,11 @@ class OrderManagement extends Component
     {
         $this->activeFilter = 'All Time';
         $this->resetPage();
+    }
+
+    public function updatedUserIdFilter()
+    {
+        $this->resetAllPages();
     }
 
     public function applyQuickDateFilter($range)
@@ -283,6 +290,11 @@ class OrderManagement extends Component
         // Filter by branch
         $query->where('branch_id', auth()->user()->branch_id);
 
+        // Filter by user / cashier (staff who processed transaction)
+        if (!empty($this->userIdFilter)) {
+            $query->where('user_id', $this->userIdFilter);
+        }
+
         // Filter by date range
         if ($this->startDate && $this->endDate) {
             $query->whereBetween('created_at', [
@@ -292,6 +304,15 @@ class OrderManagement extends Component
         }
 
         return $query->orderBy('created_at', 'desc');
+    }
+
+    public function getUsersProperty()
+    {
+        $branchId = auth()->user()->branch_id;
+        return \App\Models\User::where('branch_id', $branchId)
+            ->where('role_id', '!=', 4)
+            ->orderBy('first_name')
+            ->get(['id', 'first_name', 'last_name', 'email']);
     }
 
     public function getAppOrdersProperty()
@@ -322,13 +343,70 @@ class OrderManagement extends Component
 
     public function openOrderDetail($orderId)
     {
-        // Reload order with all necessary relationships
-        $this->selectedOrder = Order::with(['branch', 'user', 'items.product', 'customer', 'refundedBy', 'rider'])
-            ->findOrFail($orderId);
+        // Reload order with all necessary relationships including options and modifiers
+        $this->selectedOrder = Order::with([
+            'branch',
+            'user',
+            'items.product',
+            'items.options.option',
+            'items.modifiers.modifier',
+            'customer',
+            'refundedBy',
+            'rider',
+            'proofOfDelivery.rider'
+        ])->findOrFail($orderId);
         $this->selectedOrderId = $this->selectedOrder->id;
         $this->activeTab = 'summary';
         $this->dispatch('open-modal', name: 'view-order-detail');
         $this->dispatch('update-active-tab', activeTab: 'summary');
+    }
+
+    public function getOrderKpisProperty(): array
+    {
+        $branchId = auth()->user()->branch_id;
+        $voidRefundCutoff = now()->subHour();
+        $staleCutoff = now()->subHours(24);
+        $unresolvedStatuses = ['Pending', 'Preparing', 'Ready', 'Handed to Rider', 'Out for Delivery'];
+        $unresolvedList = "'" . implode("','", $unresolvedStatuses) . "'";
+
+        $row = DB::table('orders')
+            ->where('branch_id', $branchId)
+            ->selectRaw("
+                SUM(CASE WHEN source = 'App' AND (status NOT IN ('Completed', 'Cancelled', 'Void', 'Refunded', 'Partially Refunded') OR (status IN ('Completed', 'Void', 'Refunded', 'Partially Refunded') AND created_at >= ?)) THEN 1 ELSE 0 END) as app_badge_count,
+                SUM(CASE WHEN source = 'POS' AND (status IN ('Pending', 'Drafted') OR (status = 'Completed' AND created_at >= ?)) THEN 1 ELSE 0 END) as pos_badge_count,
+                SUM(CASE WHEN source = 'App' AND status IN ({$unresolvedList}) THEN 1 ELSE 0 END) as app_active_pending,
+                SUM(CASE WHEN source = 'App' AND status IN ({$unresolvedList}) AND created_at < ? THEN 1 ELSE 0 END) as app_active_stale,
+                SUM(CASE WHEN source = 'POS' AND status IN ({$unresolvedList}) THEN 1 ELSE 0 END) as pos_active_pending,
+                SUM(CASE WHEN source = 'POS' AND status IN ({$unresolvedList}) AND created_at < ? THEN 1 ELSE 0 END) as pos_active_stale,
+                SUM(CASE WHEN status = 'Completed' AND created_at >= ? THEN 1 ELSE 0 END) as completed_today,
+                SUM(CASE WHEN payment_status = 'Paid' AND status != 'Void' AND created_at >= ? THEN (total_amount - refunded_amount) ELSE 0 END) as today_revenue
+            ", [
+                $voidRefundCutoff,
+                $voidRefundCutoff,
+                $staleCutoff,
+                $staleCutoff,
+                today()->startOfDay(),
+                today()->startOfDay(),
+            ])
+            ->first();
+
+        return [
+            'appBadge' => (int)($row->app_badge_count ?? 0),
+            'posBadge' => (int)($row->pos_badge_count ?? 0),
+            'activeCounts' => [
+                'App' => [
+                    'pending' => (int)($row->app_active_pending ?? 0),
+                    'stale'   => (int)($row->app_active_stale ?? 0),
+                ],
+                'POS' => [
+                    'pending' => (int)($row->pos_active_pending ?? 0),
+                    'stale'   => (int)($row->pos_active_stale ?? 0),
+                ],
+                'History' => ['pending' => 0, 'stale' => 0],
+            ],
+            'completedToday' => (int)($row->completed_today ?? 0),
+            'todayRevenue'   => (float)($row->today_revenue ?? 0),
+        ];
     }
 
     public function backToList()
@@ -773,12 +851,16 @@ class OrderManagement extends Component
             ])->layout('layouts.app');
         }
 
+        $activeOrders = $this->orders;
+        $emptyPaginator = new \Illuminate\Pagination\LengthAwarePaginator([], 0, $this->perPage);
+
         return view('livewire.order-management', [
-            'orders' => $this->orders,
-            'appOrders' => $this->appOrders,
-            'posOrders' => $this->posOrders,
-            'historyOrders' => $this->historyOrders,
-            'statuses' => $filteredStatuses,
+            'orders'        => $activeOrders,
+            'appOrders'     => $this->sourceFilter === 'App' ? $activeOrders : $emptyPaginator,
+            'posOrders'     => $this->sourceFilter === 'POS' ? $activeOrders : $emptyPaginator,
+            'historyOrders' => $this->sourceFilter === 'History' ? $activeOrders : $emptyPaginator,
+            'statuses'      => $filteredStatuses,
+            'kpis'          => $this->orderKpis,
         ])->layout('layouts.app');
     }
 }

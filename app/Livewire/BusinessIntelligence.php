@@ -37,6 +37,11 @@ class BusinessIntelligence extends Component
     public string $activeFilter = 'All Time';
     public string $dateError = '';
 
+    // Forecasting State
+    public $forecastDays = 30;
+    public $forecastMonths = 12;
+    public $forecastHorizonType = 'daily'; // 'daily' | 'monthly'
+
     public bool $showBreakdown = false;
     public string $selectedMetric = 'Gross Revenue';
     public array $breakdownData = [];
@@ -228,22 +233,35 @@ class BusinessIntelligence extends Component
         $ingredient = Ingredient::find($this->stockReview['ingredient_id']);
         $outgoingTypes = ['order', 'out', 'waste', 'waste_expired', 'return_to_supplier', 'transfer_out'];
 
-        return StockMovement::where('branch_id', $this->stockReview['branch_id'])
+        /** @var LengthAwarePaginator $paginatedMovements */
+        $paginatedMovements = StockMovement::where('branch_id', $this->stockReview['branch_id'])
             ->where('ingredient_id', $this->stockReview['ingredient_id'])
             ->latest()
-            ->paginate($this->stockReviewPerPage, ['*'], 'stockReviewPage')
-            ->through(function ($movement) use ($ingredient, $outgoingTypes) {
-                $quantity = abs((float) $movement->quantity);
-                $signedQuantity = in_array($movement->type, $outgoingTypes, true) ? -$quantity : $quantity;
+            ->paginate($this->stockReviewPerPage, ['*'], 'stockReviewPage');
 
-                return [
-                    'type' => ucfirst(str_replace('_', ' ', $movement->type)),
-                    'quantity' => $signedQuantity,
-                    'quantity_display' => $this->formatInventoryQuantity($signedQuantity, $ingredient?->unit),
-                    'reference' => $movement->reference_id ?: 'No reference',
-                    'date' => $movement->created_at?->format('M d, Y H:i'),
-                ];
-            });
+        $transformedItems = collect($paginatedMovements->items())->map(function ($movement) use ($ingredient, $outgoingTypes) {
+            $quantity = abs((float) $movement->quantity);
+            $signedQuantity = in_array($movement->type, $outgoingTypes, true) ? -$quantity : $quantity;
+
+            return [
+                'type' => ucfirst(str_replace('_', ' ', $movement->type)),
+                'quantity' => $signedQuantity,
+                'quantity_display' => $this->formatInventoryQuantity($signedQuantity, $ingredient?->unit),
+                'reference' => $movement->reference_id ?: 'No reference',
+                'date' => $movement->created_at?->format('M d, Y H:i'),
+            ];
+        });
+
+        return new LengthAwarePaginator(
+            $transformedItems,
+            $paginatedMovements->total(),
+            $this->stockReviewPerPage,
+            $paginatedMovements->currentPage(),
+            [
+                'path' => request()->url(),
+                'pageName' => 'stockReviewPage',
+            ]
+        );
     }
 
     private function formatInventoryQuantity(float $quantity, ?string $unit): array
@@ -472,7 +490,7 @@ class BusinessIntelligence extends Component
 
         $grossProfit = $netSales - $totalCogs - $wasteCost;
         $trendData   = $this->buildTrendData($completedOrders, $start, $end);
-        $breakdown   = $this->buildSalesBreakdown($completedOrders);
+        $breakdown   = $this->buildSalesBreakdown($completedOrders, $branchId);
 
         return $this->analyticsCache = [
             'gross_sales'     => $grossSales,
@@ -498,7 +516,7 @@ class BusinessIntelligence extends Component
 
     /**
      * Calculate total Cost of Goods Sold for a set of completed orders.
-     * Uses optimized SQL aggregation on products.cost and product_options.cost.
+     * Uses direct indexed SQL join on products.cost and product_options.cost without plucking IDs.
      */
     private function computeCogs(Collection $completedOrders, ?string $branchId): float
     {
@@ -506,17 +524,23 @@ class BusinessIntelligence extends Component
             return 0.0;
         }
 
-        $orderIds = $completedOrders->pluck('id');
-
         $baseCogs = (float) DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->join('products', 'order_items.product_id', '=', 'products.id')
-            ->whereIn('order_items.order_id', $orderIds)
+            ->where('orders.status', Order::STATUS_COMPLETED)
+            ->when($this->startDate, fn($q) => $q->where('orders.created_at', '>=', Carbon::parse($this->startDate)->startOfDay()))
+            ->when($this->endDate,   fn($q) => $q->where('orders.created_at', '<=', Carbon::parse($this->endDate)->endOfDay()))
+            ->when($branchId,        fn($q) => $q->where('orders.branch_id', (int)$branchId))
             ->sum(DB::raw('order_items.quantity * COALESCE(products.cost, 0)'));
 
         $optionCogs = (float) DB::table('order_item_options')
             ->join('order_items', 'order_item_options.order_item_id', '=', 'order_items.id')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->join('product_options', 'order_item_options.product_option_id', '=', 'product_options.id')
-            ->whereIn('order_items.order_id', $orderIds)
+            ->where('orders.status', Order::STATUS_COMPLETED)
+            ->when($this->startDate, fn($q) => $q->where('orders.created_at', '>=', Carbon::parse($this->startDate)->startOfDay()))
+            ->when($this->endDate,   fn($q) => $q->where('orders.created_at', '<=', Carbon::parse($this->endDate)->endOfDay()))
+            ->when($branchId,        fn($q) => $q->where('orders.branch_id', (int)$branchId))
             ->sum(DB::raw('order_items.quantity * COALESCE(product_options.cost, 0)'));
 
         return $baseCogs + $optionCogs;
@@ -556,7 +580,7 @@ class BusinessIntelligence extends Component
      * Build payment method breakdown, order source breakdown, and top-selling items
      * from an already-fetched collection of completed orders.
      */
-    private function buildSalesBreakdown(Collection $completedOrders): array
+    private function buildSalesBreakdown(Collection $completedOrders, ?string $branchId = null): array
     {
         $paymentGroups = $completedOrders->groupBy(function ($order) {
             $method = strtolower(trim((string) $order->payment_method));
@@ -597,9 +621,13 @@ class BusinessIntelligence extends Component
         $topItems = collect();
         if ($completedOrders->isNotEmpty()) {
             $topItems = OrderItem::with('product')
-                ->whereIn('order_id', $completedOrders->pluck('id'))
-                ->select('product_id', DB::raw('sum(quantity) as total_quantity'), DB::raw('sum(subtotal) as total_sales'))
-                ->groupBy('product_id')
+                ->join('orders', 'order_items.order_id', '=', 'orders.id')
+                ->where('orders.status', Order::STATUS_COMPLETED)
+                ->when($this->startDate, fn($q) => $q->where('orders.created_at', '>=', Carbon::parse($this->startDate)->startOfDay()))
+                ->when($this->endDate,   fn($q) => $q->where('orders.created_at', '<=', Carbon::parse($this->endDate)->endOfDay()))
+                ->when($branchId,        fn($q) => $q->where('orders.branch_id', (int)$branchId))
+                ->select('order_items.product_id', DB::raw('sum(order_items.quantity) as total_quantity'), DB::raw('sum(order_items.subtotal) as total_sales'))
+                ->groupBy('order_items.product_id')
                 ->orderByDesc('total_quantity')
                 ->take(5)
                 ->get();
@@ -610,23 +638,70 @@ class BusinessIntelligence extends Component
             'order_sources'   => $orderSources,
             'top_items'       => $topItems,
         ];
-
     }
 
 
-        private function getForecastingData()
+    public function setForecastDays($days)
     {
-        $shortTerm = $this->calculateRegression('daily', 60, 7);
-        $longTerm = $this->calculateRegression('monthly', 12, 6);
+        $this->forecastDays = max(14, min(180, (int)$days));
+        $this->forecastingCache = null;
+    }
+
+    public function setForecastMonths($months)
+    {
+        $this->forecastMonths = max(3, min(24, (int)$months));
+        $this->forecastingCache = null;
+    }
+
+    public function updatedForecastDays($value = null)
+    {
+        $val = is_numeric($value) ? (int)$value : (is_numeric($this->forecastDays) ? (int)$this->forecastDays : 30);
+        $this->forecastDays = max(14, min(180, $val));
+        $this->forecastingCache = null;
+    }
+
+    public function updatedForecastMonths($value = null)
+    {
+        $val = is_numeric($value) ? (int)$value : (is_numeric($this->forecastMonths) ? (int)$this->forecastMonths : 12);
+        $this->forecastMonths = max(3, min(24, $val));
+        $this->forecastingCache = null;
+    }
+
+    private function getForecastingData()
+    {
+        $days = max(14, min(180, (int)($this->forecastDays ?: 30)));
+        $months = max(3, min(24, (int)($this->forecastMonths ?: 12)));
+
+        $dailyLookback = max(60, min(365, $days * 3));
+        $monthlyLookback = max(12, min(36, $months * 2));
+
+        $shortTerm = $this->calculateRegression('daily', $dailyLookback, $days);
+        $longTerm = $this->calculateRegression('monthly', $monthlyLookback, $months);
         $accuracy = $this->calculateForecastAccuracy($shortTerm['forecast'] ?? []);
 
-        // Attach a simple ± RMSE confidence band to each short-term point so the
-        // chart can show a range instead of a single line pretending to be exact.
+        // Attach a dynamic confidence band that widens with horizon distance,
+        // reflecting statistical prediction uncertainty over longer date ranges.
         $rmse = $accuracy['rmse'] ?? 0;
+        if ($rmse <= 0 && ($shortTerm['baseline_avg'] ?? 0) > 0) {
+            $rmse = round(($shortTerm['baseline_avg'] ?? 0) * 0.18, 2);
+        }
+        $nDaily = max(1, count($shortTerm['forecast'] ?? []));
         if ($rmse > 0) {
-            $shortTerm['forecast'] = collect($shortTerm['forecast'])->map(function ($point) use ($rmse) {
-                $point['lower'] = round(max(0, $point['predicted'] - $rmse), 2);
-                $point['upper'] = round($point['predicted'] + $rmse, 2);
+            $shortTerm['forecast'] = collect($shortTerm['forecast'])->map(function ($point, $idx) use ($rmse, $nDaily) {
+                $stepError = $rmse * sqrt(1.0 + (($idx + 1) / max(14, $nDaily)));
+                $point['lower'] = round(max(0, $point['predicted'] - $stepError), 2);
+                $point['upper'] = round($point['predicted'] + $stepError, 2);
+                return $point;
+            })->all();
+        }
+
+        $longRmse = ($longTerm['baseline_avg'] ?? 0) * 0.12;
+        $nMonthly = max(1, count($longTerm['forecast'] ?? []));
+        if ($longRmse > 0 && !empty($longTerm['forecast'])) {
+            $longTerm['forecast'] = collect($longTerm['forecast'])->map(function ($point, $idx) use ($longRmse, $nMonthly) {
+                $stepError = $longRmse * sqrt(1.0 + (($idx + 1) / max(6, $nMonthly)));
+                $point['lower'] = round(max(0, $point['predicted'] - $stepError), 2);
+                $point['upper'] = round($point['predicted'] + $stepError, 2);
                 return $point;
             })->all();
         }
@@ -704,8 +779,8 @@ class BusinessIntelligence extends Component
             $series->pop();
         }
 
-        $holdout = 7;
-        if ($series->count() < $holdout + 14) {
+        $nSeries = $series->count();
+        if ($nSeries < 10) {
             return [
                 'mae' => 0.0, 'rmse' => 0.0, 'mape' => 0.0,
                 'benchmark_mae' => 0.0, 'benchmark_mape' => 0.0,
@@ -714,6 +789,8 @@ class BusinessIntelligence extends Component
                 'model' => 'Not enough data',
             ];
         }
+
+        $holdout = min(7, max(3, (int)floor($nSeries * 0.25)));
 
         $train = $series->slice(0, -$holdout)->values();
         $actual = $series->slice(-$holdout)->values();
@@ -837,64 +914,61 @@ class BusinessIntelligence extends Component
         ];
     }
 
-    private function calculateRegression(string $type, int $historyCount, int $predictCount)
+    private function fetchRegressionTrainingData(string $type, int $historyCount): ?Collection
     {
-        // Forecasting always trains on a fixed rolling lookback window,
-        // independent of the report's date-range filter.
         $lookbackStart = $type === 'daily'
             ? Carbon::now()->subDays($historyCount)->startOfDay()
             : Carbon::now()->subMonths($historyCount)->startOfMonth();
 
-        // Exclude the current, still-in-progress period. Its total is
-        // artificially low (day/month isn't over yet) and, since the
-        // regression weights recent periods exponentially higher, an
-        // incomplete period would systematically drag the forecast down.
         $periodEnd = $type === 'daily'
             ? Carbon::yesterday()->endOfDay()
-            : Carbon::now()->startOfMonth()->subSecond(); // end of last full month
+            : Carbon::now()->startOfMonth()->subSecond();
 
         $query = Order::whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
             ->when($this->selectedBranchId !== 'all', fn($q) => $q->where('branch_id', (int)$this->selectedBranchId))
             ->where('created_at', '>=', $lookbackStart)
             ->where('created_at', '<=', $periodEnd);
 
-        if ($type === 'daily') {
-            $rawPoints = (clone $query)
-                ->selectRaw('DATE(created_at) as label, SUM(total_amount) as total')
-                ->groupBy('label')
-                ->orderBy('label', 'asc')
-                ->get()
-                ->pluck('total', 'label')
-                ->map(fn($v) => (float)$v);
-
-            $lastActiveDate = $rawPoints->isNotEmpty() ? Carbon::parse($rawPoints->keys()->last()) : $periodEnd;
-            $trainingEnd = ($lastActiveDate->diffInDays($periodEnd) > 2)
-                ? $lastActiveDate->copy()->endOfDay()
-                : $periodEnd->copy();
-
-            $data = collect();
-            if ($rawPoints->isNotEmpty()) {
-                $cursor = Carbon::parse($rawPoints->keys()->first());
-                while ($cursor->lte($trainingEnd)) {
-                    $lbl = $cursor->format('Y-m-d');
-                    $data->push((object)[
-                        'label' => $lbl,
-                        'total' => (float)($rawPoints[$lbl] ?? 0.0),
-                    ]);
-                    $cursor->addDay();
-                }
-            }
-        } else {
-            $data = (clone $query)
+        if ($type === 'monthly') {
+            $monthlyData = (clone $query)
                 ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') as label, SUM(total_amount) as total")
                 ->groupBy('label')
                 ->orderBy('label', 'asc')
                 ->get();
+
+            if ($monthlyData->count() < 2) {
+                return null;
+            }
+            return $monthlyData;
         }
 
-        // Trim trailing (near-)empty days so closed days or stray test orders
-        // don't drag the forecast level down (same rule as the backtest).
-        if ($type === 'daily' && $data->isNotEmpty()) {
+        $rawPoints = (clone $query)
+            ->selectRaw('DATE(created_at) as label, SUM(total_amount) as total')
+            ->groupBy('label')
+            ->orderBy('label', 'asc')
+            ->get()
+            ->pluck('total', 'label')
+            ->map(fn($v) => (float)$v);
+
+        $lastActiveDate = $rawPoints->isNotEmpty() ? Carbon::parse($rawPoints->keys()->last()) : $periodEnd;
+        $trainingEnd = ($lastActiveDate->diffInDays($periodEnd) > 2)
+            ? $lastActiveDate->copy()->endOfDay()
+            : $periodEnd->copy();
+
+        $data = collect();
+        if ($rawPoints->isNotEmpty()) {
+            $cursor = Carbon::parse($rawPoints->keys()->first());
+            while ($cursor->lte($trainingEnd)) {
+                $lbl = $cursor->format('Y-m-d');
+                $data->push((object)[
+                    'label' => $lbl,
+                    'total' => (float)($rawPoints[$lbl] ?? 0.0),
+                ]);
+                $cursor->addDay();
+            }
+        }
+
+        if ($data->isNotEmpty()) {
             $activeMean = $data->where('total', '>', 0)->avg('total') ?: 0;
             $minDayTotal = $activeMean * 0.10;
             while ($data->count() > 0 && (float) $data->last()->total < $minDayTotal) {
@@ -902,12 +976,146 @@ class BusinessIntelligence extends Component
             }
         }
 
-        $n = $data->count();
-        if ($n < 2) {
-            return ['forecast' => [], 'trend' => 'Insufficient Data', 'growth_rate' => 0.0, 'confidence' => 'Insufficient Data', 'baseline_avg' => 0];
+        if ($data->count() < 14) {
+            return null;
         }
 
-        // ── Step 1: Remove outliers using IQR method ──────────────────
+        return $data;
+    }
+
+    private function fitWeightedLinearRegression(Collection $cleanData): array
+    {
+        $nClean = $cleanData->count();
+        $sumW = $sumWX = $sumWY = $sumWXX = $sumWXY = 0.0;
+        foreach ($cleanData as $index => $row) {
+            $x = $index + 1;
+            $y = (float)$row->total;
+            $w = $x / $nClean;
+            $sumW   += $w;
+            $sumWX  += $w * $x;
+            $sumWY  += $w * $y;
+            $sumWXX += $w * $x * $x;
+            $sumWXY += $w * $x * $y;
+        }
+        $denominator = ($sumW * $sumWXX) - ($sumWX * $sumWX);
+        if ($denominator != 0) {
+            $slope = (($sumW * $sumWXY) - ($sumWX * $sumWY)) / $denominator;
+            $intercept = ($sumWY - ($slope * $sumWX)) / $sumW;
+            return [$slope, $intercept];
+        }
+
+        return [0.0, (float)($cleanData->avg('total') ?: 0.0)];
+    }
+
+    private function deriveLag1Damping(Collection $cleanData, float $meanY): float
+    {
+        $nClean = $cleanData->count();
+        $numerator = 0.0;
+        $denomR1 = 0.0;
+        for ($k = 1; $k < $nClean; $k++) {
+            $numerator += ((float)$cleanData[$k]->total - $meanY) * ((float)$cleanData[$k - 1]->total - $meanY);
+        }
+        for ($k = 0; $k < $nClean; $k++) {
+            $denomR1 += pow((float)$cleanData[$k]->total - $meanY, 2);
+        }
+        $r1 = ($denomR1 > 0) ? ($numerator / $denomR1) : 0.85;
+        return max(0.80, min(0.96, abs($r1)));
+    }
+
+    private function generateContinuousForecastTrajectory(
+        string $type,
+        int $predictCount,
+        float $currentLevel,
+        float $slope,
+        float $phi,
+        float $activeMin
+    ): array {
+        $forecast = [];
+        $startDate = $type === 'daily' ? Carbon::tomorrow() : Carbon::now()->addMonth()->startOfMonth();
+
+        $cumTrend = 0.0;
+        for ($i = 0; $i < $predictCount; $i++) {
+            $predictedDate = $type === 'daily'
+                ? $startDate->copy()->addDays($i)
+                : $startDate->copy()->addMonths($i);
+
+            $cumTrend += pow($phi, $i + 1) * $slope;
+            $predictedValue = max($activeMin, round($currentLevel + $cumTrend, 2));
+
+            $forecast[] = [
+                'date'      => $type === 'daily' ? $predictedDate->format('M d') : $predictedDate->format('M Y'),
+                'full_date' => $type === 'daily' ? $predictedDate->format('M d, Y') : $predictedDate->format('F Y'),
+                'day'       => strtoupper($predictedDate->format('D')),
+                'full_day'  => $predictedDate->format('l'),
+                'predicted' => $predictedValue,
+            ];
+        }
+
+        return $forecast;
+    }
+
+    private function evaluateForecastQuality(
+        string $type,
+        Collection $cleanData,
+        float $meanY,
+        float $slope,
+        float $intercept,
+        float $currentLevel,
+        int $n,
+        bool $hasReliableTrend
+    ): array {
+        $ssTot = $cleanData->sum(fn($row) => pow((float)$row->total - $meanY, 2));
+        $ssRes = 0.0;
+        foreach ($cleanData as $index => $row) {
+            $pred = ($slope * ($index + 1)) + $intercept;
+            $ssRes += pow((float)$row->total - $pred, 2);
+        }
+        $rSquared = $ssTot > 0 ? max(0, 1 - ($ssRes / $ssTot)) : 0.0;
+
+        $confidence = match(true) {
+            !$hasReliableTrend                                  => 'Insufficient Data',
+            $type === 'monthly' && $n >= 12 && $rSquared >= 0.7 => 'High',
+            $type === 'monthly' && $n >= 6 && $rSquared >= 0.4  => 'Medium',
+            $type === 'monthly' && $n >= 3                      => 'Moderate',
+            $type === 'monthly' && $n >= 2                      => 'Low',
+            $type === 'monthly'                                 => 'Insufficient Data',
+            $n >= 60 && $rSquared >= 0.7                        => 'High',
+            $n >= 30 && $rSquared >= 0.4                        => 'Medium',
+            $n >= 14 && $rSquared >= 0.2                        => 'Moderate',
+            $n >= 14                                            => 'Low',
+            default                                             => 'Insufficient Data',
+        };
+
+        $relativeSlope = $currentLevel > 0 ? ($slope / $currentLevel) : 0.0;
+        $trendLabel = match(true) {
+            !$hasReliableTrend     => 'Stable',
+            $relativeSlope > 0.02  => 'Upward',
+            $relativeSlope < -0.02 => 'Downward',
+            default                => 'Stable',
+        };
+
+        return [$confidence, round($rSquared, 3), $trendLabel, round($relativeSlope * 100, 2)];
+    }
+
+    private function calculateRegression(string $type, int $historyCount, int $predictCount): array
+    {
+        $data = $this->fetchRegressionTrainingData($type, $historyCount);
+
+        if (!$data || $data->count() < 2) {
+            return [
+                'forecast'     => [],
+                'trend'        => 'Insufficient Data',
+                'growth_rate'  => 0.0,
+                'confidence'   => 'Insufficient Data',
+                'baseline_avg' => 0.0,
+                'r_squared'    => 0.0,
+                'peak_day'     => 'N/A',
+            ];
+        }
+
+        $n = $data->count();
+
+        // Remove outliers using IQR method
         $values = $data->pluck('total')->map(fn($v) => (float)$v)->sort()->values();
         $q1 = $values[(int)floor($n * 0.25)];
         $q3 = $values[(int)floor($n * 0.75)];
@@ -915,146 +1123,42 @@ class BusinessIntelligence extends Component
         $lowerFence = $q1 - 1.5 * $iqr;
         $upperFence = $q3 + 1.5 * $iqr;
         $cleanData = $data->filter(fn($row) => (float)$row->total >= $lowerFence && (float)$row->total <= $upperFence)->values();
-        $nClean = $cleanData->count();
-        if ($nClean < 2) $cleanData = $data; // fallback if too many removed
+        if ($cleanData->count() < 2) {
+            $cleanData = $data;
+        }
         $nClean = $cleanData->count();
 
-        $meanY = $cleanData->avg('total') ?: 0.0;
-
-        // Below threshold we skip the trend and forecast off the recent average instead.
+        $meanY = (float)($cleanData->avg('total') ?: 0.0);
+        $activeMin = (float)($cleanData->where('total', '>', 0)->min('total') ?: 0.0);
         $minPeriodsForTrend = $type === 'daily' ? 5 : 3;
         $hasReliableTrend = $nClean >= $minPeriodsForTrend;
 
         $slope = 0.0;
         $intercept = $meanY;
-
         if ($hasReliableTrend) {
-            // ── Step 2: Weighted Linear Regression (recent data weighs more) ──
-            $sumW = $sumWX = $sumWY = $sumWXX = $sumWXY = 0.0;
-            foreach ($cleanData as $index => $row) {
-                $x = $index + 1;
-                $y = (float)$row->total;
-                $w = exp($index / max($nClean, 1));
-                $sumW   += $w;
-                $sumWX  += $w * $x;
-                $sumWY  += $w * $y;
-                $sumWXX += $w * $x * $x;
-                $sumWXY += $w * $x * $y;
-            }
-            $denominator = ($sumW * $sumWXX) - ($sumWX * $sumWX);
-            if ($denominator != 0) {
-                $slope     = (($sumW * $sumWXY) - ($sumWX * $sumWY)) / $denominator;
-                $intercept = ($sumWY - ($slope * $sumWX)) / $sumW;
-            }
+            [$slope, $intercept] = $this->fitWeightedLinearRegression($cleanData);
         }
 
-        // ── Step 3: Day-of-week seasonality indices with Bayesian shrinkage (daily only) ──────
-        $dowIndices = array_fill(1, 7, 1.0);
-        if ($type === 'daily' && $nClean >= 7) {
-            $dowSums   = array_fill(1, 7, 0.0);
-            $dowCounts = array_fill(1, 7, 0);
-            foreach ($cleanData as $row) {
-                if ($row->total <= 0) continue;
-                $dow = (int)Carbon::parse($row->label)->dayOfWeekIso; // 1=Mon..7=Sun
-                $dowSums[$dow]   += (float)$row->total;
-                $dowCounts[$dow] += 1;
-            }
-            $activeAvg = $cleanData->where('total', '>', 0)->avg('total') ?: $meanY;
-            foreach ($dowIndices as $d => $_) {
-                // Shrink small-sample DOW estimates toward neutral 1.0
-                $smoothed = ($dowSums[$d] + 2.0 * $activeAvg) / ($dowCounts[$d] + 2.0);
-                $dowIndices[$d] = $activeAvg > 0 ? $smoothed / $activeAvg : 1.0;
-            }
-            // Normalize so weekly average multiplier across 7 days is 1.0
-            $avgDow = array_sum($dowIndices) / 7;
-            if ($avgDow > 0) {
-                foreach ($dowIndices as $d => $val) {
-                    $dowIndices[$d] = $val / $avgDow;
-                }
-            }
-        }
+        $currentLevel = $intercept + ($slope * $nClean);
+        $phi = $this->deriveLag1Damping($cleanData, $meanY);
+        $forecast = $this->generateContinuousForecastTrajectory($type, $predictCount, $currentLevel, $slope, $phi, $activeMin);
 
-        // ── Step 4: Generate forecast with damped trend + seasonality ──
-        $phi = $type === 'daily' ? 0.98 : 0.85;
-
-        // Cap daily slope drift to max ±8% of mean
-        $slopeCap = $meanY * 0.08;
-        $slope = max(-$slopeCap, min($slopeCap, $slope));
-
-        $avgDailySales = $cleanData->take(-7)->avg('total') ?: $meanY;
-        $endFittedLevel = $hasReliableTrend ? ($intercept + ($slope * $nClean)) : $avgDailySales;
-        $currentLevel = max($meanY * 0.5, ($endFittedLevel * 0.5) + ($avgDailySales * 0.5));
-
-        $forecast = [];
-        $startDate = $type === 'daily' ? Carbon::tomorrow() : Carbon::now()->addMonth()->startOfMonth();
-
-        $trendCumulative = 0.0;
-        for ($i = 0; $i < $predictCount; $i++) {
-            $predictedDate = $type === 'daily'
-                ? $startDate->copy()->addDays($i)
-                : $startDate->copy()->addMonths($i);
-
-            $trendCumulative += pow($phi, $i + 1) * $slope;
-            $baselinePrediction = max($meanY * 0.4, $currentLevel + $trendCumulative);
-
-            $seasonalIndex = 1.0;
-            if ($type === 'daily') {
-                $dow = (int)$predictedDate->dayOfWeekIso;
-                $seasonalIndex = $dowIndices[$dow] ?? 1.0;
-            }
-
-            $adjusted = round($baselinePrediction * $seasonalIndex, 2);
-            $adjusted = max(10.0, $adjusted);
-
-            $forecast[] = [
-                'date'      => $type === 'daily' ? $predictedDate->format('M d') : $predictedDate->format('M Y'),
-                'day'       => strtoupper($predictedDate->format('D')),
-                'predicted' => $adjusted,
-            ];
-        }
-
-        // ── Step 5: Confidence & trend scoring ─────────────────────────
-        $ssTot = $cleanData->sum(fn($row) => pow((float)$row->total - $meanY, 2));
-        $ssRes = 0.0;
-        foreach ($cleanData as $index => $row) {
-            $predicted = ($slope * ($index + 1)) + $intercept;
-            if ($type === 'daily') {
-                $rowDow = (int) Carbon::parse($row->label)->dayOfWeekIso;
-                $predicted *= ($dowIndices[$rowDow] ?? 1.0);
-            }
-            $ssRes += pow((float)$row->total - $predicted, 2);
-        }
-        $rSquared = $ssTot > 0 ? max(0, 1 - ($ssRes / $ssTot)) : 0;
-
-        $confidence = match(true) {
-            !$hasReliableTrend           => 'Insufficient Data',
-            $n >= 60 && $rSquared >= 0.7 => 'High',
-            $n >= 30 && $rSquared >= 0.4 => 'Medium',
-            $n >= 14                     => 'Low',
-            default                      => 'Insufficient Data',
-        };
-
-        // Relative to current run-rate average
-        $relativeSlope = $currentLevel > 0 ? ($slope / $currentLevel) : 0;
-        $trendLabel = match(true) {
-            !$hasReliableTrend    => 'Insufficient Data',
-            $relativeSlope > 0.03  => 'Upward',
-            $relativeSlope < -0.03 => 'Downward',
-            default                 => 'Stable',
-        };
+        [$confidence, $rSquared, $trendLabel, $growthRate] = $this->evaluateForecastQuality(
+            $type, $cleanData, $meanY, $slope, $intercept, $currentLevel, $n, $hasReliableTrend
+        );
 
         return [
             'forecast'     => $forecast,
             'trend'        => $trendLabel,
-            'growth_rate'  => round($slope, 2),
+            'growth_rate'  => $growthRate,
             'confidence'   => $confidence,
-            'baseline_avg' => round($avgDailySales, 2),
-            'r_squared'    => round($rSquared, 3),
+            'baseline_avg' => round($currentLevel, 2),
+            'r_squared'    => $rSquared,
             'peak_day'     => collect($forecast)->sortByDesc('predicted')->first()['day'] ?? 'N/A',
         ];
     }
 
-    private function getIngredientDemandForecast(?array $shortTermForecast = null)
+    private function getIngredientDemandForecast(?array $shortTermForecast = null): array
     {
         $start = $this->startDate ? Carbon::parse($this->startDate)->startOfDay() : null;
         $end = $this->endDate ? Carbon::parse($this->endDate)->endOfDay() : null;
@@ -1087,63 +1191,10 @@ class BusinessIntelligence extends Component
             ->with('product.recipes.ingredient')
             ->get();
 
-        $ingredientDemand = [];
-
-        foreach ($topProducts as $tp) {
-            if (!$tp->product || !$tp->product->recipes) continue;
-
-            // Projected 14-day ingredient consumption based on forecasted growth factor
-            $projectedUnits = $tp->daily_avg * 14 * $forecastGrowthFactor;
-
-            foreach ($tp->product->recipes as $recipe) {
-                if (!$recipe->ingredient) continue;
-
-                $id = $recipe->ingredient_id;
-                if (!isset($ingredientDemand[$id])) {
-                    $ingredientDemand[$id] = [
-                        'id' => $id,
-                        'name' => $recipe->ingredient->name,
-                        'unit' => $recipe->ingredient->unit,
-                        'amount' => 0,
-                        'priority' => 'Medium'
-                    ];
-                }
-                $ingredientDemand[$id]['amount'] += ($recipe->quantity * $projectedUnits);
-            }
-        }
+        $ingredientDemand = $this->aggregateRecipeIngredientDemand($topProducts, $forecastGrowthFactor);
 
         if (empty($ingredientDemand)) {
-            $recentSales = Order::where('status', Order::STATUS_COMPLETED)
-                ->when($this->selectedBranchId !== 'all', fn($q) => $q->where('branch_id', (int)$this->selectedBranchId))
-                ->when($start, fn($q) => $q->where('created_at', '>=', $start))
-                ->when($end, fn($q) => $q->where('created_at', '<=', $end))
-                ->sum('total_amount');
-
-            $baseDemand = max(18, (float)($recentSales / max(1, $daysInRange)) * 0.18 * $forecastGrowthFactor);
-
-                        return [
-                [
-                    'id' => 0,
-                    'name' => 'Takoyaki Base Mix',
-                    'unit' => 'packs',
-                    'amount' => (int) ceil($baseDemand * 1.8),
-                    'priority' => 'High',
-                ],
-                [
-                    'id' => 0,
-                    'name' => 'Sauce & Toppings',
-                    'unit' => 'bottles',
-                    'amount' => (int) ceil($baseDemand * 1.2),
-                    'priority' => 'Medium',
-                ],
-                [
-                    'id' => 0,
-                    'name' => 'Packaging Buffer',
-                    'unit' => 'pcs',
-                    'amount' => (int) ceil($baseDemand * 0.9),
-                    'priority' => 'Medium',
-                ],
-            ];
+            return [];
         }
 
         return collect($ingredientDemand)
@@ -1156,6 +1207,35 @@ class BusinessIntelligence extends Component
             })
             ->values()
             ->toArray();
+    }
+
+    private function aggregateRecipeIngredientDemand(Collection $topProducts, float $forecastGrowthFactor): array
+    {
+        $demand = [];
+
+        foreach ($topProducts as $tp) {
+            if (!$tp->product || !$tp->product->recipes) continue;
+
+            $projectedUnits = $tp->daily_avg * 14 * $forecastGrowthFactor;
+
+            foreach ($tp->product->recipes as $recipe) {
+                if (!$recipe->ingredient) continue;
+
+                $id = $recipe->ingredient_id;
+                if (!isset($demand[$id])) {
+                    $demand[$id] = [
+                        'id' => $id,
+                        'name' => $recipe->ingredient->name,
+                        'unit' => $recipe->ingredient->unit,
+                        'amount' => 0,
+                        'priority' => 'Medium'
+                    ];
+                }
+                $demand[$id]['amount'] += ($recipe->quantity * $projectedUnits);
+            }
+        }
+
+        return $demand;
     }
 
     /**
@@ -1368,32 +1448,35 @@ class BusinessIntelligence extends Component
 
     private function getProductInsights(array $analytics): array
     {
-        $orderIds = $analytics['completed_orders']->pluck('id');
+        $branchId = $this->selectedBranchId !== 'all' ? (int)$this->selectedBranchId : null;
 
-        $topProducts = collect();
-        $categorySales = collect();
+        $topProducts = OrderItem::with('product')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->where('orders.status', Order::STATUS_COMPLETED)
+            ->when($this->startDate, fn($q) => $q->where('orders.created_at', '>=', Carbon::parse($this->startDate)->startOfDay()))
+            ->when($this->endDate,   fn($q) => $q->where('orders.created_at', '<=', Carbon::parse($this->endDate)->endOfDay()))
+            ->when($branchId,        fn($q) => $q->where('orders.branch_id', $branchId))
+            ->select('order_items.product_id', DB::raw('SUM(order_items.quantity) as units_sold'), DB::raw('SUM(order_items.subtotal) as revenue'))
+            ->groupBy('order_items.product_id')
+            ->orderByDesc('units_sold')
+            ->take(5)
+            ->get();
 
-        if ($orderIds->isNotEmpty()) {
-            $topProducts = OrderItem::with('product')
-                ->whereIn('order_id', $orderIds)
-                ->select('product_id', DB::raw('SUM(quantity) as units_sold'), DB::raw('SUM(subtotal) as revenue'))
-                ->groupBy('product_id')
-                ->orderBy('units_sold', 'desc')
-                ->take(5)
-                ->get();
-
-            $categorySales = OrderItem::whereIn('order_id', $orderIds)
-                ->join('products', 'order_items.product_id', '=', 'products.id')
-                ->join('product_categories', 'products.category_id', '=', 'product_categories.id')
-                ->select('product_categories.name', DB::raw('SUM(order_items.subtotal) as revenue'))
-                ->groupBy('product_categories.name')
-                ->get();
-        }
+        $categorySales = OrderItem::join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->join('products', 'order_items.product_id', '=', 'products.id')
+            ->join('product_categories', 'products.category_id', '=', 'product_categories.id')
+            ->where('orders.status', Order::STATUS_COMPLETED)
+            ->when($this->startDate, fn($q) => $q->where('orders.created_at', '>=', Carbon::parse($this->startDate)->startOfDay()))
+            ->when($this->endDate,   fn($q) => $q->where('orders.created_at', '<=', Carbon::parse($this->endDate)->endOfDay()))
+            ->when($branchId,        fn($q) => $q->where('orders.branch_id', $branchId))
+            ->select('product_categories.name', DB::raw('SUM(order_items.subtotal) as revenue'))
+            ->groupBy('product_categories.name')
+            ->get();
 
         return [
-            'top_products'  => $topProducts,
-            'category_sales'=> $categorySales,
-            'seasonality'   => $this->getProductSeasonality(),
+            'top_products'   => $topProducts,
+            'category_sales' => $categorySales,
+            'seasonality'    => $this->getProductSeasonality(),
         ];
     }
 
@@ -1435,7 +1518,7 @@ class BusinessIntelligence extends Component
         if ($topProductIds->isEmpty()) return [];
 
         $seasonalityData = [];
-$products = \App\Models\Product::whereIn('id', $topProductIds)->get()->keyBy('id');
+        $products = Product::whereIn('id', $topProductIds)->get()->keyBy('id');
 
 foreach ($topProductIds as $pid) {
     $product = $products[$pid] ?? null;
@@ -1508,7 +1591,7 @@ foreach ($topProductIds as $pid) {
         }
 
         $seasonalityData = [];
-$products = \App\Models\Product::whereIn('id', $topProductIds)->get()->keyBy('id');
+        $products = Product::whereIn('id', $topProductIds)->get()->keyBy('id');
 
 foreach ($topProductIds as $pid) {
     $product = $products[$pid] ?? null;
@@ -1539,10 +1622,8 @@ foreach ($topProductIds as $pid) {
         return $seasonalityData;
     }
 
-    private function getOperationalData(array $analytics)
+    private function buildHourlyIntensity(Collection $completedOrders): array
     {
-        $completedOrders = $analytics['completed_orders'];
-        
         $hourlySales = $completedOrders->groupBy(fn($o) => $o->created_at->format('H'))
             ->map(fn($group, $hour) => (object)[
                 'hour'    => (int)$hour,
@@ -1550,8 +1631,7 @@ foreach ($topProductIds as $pid) {
                 'revenue' => $group->sum('total_amount'),
             ])->values();
 
-        // Build an hours intensity payload (0-23) for charting
-        $hoursMap = collect(range(0,23))->mapWithKeys(fn($h) => [str_pad((string)$h, 2, '0', STR_PAD_LEFT) => 0])->toArray();
+        $hoursMap = collect(range(0, 23))->mapWithKeys(fn($h) => [str_pad((string)$h, 2, '0', STR_PAD_LEFT) => 0])->toArray();
         foreach ($hourlySales as $hs) {
             $key = str_pad((string)$hs->hour, 2, '0', STR_PAD_LEFT);
             $hoursMap[$key] = $hs->count;
@@ -1560,14 +1640,19 @@ foreach ($topProductIds as $pid) {
         $categories = array_map(fn($h) => $h . ':00', array_keys($hoursMap));
         $counts = array_values($hoursMap);
 
-        $hoursIntensity = [
-            'categories' => $categories,
-            'counts' => $counts,
-            'has_data' => array_sum($counts) > 0,
+        return [
+            'hourly_sales' => $hourlySales,
+            'hours_intensity' => [
+                'categories' => $categories,
+                'counts' => $counts,
+                'has_data' => array_sum($counts) > 0,
+            ],
         ];
+    }
 
-
-                $branchPerformance = [];
+    private function buildBranchOperationalData(array $analytics, Collection $completedOrders): array
+    {
+        $branchPerformance = [];
         $branchChartData = [
             'branches' => [],
             'revenue' => [],
@@ -1578,16 +1663,17 @@ foreach ($topProductIds as $pid) {
         $globalNetworkTotal = 0;
 
         if (auth()->user()->role_id === 1 || auth()->user()->isSuperAdmin()) {
-            // Match the Performance tab's branch comparison, which counts
-            // Completed + Refunded + Partially Refunded orders as revenue.
             $allOrders = $analytics['orders'] ?? $completedOrders;
             $globalNetworkTotal = $allOrders->sum('total_amount');
-            
-            // Full branch comparison dataset for the Column Chart (unpaginated)
-            $allBranchStats = Order::whereIn('id', $allOrders->pluck('id'))
+
+            $branchStatsQuery = Order::whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
+                ->when($this->startDate, fn($q) => $q->where('created_at', '>=', Carbon::parse($this->startDate)->startOfDay()))
+                ->when($this->endDate,   fn($q) => $q->where('created_at', '<=', Carbon::parse($this->endDate)->endOfDay()))
                 ->selectRaw('branch_id, SUM(total_amount) as revenue, COUNT(*) as count')
                 ->groupBy('branch_id')
-                ->with('branch')
+                ->with('branch');
+
+            $allBranchStats = (clone $branchStatsQuery)
                 ->get()
                 ->sortByDesc('revenue')
                 ->values();
@@ -1624,7 +1710,6 @@ foreach ($topProductIds as $pid) {
             $sumTotalRev = array_sum($totalRev) ?: 1;
             $totalShares = array_map(fn($r) => round(($r / $sumTotalRev) * 100, 1), $totalRev);
 
-            // Pre-aggregate all orders by date (Y-m-d) and month (Y-m) per branch
             $dailyGroups = [];
             $monthlyGroups = [];
 
@@ -1632,7 +1717,7 @@ foreach ($topProductIds as $pid) {
                 $d = $order->created_at->format('Y-m-d');
                 $m = $order->created_at->format('Y-m');
                 $bId = $order->branch_id;
-                
+
                 if (!isset($dailyGroups[$d][$bId])) {
                     $dailyGroups[$d][$bId] = ['rev' => 0.0, 'count' => 0];
                 }
@@ -1646,7 +1731,7 @@ foreach ($topProductIds as $pid) {
                 $monthlyGroups[$m][$bId]['count']++;
             }
 
-            // 1. Daily Series (Date for each day on x-axis)
+            // 1. Daily Series
             $dailyCategories = [];
             $dailyRevSeries = array_fill(0, count($branchIds), []);
             $dailyOrdersSeries = array_fill(0, count($branchIds), []);
@@ -1664,7 +1749,7 @@ foreach ($topProductIds as $pid) {
                 $dCur->addDay();
             }
 
-            // 2. Weekly Series (Week date ranges on x-axis)
+            // 2. Weekly Series
             $weeklyCategories = [];
             $weeklyRevSeries = array_fill(0, count($branchIds), []);
             $weeklyOrdersSeries = array_fill(0, count($branchIds), []);
@@ -1693,7 +1778,7 @@ foreach ($topProductIds as $pid) {
                 $wCur->addWeek();
             }
 
-            // 3. Monthly Series (Months on x-axis)
+            // 3. Monthly Series
             $monthlyCategories = [];
             $monthlyRevSeries = array_fill(0, count($branchIds), []);
             $monthlyOrdersSeries = array_fill(0, count($branchIds), []);
@@ -1712,7 +1797,6 @@ foreach ($topProductIds as $pid) {
                 $mCur->addMonth();
             }
 
-            // Format series arrays for multi-series grouped column ApexCharts
             $formatSeries = function(array $valuesSeries) use ($branches) {
                 $res = [];
                 foreach ($branches as $idx => $bName) {
@@ -1752,25 +1836,34 @@ foreach ($topProductIds as $pid) {
                         'orders_series' => $formatSeries($monthlyOrdersSeries),
                     ],
                 ],
-                // Backward-compatible fallbacks
                 'revenue' => $totalRev,
                 'orders' => $totalOrders,
                 'shares' => $totalShares,
             ];
 
-            $branchPerformance = Order::whereIn('id', $allOrders->pluck('id'))
-                ->selectRaw('branch_id, SUM(total_amount) as revenue, COUNT(*) as count')
-                ->groupBy('branch_id')
-                ->with('branch')
+            $branchPerformance = (clone $branchStatsQuery)
                 ->paginate($this->perPage, ['*'], 'branchPage');
         }
 
         return [
-            'hourly_sales' => $hourlySales,
-            'hours_intensity' => $hoursIntensity,
             'branch_performance' => $branchPerformance,
             'branch_chart' => $branchChartData,
             'global_network_total' => $globalNetworkTotal ?: 1,
+        ];
+    }
+
+    private function getOperationalData(array $analytics): array
+    {
+        $completedOrders = $analytics['completed_orders'];
+        $intensityData = $this->buildHourlyIntensity($completedOrders);
+        $branchData = $this->buildBranchOperationalData($analytics, $completedOrders);
+
+        return [
+            'hourly_sales' => $intensityData['hourly_sales'],
+            'hours_intensity' => $intensityData['hours_intensity'],
+            'branch_performance' => $branchData['branch_performance'],
+            'branch_chart' => $branchData['branch_chart'],
+            'global_network_total' => $branchData['global_network_total'],
         ];
     }
 

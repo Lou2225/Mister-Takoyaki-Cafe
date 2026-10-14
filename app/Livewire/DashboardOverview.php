@@ -87,35 +87,42 @@ class DashboardOverview extends Component
     private function getRevenueBreakdown(): array
     {
         $branchId = $this->selectedBranchId;
-        $orders = $this->fetchFinancialOrders($branchId);
-        
-        $categories = [];
-        $untrackedRevenue = 0;
-        
-                $service = $orders->sum('service_charge');
-        $delivery = $orders->sum('delivery_fee');
-        $discounts = $orders->sum('discount_amount');
-        $refunds = $orders->sum('refunded_amount');
+        $start = $this->startDate ? $this->startDate . ' 00:00:00' : null;
+        $end = $this->endDate ? $this->endDate . ' 23:59:59' : null;
 
-        foreach ($orders as $order) {
-            if ($order->items->count() > 0) {
-                foreach ($order->items as $item) {
-                    $categoryName = $item->product->category->name ?? 'Uncategorized';
-                    $categories[$categoryName] = ($categories[$categoryName] ?? 0) + $item->subtotal;
-                }
-            } else {
-                // If order has no items but has a total, track it as untracked
-                $untrackedRevenue += $order->total_amount;
-            }
-        }
+        $categories = DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->join('products', 'order_items.product_id', '=', 'products.id')
+            ->leftJoin('product_categories', 'products.category_id', '=', 'product_categories.id')
+            ->whereIn('orders.status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
+            ->when($start, fn($q) => $q->where('orders.created_at', '>=', $start))
+            ->when($end,   fn($q) => $q->where('orders.created_at', '<=', $end))
+            ->when(!$this->isSuperAdmin, fn($q) => $q->where('orders.branch_id', auth()->user()->branch_id))
+            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('orders.branch_id', $branchId))
+            ->selectRaw("COALESCE(product_categories.name, 'Uncategorized') as category, SUM(order_items.subtotal) as total")
+            ->groupBy('product_categories.name')
+            ->orderByDesc('total')
+            ->get();
 
-        $breakdown = collect($categories)->map(fn($val, $key) => ['category' => $key, 'total' => (float)$val])->values()->toArray();
-        
-                if ($service > 0) $breakdown[] = ['category' => 'Service Charges', 'total' => (float)$service];
-        if ($delivery > 0) $breakdown[] = ['category' => 'Delivery Deductions', 'total' => (float)-$delivery];
-        if ($discounts > 0) $breakdown[] = ['category' => 'Discounts Applied', 'total' => (float)-$discounts];
-        if ($refunds > 0) $breakdown[] = ['category' => 'Refunds Deducted', 'total' => (float)-$refunds];
-        if ($untrackedRevenue > 0) $breakdown[] = ['category' => 'Untracked Sales', 'total' => (float)$untrackedRevenue];
+        $breakdown = $categories->map(fn($row) => [
+            'category' => $row->category,
+            'total'    => (float)$row->total,
+        ])->toArray();
+
+        // Get delivery, discounts, refunds totals
+        $orderTotals = DB::table('orders')
+            ->whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
+            ->when($start, fn($q) => $q->where('created_at', '>=', $start))
+            ->when($end,   fn($q) => $q->where('created_at', '<=', $end))
+            ->when(!$this->isSuperAdmin, fn($q) => $q->where('orders.branch_id', auth()->user()->branch_id))
+            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('orders.branch_id', $branchId))
+            ->selectRaw('SUM(service_charge) as service, SUM(delivery_fee) as delivery, SUM(discount_amount) as discounts, SUM(refunded_amount) as refunds')
+            ->first();
+
+        if (($orderTotals->service ?? 0) > 0) $breakdown[] = ['category' => 'Service Charges', 'total' => (float)$orderTotals->service];
+        if (($orderTotals->delivery ?? 0) > 0) $breakdown[] = ['category' => 'Delivery Deductions', 'total' => -(float)$orderTotals->delivery];
+        if (($orderTotals->discounts ?? 0) > 0) $breakdown[] = ['category' => 'Discounts Applied', 'total' => -(float)$orderTotals->discounts];
+        if (($orderTotals->refunds ?? 0) > 0) $breakdown[] = ['category' => 'Refunds Deducted', 'total' => -(float)$orderTotals->refunds];
 
         usort($breakdown, fn($a, $b) => abs($b['total']) <=> abs($a['total']));
         return $breakdown;
@@ -124,32 +131,53 @@ class DashboardOverview extends Component
     private function getCogsBreakdown(): array
     {
         $branchId = $this->selectedBranchId;
-        $orderItems = $this->fetchBreakdownOrderItems($branchId);
-        
-                $branchCosts = $this->buildBranchCostMap($branchId);
+        $start = $this->startDate ? $this->startDate . ' 00:00:00' : null;
+        $end = $this->endDate ? $this->endDate . ' 23:59:59' : null;
 
-        $purchaseCosts = $this->fetchPurchasePrices($branchId);
-        $globalCosts = Ingredient::pluck('cost', 'id');
+        // Base Product COGS by category
+        $baseCogs = DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->join('products', 'order_items.product_id', '=', 'products.id')
+            ->leftJoin('product_categories', 'products.category_id', '=', 'product_categories.id')
+            ->where('orders.status', Order::STATUS_COMPLETED)
+            ->when($start, fn($q) => $q->where('orders.created_at', '>=', $start))
+            ->when($end,   fn($q) => $q->where('orders.created_at', '<=', $end))
+            ->when(!$this->isSuperAdmin, fn($q) => $q->where('orders.branch_id', auth()->user()->branch_id))
+            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('orders.branch_id', $branchId))
+            ->selectRaw("COALESCE(product_categories.name, 'Uncategorized') as category, SUM(order_items.quantity * COALESCE(products.cost, 0)) as total")
+            ->groupBy('product_categories.name')
+            ->pluck('total', 'category')
+            ->toArray();
 
-        $ingredients = Ingredient::pluck('name', 'id');
-        $usage = [];
-        $categoryCogs = [];
+        // Option COGS by category
+        $optionCogs = DB::table('order_item_options')
+            ->join('order_items', 'order_item_options.order_item_id', '=', 'order_items.id')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->join('products', 'order_items.product_id', '=', 'products.id')
+            ->leftJoin('product_categories', 'products.category_id', '=', 'product_categories.id')
+            ->join('product_options', 'order_item_options.product_option_id', '=', 'product_options.id')
+            ->where('orders.status', Order::STATUS_COMPLETED)
+            ->when($start, fn($q) => $q->where('orders.created_at', '>=', $start))
+            ->when($end,   fn($q) => $q->where('orders.created_at', '<=', $end))
+            ->when(!$this->isSuperAdmin, fn($q) => $q->where('orders.branch_id', auth()->user()->branch_id))
+            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('orders.branch_id', $branchId))
+            ->selectRaw("COALESCE(product_categories.name, 'Uncategorized') as category, SUM(order_items.quantity * COALESCE(product_options.cost, 0)) as total")
+            ->groupBy('product_categories.name')
+            ->pluck('total', 'category')
+            ->toArray();
 
-        foreach ($orderItems as $item) {
-            $bid = $item->order->branch_id;
-            $productCostMap = []; $optionCostMap = []; $modifierCostMap = [];
-            $itemCost = $this->calculateItemCogs($item, $branchCosts, $globalCosts, $purchaseCosts, $productCostMap, $optionCostMap, $modifierCostMap, $bid);
-            $totalItemCogs = $itemCost * $item->quantity;
-
-            // Group by category for visual consistency
-            $categoryName = $item->product->category->name ?? 'Uncategorized';
-            $categoryCogs[$categoryName] = ($categoryCogs[$categoryName] ?? 0) + $totalItemCogs;
-
-            $this->trackIngredientUsage($item, $branchCosts, $globalCosts, $purchaseCosts, $ingredients, $usage, $bid);
+        $combined = [];
+        foreach ($baseCogs as $cat => $val) {
+            $combined[$cat] = (float)$val + (float)($optionCogs[$cat] ?? 0);
+        }
+        foreach ($optionCogs as $cat => $val) {
+            if (!isset($combined[$cat])) {
+                $combined[$cat] = (float)$val;
+            }
         }
 
-        arsort($categoryCogs);
-        return collect($categoryCogs)->map(fn($val, $key) => ['category' => $key, 'total' => $val])->values()->toArray();
+        arsort($combined);
+        return collect($combined)->map(fn($val, $key) => ['category' => $key, 'total' => (float)$val])->values()->toArray();
     }
 
     private function fetchBreakdownOrderItems(?int $branchId): Collection
@@ -194,46 +222,60 @@ class DashboardOverview extends Component
     private function getProfitBreakdown(): array
     {
         $branchId = $this->selectedBranchId;
-        $orders = $this->fetchFinancialOrders($branchId);
-        $completedOrders = $orders->where('status', Order::STATUS_COMPLETED);
-        
-                $branchCosts = $this->buildBranchCostMap($branchId);
+        $start = $this->startDate ? $this->startDate . ' 00:00:00' : null;
+        $end = $this->endDate ? $this->endDate . ' 23:59:59' : null;
 
-        $purchaseCosts = $this->fetchPurchasePrices($branchId);
-        $globalCosts = Ingredient::pluck('cost', 'id');
+        $categorySales = DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->join('products', 'order_items.product_id', '=', 'products.id')
+            ->leftJoin('product_categories', 'products.category_id', '=', 'product_categories.id')
+            ->where('orders.status', Order::STATUS_COMPLETED)
+            ->when($start, fn($q) => $q->where('orders.created_at', '>=', $start))
+            ->when($end,   fn($q) => $q->where('orders.created_at', '<=', $end))
+            ->when(!$this->isSuperAdmin, fn($q) => $q->where('orders.branch_id', auth()->user()->branch_id))
+            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('orders.branch_id', $branchId))
+            ->selectRaw("
+                COALESCE(product_categories.name, 'Uncategorized') as category,
+                SUM(order_items.subtotal - (order_items.quantity * COALESCE(products.cost, 0))) as base_profit
+            ")
+            ->groupBy('product_categories.name')
+            ->pluck('base_profit', 'category')
+            ->toArray();
 
-        $categoryProfit = [];
-        $untrackedProfit = 0;
+        $optionCogs = DB::table('order_item_options')
+            ->join('order_items', 'order_item_options.order_item_id', '=', 'order_items.id')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->join('products', 'order_items.product_id', '=', 'products.id')
+            ->leftJoin('product_categories', 'products.category_id', '=', 'product_categories.id')
+            ->join('product_options', 'order_item_options.product_option_id', '=', 'product_options.id')
+            ->where('orders.status', Order::STATUS_COMPLETED)
+            ->when($start, fn($q) => $q->where('orders.created_at', '>=', $start))
+            ->when($end,   fn($q) => $q->where('orders.created_at', '<=', $end))
+            ->when(!$this->isSuperAdmin, fn($q) => $q->where('orders.branch_id', auth()->user()->branch_id))
+            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('orders.branch_id', $branchId))
+            ->selectRaw("COALESCE(product_categories.name, 'Uncategorized') as category, SUM(order_items.quantity * COALESCE(product_options.cost, 0)) as total")
+            ->groupBy('product_categories.name')
+            ->pluck('total', 'category')
+            ->toArray();
 
-                        foreach ($completedOrders as $order) {
-            $bid = $order->branch_id;
-            if ($order->items->count() > 0) {
-                foreach ($order->items as $item) {
-                    $productCostMap = []; $optionCostMap = []; $modifierCostMap = [];
-                    $itemCost = $this->calculateItemCogs($item, $branchCosts, $globalCosts, $purchaseCosts, $productCostMap, $optionCostMap, $modifierCostMap, $bid);
-                    $itemProfit = ($item->unit_price - $itemCost) * $item->quantity;
-
-                    $categoryName = $item->product->category->name ?? 'Uncategorized';
-                    $categoryProfit[$categoryName] = ($categoryProfit[$categoryName] ?? 0) + $itemProfit;
-                }
-            } else {
-                $untrackedProfit += $order->total_amount;
-            }
+        $combined = [];
+        foreach ($categorySales as $cat => $val) {
+            $combined[$cat] = (float)$val - (float)($optionCogs[$cat] ?? 0);
         }
 
-        // Adjust profit for discounts (Discounts reduce profit directly)
-        $discounts = $orders->sum('discount_amount');
-$refunds = $orders->sum('refunded_amount');
-if ($discounts > 0) {
-    $categoryProfit['Discounts Impact'] = ($categoryProfit['Discounts Impact'] ?? 0) - $discounts;
-}
-if ($refunds > 0) {
-    $categoryProfit['Refunds Impact'] = ($categoryProfit['Refunds Impact'] ?? 0) - $refunds;
-}
+        $adjustments = DB::table('orders')
+            ->where('status', Order::STATUS_COMPLETED)
+            ->when($start, fn($q) => $q->where('created_at', '>=', $start))
+            ->when($end,   fn($q) => $q->where('created_at', '<=', $end))
+            ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
+            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->selectRaw('SUM(discount_amount) as discounts, SUM(refunded_amount) as refunds')
+            ->first();
 
-        $breakdown = collect($categoryProfit)->map(fn($val, $key) => ['category' => $key, 'total' => (float)$val])->values()->toArray();
-        if ($untrackedProfit > 0) $breakdown[] = ['category' => 'Untracked Profit', 'total' => (float)$untrackedProfit];
+        if (($adjustments->discounts ?? 0) > 0) $combined['Discounts Impact'] = -(float)$adjustments->discounts;
+        if (($adjustments->refunds ?? 0) > 0) $combined['Refunds Impact'] = -(float)$adjustments->refunds;
 
+        $breakdown = collect($combined)->map(fn($val, $key) => ['category' => $key, 'total' => (float)$val])->values()->toArray();
         usort($breakdown, fn($a, $b) => abs($b['total']) <=> abs($a['total']));
         return $breakdown;
     }
@@ -241,40 +283,36 @@ if ($refunds > 0) {
     private function getMarginBreakdown(): array
     {
         $branchId = $this->selectedBranchId;
-        $orders = $this->fetchFinancialOrders($branchId);
-        $completedOrders = $orders->where('status', Order::STATUS_COMPLETED);
-        
-               $branchCosts = $this->buildBranchCostMap($branchId);
+        $start = $this->startDate ? $this->startDate . ' 00:00:00' : null;
+        $end = $this->endDate ? $this->endDate . ' 23:59:59' : null;
 
-        $purchaseCosts = $this->fetchPurchasePrices($branchId);
-        $globalCosts = Ingredient::pluck('cost', 'id');
-
-        $margins = [];
-        $categoryRevenue = [];
-        $categoryProfit = [];
-
-                   foreach ($completedOrders as $order) {
-            $bid = $order->branch_id;
-            foreach ($order->items as $item) {
-                $productCostMap = []; $optionCostMap = []; $modifierCostMap = [];
-                $itemCost = $this->calculateItemCogs($item, $branchCosts, $globalCosts, $purchaseCosts, $productCostMap, $optionCostMap, $modifierCostMap, $bid);
-                $itemProfit = ($item->unit_price - $itemCost) * $item->quantity;
-
-                $categoryName = $item->product->category->name ?? 'Uncategorized';
-                $categoryRevenue[$categoryName] = ($categoryRevenue[$categoryName] ?? 0) + ($item->unit_price * $item->quantity);
-                $categoryProfit[$categoryName] = ($categoryProfit[$categoryName] ?? 0) + $itemProfit;
-            }
-        }
+        $categoryStats = DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->join('products', 'order_items.product_id', '=', 'products.id')
+            ->leftJoin('product_categories', 'products.category_id', '=', 'product_categories.id')
+            ->where('orders.status', Order::STATUS_COMPLETED)
+            ->when($start, fn($q) => $q->where('orders.created_at', '>=', $start))
+            ->when($end,   fn($q) => $q->where('orders.created_at', '<=', $end))
+            ->when(!$this->isSuperAdmin, fn($q) => $q->where('orders.branch_id', auth()->user()->branch_id))
+            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('orders.branch_id', $branchId))
+            ->selectRaw("
+                COALESCE(product_categories.name, 'Uncategorized') as category,
+                SUM(order_items.subtotal) as revenue,
+                SUM(order_items.subtotal - (order_items.quantity * COALESCE(products.cost, 0))) as profit
+            ")
+            ->groupBy('product_categories.name')
+            ->get();
 
         $margins = [];
-        foreach ($categoryRevenue as $name => $rev) {
-            $profit = $categoryProfit[$name] ?? 0;
+        foreach ($categoryStats as $row) {
+            $rev = (float)$row->revenue;
+            $profit = (float)$row->profit;
             $margins[] = [
-                'category' => $name,
-                'total'    => $rev > 0 ? ($profit / $rev) * 100 : 0,
+                'category'      => $row->category,
+                'total'         => $rev > 0 ? round(($profit / $rev) * 100, 1) : 0,
                 'is_percentage' => true,
-                'revenue' => $rev,
-                'profit' => $profit
+                'revenue'       => $rev,
+                'profit'        => $profit,
             ];
         }
 
@@ -557,48 +595,56 @@ if ($refunds > 0) {
                 ? $this->selectedBranchId
                 : auth()->user()?->branch_id;
 
-            // ── 1. Fetch orders (same scope as BusinessIntelligence::getAnalytics) ──
-            $orders = Order::select([
-                    'id', 'branch_id', 'created_at', 'status',
-                    'total_amount', 'delivery_fee', 'discount_amount', 'refunded_amount',
-                ])
-                ->whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
+            // ── 1. Fetch aggregated order metrics directly from MySQL index in a single row ──
+            $financialRow = Order::whereIn('status', [Order::STATUS_COMPLETED, Order::STATUS_REFUNDED, Order::STATUS_PARTIALLY_REFUNDED])
                 ->when($this->startDate, fn($q) => $q->where('created_at', '>=', $this->startDate . ' 00:00:00'))
                 ->when($this->endDate,   fn($q) => $q->where('created_at', '<=', $this->endDate   . ' 23:59:59'))
                 ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
                 ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
-                ->get();
+                ->selectRaw('
+                    COUNT(*) as total_orders,
+                    COALESCE(SUM(total_amount), 0) as total_collected,
+                    COALESCE(SUM(delivery_fee), 0) as delivery_fees,
+                    COALESCE(SUM(discount_amount), 0) as total_discounts,
+                    COALESCE(SUM(refunded_amount), 0) as refunds,
+                    COUNT(CASE WHEN status = "completed" THEN 1 END) as order_count,
+                    COALESCE(SUM(CASE WHEN status = "completed" THEN total_amount ELSE 0 END), 0) as completed_revenue
+                ')
+                ->first();
 
-            $completedOrders = $orders->where('status', Order::STATUS_COMPLETED);
-
-            // ── 2. Revenue metrics (identical formulas to BusinessIntelligence) ──
-            $totalCollected = $orders->sum('total_amount');
-            $deliveryFees   = $orders->sum('delivery_fee');
-            $totalDiscounts = $orders->sum('discount_amount');
-            $refunds        = $orders->sum('refunded_amount');
+            // ── 2. Revenue metrics ──
+            $totalCollected = (float)($financialRow->total_collected ?? 0);
+            $deliveryFees   = (float)($financialRow->delivery_fees ?? 0);
+            $totalDiscounts = (float)($financialRow->total_discounts ?? 0);
+            $refunds        = (float)($financialRow->refunds ?? 0);
             $netSales       = $totalCollected - $deliveryFees - $refunds;
             $grossSales     = $netSales + $totalDiscounts;
-            $orderCount     = $completedOrders->count();
-            $aov            = $orderCount > 0 ? ($completedOrders->sum('total_amount') / $orderCount) : 0;
+            $orderCount     = (int)($financialRow->order_count ?? 0);
+            $aov            = $orderCount > 0 ? ((float)$financialRow->completed_revenue / $orderCount) : 0;
 
-            // ── 3. COGS via SQL JOIN on products.cost (same as BusinessIntelligence::computeCogs) ──
-            $totalCogs = 0.0;
-            if ($completedOrders->isNotEmpty()) {
-                $orderIds = $completedOrders->pluck('id');
+            // ── 3. COGS via direct SQL JOIN with indexed orders ──
+            $baseCogs = (float) DB::table('order_items')
+                ->join('orders', 'order_items.order_id', '=', 'orders.id')
+                ->join('products', 'order_items.product_id', '=', 'products.id')
+                ->where('orders.status', Order::STATUS_COMPLETED)
+                ->when($this->startDate, fn($q) => $q->where('orders.created_at', '>=', $this->startDate . ' 00:00:00'))
+                ->when($this->endDate,   fn($q) => $q->where('orders.created_at', '<=', $this->endDate   . ' 23:59:59'))
+                ->when(!$this->isSuperAdmin, fn($q) => $q->where('orders.branch_id', auth()->user()->branch_id))
+                ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('orders.branch_id', $branchId))
+                ->sum(DB::raw('order_items.quantity * COALESCE(products.cost, 0)'));
 
-                $baseCogs = (float) DB::table('order_items')
-                    ->join('products', 'order_items.product_id', '=', 'products.id')
-                    ->whereIn('order_items.order_id', $orderIds)
-                    ->sum(DB::raw('order_items.quantity * COALESCE(products.cost, 0)'));
+            $optionCogs = (float) DB::table('order_item_options')
+                ->join('order_items', 'order_item_options.order_item_id', '=', 'order_items.id')
+                ->join('orders', 'order_items.order_id', '=', 'orders.id')
+                ->join('product_options', 'order_item_options.product_option_id', '=', 'product_options.id')
+                ->where('orders.status', Order::STATUS_COMPLETED)
+                ->when($this->startDate, fn($q) => $q->where('orders.created_at', '>=', $this->startDate . ' 00:00:00'))
+                ->when($this->endDate,   fn($q) => $q->where('orders.created_at', '<=', $this->endDate   . ' 23:59:59'))
+                ->when(!$this->isSuperAdmin, fn($q) => $q->where('orders.branch_id', auth()->user()->branch_id))
+                ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('orders.branch_id', $branchId))
+                ->sum(DB::raw('order_items.quantity * COALESCE(product_options.cost, 0)'));
 
-                $optionCogs = (float) DB::table('order_item_options')
-                    ->join('order_items', 'order_item_options.order_item_id', '=', 'order_items.id')
-                    ->join('product_options', 'order_item_options.product_option_id', '=', 'product_options.id')
-                    ->whereIn('order_items.order_id', $orderIds)
-                    ->sum(DB::raw('order_items.quantity * COALESCE(product_options.cost, 0)'));
-
-                $totalCogs = $baseCogs + $optionCogs;
-            }
+            $totalCogs = $baseCogs + $optionCogs;
 
             // ── 4. Waste cost (same as BusinessIntelligence) ──
             $start = $this->startDate ? Carbon::parse($this->startDate)->startOfDay() : null;
@@ -740,8 +786,8 @@ if ($refunds > 0) {
                 ->where('orders.status', Order::STATUS_COMPLETED)
                 ->when($this->startDate, fn($q) => $q->where('orders.created_at', '>=', $this->startDate . ' 00:00:00'))
                 ->when($this->endDate, fn($q) => $q->where('orders.created_at', '<=', $this->endDate . ' 23:59:59'))
-                ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
-                ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
+                ->when(!$this->isSuperAdmin, fn($q) => $q->where('orders.branch_id', auth()->user()->branch_id))
+                ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('orders.branch_id', $branchId))
                 ->select('products.name', 'product_categories.name as category_name', 'order_items.product_id', 
                          DB::raw('SUM(order_items.quantity) as total_sold'),
                          DB::raw('SUM(order_items.subtotal) as total_revenue'))
@@ -849,11 +895,11 @@ if ($refunds > 0) {
             $wasteMovements = $this->fetchChartWasteMovements($start, $end, $branchId);
 
             if ($start->toDateString() === $end->toDateString()) {
-                $hourlyData = $this->aggregateHourlyChartData($orders, $branchCosts, $globalCosts, $purchaseCosts, $wasteMovements);
+                $hourlyData = $this->aggregateHourlyChartData($orders, $branchCosts, $globalCosts, $purchaseCosts, $wasteMovements, $start, $end, $branchId);
                 return $this->formatHourlyChartOutput($start, $end, $hourlyData, $orders);
             }
 
-            $dailyData = $this->aggregateDailyChartData($orders, $branchCosts, $globalCosts, $purchaseCosts, $wasteMovements);
+            $dailyData = $this->aggregateDailyChartData($orders, $branchCosts, $globalCosts, $purchaseCosts, $wasteMovements, $start, $end, $branchId);
             
             return $this->formatChartOutput($start, $end, $dailyData, $orders);
         });
@@ -868,32 +914,56 @@ if ($refunds > 0) {
             ->get(['branch_id', 'ingredient_id', 'quantity', 'unit_cost', 'created_at']);
     }
 
-        private function aggregateHourlyChartData(Collection $orders, Collection $branchCostMap, Collection $globalCostMap, Collection $purchaseCostMap, Collection $wasteMovements): array
+    private function aggregateHourlyChartData(Collection $orders, Collection $branchCostMap, Collection $globalCostMap, Collection $purchaseCostMap, Collection $wasteMovements, Carbon $start, Carbon $end, ?int $branchId): array
     {
         $hourlyData = [];
         for ($h = 0; $h < 24; $h++) {
             $hourlyData[$h] = ['sales' => 0, 'volume' => 0, 'profit' => 0, 'cogs' => 0, 'waste' => 0];
         }
 
-        $productCostMap = [];
-        $optionCostMap = [];
-        $modifierCostMap = [];
+        $hourlySales = DB::table('orders')
+            ->where('status', Order::STATUS_COMPLETED)
+            ->whereBetween('created_at', [$start, $end])
+            ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
+            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->selectRaw('HOUR(created_at) as hour, COUNT(*) as volume, SUM(total_amount) as sales, SUM(delivery_fee) as delivery_fee')
+            ->groupBy('hour')
+            ->get()
+            ->keyBy('hour');
 
-        foreach ($orders as $order) {
-            $hour = (int)Carbon::parse($order->created_at)->hour;
-            $bid = $order->branch_id;
-            
-            $hourlyData[$hour]['sales'] += $order->total_amount;
-            $hourlyData[$hour]['volume'] += 1;
+        $hourlyBaseCogs = DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->join('products', 'order_items.product_id', '=', 'products.id')
+            ->where('orders.status', Order::STATUS_COMPLETED)
+            ->whereBetween('orders.created_at', [$start, $end])
+            ->when(!$this->isSuperAdmin, fn($q) => $q->where('orders.branch_id', auth()->user()->branch_id))
+            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('orders.branch_id', $branchId))
+            ->selectRaw('HOUR(orders.created_at) as hour, SUM(order_items.quantity * COALESCE(products.cost, 0)) as cogs')
+            ->groupBy('hour')
+            ->pluck('cogs', 'hour');
 
-            $orderCogs = 0;
-            foreach ($order->items as $item) {
-                $itemCost = $this->calculateItemCogs($item, $branchCostMap, $globalCostMap, $purchaseCostMap, $productCostMap, $optionCostMap, $modifierCostMap, $bid);
-                $orderCogs += ($itemCost * $item->quantity);
-            }
-            $hourlyData[$hour]['cogs'] += $orderCogs;
-            // Profit = (Total Amount - Delivery Fee) - COGS
-            $hourlyData[$hour]['profit'] += ($order->total_amount - $order->delivery_fee - $orderCogs);
+        $hourlyOptionCogs = DB::table('order_item_options')
+            ->join('order_items', 'order_item_options.order_item_id', '=', 'order_items.id')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->join('product_options', 'order_item_options.product_option_id', '=', 'product_options.id')
+            ->where('orders.status', Order::STATUS_COMPLETED)
+            ->whereBetween('orders.created_at', [$start, $end])
+            ->when(!$this->isSuperAdmin, fn($q) => $q->where('orders.branch_id', auth()->user()->branch_id))
+            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('orders.branch_id', $branchId))
+            ->selectRaw('HOUR(orders.created_at) as hour, SUM(order_items.quantity * COALESCE(product_options.cost, 0)) as cogs')
+            ->groupBy('hour')
+            ->pluck('cogs', 'hour');
+
+        foreach ($hourlySales as $h => $row) {
+            $hour = (int)$h;
+            $sales = (float)$row->sales;
+            $deliveryFee = (float)$row->delivery_fee;
+            $cogs = (float)(($hourlyBaseCogs[$hour] ?? 0) + ($hourlyOptionCogs[$hour] ?? 0));
+
+            $hourlyData[$hour]['sales'] = $sales;
+            $hourlyData[$hour]['volume'] = (int)$row->volume;
+            $hourlyData[$hour]['cogs'] = $cogs;
+            $hourlyData[$hour]['profit'] = ($sales - $deliveryFee - $cogs);
         }
 
         // Net real waste events into the hour they happened.
@@ -965,15 +1035,7 @@ if ($refunds > 0) {
             default  => $salesForecast,
         };
 
-        $posConfig = ConfigurationService::getPosConfig();
-        
-        $paymentRaw = $orders->groupBy('payment_method')->map->count();
-        $paymentTotalsRaw = $orders->groupBy('payment_method')->map(fn($g) => round($g->sum('total_amount'), 2));
-        $paymentLabels = $posConfig['payment_methods'] ?? ['Cash', 'GCash'];
-        $paymentSeries = [];
-        foreach ($paymentLabels as $label) {
-            $paymentSeries[] = (int)($paymentRaw[$label] ?? 0);
-        }
+        $payment = $this->resolvePaymentMethods($orders);
 
         $channelsRaw = $orders->groupBy('order_type')->map->count();
         $channelLabels = collect($posConfig['order_types'] ?? ['Dine-in', 'Take-out'])
@@ -1006,11 +1068,7 @@ if ($refunds > 0) {
                     'AOV'    => $aovForecast,
                 ]
             ],
-            'payment'    => [
-                'series' => $paymentSeries,
-                'labels' => $paymentLabels,
-                'totals' => array_map(fn($label) => $paymentTotalsRaw[$label] ?? 0, $paymentLabels),
-            ],
+            'payment'    => $payment,
             'channels'   => [
                 'series' => $channelSeries,
                 'labels' => $channelLabels
@@ -1057,13 +1115,12 @@ if ($refunds > 0) {
 
     private function fetchChartOrders(Carbon $start, Carbon $end, ?int $branchId): Collection
     {
-        return $this->withOptimizedOrderItemRelations(
-            Order::select('id', 'branch_id', 'created_at', 'status', 'total_amount', 'delivery_fee', 'discount_amount', 'payment_method', 'order_type')
-                ->where('status', Order::STATUS_COMPLETED)
-                ->whereBetween('created_at', [$start, $end])
-                ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
-                ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
-        )->get();
+        return Order::select('id', 'branch_id', 'created_at', 'status', 'total_amount', 'delivery_fee', 'discount_amount', 'payment_method', 'order_type')
+            ->where('status', Order::STATUS_COMPLETED)
+            ->whereBetween('created_at', [$start, $end])
+            ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
+            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->get();
     }
 
     private function fetchChartStandardCosts(?int $branchId): Collection
@@ -1074,42 +1131,68 @@ if ($refunds > 0) {
             ->get();
     }
 
-        private function aggregateDailyChartData(Collection $orders, Collection $branchCostMap, Collection $globalCostMap, Collection $purchaseCostMap, Collection $wasteMovements): array
+    private function aggregateDailyChartData(Collection $orders, Collection $branchCostMap, Collection $globalCostMap, Collection $purchaseCostMap, Collection $wasteMovements, Carbon $start, Carbon $end, ?int $branchId): array
     {
         $dailyData = [];
-        $productCostMap = [];
-        $optionCostMap = [];
-        $modifierCostMap = [];
 
-        foreach ($orders as $order) {
-            $date = Carbon::parse($order->created_at)->toDateString();
-            $bid = $order->branch_id;
-            if (!isset($dailyData[$date])) $dailyData[$date] = ['sales' => 0, 'volume' => 0, 'profit' => 0, 'cogs' => 0, 'waste' => 0];
-            
-            $dailyData[$date]['sales'] += $order->total_amount;
-            $dailyData[$date]['volume'] += 1;
+        $dailySales = DB::table('orders')
+            ->where('status', Order::STATUS_COMPLETED)
+            ->whereBetween('created_at', [$start, $end])
+            ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
+            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->selectRaw('DATE(created_at) as date, COUNT(*) as volume, SUM(total_amount) as sales, SUM(delivery_fee) as delivery_fee')
+            ->groupBy('date')
+            ->get()
+            ->keyBy('date');
 
-            $orderCogs = 0;
-            foreach ($order->items as $item) {
-                $itemCost = $this->calculateItemCogs($item, $branchCostMap, $globalCostMap, $purchaseCostMap, $productCostMap, $optionCostMap, $modifierCostMap, $bid);
-                $orderCogs += ($itemCost * $item->quantity);
-            }
-            $dailyData[$date]['cogs'] += $orderCogs;
-            // Profit = (Total Amount - Delivery Fee) - COGS
-            $dailyData[$date]['profit'] += ($order->total_amount - $order->delivery_fee - $orderCogs);
-        }
+        $dailyBaseCogs = DB::table('order_items')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->join('products', 'order_items.product_id', '=', 'products.id')
+            ->where('orders.status', Order::STATUS_COMPLETED)
+            ->whereBetween('orders.created_at', [$start, $end])
+            ->when(!$this->isSuperAdmin, fn($q) => $q->where('orders.branch_id', auth()->user()->branch_id))
+            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('orders.branch_id', $branchId))
+            ->selectRaw('DATE(orders.created_at) as date, SUM(order_items.quantity * COALESCE(products.cost, 0)) as cogs')
+            ->groupBy('date')
+            ->pluck('cogs', 'date');
 
-        // Net real waste events into the same day they happened, so this
-        // profit series equals Net Sales - COGS - Waste, matching the KPI card.
+        $dailyOptionCogs = DB::table('order_item_options')
+            ->join('order_items', 'order_item_options.order_item_id', '=', 'order_items.id')
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->join('product_options', 'order_item_options.product_option_id', '=', 'product_options.id')
+            ->where('orders.status', Order::STATUS_COMPLETED)
+            ->whereBetween('orders.created_at', [$start, $end])
+            ->when(!$this->isSuperAdmin, fn($q) => $q->where('orders.branch_id', auth()->user()->branch_id))
+            ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('orders.branch_id', $branchId))
+            ->selectRaw('DATE(orders.created_at) as date, SUM(order_items.quantity * COALESCE(product_options.cost, 0)) as cogs')
+            ->groupBy('date')
+            ->pluck('cogs', 'date');
+
         $dailyWaste = $wasteMovements->groupBy(fn($m) => Carbon::parse($m->created_at)->toDateString())
             ->map(fn($g) => $g->sum(fn($m) => abs((float)$m->quantity) * ((float)($m->unit_cost ?? 0))));
 
-        foreach ($dailyWaste as $date => $wasteAmt) {
-            if (!isset($dailyData[$date])) $dailyData[$date] = ['sales' => 0, 'volume' => 0, 'profit' => 0, 'cogs' => 0, 'waste' => 0];
-            $dailyData[$date]['waste'] = $wasteAmt;
-            $dailyData[$date]['profit'] -= $wasteAmt;
+        foreach ($dailySales as $date => $row) {
+            $sales = (float)$row->sales;
+            $volume = (int)$row->volume;
+            $deliveryFee = (float)$row->delivery_fee;
+            $cogs = (float)(($dailyBaseCogs[$date] ?? 0) + ($dailyOptionCogs[$date] ?? 0));
+            $waste = (float)($dailyWaste[$date] ?? 0);
+
+            $dailyData[$date] = [
+                'sales'  => $sales,
+                'volume' => $volume,
+                'cogs'   => $cogs,
+                'waste'  => $waste,
+                'profit' => ($sales - $deliveryFee - $cogs - $waste),
+            ];
         }
-        
+
+        foreach ($dailyWaste as $date => $wasteAmt) {
+            if (!isset($dailyData[$date])) {
+                $dailyData[$date] = ['sales' => 0, 'volume' => 0, 'profit' => -$wasteAmt, 'cogs' => 0, 'waste' => $wasteAmt];
+            }
+        }
+
         return $dailyData;
     }
 
@@ -1171,13 +1254,7 @@ if ($refunds > 0) {
         $posConfig = ConfigurationService::getPosConfig();
         
         // Payment Distribution
-        $paymentRaw = $orders->groupBy('payment_method')->map->count();
-        $paymentTotalsRaw = $orders->groupBy('payment_method')->map(fn($g) => round($g->sum('total_amount'), 2));
-        $paymentLabels = $posConfig['payment_methods'] ?? ['Cash', 'GCash'];
-        $paymentSeries = [];
-        foreach ($paymentLabels as $label) {
-            $paymentSeries[] = (int)($paymentRaw[$label] ?? 0);
-        }
+        $payment = $this->resolvePaymentMethods($orders);
 
         // Revenue Channels (Order Types)
         $channelsRaw = $orders->groupBy('order_type')->map->count();
@@ -1211,16 +1288,46 @@ if ($refunds > 0) {
                     'AOV'    => $aovForecast,
                 ]
             ],
-            'payment'    => [
-                'series' => $paymentSeries,
-                'labels' => $paymentLabels,
-                'totals' => array_map(fn($label) => $paymentTotalsRaw[$label] ?? 0, $paymentLabels),
-            ],
+            'payment'    => $payment,
             'channels'   => [
                 'series' => $channelSeries,
                 'labels' => $channelLabels
             ],
             'metric' => $this->selectedChartMetric
+        ];
+    }
+
+    private function resolvePaymentMethods(Collection $orders): array
+    {
+        $posConfig = ConfigurationService::getPosConfig();
+
+        $paymentGroups = $orders->groupBy(function ($order) {
+            $method = strtolower(trim((string) $order->payment_method));
+
+            return in_array($method, ['cod', 'cash on delivery'], true)
+                ? 'Cash on Delivery'
+                : ($order->payment_method ?: 'Unknown');
+        });
+
+        $paymentLabels = collect($posConfig['payment_methods'] ?? ['Cash', 'GCash'])
+            ->merge(['Cash on Delivery'])
+            ->merge($paymentGroups->keys())
+            ->unique()
+            ->values()
+            ->all();
+
+        $paymentSeries = [];
+        $paymentTotals = [];
+        foreach ($paymentLabels as $label) {
+            $group = $paymentGroups->get($label, collect());
+            $paymentSeries[] = (int)$group->count();
+            $paymentTotals[] = round((float)$group->sum('total_amount'), 2);
+        }
+
+        return [
+            'series' => $paymentSeries,
+            'labels' => $paymentLabels,
+            'totals' => $paymentTotals,
         ];
     }
 
@@ -1312,7 +1419,9 @@ if ($refunds > 0) {
                 ->when($filterEnd, fn($q) => $q->where('created_at', '<=', $filterEnd))
                 ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
                 ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
-                ->get(['branch_id', 'ingredient_id', 'quantity']);
+                ->select('branch_id', 'ingredient_id', DB::raw('SUM(ABS(quantity)) as total_quantity'))
+                ->groupBy('branch_id', 'ingredient_id')
+                ->get();
 
             // Exclude generic "adjust" records here because positive reconciliations store
             // the final counted stock level, which would distort loss calculations.
@@ -1321,16 +1430,18 @@ if ($refunds > 0) {
                 ->when($filterEnd, fn($q) => $q->where('created_at', '<=', $filterEnd))
                 ->when(!$this->isSuperAdmin, fn($q) => $q->where('branch_id', auth()->user()->branch_id))
                 ->when($this->isSuperAdmin && $branchId, fn($q) => $q->where('branch_id', $branchId))
-                ->get(['branch_id', 'ingredient_id', 'quantity']);
+                ->select('branch_id', 'ingredient_id', DB::raw('SUM(ABS(quantity)) as total_quantity'))
+                ->groupBy('branch_id', 'ingredient_id')
+                ->get();
 
-            $salesValue = $salesMovements->sum(fn ($movement) => abs((float) $movement->quantity) * $this->resolveInventoryIntelUnitCost(
+            $salesValue = $salesMovements->sum(fn ($movement) => ((float) $movement->total_quantity) * $this->resolveInventoryIntelUnitCost(
                 (int) $movement->branch_id,
                 (int) $movement->ingredient_id,
                 $branchCostMap,
                 $globalCostMap
             ));
 
-            $wasteValue = $wasteMovements->sum(fn ($movement) => abs((float) $movement->quantity) * $this->resolveInventoryIntelUnitCost(
+            $wasteValue = $wasteMovements->sum(fn ($movement) => ((float) $movement->total_quantity) * $this->resolveInventoryIntelUnitCost(
                 (int) $movement->branch_id,
                 (int) $movement->ingredient_id,
                 $branchCostMap,

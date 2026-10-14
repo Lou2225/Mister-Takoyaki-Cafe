@@ -71,10 +71,13 @@
             {{-- Primary Revenue Metrics --}}
 <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 px-1">
                     {{-- Gross Revenue --}}
-                <div wire:click="openBreakdown('Gross Revenue')" class="p-3 sm:p-4 md:p-6 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between relative overflow-hidden group">
+                <div wire:click="openBreakdown('Gross Revenue')" class="p-3 sm:p-4 md:p-6 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between relative overflow-visible group hover:z-20">
                     <div>
                         <div class="flex items-center justify-between mb-1 sm:mb-2">
-    <span class="text-[10px] sm:text-[11px] md:text-[12px] font-bold text-slate-400 uppercase tracking-wider">Gross Revenue</span>
+    <span class="text-[10px] sm:text-[11px] md:text-[12px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+        Gross Revenue
+        <x-tooltip title="Gross Revenue" text="Total value of all sales before discounts, delivery fees, or refunds." position="bottom" align="start" />
+    </span>
     <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 border border-indigo-100 group-hover:scale-110 transition-transform shrink-0">
         <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
     </div>
@@ -85,10 +88,13 @@
                 </div>
 
                 {{-- Net Sales --}}
-                <div wire:click="openBreakdown('Net Sales')" class="p-3 sm:p-4 md:p-6 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between relative overflow-hidden group">
+                <div wire:click="openBreakdown('Net Sales')" class="p-3 sm:p-4 md:p-6 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between relative overflow-visible group hover:z-20">
                     <div>
                         <div class="flex items-center justify-between mb-1 sm:mb-2">
-    <span class="text-[10px] sm:text-[11px] md:text-[12px] font-bold text-slate-400 uppercase tracking-wider">Net Sales</span>
+    <span class="text-[10px] sm:text-[11px] md:text-[12px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+        Net Sales
+        <x-tooltip title="Net Sales" text="Gross sales minus customer discounts, refunds, and delivery fees." position="bottom" align="start" />
+    </span>
     <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 group-hover:scale-110 transition-transform shrink-0">
         <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
     </div>
@@ -99,10 +105,13 @@
                 </div>
 
                 {{-- Gross Profit --}}
-                <div wire:click="openBreakdown('Gross Profit')" class="p-3 sm:p-4 md:p-6 bg-gradient-to-br from-violet-500/10 via-violet-500/5 to-white border border-violet-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between relative overflow-hidden group col-span-2 lg:col-span-1">
+                <div wire:click="openBreakdown('Gross Profit')" class="p-3 sm:p-4 md:p-6 bg-gradient-to-br from-violet-500/10 via-violet-500/5 to-white border border-violet-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between relative overflow-visible group hover:z-20 col-span-2 lg:col-span-1">
                     <div>
                         <div class="flex items-center justify-between mb-1 sm:mb-2">
-    <span class="text-[10px] sm:text-[11px] md:text-[12px] font-bold text-slate-400 uppercase tracking-wider">Gross Profit</span>
+    <span class="text-[10px] sm:text-[11px] md:text-[12px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+        Gross Profit
+        <x-tooltip title="Gross Profit" text="Net sales revenue minus direct raw material costs (COGS) and spoilage waste." position="bottom" align="start" />
+    </span>
     <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-violet-50 flex items-center justify-center text-violet-600 border border-violet-100 group-hover:scale-110 transition-transform shrink-0">
         <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
     </div>
@@ -116,56 +125,71 @@
             {{-- Operational Insights & Deductions --}}
             <div class="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-nowrap gap-3 sm:gap-4 px-1">
                 {{-- Discounts --}}
-                <div class="bg-white border border-gray-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-3 sm:gap-4 group hover:border-rose-200 transition-all lg:flex-1 lg:min-w-0">
+                <div class="bg-white border border-gray-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-3 sm:gap-4 group hover:border-rose-200 transition-all lg:flex-1 lg:min-w-0 relative overflow-visible hover:z-20">
     <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
         <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
     </div>
     <div class="min-w-0">
-        <span class="block text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Discounts</span>
-        <span class="block text-[13px] sm:text-[15px] font-black text-rose-600 leading-none truncate">-&#8369;{{ number_format($performance['total_discounts'], 2) }}</span>
+        <span class="block text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1 flex items-center gap-1">
+            Discounts
+            <x-tooltip title="Discounts" text="Total value of vouchers and promotional discounts granted." position="bottom" align="start" />
+        </span>
+        <span class="block text-[13px] sm:text-[15px] font-black text-rose-600 leading-none truncate">&#8369;{{ number_format(abs($performance['total_discounts']), 2) }}</span>
     </div>
 </div>
 
                 {{-- Delivery Fees --}}
-                <div class="bg-white border border-gray-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-3 sm:gap-4 group hover:border-amber-200 transition-all lg:flex-1 lg:min-w-0">
+                <div class="bg-white border border-gray-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-3 sm:gap-4 group hover:border-amber-200 transition-all lg:flex-1 lg:min-w-0 relative overflow-visible hover:z-20">
     <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
         <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
     </div>
     <div class="min-w-0">
-        <span class="block text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Delivery</span>
+        <span class="block text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1 flex items-center gap-1">
+            Delivery
+            <x-tooltip title="Delivery Fees" text="Total delivery charges collected for order transit." position="bottom" align="start" />
+        </span>
         <span class="block text-[13px] sm:text-[15px] font-black text-amber-600 leading-none truncate">&#8369;{{ number_format($performance['delivery_fees'], 2) }}</span>
     </div>
 </div>
 
                 {{-- Refunds --}}
-                <div class="bg-white border border-gray-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-3 sm:gap-4 group hover:border-rose-200 transition-all lg:flex-1 lg:min-w-0">
+                <div class="bg-white border border-gray-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-3 sm:gap-4 group hover:border-rose-200 transition-all lg:flex-1 lg:min-w-0 relative overflow-visible hover:z-20">
     <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
         <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3"/></svg>
     </div>
     <div class="min-w-0">
-        <span class="block text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Refunds</span>
-        <span class="block text-[13px] sm:text-[15px] font-black text-rose-600 leading-none truncate">-&#8369;{{ number_format($performance['refunds'], 2) }}</span>
+        <span class="block text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1 flex items-center gap-1">
+            Refunds
+            <x-tooltip title="Refunds" text="Total customer reimbursements for cancelled orders." position="bottom" align="start" />
+        </span>
+        <span class="block text-[13px] sm:text-[15px] font-black text-rose-600 leading-none truncate">&#8369;{{ number_format(abs($performance['refunds']), 2) }}</span>
     </div>
 </div>
 
                 {{-- Waste / Spoilage --}}
-                <div class="bg-white border border-gray-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-3 sm:gap-4 group hover:border-rose-200 transition-all lg:flex-1 lg:min-w-0">
+                <div class="bg-white border border-gray-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-3 sm:gap-4 group hover:border-rose-200 transition-all lg:flex-1 lg:min-w-0 relative overflow-visible hover:z-20">
     <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
         <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
     </div>
     <div class="min-w-0">
-        <span class="block text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Spoilage</span>
-        <span class="block text-[13px] sm:text-[15px] font-black text-rose-600 leading-none truncate">-&#8369;{{ number_format($performance['waste_cost'] ?? 0, 2) }}</span>
+        <span class="block text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1 flex items-center gap-1">
+            Spoilage
+            <x-tooltip title="Spoilage & Waste" text="Inventory loss from damaged or expired raw materials." position="bottom" align="start" />
+        </span>
+        <span class="block text-[13px] sm:text-[15px] font-black text-rose-600 leading-none truncate">&#8369;{{ number_format(abs($performance['waste_cost'] ?? 0), 2) }}</span>
     </div>
 </div>
 
                 {{-- Average Ticket --}}
-                <div class="bg-white border border-gray-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-3 sm:gap-4 group hover:border-blue-200 transition-all col-span-2 sm:col-span-1 lg:flex-1 lg:min-w-0">
+                <div class="bg-white border border-gray-200 rounded-2xl p-3 sm:p-4 shadow-sm flex items-center gap-3 sm:gap-4 group hover:border-blue-200 transition-all col-span-2 sm:col-span-1 lg:flex-1 lg:min-w-0 relative overflow-visible hover:z-20">
     <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
         <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
     </div>
     <div class="min-w-0">
-        <span class="block text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Avg Ticket</span>
+        <span class="block text-[8px] sm:text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1 flex items-center gap-1">
+            Avg Ticket
+            <x-tooltip title="Average Order Value" text="Average sales amount collected per completed order." position="bottom" align="start" />
+        </span>
         <span class="block text-[13px] sm:text-[15px] font-black text-gray-900 leading-none truncate">&#8369;{{ number_format($performance['avg_order_value'], 2) }}</span>
     </div>
 </div>
@@ -252,44 +276,47 @@
                                 <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                                 <div>
                                     <p class="text-[11px] font-black text-emerald-700">High</p>
-                                    <p class="text-[10px] text-emerald-600/70">60+ days of data, R2 >= 0.70</p>
+                                    <p class="text-[10px] text-emerald-600/70">60+ days (or 12+ months), R2 &ge; 0.70</p>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2 px-3 py-2 bg-amber-50 rounded-lg border border-amber-100">
                                 <span class="w-2 h-2 rounded-full bg-amber-500"></span>
                                 <div>
                                     <p class="text-[11px] font-black text-amber-700">Medium</p>
-                                    <p class="text-[10px] text-amber-600/70">30+ days of data, R2 >= 0.40</p>
+                                    <p class="text-[10px] text-amber-600/70">30+ days (or 6+ months), R2 &ge; 0.40</p>
                                 </div>
                             </div>
-                            <div class="flex items-center gap-2 px-3 py-2 bg-rose-50 rounded-lg border border-rose-100">
-                                <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                            <div class="flex items-center gap-2 px-3 py-2 bg-indigo-50 rounded-lg border border-indigo-100">
+                                <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
                                 <div>
-                                    <p class="text-[11px] font-black text-rose-700">Low</p>
-                                    <p class="text-[10px] text-rose-600/70">14+ days, pattern not yet clear</p>
+                                    <p class="text-[11px] font-black text-indigo-700">Moderate</p>
+                                    <p class="text-[10px] text-indigo-600/70">14+ days (or 3+ months), active baseline</p>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-200">
                                 <span class="w-2 h-2 rounded-full bg-slate-400"></span>
                                 <div>
-                                    <p class="text-[11px] font-black text-slate-600">Insufficient</p>
-                                    <p class="text-[10px] text-slate-500/70">Less than 14 days of sales data</p>
+                                    <p class="text-[11px] font-black text-slate-600">Low / Insufficient</p>
+                                    <p class="text-[10px] text-slate-500/70">&lt; 14 days daily or &lt; 2 months monthly</p>
                                 </div>
                             </div>
                         </div>
-                        <p class="mt-3 text-[10px] leading-relaxed text-slate-500">Confidence is assigned separately to the 7-day and 6-month forecasts. It combines the amount of usable history with how closely the weighted trend fits that history (R2). It does not mean the forecast is guaranteed.</p>
+                        <p class="mt-3 text-[10px] leading-relaxed text-slate-500">Confidence reflects statistical sample depth, empirical trend fit (R2), and residual stability across daily and monthly forecast horizons.</p>
                     </div>
 
                     {{-- Acronym guide --}}
                     <div class="pt-4 border-t border-slate-100">
-                        <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Acronym guide</p>
+                        <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Acronym & Methodology Guide</p>
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                             <div class="rounded-lg bg-indigo-50 px-3 py-2"><span class="font-black text-indigo-800">MAE</span><span class="text-slate-600"> - Mean Absolute Error</span></div>
                             <div class="rounded-lg bg-indigo-50 px-3 py-2"><span class="font-black text-indigo-800">RMSE</span><span class="text-slate-600"> - Root Mean Squared Error</span></div>
                             <div class="rounded-lg bg-indigo-50 px-3 py-2"><span class="font-black text-indigo-800">WAPE</span><span class="text-slate-600"> - Weighted Absolute Percentage Error</span></div>
                             <div class="rounded-lg bg-slate-50 px-3 py-2"><span class="font-black text-slate-800">R2</span><span class="text-slate-600"> - R-squared model fit score</span></div>
                             <div class="rounded-lg bg-slate-50 px-3 py-2"><span class="font-black text-slate-800">WLR</span><span class="text-slate-600"> - Weighted Linear Regression</span></div>
-                            <div class="rounded-lg bg-slate-50 px-3 py-2"><span class="font-black text-slate-800">IQR</span><span class="text-slate-600"> - Interquartile Range for outlier filtering</span></div>
+                            <div class="rounded-lg bg-slate-50 px-3 py-2"><span class="font-black text-slate-800">IQR</span><span class="text-slate-600"> - Interquartile Range outlier filter</span></div>
+                            <div class="rounded-lg bg-amber-50 px-3 py-2"><span class="font-black text-amber-800">DCT</span><span class="text-slate-600"> - Dynamic Continuous Trajectory</span></div>
+                            <div class="rounded-lg bg-emerald-50 px-3 py-2"><span class="font-black text-emerald-800">DST</span><span class="text-slate-600"> - Data Sufficiency Threshold</span></div>
+                            <div class="rounded-lg bg-violet-50 px-3 py-2"><span class="font-black text-violet-800">MRD</span><span class="text-slate-600"> - Mean-Reverting Damped Trend</span></div>
                         </div>
                     </div>
 
@@ -298,17 +325,17 @@
                         <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">How the forecast is calculated</p>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div class="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
-                                <p class="text-[11px] font-black text-indigo-800">7-Day Forecast</p>
-                                <p class="mt-1 text-[10px] leading-relaxed text-indigo-900/70">Uses up to 60 completed daily periods. Recent days have more weight, unusual values are filtered with the IQR method, and day-of-week patterns are applied when at least 7 days are available.</p>
+                                <p class="text-[11px] font-black text-indigo-800">Daily Rolling Timeline (14 – 180 Days)</p>
+                                <p class="mt-1 text-[10px] leading-relaxed text-indigo-900/70">Calculated using recency-weighted linear regression over active daily history, combined with empirical autocorrelation trend momentum. Eliminates artificial repeating patterns by computing a continuous forward trajectory where values evolve dynamically as the date range extends. Prediction uncertainty bounds widen with horizon distance without synthetic or hardcoded assumptions.</p>
                             </div>
                             <div class="rounded-xl border border-violet-100 bg-violet-50/60 p-4">
-                                <p class="text-[11px] font-black text-violet-800">6-Month Forecast</p>
-                                <p class="mt-1 text-[10px] leading-relaxed text-violet-900/70">Uses up to 12 completed monthly periods. The trend is damped over time, so a short recent spike does not grow indefinitely across six months.</p>
+                                <p class="text-[11px] font-black text-violet-800">Monthly Capacity Projection (3 – 24 Months)</p>
+                                <p class="mt-1 text-[10px] leading-relaxed text-violet-900/70">Requires at least 2 completed calendar months of recorded sales history. Aggregates actual monthly order inflows to model long-term momentum without fabricating seasonal multipliers or hypothetical holiday assumptions.</p>
                             </div>
                         </div>
                         <div class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
                             <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Model flow</p>
-                            <p class="mt-2 text-[10px] leading-relaxed text-slate-600">Historical sales -> remove extreme outliers -> fit a recent-weighted trend -> apply seasonality -> damp the distant trend -> prevent unrealistic near-zero results.</p>
+                            <p class="mt-2 text-[10px] leading-relaxed text-slate-600">Historical recorded orders &rarr; Filter recording outliers (IQR) &rarr; Fit recency-weighted trend line &rarr; Advance continuous trajectory over future horizon &rarr; Bound with dynamically expanding confidence interval bands.</p>
                         </div>
                     </div>
 
@@ -322,7 +349,7 @@
                                     <span class="text-[10px] font-black text-indigo-600">Pesos</span>
                                 </div>
                                 <p class="mt-1 text-[10px] font-mono text-indigo-700">MAE = average(|actual - predicted|)</p>
-                                <p class="mt-1 text-[10px] leading-relaxed text-slate-500">The average absolute difference between predicted and actual daily revenue. Example: MAE of P500 means the forecast is off by about P500 per day on average.</p>
+                                <p class="mt-1 text-[10px] leading-relaxed text-slate-500">The average absolute difference between predicted and actual daily revenue. Example: MAE of &#8369;500 means the forecast is off by about &#8369;500 per day on average.</p>
                             </div>
                             <div class="rounded-xl border border-slate-200 p-3">
                                 <div class="flex items-center justify-between gap-3">
@@ -330,28 +357,28 @@
                                     <span class="text-[10px] font-black text-indigo-600">Pesos</span>
                                 </div>
                                 <p class="mt-1 text-[10px] font-mono text-indigo-700">RMSE = sqrt(average((actual - predicted)^2))</p>
-                                <p class="mt-1 text-[10px] leading-relaxed text-slate-500">Similar to MAE, but large misses count more heavily. A much higher RMSE than MAE usually means a few days had unusually large errors.</p>
+                                <p class="mt-1 text-[10px] leading-relaxed text-slate-500">Similar to MAE, but large misses count more heavily. A higher RMSE indicates periods of unusually large error or volatility.</p>
                             </div>
                             <div class="rounded-xl border border-slate-200 p-3">
                                 <div class="flex items-center justify-between gap-3">
-<p class="text-[11px] font-black text-slate-800">WAPE - Weighted Absolute Percentage Error</p>
+                                    <p class="text-[11px] font-black text-slate-800">WAPE - Weighted Absolute Percentage Error</p>
                                     <span class="text-[10px] font-black text-indigo-600">Percent</span>
                                 </div>
                                 <p class="mt-1 text-[10px] font-mono text-indigo-700">WAPE = sum(|actual - predicted|) / sum(actual) x 100</p>
-                                <p class="mt-1 text-[10px] leading-relaxed text-slate-500">Total forecast error relative to total actual revenue. A WAPE of 12% means the forecast missed about 12% of actual sales over the test week. Unlike MAPE, a single near-zero sales day cannot blow it up.</p>
+                                <p class="mt-1 text-[10px] leading-relaxed text-slate-500">Total forecast error relative to total actual revenue. A WAPE of 12% means the forecast missed about 12% of actual sales over the test week. Unlike MAPE, a single near-zero sales day cannot distort the percentage.</p>
                             </div>
                         </div>
-                        <p class="mt-3 text-[10px] leading-relaxed text-slate-500">These metrics are calculated by hiding the most recent 7 trading days (empty trailing days are ignored), forecasting them from earlier data, and comparing the predictions with what actually happened. Lower MAE, RMSE, and WAPE are better.</p>
+                        <p class="mt-3 text-[10px] leading-relaxed text-slate-500">These metrics are calculated by backtesting on historical data: training on prior days, projecting forward, and comparing predictions against authentic recorded sales.</p>
                     </div>
 
                     {{-- Where metrics apply --}}
                     <div class="pt-4 border-t border-slate-100">
                         <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Where each signal is used</p>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px] leading-relaxed text-slate-600">
-                            <div class="rounded-lg bg-indigo-50 px-3 py-2"><span class="font-black text-indigo-800">Confidence:</span> shown on both forecast cards to indicate how much trust to place in the trend.</div>
-                            <div class="rounded-lg bg-slate-50 px-3 py-2"><span class="font-black text-slate-800">MAE / RMSE / WAPE:</span> shown in Benchmarking to evaluate forecast quality against the baseline.</div>
-                            <div class="rounded-lg bg-amber-50 px-3 py-2"><span class="font-black text-amber-800">RMSE range:</span> used around the 7-day chart as an approximate error range, not a guaranteed interval.</div>
-                            <div class="rounded-lg bg-emerald-50 px-3 py-2"><span class="font-black text-emerald-800">Restock actions:</span> use the 7-day forecast to estimate 14-day ingredient demand, then adjust for buffer, waste, and current stock.</div>
+                            <div class="rounded-lg bg-indigo-50 px-3 py-2"><span class="font-black text-indigo-800">Confidence:</span> shown on timeline cards to indicate trust level based on data volume and stability.</div>
+                            <div class="rounded-lg bg-slate-50 px-3 py-2"><span class="font-black text-slate-800">MAE / RMSE / WAPE:</span> evaluated in Benchmarking to compare model performance against the simple baseline.</div>
+                            <div class="rounded-lg bg-amber-50 px-3 py-2"><span class="font-black text-amber-800">Confidence bounds:</span> rendered around the timeline chart to display the expected error envelope.</div>
+                            <div class="rounded-lg bg-emerald-50 px-3 py-2"><span class="font-black text-emerald-800">Restock actions:</span> uses forecasted demand to project ingredient requirements and suggest purchase orders.</div>
                         </div>
                     </div>
 
@@ -363,7 +390,7 @@
                                 <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Model Quality (R2 Score)</p>
                                 <p class="text-[18px] font-black text-indigo-900">{{ number_format($forecasting['short_term']['r_squared'] * 100, 1) }}%</p>
                             </div>
-                            <p class="text-[10px] text-slate-600 leading-relaxed">R2 measures how well the trend and day-of-week pattern fit your historical daily sales on a scale of 0-100%. Daily sales are naturally noisy, so use WAPE as the main accuracy check. Higher scores indicate more reliable forecasts. Typically, 70%+ = Strong, 40-70% = Moderate, Below 40% = Weak.</p>
+                            <p class="text-[10px] text-slate-600 leading-relaxed">R2 measures how well the empirical trend trajectory fits your historical daily sales on a scale of 0-100%. Daily sales naturally fluctuate, so use WAPE as the primary accuracy metric. Higher scores indicate stronger trend reliability. Typically, 70%+ = Strong, 40-70% = Moderate, Below 40% = Volatile.</p>
                         </div>
                     </div>
                     @endif
@@ -440,30 +467,6 @@
                         {{ number_format($accuracy['mape'] ?? 0, 1) }}%
                     </div>
                 </div>
-
-                @php
-                    $short = $fc['short_term']['forecast'] ?? [];
-                    $categories = collect($short)->pluck('date')->all();
-                    $predicted = collect($short)->pluck('predicted')->map(fn($v) => round($v, 2))->all();
-                @endphp
-
-                @if(count($predicted) > 0)
-                    <script type="application/json" id="bi-forecast-short-data">
-                        {!! json_encode(['categories' => $categories, 'predicted' => $predicted], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!}
-                    </script>
-
-                    <div x-data="forecastingChart(JSON.parse(document.getElementById('bi-forecast-short-data').textContent))"
-                         wire:ignore
-                         wire:key="bi-forecast-short-{{ $selectedBranchId }}-{{ $startDate }}-{{ $endDate }}-{{ str_replace(' ', '-', $activeFilter) }}"
-                         x-init="init()"
-                         class="w-full">
-                        <div x-ref="forecastChart" class="w-full h-[320px]"></div>
-                    </div>
-                @else
-                    <div class="p-6">
-                        <x-empty-state title="No Forecast Data" description="Not enough historical data to compute a forecast for this selection." />
-                    </div>
-                @endif
             </div>
 
             <p class="mt-4 text-[11px] leading-relaxed text-gray-500">
@@ -473,37 +476,53 @@
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
         <div x-data="{ flipped: false }" class="flex flex-col">
-            {{-- Flip Toggle --}}
-            <div class="flex items-center justify-between mb-3">
-                <p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest">
-                    <span x-show="!flipped">Showing 7-Day Forecast</span>
-                    <span x-show="flipped" x-cloak>Showing 6-Month Forecast</span>
+            {{-- Flip Toggle and Timeline Header --}}
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <p class="text-[11px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                    <span x-show="!flipped">Daily Forecast Timeline</span>
+                    <span x-show="flipped" x-cloak>Monthly Projection Timeline</span>
+                    <x-tooltip title="Timeline Projection" text="Continuous timeline projection anticipating future sales demand without clipping. Scroll horizontally to inspect all future periods." position="bottom" align="start" />
                 </p>
                 <button type="button" @click="flipped = !flipped"
-                    class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest text-white shadow-sm hover:shadow-md transition-all active:scale-95"
+                    class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest text-white shadow-sm hover:shadow-md transition-all active:scale-95"
                     :class="flipped ? 'bg-violet-600 hover:bg-violet-700' : 'bg-indigo-600 hover:bg-indigo-700'">
                     <svg class="w-3.5 h-3.5 transition-transform duration-500" :class="flipped ? '-scale-x-100' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                    <span x-text="flipped ? 'View 7-Day' : 'View 6-Month'"></span>
+                    <span x-text="flipped ? 'Switch to Daily Timeline' : 'Switch to Monthly Projection'"></span>
                 </button>
             </div>
 
-            {{-- Flip Card --}}
-            <div style="perspective: 2000px;">
-                <div class="relative w-full"
-                     :style="'transform-style: preserve-3d; transition: transform 0.7s cubic-bezier(0.4,0,0.2,1); transform: rotateY(' + (flipped ? '180deg' : '0deg') + ');'">
-
-                    {{-- FRONT FACE: Short-Term Forecast --}}
-                    <div class="relative bg-white rounded-2xl border border-gray-100 shadow-sm p-6 overflow-hidden" style="backface-visibility:hidden;">
+            {{-- Forecast Timeline Cards --}}
+            <div class="relative w-full">
+                {{-- Daily Forecast Timeline --}}
+                <div x-show="!flipped"
+                     x-transition:enter="transition ease-out duration-300"
+                     x-transition:enter-start="opacity-0 translate-y-1"
+                     x-transition:enter-end="opacity-100 translate-y-0"
+                     class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 overflow-hidden">
                         <div class="flex flex-col gap-3 mb-4">
-                            <div class="flex items-start justify-between">
+                            <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                                 <div>
-                                    <h4 class="text-[15px] font-bold text-gray-900 tracking-tight">7-Day Forecast</h4>
-                                    <p class="text-[11px] text-gray-400 font-medium">Short-term revenue projection for the next week.</p>
+                                    <h4 class="text-[15px] font-bold text-gray-900 tracking-tight flex items-center gap-1.5">
+                                        Daily Forecast Timeline ({{ count($fc['short_term']['forecast'] ?? []) }} Days)
+                                        <x-tooltip title="Daily Timeline" text="Continuous rolling sales prediction incorporating recency-weighted linear regression and autocorrelation momentum. Scroll horizontally to inspect future days." position="bottom" align="start" />
+                                    </h4>
+                                    <p class="text-[11px] text-gray-400 font-medium">Sequential daily revenue projections. Scroll horizontally across the timeline to view future dates.</p>
                                 </div>
-                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-[9px] font-black text-indigo-700 uppercase tracking-widest whitespace-nowrap">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-[9px] font-black text-indigo-700 uppercase tracking-widest whitespace-nowrap self-start">
                                     <span class="w-1 h-1 rounded-full bg-indigo-500"></span>
-                                    WLR w/ Seasonality
-                                    </span>
+                                    WLR w/ Damped Trend
+                                </span>
+                            </div>
+
+                            {{-- Scroll Hint Bar --}}
+                            <div class="flex items-center justify-between px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-100 text-[11px] text-slate-500 font-medium">
+                                <span class="flex items-center gap-1.5 text-slate-600 font-bold">
+                                    <svg class="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                    Timeline Forecast
+                                </span>
+                                <span class="flex items-center gap-1 text-[10px] text-indigo-600 font-bold uppercase tracking-wider">
+                                    Scroll horizontally &rarr;
+                                </span>
                             </div>
                         </div>
 
@@ -511,26 +530,33 @@
                         @php
                             $summary = $fc['short_term'] ?? ['trend'=>'N/A','growth_rate'=>0,'confidence'=>'Low','baseline_avg'=>0];
                             $predicted_sum = collect($fc['short_term']['forecast'] ?? [])->sum('predicted');
-                            $baseline_week = ($summary['baseline_avg'] ?? 0) * 7;
+                            $shortCount = count($fc['short_term']['forecast'] ?? []);
+                            $baseline_week = ($summary['baseline_avg'] ?? 0) * max(1, $shortCount);
                         @endphp
                         <div class="mb-4 grid grid-cols-2 gap-3">
                             <div class="bg-gray-50/50 rounded-xl p-3 flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center border border-gray-100">
+                                <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center border border-gray-100 shrink-0">
                                     <svg class="w-5 h-5 text-{{ $primaryColor }}-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3v18h18"/></svg>
                                 </div>
                                 <div class="min-w-0">
-                                    <div class="text-[10px] text-gray-500 font-medium">Trend (Slope)</div>
+                                    <div class="text-[10px] text-gray-500 font-medium flex items-center gap-1">
+                                        Trend (Slope)
+                                        <x-tooltip title="Sales Trend" text="Direction and slope of daily sales changes calculated over historical order records." position="bottom" align="start" />
+                                    </div>
                                     <div class="text-[13px] font-black text-gray-900 truncate">{{ $summary['trend'] ?? 'N/A' }}</div>
                                     <div class="text-[9px] text-gray-400">{{ $summary['confidence'] ?? 'Low' }} confidence</div>
                                 </div>
                             </div>
 
                             <div class="bg-gray-50/50 rounded-xl p-3 flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center border border-gray-100">
+                                <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center border border-gray-100 shrink-0">
                                     <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                 </div>
                                 <div class="min-w-0">
-                                    <div class="text-[10px] text-gray-500 font-medium">7-Day Forecast</div>
+                                    <div class="text-[10px] text-gray-500 font-medium flex items-center gap-1">
+                                        {{ $shortCount }}-Day Total
+                                        <x-tooltip title="Predicted Total" text="Total revenue projected across the entire {{ $shortCount }}-day timeline." position="bottom" align="start" />
+                                    </div>
                                     <div class="text-[13px] font-black text-gray-900 truncate">&#8369;{{ number_format($predicted_sum, 0) }}</div>
                                     <div class="text-[9px] text-gray-400">vs &#8369;{{ number_format($baseline_week, 0) }} baseline</div>
                                 </div>
@@ -538,50 +564,73 @@
                         </div>
 
                         <div class="text-[10px] text-gray-500 space-y-1 bg-blue-50/50 border border-blue-100 rounded-lg p-3 mb-4">
-                            <p><span class="font-bold text-gray-700">Trend:</span> Direction of daily sales change (60-day history analyzed)</p>
-                            <p><span class="font-bold text-gray-700">Baseline:</span> Average of last 7 days x 7 (reference for comparison)</p>
-                            <p><span class="font-bold text-gray-700">Method:</span> Weighted Linear Regression with exponential recent-data emphasis + day-of-week seasonal adjustment</p>
+                            <p><span class="font-bold text-gray-700">Trend:</span> Direction of daily sales change (analyzed over trailing window)</p>
+                            <p><span class="font-bold text-gray-700">Baseline:</span> Trailing average x {{ $shortCount }} days (reference benchmark)</p>
+                            <p><span class="font-bold text-gray-700">Method:</span> Weighted Linear Regression with recency emphasis + autocorrelation momentum (non-cyclical continuous trajectory)</p>
                         </div>
 
                           @php
                             $short = $fc['short_term']['forecast'] ?? [];
                             $shortCategories = collect($short)->pluck('date')->all();
+                            $shortFullDates = collect($short)->pluck('full_date')->all();
+                            $shortDays = collect($short)->pluck('day')->all();
                             $shortPredicted = collect($short)->pluck('predicted')->map(fn($v) => round($v, 2))->all();
                             $hasBandData = collect($short)->every(fn($p) => isset($p['lower'], $p['upper']));
                             $shortLower = $hasBandData ? collect($short)->pluck('lower')->map(fn($v) => round($v, 2))->all() : [];
                             $shortUpper = $hasBandData ? collect($short)->pluck('upper')->map(fn($v) => round($v, 2))->all() : [];
                         @endphp
 
-                        {{-- Short-Term Chart --}}
+                        {{-- Short-Term Scrollable Chart --}}
                         @if(count($shortPredicted) > 0)
                             <script type="application/json" id="bi-forecast-short-data-card">
-                                {!! json_encode(['categories' => $shortCategories, 'predicted' => $shortPredicted, 'lower' => $shortLower, 'upper' => $shortUpper], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!}
+                                {!! json_encode(['categories' => $shortCategories, 'full_dates' => $shortFullDates, 'days' => $shortDays, 'predicted' => $shortPredicted, 'lower' => $shortLower, 'upper' => $shortUpper], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!}
                             </script>
-                            <div x-data="forecastingChart(JSON.parse(document.getElementById('bi-forecast-short-data-card').textContent), '#6366F1')"
-                                 wire:ignore
-                                 wire:key="bi-forecast-short-card-{{ $selectedBranchId }}-{{ $startDate }}-{{ $endDate }}-{{ str_replace(' ', '-', $activeFilter) }}"
-                                 x-intersect.once="init()"
-                                 class="w-full">
-                                <div x-ref="forecastChart" class="w-full h-[300px]"></div>
+                            <div class="w-full overflow-x-auto overflow-y-hidden custom-scrollbar rounded-xl border border-slate-100 p-1" style="scrollbar-width: thin;">
+                                <div style="min-width: {{ max(650, count($shortCategories) * 48) }}px; height: 290px;"
+                                     class="overflow-hidden"
+                                     x-data="forecastingChart(JSON.parse(document.getElementById('bi-forecast-short-data-card').textContent), '#6366F1')"
+                                     wire:ignore
+                                     wire:key="bi-forecast-short-card-{{ $selectedBranchId }}-{{ $startDate }}-{{ $endDate }}-{{ str_replace(' ', '-', $activeFilter) }}">
+                                    <div x-ref="forecastChart" class="w-full h-[290px]"></div>
+                                </div>
                             </div>
                         @else
                             <div class="p-6">
-                                <x-empty-state title="No Short-Term Forecast" description="Not enough historical data to compute a forecast." />
+                                <x-empty-state title="No Short-Term Forecast" description="Not enough historical data to compute a forecast for this range." />
                             </div>
                         @endif
                     </div>
 
-                    {{-- BACK FACE: Long-Term Forecast --}}
-                    <div class="absolute inset-0 bg-white rounded-2xl border border-gray-100 shadow-sm p-6 overflow-hidden" style="backface-visibility:hidden; transform: rotateY(180deg);">
+                    {{-- Monthly Projection Timeline --}}
+                    <div x-cloak
+                         x-show="flipped"
+                         x-transition:enter="transition ease-out duration-300"
+                         x-transition:enter-start="opacity-0 translate-y-1"
+                         x-transition:enter-end="opacity-100 translate-y-0"
+                         class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 overflow-hidden">
                         <div class="flex flex-col gap-3 mb-4">
-                            <div class="flex items-start justify-between">
+                            <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                                 <div>
-                                    <h4 class="text-[15px] font-bold text-gray-900 tracking-tight">6-Month Forecast</h4>
-                                    <p class="text-[11px] text-gray-400 font-medium">Long-term revenue projection for the next 6 months.</p>
+                                    <h4 class="text-[15px] font-bold text-gray-900 tracking-tight flex items-center gap-1.5">
+                                        Monthly Projection Timeline ({{ count($fc['long_term']['forecast'] ?? []) }} Months)
+                                        <x-tooltip title="Long-Term Projection" text="Weighted regression with damped trend projecting month-by-month revenue for long-term inventory and capacity planning." position="bottom" align="start" />
+                                    </h4>
+                                    <p class="text-[11px] text-gray-400 font-medium">Long-term monthly capacity and demand projection.</p>
                                 </div>
-                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-violet-50 border border-violet-200 text-[9px] font-black text-violet-700 uppercase tracking-widest whitespace-nowrap">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-violet-50 border border-violet-200 text-[9px] font-black text-violet-700 uppercase tracking-widest whitespace-nowrap self-start">
                                     <span class="w-1 h-1 rounded-full bg-violet-500"></span>
-                                                                        WLR w/ Damped Trend
+                                    WLR w/ Damped Trend
+                                </span>
+                            </div>
+
+                            {{-- Scroll Hint Bar --}}
+                            <div class="flex items-center justify-between px-3 py-1.5 rounded-xl bg-violet-50/50 border border-violet-100 text-[11px] text-violet-700 font-medium">
+                                <span class="flex items-center gap-1.5 font-bold">
+                                    <svg class="w-3.5 h-3.5 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                    Monthly Timeline
+                                </span>
+                                <span class="flex items-center gap-1 text-[10px] text-violet-600 font-bold uppercase tracking-wider">
+                                    Scroll horizontally &rarr;
                                 </span>
                             </div>
                         </div>
@@ -590,25 +639,32 @@
                         @php
                             $longSummary = $fc['long_term'] ?? ['trend'=>'N/A','growth_rate'=>0,'confidence'=>'Low','baseline_avg'=>0];
                             $long_total = collect($fc['long_term']['forecast'] ?? [])->sum('predicted');
+                            $longCount = count($fc['long_term']['forecast'] ?? []);
                         @endphp
                         <div class="mb-4 grid grid-cols-2 gap-3">
                             <div class="bg-gray-50/50 rounded-xl p-3 flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center border border-gray-100">
+                                <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center border border-gray-100 shrink-0">
                                     <svg class="w-5 h-5 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10"/></svg>
                                 </div>
                                 <div class="min-w-0">
-                                    <div class="text-[10px] text-gray-500 font-medium">Trend (Monthly)</div>
+                                    <div class="text-[10px] text-gray-500 font-medium flex items-center gap-1">
+                                        Trend (Monthly)
+                                        <x-tooltip title="Monthly Trend" text="Direction and trajectory of sales growth across multi-month historical cycles." position="bottom" align="start" />
+                                    </div>
                                     <div class="text-[13px] font-black text-gray-900 truncate">{{ $longSummary['trend'] ?? 'N/A' }}</div>
                                     <div class="text-[9px] text-gray-400">{{ $longSummary['confidence'] ?? 'Low' }} confidence</div>
                                 </div>
                             </div>
 
                             <div class="bg-gray-50/50 rounded-xl p-3 flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center border border-gray-100">
+                                <div class="w-10 h-10 rounded-xl bg-white flex items-center justify-center border border-gray-100 shrink-0">
                                     <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
                                 </div>
                                 <div class="min-w-0">
-                                    <div class="text-[10px] text-gray-500 font-medium">6-Month Total</div>
+                                    <div class="text-[10px] text-gray-500 font-medium flex items-center gap-1">
+                                        {{ $longCount }}-Month Total
+                                        <x-tooltip title="Projected Revenue" text="Aggregated total projected revenue across the selected {{ $longCount }}-month forecast period." position="bottom" align="start" />
+                                    </div>
                                     <div class="text-[13px] font-black text-gray-900 truncate">&#8369;{{ number_format($long_total, 0) }}</div>
                                     <div class="text-[9px] text-gray-400">Projected revenue</div>
                                 </div>
@@ -616,28 +672,34 @@
                         </div>
 
                         <div class="text-[10px] text-gray-500 space-y-1 bg-violet-50/50 border border-violet-100 rounded-lg p-3 mb-4">
-                            <p><span class="font-bold text-gray-700">Trend:</span> Direction of monthly sales change (12-month history analyzed)</p>
-                            <p><span class="font-bold text-gray-700">Total:</span> Sum of all 6 monthly forecasts (damped trend, no seasonality)</p>
-<p><span class="font-bold text-gray-700">Method:</span> Weighted Linear Regression using monthly totals with a damped trend</p>
+                            <p><span class="font-bold text-gray-700">Trend:</span> Direction of monthly sales change analyzed over historical records</p>
+                            <p><span class="font-bold text-gray-700">Total:</span> Sum of all {{ $longCount }} monthly forecasts (damped trend)</p>
+                            <p><span class="font-bold text-gray-700">Method:</span> Weighted Linear Regression using monthly totals with a damped trend</p>
                         </div>
 
                         @php
                             $long = $fc['long_term']['forecast'] ?? [];
                             $longCategories = collect($long)->pluck('date')->all();
+                            $longFullDates = collect($long)->pluck('full_date')->all();
                             $longPredicted = collect($long)->pluck('predicted')->map(fn($v) => round($v, 2))->all();
+                            $hasLongBandData = collect($long)->every(fn($p) => isset($p['lower'], $p['upper']));
+                            $longLower = $hasLongBandData ? collect($long)->pluck('lower')->map(fn($v) => round($v, 2))->all() : [];
+                            $longUpper = $hasLongBandData ? collect($long)->pluck('upper')->map(fn($v) => round($v, 2))->all() : [];
                         @endphp
 
-                        {{-- Long-Term Chart --}}
+                        {{-- Long-Term Scrollable Chart --}}
                         @if(count($longPredicted) > 0)
                             <script type="application/json" id="bi-forecast-long-data">
-                                {!! json_encode(['categories' => $longCategories, 'predicted' => $longPredicted], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!}
+                                {!! json_encode(['categories' => $longCategories, 'full_dates' => $longFullDates, 'predicted' => $longPredicted, 'lower' => $longLower, 'upper' => $longUpper], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!}
                             </script>
-                            <div x-data="forecastingChart(JSON.parse(document.getElementById('bi-forecast-long-data').textContent), '#8b5cf6')"
-                                 wire:ignore
-                                 wire:key="bi-forecast-long-{{ $selectedBranchId }}-{{ $startDate }}-{{ $endDate }}-{{ str_replace(' ', '-', $activeFilter) }}"
-                                 x-intersect.once="init()"
-                                 class="w-full">
-                                <div x-ref="forecastChart" class="w-full h-[300px]"></div>
+                            <div class="w-full overflow-x-auto overflow-y-hidden custom-scrollbar rounded-xl border border-slate-100 p-1" style="scrollbar-width: thin;">
+                                <div style="min-width: {{ max(600, count($longCategories) * 60) }}px; height: 290px;"
+                                     class="overflow-hidden"
+                                     x-data="forecastingChart(JSON.parse(document.getElementById('bi-forecast-long-data').textContent), '#8b5cf6')"
+                                     wire:ignore
+                                     wire:key="bi-forecast-long-{{ $selectedBranchId }}-{{ $startDate }}-{{ $endDate }}-{{ str_replace(' ', '-', $activeFilter) }}">
+                                     <div x-ref="forecastChart" class="w-full h-[290px]"></div>
+                                </div>
                             </div>
                         @else
                             <div class="p-6">
@@ -645,15 +707,17 @@
                             </div>
                         @endif
                     </div>
-               </div>
+                </div>
             </div>
-        </div>
 
         {{-- Restock Insight - sits to the right of the flip card, filling the space instead of leaving it empty --}}
-<div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-col h-full overflow-hidden">
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex flex-col h-full overflow-hidden">
                 <div class="flex items-center justify-between gap-3 mb-4 shrink-0">
                     <div>
-                        <h4 class="text-[15px] font-bold text-gray-900 tracking-tight">Restock Insight</h4>
+                        <h4 class="text-[15px] font-bold text-gray-900 tracking-tight flex items-center gap-1.5">
+                            Restock Insight
+                            <x-tooltip title="Restock Insight" text="Predicted ingredient demand for the upcoming period based on menu item sales trajectories and recipe requirements." position="bottom" align="start" />
+                        </h4>
                         <p class="text-[11px] text-gray-400 font-medium">Ingredient demand recommendations based on the forecasted sales trend.</p>
                     </div>
                     <span class="inline-flex items-center rounded-full bg-{{ $primaryColor }}-50 text-{{ $primaryColor }}-700 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 shrink-0">
@@ -1549,12 +1613,12 @@
     </div>
 
     {{-- â”€â”€â”€ Breakdown Side Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ --}}
-    <x-side-panel name="kpi-breakdown" width="max-w-md">
-        <div class="flex flex-col h-full bg-white">
+    <x-modal name="kpi-breakdown" maxWidth="2xl" focusable>
+        <div style="max-height: calc(88vh - 40px);" class="flex flex-col bg-white rounded-2xl overflow-hidden">
             {{-- Premium Header --}}
-            <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/40">
+            <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/40 shrink-0">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white shadow-lg shadow-slate-200">
+                    <div class="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white shadow-lg shadow-slate-200 shrink-0">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     </div>
                     <div>
@@ -1562,7 +1626,7 @@
                         <span class="text-[11px] text-indigo-600 font-bold uppercase tracking-wider mt-1 block">{{ $selectedMetric }} Analysis</span>
                     </div>
                 </div>
-                <button @click="isPanelOpen = false" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all">
+                <button @click="$dispatch('close-modal', 'kpi-breakdown')" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all shrink-0">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
@@ -1606,39 +1670,54 @@
                         $gpData = $breakdownData;
                     @endphp
                     @if(!empty($gpData) && isset($gpData['gross_profit']))
-    <div class="space-y-4">
-                            <div class="p-5 rounded-2xl bg-white border border-slate-100 shadow-sm">
-                                <span class="text-[10px] font-black text-indigo-600 uppercase tracking-widest block mb-1">Net Sales inflow</span>
-                                <div class="flex items-baseline gap-2">
-                                    <p class="text-2xl font-black text-slate-900">&#8369; {{ number_format($gpData['net_sales'] ?? 0, 2) }}</p>
-                                    <span class="text-[10px] font-bold text-slate-400">Total Net</span>
+                        <div class="space-y-4">
+                            {{-- Gross Margin Result Hero Card at Top --}}
+                            <div class="flex justify-between items-end bg-slate-900 p-6 rounded-2xl shadow-xl shadow-slate-200 overflow-visible relative">
+                                <div class="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full -mr-16 -mt-16 pointer-events-none"></div>
+                                <div class="relative z-10">
+                                    <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-1.5 mb-1">
+                                        Gross Margin Result
+                                        <x-tooltip title="Gross Margin" text="Net Sales minus total Cost of Goods Sold (COGS). Measures actual cash generated after raw ingredient costs." position="bottom" align="start" />
+                                    </span>
+                                    <p class="text-3xl font-black text-white">&#8369; {{ number_format($gpData['gross_profit'] ?? 0, 2) }}</p>
+                                </div>
+                                <div class="relative z-10 text-right">
+                                    <span class="px-3 py-1.5 rounded-xl bg-white/10 text-white text-[14px] font-black backdrop-blur-md">{{ number_format($gpData['profit_margin_pct'] ?? 0, 1) }}%</span>
+                                    <p class="text-[9px] font-black text-slate-500 uppercase mt-2">Margin</p>
                                 </div>
                             </div>
-                            <div class="p-5 rounded-2xl bg-white border border-slate-100 shadow-sm">
-                                <span class="text-[10px] font-black text-rose-600 uppercase tracking-widest block mb-1">Ingredient Cost (COGS)</span>
-                                <div class="flex items-baseline gap-2">
-                                    <p class="text-2xl font-black text-slate-900">- &#8369; {{ number_format($gpData['total_cogs'] ?? 0, 2) }}</p>
-                                    <span class="text-[10px] font-bold text-slate-400">Raw Expense</span>
-                                </div>
-                            </div>
-                            <div class="p-5 rounded-2xl bg-white border border-slate-100 shadow-sm">
-                                <span class="text-[10px] font-black text-amber-600 uppercase tracking-widest block mb-1">Waste & Spoilage Cost</span>
-                                <div class="flex items-baseline gap-2">
-                                    <p class="text-2xl font-black text-slate-900">- &#8369; {{ number_format($gpData['waste_cost'] ?? 0, 2) }}</p>
-                                    <span class="text-[10px] font-bold text-slate-400">Spoiled Raw</span>
-                                </div>
-                            </div>
-                            <div class="mt-6 pt-6 border-t border-dashed border-slate-200">
-                                <div class="flex justify-between items-end bg-slate-900 p-6 rounded-2xl shadow-xl shadow-slate-200 overflow-hidden relative">
-                                    <div class="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full -mr-16 -mt-16"></div>
-                                    <div class="relative z-10">
-                                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-1">Gross Margin Result</span>
-                                        <p class="text-3xl font-black text-white">&#8369; {{ number_format($gpData['gross_profit'] ?? 0, 2) }}</p>
+
+                            {{-- Component Inflow / Outflow Cards Below --}}
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div class="p-4 rounded-xl bg-white border border-slate-100 shadow-sm relative overflow-visible hover:z-20">
+                                    <span class="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-1 mb-1">
+                                        Net Sales Inflow
+                                        <x-tooltip title="Net Sales Inflow" text="Final revenue collected after discounts and delivery fees." position="bottom" align="start" />
+                                    </span>
+                                    <div class="flex items-baseline gap-2">
+                                        <p class="text-xl font-black text-slate-900">&#8369; {{ number_format(abs($gpData['net_sales'] ?? 0), 2) }}</p>
                                     </div>
-                                    <div class="relative z-10 text-right">
-                                        <span class="px-3 py-1.5 rounded-xl bg-white/10 text-white text-[14px] font-black backdrop-blur-md">{{ number_format($gpData['profit_margin_pct'] ?? 0, 1) }}%</span>
-                                        <p class="text-[9px] font-black text-slate-500 uppercase mt-2">Margin</p>
+                                    <span class="text-[10px] font-bold text-slate-400 mt-1 block">Total Net</span>
+                                </div>
+                                <div class="p-4 rounded-xl bg-white border border-slate-100 shadow-sm relative overflow-visible hover:z-20">
+                                    <span class="text-[10px] font-black text-rose-600 uppercase tracking-widest flex items-center gap-1 mb-1">
+                                        Ingredient Cost (COGS)
+                                        <x-tooltip title="Ingredient Cost" text="Total direct cost of raw ingredients consumed to prepare sold items." position="bottom" align="start" />
+                                    </span>
+                                    <div class="flex items-baseline gap-2">
+                                        <p class="text-xl font-black text-slate-900">&#8369; {{ number_format(abs($gpData['total_cogs'] ?? 0), 2) }}</p>
                                     </div>
+                                    <span class="text-[10px] font-bold text-slate-400 mt-1 block">Raw Expense</span>
+                                </div>
+                                <div class="p-4 rounded-xl bg-white border border-slate-100 shadow-sm relative overflow-visible hover:z-20">
+                                    <span class="text-[10px] font-black text-amber-600 uppercase tracking-widest flex items-center gap-1 mb-1">
+                                        Waste & Spoilage
+                                        <x-tooltip title="Waste & Spoilage" text="Total cost of wasted, damaged, or expired stock registered during this period." position="bottom" align="start" />
+                                    </span>
+                                    <div class="flex items-baseline gap-2">
+                                        <p class="text-xl font-black text-slate-900">&#8369; {{ number_format(abs($gpData['waste_cost'] ?? 0), 2) }}</p>
+                                    </div>
+                                    <span class="text-[10px] font-bold text-slate-400 mt-1 block">Spoiled Raw</span>
                                 </div>
                             </div>
                         </div>
@@ -1700,7 +1779,7 @@
                 @endif
             </div>
         </div>
-    </x-side-panel>
+    </x-modal>
 
     {{-- Store chart data in a hidden DOM element so Livewire updates can refresh it reliably --}}
     @php
@@ -1980,13 +2059,20 @@
         function forecastingChart(initialData, color) {
             return {
                 chartRef: null,
-                chartData: initialData || { categories: [], predicted: [] },
+                chartData: initialData || { categories: [], predicted: [], days: [], full_dates: [] },
                 chartColor: color || '#6366F1',
 
                 init() {
                     if (typeof window.ApexCharts === 'undefined' || !this.$refs.forecastChart) return;
 
                     const self = this;
+                    if (self.chartRef) {
+                        try { self.chartRef.destroy(); } catch (e) {}
+                        self.chartRef = null;
+                    }
+                    if (self.$refs.forecastChart) {
+                        self.$refs.forecastChart.innerHTML = '';
+                    }
                     const toFiniteArray = (arr) => Array.isArray(arr) ? arr.map(v => Number(v)) : [];
                     const isAllFinite = (arr) => arr.length > 0 && arr.every(v => Number.isFinite(v));
 
@@ -2012,11 +2098,12 @@
                         series,
                         chart: {
                             type: 'area',
-                            height: 320,
+                            height: 290,
                             toolbar: { show: false },
                             zoom: { enabled: false },
                             animations: {
-                                enabled: false
+                                enabled: true,
+                                speed: 250
                             }
                         },
                         dataLabels: { enabled: false },
@@ -2041,15 +2128,17 @@
                         xaxis: {
                             categories: self.chartData.categories,
                             labels: {
-                                rotate: -45,
-                                style: { fontSize: '11px', colors: '#9CA3AF' }
+                                rotate: 0,
+                                hideOverlappingLabels: false,
+                                style: { fontSize: '11px', colors: '#64748B', fontWeight: 600 }
                             },
                             axisBorder: { show: false },
-                            axisTicks: { show: false }
+                            axisTicks: { show: true, color: '#E2E8F0' },
+                            tooltip: { enabled: false }
                         },
                         yaxis: {
                             labels: {
-                                style: { colors: '#9CA3AF', fontSize: '11px' },
+                                style: { colors: '#94A3B8', fontSize: '11px', fontWeight: 600 },
                                 formatter: (val) => {
                                     if (val >= 1000) return '\u20B1' + (val / 1000).toFixed(1) + 'k';
                                     return '\u20B1' + Math.round(val);
@@ -2059,14 +2148,34 @@
                         colors: hasBand ? [self.chartColor, '#94a3b8', '#94a3b8'] : [self.chartColor],
                         tooltip: {
                             theme: 'dark',
-                            y: {
-                                formatter: (val) => '\u20B1 ' + Number(val).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                            shared: false,
+                            intersect: false,
+                            custom: function({ series, seriesIndex, dataPointIndex, w }) {
+                                const date = self.chartData.categories[dataPointIndex] || '';
+                                const fullDate = (self.chartData.full_dates && self.chartData.full_dates[dataPointIndex]) ? self.chartData.full_dates[dataPointIndex] : date;
+                                const day = (self.chartData.days && self.chartData.days[dataPointIndex]) ? self.chartData.days[dataPointIndex] : '';
+                                const val = series[seriesIndex][dataPointIndex];
+                                const sName = w.globals.seriesNames[seriesIndex] || 'Forecast';
+
+                                return `
+                                    <div style="padding: 10px 14px; background: #0F172A; border: 1px solid #334155; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5); font-family: inherit;">
+                                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px;">
+                                            <span style="font-size: 11px; font-weight: 800; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em;">${fullDate}</span>
+                                            ${day ? `<span style="font-size: 9px; font-weight: 800; background: rgba(99,102,241,0.25); color: #A5B4FC; padding: 2px 6px; border-radius: 6px; text-transform: uppercase;">${day}</span>` : ''}
+                                        </div>
+                                        <div style="display: flex; align-items: baseline; gap: 6px;">
+                                            <span style="width: 8px; height: 8px; border-radius: 50%; background: ${self.chartColor}; display: inline-block;"></span>
+                                            <span style="font-size: 11px; color: #CBD5E1; font-weight: 600;">${sName}:</span>
+                                            <span style="font-size: 14px; font-weight: 900; color: #FFFFFF;">&#8369;${Number(val).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                        </div>
+                                    </div>
+                                `;
                             }
                         },
                         grid: {
-                            borderColor: '#f8fafc',
+                            borderColor: '#F1F5F9',
                             strokeDashArray: 4,
-                            padding: { top: 0, right: 15, bottom: 10, left: 10 }
+                            padding: { top: 0, right: 20, bottom: 10, left: 15 }
                         },
                         legend: { show: hasBand },
                         markers: {

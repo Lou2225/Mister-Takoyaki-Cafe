@@ -170,6 +170,12 @@
                         </x-slot>
                         Order History
                     </x-sliding-tab>
+                    <x-sliding-tab model="historyTab" value="audit">
+                        <x-slot name="icon">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        </x-slot>
+                        Audit Logs
+                    </x-sliding-tab>
                 </x-sliding-tabs>
 
                 {{-- Tab Contents --}}
@@ -427,6 +433,132 @@
                         </x-data-table>
                         <div class="mt-4">
                             <x-pagination :paginator="$this->historyOrders" />
+                        </div>
+                    </div>
+
+                    <div x-cloak x-show="historyTab === 'audit'"
+                        x-transition:enter="transition ease-out duration-200"
+                        x-transition:enter-start="opacity-0 translate-y-4"
+                        x-transition:enter-end="opacity-100 translate-y-0">
+
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                            <div>
+                                <h5 class="text-[14px] font-bold text-slate-800">Account Audit Trail</h5>
+                                <p class="text-[11px] text-slate-400 font-medium">Recorded administrative actions and lifecycle updates for this user</p>
+                            </div>
+
+                            <div class="flex flex-wrap items-center gap-2">
+                                {{-- Audit Scope Dropdown --}}
+                                <x-dropdown align="right" width="48">
+                                    <x-slot name="trigger">
+                                        <button type="button" class="inline-flex items-center gap-2 px-3 py-1.5 text-[12px] font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:border-slate-300 focus:outline-none shadow-sm transition-colors">
+                                            <span>{{ match($auditScope) {
+                                                'target' => 'Account History Only',
+                                                'performer' => 'Actions Performed',
+                                                default => 'All User Audits'
+                                            } }}</span>
+                                            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                        </button>
+                                    </x-slot>
+                                    <x-slot name="content">
+                                        <x-dropdown-link href="#" wire:click.prevent="$set('auditScope', 'all')">All User Audits</x-dropdown-link>
+                                        <x-dropdown-link href="#" wire:click.prevent="$set('auditScope', 'target')">Account History Only</x-dropdown-link>
+                                        <x-dropdown-link href="#" wire:click.prevent="$set('auditScope', 'performer')">Actions Performed</x-dropdown-link>
+                                    </x-slot>
+                                </x-dropdown>
+
+                                {{-- Event Type Dropdown using shared component --}}
+                                <x-dropdown align="right" width="48">
+                                    <x-slot name="trigger">
+                                        <button type="button" class="inline-flex items-center gap-2 px-3 py-1.5 text-[12px] font-semibold text-slate-700 bg-white border border-slate-200 rounded-xl hover:border-slate-300 focus:outline-none shadow-sm transition-colors">
+                                            <span>{{ match($auditEventType) {
+                                                'hired' => 'Hired / Registered',
+                                                'activated' => 'Activated',
+                                                'deactivated' => 'Deactivated',
+                                                'archived' => 'Archived',
+                                                'restored' => 'Restored',
+                                                'updated' => 'Profile Updated',
+                                                default => 'All Event Types'
+                                            } }}</span>
+                                            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                        </button>
+                                    </x-slot>
+                                    <x-slot name="content">
+                                        <x-dropdown-link href="#" wire:click.prevent="$set('auditEventType', '')">All Event Types</x-dropdown-link>
+                                        <x-dropdown-link href="#" wire:click.prevent="$set('auditEventType', 'hired')">Hired / Registered</x-dropdown-link>
+                                        <x-dropdown-link href="#" wire:click.prevent="$set('auditEventType', 'activated')">Activated</x-dropdown-link>
+                                        <x-dropdown-link href="#" wire:click.prevent="$set('auditEventType', 'deactivated')">Deactivated</x-dropdown-link>
+                                        <x-dropdown-link href="#" wire:click.prevent="$set('auditEventType', 'archived')">Archived</x-dropdown-link>
+                                        <x-dropdown-link href="#" wire:click.prevent="$set('auditEventType', 'restored')">Restored</x-dropdown-link>
+                                        <x-dropdown-link href="#" wire:click.prevent="$set('auditEventType', 'updated')">Profile Updated</x-dropdown-link>
+                                    </x-slot>
+                                </x-dropdown>
+                            </div>
+                        </div>
+
+                        <x-data-table>
+                            <x-slot name="header">
+                                <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Date & Time</th>
+                                <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Event</th>
+                                <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Description</th>
+                                <th class="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-right">Performed By</th>
+                            </x-slot>
+
+                            @forelse($this->auditLogs as $log)
+                                @php
+                                    $badgeColors = match($log->event_type) {
+                                        'hired' => 'bg-indigo-50 text-indigo-700 border-indigo-200',
+                                        'activated' => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                                        'deactivated' => 'bg-amber-50 text-amber-700 border-amber-200',
+                                        'archived' => 'bg-rose-50 text-rose-700 border-rose-200',
+                                        'restored' => 'bg-sky-50 text-sky-700 border-sky-200',
+                                        'updated' => 'bg-violet-50 text-violet-700 border-violet-200',
+                                        default => 'bg-slate-50 text-slate-700 border-slate-200'
+                                    };
+                                @endphp
+                                <tr class="hover:bg-slate-50/50 transition-colors">
+                                    <td class="px-4 py-3 text-[12px] text-slate-600 font-medium whitespace-nowrap">
+                                        <div>{{ $log->created_at->format('M d, Y h:i A') }}</div>
+                                        <div class="text-[10px] text-slate-400 font-normal">{{ $log->created_at->diffForHumans() }}</div>
+                                    </td>
+                                    <td class="px-4 py-3 whitespace-nowrap">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider {{ $badgeColors }}">
+                                            {{ $log->event_label }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3 text-[12px] text-slate-700 font-medium">
+                                        @if($log->user_id !== $this->editUserId && $log->user)
+                                            <span class="text-indigo-600 font-bold mr-1">[{{ $log->user->first_name }} {{ $log->user->last_name }}]</span>
+                                        @endif
+                                        {{ $log->description ?: 'Profile details updated.' }}
+                                    </td>
+                                    <td class="px-4 py-3 text-right text-[12px] font-bold text-slate-700 whitespace-nowrap">
+                                        @if($log->performer)
+                                            <div class="flex items-center justify-end gap-1.5">
+                                                <div class="w-5 h-5 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-[9px] font-black text-slate-600">
+                                                    {{ substr($log->performer->first_name, 0, 1) }}
+                                                </div>
+                                                <span>{{ $log->performer->first_name }} {{ $log->performer->last_name }}</span>
+                                            </div>
+                                        @else
+                                            <span class="text-slate-400 font-normal italic">System Automated</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="4" class="px-4 py-12 text-center text-slate-400">
+                                        <x-empty-state 
+                                            compact
+                                            title="No audit logs recorded" 
+                                            description="No activity logs match the selected filter."
+                                        />
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </x-data-table>
+                        <div class="mt-4">
+                            <x-pagination :paginator="$this->auditLogs" keyPrefix="audit-logs" perPageModel="auditPerPage" :perPageOptions="[5, 10, 15, 30, 50]" />
                         </div>
                     </div>
                 </div>

@@ -10,6 +10,7 @@ use App\Models\Branch;
 use App\Models\Order;
 use App\Models\UserActivityLog;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use App\Traits\HandlesValidations;
 use App\Helpers\ValidationHelper;
@@ -74,6 +75,9 @@ class UserManagement extends Component
     public $historyTab = 'overview';
     public $historyStartDate = '';
     public $historyEndDate = '';
+    public $auditScope = 'all';
+    public $auditEventType = '';
+    public $auditPerPage = 5;
     public $activeFilter = 'All Time';
     public $viewingOrder = null;
     public $timelineLimit = 5; // number of timeline events loaded; incremented by loadMoreTimeline()
@@ -266,35 +270,33 @@ class UserManagement extends Component
     public function getHistoryStatsProperty()
     {
         if (!$this->editUserId) return [];
-        
-        $baseOrderQuery = Order::where(function($q) {
-            $q->where('user_id', $this->editUserId)->orWhere('rider_id', $this->editUserId);
-        });
-        
-        if ($this->historyStartDate) {
-            $baseOrderQuery->whereDate('created_at', '>=', $this->historyStartDate);
-        }
-        if ($this->historyEndDate) {
-            $baseOrderQuery->whereDate('created_at', '<=', $this->historyEndDate);
-        }
 
-        // Clone for counts to avoid mutating the base query if we need sum
-        $orderCount = (clone $baseOrderQuery)->count();
-        $totalSales = (clone $baseOrderQuery)->where('status', 'Completed')->sum('total_amount');
+        $recentThreshold = now('Asia/Manila')->subDays(7)->toDateTimeString();
 
-        $completedOrderCount = (clone $baseOrderQuery)->where('status', 'Completed')->count();
-        $completionRate = $orderCount > 0 ? ($completedOrderCount / $orderCount) * 100 : 0;
-        $avgOrderValue = $orderCount > 0 ? ($totalSales / $orderCount) : 0;
+        $stats = DB::table('orders')
+            ->where(function($q) {
+                $q->where('user_id', $this->editUserId)->orWhere('rider_id', $this->editUserId);
+            })
+            ->when($this->historyStartDate, fn($q) => $q->whereDate('created_at', '>=', $this->historyStartDate))
+            ->when($this->historyEndDate,   fn($q) => $q->whereDate('created_at', '<=', $this->historyEndDate))
+            ->selectRaw("
+                COUNT(*) as total_orders,
+                COALESCE(SUM(CASE WHEN status = 'Completed' THEN total_amount ELSE 0 END), 0) as total_sales,
+                COALESCE(SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END), 0) as completed_orders,
+                COALESCE(SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END), 0) as recent_orders
+            ", [$recentThreshold])
+            ->first();
 
-        $recentThreshold = now('Asia/Manila')->subDays(7);
-        $recentOrderCount = (clone $baseOrderQuery)->where('created_at', '>=', $recentThreshold)->count();
-        $recentActivity = $recentOrderCount;
+        $orderCount = (int)($stats->total_orders ?? 0);
+        $totalSales = (float)($stats->total_sales ?? 0);
+        $completedOrderCount = (int)($stats->completed_orders ?? 0);
+        $recentActivity = (int)($stats->recent_orders ?? 0);
 
         return [
-            'total_orders' => $orderCount,
-            'total_sales'  => $totalSales,
-            'avg_order_value' => $avgOrderValue,
-            'completion_rate' => $completionRate,
+            'total_orders'    => $orderCount,
+            'total_sales'     => $totalSales,
+            'avg_order_value' => $orderCount > 0 ? ($totalSales / $orderCount) : 0,
+            'completion_rate' => $orderCount > 0 ? ($completedOrderCount / $orderCount) * 100 : 0,
             'recent_activity' => $recentActivity,
         ];
     }
@@ -430,7 +432,7 @@ class UserManagement extends Component
                     ->orWhere('email', 'like', $searchTerm)
                     ->orWhere('employee_id', 'like', $searchTerm)
                     ->orWhere('phone', 'like', $searchTerm)
-                    ->orWhere(\Illuminate\Support\Facades\DB::raw("CONCAT(first_name, ' ', last_name)"), 'like', $searchTerm);
+                    ->orWhere(DB::raw("CONCAT(first_name, ' ', last_name)"), 'like', $searchTerm);
             });
         }
 
@@ -517,6 +519,53 @@ class UserManagement extends Component
         return $query->latest()->paginate(5, ['*'], 'historyOrdersPage');
     }
 
+    public function updatedAuditEventType()
+    {
+        $this->resetPage('auditLogsPage');
+    }
+
+    public function updatedAuditScope()
+    {
+        $this->resetPage('auditLogsPage');
+    }
+
+    public function updatedAuditPerPage()
+    {
+        $this->resetPage('auditLogsPage');
+    }
+
+    public function getAuditLogsProperty()
+    {
+        $perPage = max(1, min(100, (int)($this->auditPerPage ?: 5)));
+        if (!$this->editUserId) return new \Illuminate\Pagination\LengthAwarePaginator([], 0, $perPage);
+
+        $query = UserActivityLog::with(['performer', 'user']);
+
+        if ($this->auditScope === 'performer') {
+            $query->where('performed_by', $this->editUserId);
+        } elseif ($this->auditScope === 'target') {
+            $query->where('user_id', $this->editUserId);
+        } else {
+            $query->where(function ($q) {
+                $q->where('user_id', $this->editUserId)
+                  ->orWhere('performed_by', $this->editUserId);
+            });
+        }
+
+        if ($this->auditEventType) {
+            $query->where('event_type', $this->auditEventType);
+        }
+
+        if ($this->historyStartDate) {
+            $query->whereDate('created_at', '>=', $this->historyStartDate);
+        }
+        if ($this->historyEndDate) {
+            $query->whereDate('created_at', '<=', $this->historyEndDate);
+        }
+
+        return $query->latest()->paginate($perPage, ['*'], 'auditLogsPage');
+    }
+
 
 
     public function applyQuickDateFilter($preset)
@@ -544,6 +593,8 @@ class UserManagement extends Component
                 $this->activeFilter = 'All Time';
                 break;
         }
+        $this->resetPage('historyOrdersPage');
+        $this->resetPage('auditLogsPage');
     }
 
     // ── Back to list ──────────────────────────────────────────────
@@ -935,7 +986,7 @@ class UserManagement extends Component
 
         // If this user was a branch manager, free up the branch — an
         // archived account shouldn't stay wired as the acting manager.
-        \App\Models\Branch::where('user_id', $idToArchive)->update(['user_id' => null]);
+        Branch::where('user_id', $idToArchive)->update(['user_id' => null]);
 
         $user->is_active = false;
         $user->archived_at = now();
@@ -1073,6 +1124,8 @@ class UserManagement extends Component
         $this->addr_lat      = null;
         $this->addr_lng      = null;
         $this->timelineLimit = 5;
+        $this->auditScope    = 'all';
+        $this->auditEventType = '';
         $this->resetValidation();
     }
 
@@ -1092,7 +1145,7 @@ class UserManagement extends Component
                         ->orWhere('email', 'like', $searchTerm)
                         ->orWhere('employee_id', 'like', $searchTerm)
                         ->orWhere('phone', 'like', $searchTerm)
-                        ->orWhere(\Illuminate\Support\Facades\DB::raw("CONCAT(first_name, ' ', last_name)"), 'like', $searchTerm);
+                        ->orWhere(DB::raw("CONCAT(first_name, ' ', last_name)"), 'like', $searchTerm);
                 });
             }
             if ($this->role_id) {
@@ -1133,6 +1186,7 @@ class UserManagement extends Component
         $applyCommonFilters($archivedQuery);
         $archivedUsers = $archivedQuery->orderBy('archived_at', 'desc')
             ->paginate($this->perPage, ['*'], 'archivedPage');
+        $totalUsers = $users->total();
 
         $roles = auth()->user()->isSuperAdmin()
             ? Role::whereIn('id', [1, 2, 3])->get()

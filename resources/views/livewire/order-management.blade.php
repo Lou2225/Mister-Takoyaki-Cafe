@@ -125,44 +125,10 @@
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ $info[1] }}"/></svg>
                         </x-slot>
                         {{ $info[0] }}
-                        @if($val === 'App')
-                            @php
-                                // Match the exact logic from OrderManagement::buildOrdersQuery('App')
-                                // Count active orders + recently completed within 1-hour void/refund window
-                                $voidRefundCutoff = now()->subHour();
-                                $deliveryCount = \App\Models\Order::where('source', 'App')
-                                    ->where('branch_id', auth()->user()->branch_id)
-                                    ->where(function ($q) use ($voidRefundCutoff) {
-                                        $q->whereNotIn('status', ['Completed', 'Cancelled', 'Void', 'Refunded', 'Partially Refunded'])
-                                          ->orWhere(function ($q2) use ($voidRefundCutoff) {
-                                              $q2->whereIn('status', ['Completed', 'Void', 'Refunded', 'Partially Refunded'])
-                                                 ->where('created_at', '>=', $voidRefundCutoff);
-                                          });
-                                    })
-                                    ->count();
-                            @endphp
-                            @if($deliveryCount > 0)
-                                <span class="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-blue-500 text-white text-[9px] font-black ml-1">{{ $deliveryCount }}</span>
-                            @endif
-                        @elseif($val === 'POS')
-                            @php
-                                // Match the exact logic from OrderManagement::buildOrdersQuery('POS')
-                                // Count Pending + Drafted + recently completed within 1-hour void/refund window
-                                $voidRefundCutoff = now()->subHour();
-                                $posCount = \App\Models\Order::where('source', 'POS')
-                                    ->where('branch_id', auth()->user()->branch_id)
-                                    ->where(function ($q) use ($voidRefundCutoff) {
-                                        $q->whereIn('status', ['Pending', 'Drafted'])
-                                          ->orWhere(function ($q2) use ($voidRefundCutoff) {
-                                              $q2->where('status', 'Completed')
-                                                 ->where('created_at', '>=', $voidRefundCutoff);
-                                          });
-                                    })
-                                    ->count();
-                            @endphp
-                            @if($posCount > 0)
-                                <span class="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-white text-[9px] font-black ml-1">{{ $posCount }}</span>
-                            @endif
+                        @if($val === 'App' && ($kpis['appBadge'] ?? 0) > 0)
+                            <span class="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-blue-500 text-white text-[9px] font-black ml-1">{{ $kpis['appBadge'] }}</span>
+                        @elseif($val === 'POS' && ($kpis['posBadge'] ?? 0) > 0)
+                            <span class="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-white text-[9px] font-black ml-1">{{ $kpis['posBadge'] }}</span>
                         @endif
                     </x-sliding-tab>
                 @endforeach
@@ -186,9 +152,7 @@
                         </div>
                     </div>
                     <div class="flex items-baseline gap-1">
-                        <span x-show="sourceFilter === 'App'" class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ $appOrders->total() }}</span>
-                        <span x-show="sourceFilter === 'POS'" x-cloak class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ $posOrders->total() }}</span>
-                        <span x-show="sourceFilter === 'History'" x-cloak class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ $historyOrders->total() }}</span>
+                        <span class="text-[20px] font-black text-slate-900 tracking-tight leading-none">{{ $orders->total() }}</span>
                         <span class="text-[9px] font-bold text-slate-400">orders</span>
                     </div>
                     <p class="text-[10px] font-bold text-slate-400 mt-1.5 leading-none">Placed orders count</p>
@@ -196,18 +160,7 @@
 
                 {{-- Active / Unresolved Orders -- color-coded by urgency, matches Low Stock card style --}}
                 @php
-                    $unresolvedStatuses = ['Pending', 'Preparing', 'Ready', 'Handed to Rider', 'Out for Delivery'];
-                    $activeCounts = [];
-                    foreach (['App', 'POS'] as $src) {
-                        $q = \App\Models\Order::where('branch_id', auth()->user()->branch_id)
-                            ->whereIn('status', $unresolvedStatuses)
-                            ->where('source', $src);
-                        $activeCounts[$src] = [
-                            'pending' => (clone $q)->count(),
-                            'stale'   => (clone $q)->where('created_at', '<', now()->subHours(24))->count(),
-                        ];
-                    }
-                    $activeCounts['History'] = ['pending' => 0, 'stale' => 0];
+                    $activeCounts = $kpis['activeCounts'] ?? ['App' => ['pending' => 0, 'stale' => 0], 'POS' => ['pending' => 0, 'stale' => 0], 'History' => ['pending' => 0, 'stale' => 0]];
                 @endphp
                 @foreach($activeCounts as $tabKey => $counts)
                 @php
@@ -246,10 +199,7 @@
 
                 {{-- Completed Today -- filterable, toggles Completed status --}}
                 @php
-                    $completedToday = \App\Models\Order::where('branch_id', auth()->user()->branch_id)
-                        ->where('status', 'Completed')
-                        ->whereDate('created_at', today())
-                        ->count();
+                    $completedToday = $kpis['completedToday'] ?? 0;
                 @endphp
                 <div @click="(typeof statusFilter !== 'undefined' ? statusFilter = (statusFilter === 'Completed' ? '' : 'Completed') : null); $wire.set('statusFilter', (typeof statusFilter !== 'undefined' ? statusFilter : ($wire.statusFilter === 'Completed' ? '' : 'Completed')))"
                     :class="(typeof statusFilter !== 'undefined' ? statusFilter : $wire.statusFilter) === 'Completed' ? 'ring-2 ring-emerald-400 shadow-md scale-[1.01]' : ''"
@@ -269,14 +219,7 @@
 
                 {{-- Today's Revenue -- read-only display, no hover (same as Procurement card) --}}
                 @php
-                    $todayRevenue = \App\Models\Order::where('branch_id', auth()->user()->branch_id)
-                        ->where('payment_status', 'Paid')
-                        ->whereNotIn('status', [
-                            \App\Models\Order::STATUS_VOID,
-                        ])
-                        ->whereDate('created_at', today())
-                        ->selectRaw('SUM(total_amount - refunded_amount) as net_revenue')
-                        ->value('net_revenue') ?? 0;
+                    $todayRevenue = $kpis['todayRevenue'] ?? 0;
                 @endphp
                 <div class="bg-gradient-to-br from-rose-50 to-white border border-rose-100 rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.02)] duration-300">
                     <div class="flex items-center justify-between mb-2">
@@ -308,6 +251,37 @@
                             <x-date-filter startModel="startDate" endModel="endDate" activeModel="activeFilter" />
                         </div>
 
+                        {{-- User / Staff Filter Dropdown — History only --}}
+                        <div class="w-auto" x-show="sourceFilter === 'History'" x-cloak>
+                            <x-dropdown align="right" width="56" containerClasses="w-auto">
+                                <x-slot name="trigger">
+                                    <x-secondary-button type="button" class="gap-1.5 h-10 !px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 shadow-none justify-between whitespace-nowrap">
+                                        <div class="flex items-center gap-1.5">
+                                            <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                                            <span class="text-[12px] truncate max-w-[120px]">
+                                                @if($userIdFilter)
+                                                    @php $staffMember = $this->users->firstWhere('id', $userIdFilter); @endphp
+                                                    {{ $staffMember ? $staffMember->first_name . ' ' . $staffMember->last_name : 'Staff' }}
+                                                @else
+                                                    All Staff
+                                                @endif
+                                            </span>
+                                        </div>
+                                        <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                    </x-secondary-button>
+                                </x-slot>
+                                <x-slot name="content">
+                                    <x-dropdown-link href="#" wire:click.prevent="$set('userIdFilter', '')" x-on:click="dropdownOpen = false">All Staff / Cashiers</x-dropdown-link>
+                                    <hr class="my-1 border-slate-100">
+                                    @foreach($this->users as $staff)
+                                        <x-dropdown-link href="#" wire:click.prevent="$set('userIdFilter', '{{ $staff->id }}')" x-on:click="dropdownOpen = false">
+                                            {{ $staff->first_name }} {{ $staff->last_name }}
+                                        </x-dropdown-link>
+                                    @endforeach
+                                </x-slot>
+                            </x-dropdown>
+                        </div>
+
                         {{-- Status Filter Dropdown --}}
                         <div class="w-auto">
                             <x-dropdown align="right" width="56" containerClasses="w-auto">
@@ -335,29 +309,28 @@
             </div>
 
             <div class="w-full relative">
-                {{-- App Orders Tab Content --}}
-                <div wire:key="orders-tab-content-app" wire:ignore.self x-show="sourceFilter === 'App'" class="w-full">
-                    @include('livewire.order-list-table', ['orders' => $appOrders, 'tabName' => 'app'])
-                </div>
-
-                {{-- POS Orders Tab Content --}}
-                <div wire:key="orders-tab-content-pos" wire:ignore.self x-show="sourceFilter === 'POS'" class="w-full" x-cloak>
-                    @include('livewire.order-list-table', ['orders' => $posOrders, 'tabName' => 'pos'])
-                </div>
-
-                {{-- History Orders Tab Content --}}
-                <div wire:key="orders-tab-content-history" wire:ignore.self x-show="sourceFilter === 'History'" class="w-full" x-cloak>
-                    @include('livewire.order-list-table', ['orders' => $historyOrders, 'tabName' => 'history'])
-                </div>
+                @if($sourceFilter === 'App')
+                    <div wire:key="orders-tab-content-app" class="w-full">
+                        @include('livewire.order-list-table', ['orders' => $orders, 'tabName' => 'app'])
+                    </div>
+                @elseif($sourceFilter === 'POS')
+                    <div wire:key="orders-tab-content-pos" class="w-full">
+                        @include('livewire.order-list-table', ['orders' => $orders, 'tabName' => 'pos'])
+                    </div>
+                @else
+                    <div wire:key="orders-tab-content-history" class="w-full">
+                        @include('livewire.order-list-table', ['orders' => $orders, 'tabName' => 'history'])
+                    </div>
+                @endif
             </div>
 
         </div>
-        <x-side-panel name="view-order-detail" width="max-w-md">
+        <x-modal name="view-order-detail" maxWidth="2xl" focusable>
             @if($selectedOrder)
                 @php
                     $order = $selectedOrder;
                 @endphp
-                <div class="flex flex-col h-full bg-white relative"
+                <div style="max-height: calc(88vh - 40px);" class="flex flex-col bg-white rounded-2xl overflow-hidden relative"
                     x-data="{ 
                         activeTab: 'summary',
                         ...(typeof window.slidingTabs === 'function' ? window.slidingTabs('summary', 'activeTab') : {})
@@ -748,7 +721,7 @@
                     </div>
                 </div>
             @endif
-        </x-side-panel>
+        </x-modal>
 
     </div>{{-- end relative wrapper --}}
 

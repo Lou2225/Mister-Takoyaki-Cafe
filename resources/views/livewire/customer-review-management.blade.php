@@ -234,9 +234,9 @@
     </div>
 
     {{-- Review Detail Side Panel --}}
-    <x-side-panel name="view-review-detail" width="max-w-md">
+    <x-modal name="view-review-detail" maxWidth="2xl" focusable>
         @if($viewingReview)
-            <div class="flex flex-col h-full bg-white">
+            <div style="max-height: calc(88vh - 40px);" class="flex flex-col bg-white rounded-2xl overflow-hidden">
                 {{-- Premium Header --}}
                 <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/40">
                     <div class="flex items-center gap-3">
@@ -371,5 +371,5 @@
                 </div>
             </div>
         @endif
-    </x-side-panel>
+    </x-modal>
 </div>

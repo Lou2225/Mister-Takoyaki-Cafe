@@ -25,7 +25,7 @@ class SystemSettings extends Component
     // methods are now toggled on/off rather than freely typed, so staff
     // can't introduce typos, duplicates, or unsupported gateways.
     public const ORDER_TYPE_OPTIONS = ['Dine-in', 'Take-out', 'Delivery', 'Pick-up'];
-    public const PAYMENT_METHOD_OPTIONS = ['Cash', 'GCash'];
+    public const PAYMENT_METHOD_OPTIONS = ['Cash', 'GCash', 'Cash on Delivery'];
 
     public $tab = 'general';
     public $perPage = 5;
@@ -264,7 +264,7 @@ class SystemSettings extends Component
             self::ORDER_TYPE_OPTIONS
         ));
         $this->posPaymentMethods = array_values(array_intersect(
-            SystemSetting::get('pos_payment_methods', ['Cash', 'GCash'], $this->settingsBranchId),
+            SystemSetting::get('pos_payment_methods', ['Cash', 'GCash', 'Cash on Delivery'], $this->settingsBranchId),
             self::PAYMENT_METHOD_OPTIONS
         ));
         $this->gcashAccountName   = SystemSetting::get('gcash_account_name', 'Mister Takoyaki Cafe', $this->settingsBranchId);

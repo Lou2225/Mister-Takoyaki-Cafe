@@ -1,4 +1,15 @@
-<div class="px-2 py-2 space-y-6" x-data="{ panel: $wire.entangle('panel').live, init() {} }" @if($selectedOrderId === null) wire:poll.10s @endif>
+<div class="px-2 py-2 space-y-6" x-data="{
+    ...(typeof window.slidingTabs === 'function' ? window.slidingTabs($wire.entangle('panel').live, 'panel') : {}),
+    panel: $wire.entangle('panel').live,
+    init() {
+        if (typeof window.slidingTabs === 'function') {
+            const tabs = window.slidingTabs(this.panel, 'panel');
+            if (tabs && typeof tabs.init === 'function') {
+                tabs.init.call(this);
+            }
+        }
+    }
+}" @if($selectedOrderId === null) wire:poll.10s @endif>
     {{-- ════════════════ DYNAMIC HEADER ════════════════ --}}
     <div class="px-1 pt-2">
         <div class="mb-6 flex items-center justify-between">
@@ -563,9 +574,9 @@
     </div>
 
     <!-- Fulfillment Review -->
-    <x-side-panel name="fulfillment-review" width="max-w-md">
+    <x-modal name="fulfillment-review" maxWidth="2xl" focusable>
         @if($selectedOrder)
-            <div class="flex flex-col h-full bg-white">
+            <div style="max-height: calc(88vh - 40px);" class="flex flex-col bg-white rounded-2xl overflow-hidden">
                 <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/40">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-100"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg></div>
@@ -683,7 +694,7 @@
                 </div>
             </div>
         @endif
-    </x-side-panel>
+    </x-modal>
 
     <x-modal name="confirm-reject-order" maxWidth="sm">
         <div class="p-6 text-center">

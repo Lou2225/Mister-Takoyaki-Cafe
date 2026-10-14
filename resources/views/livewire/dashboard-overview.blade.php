@@ -149,10 +149,13 @@
                 {{-- Row 1: Gross Sales & Net Profit --}}
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {{-- Card 1: Gross Sales (Hero Card) --}}
-                    <div wire:click="openBreakdown('Revenue')" class="p-5 sm:p-6 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between relative overflow-hidden group">
+                    <div wire:click="openBreakdown('Revenue')" class="p-5 sm:p-6 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between relative overflow-visible group">
                         <div>
                             <div class="flex items-center justify-between mb-2">
-                                <span class="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Gross Revenue</span>
+                                <div class="flex items-center gap-1.5" @click.stop>
+                                    <span class="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Gross Revenue</span>
+                                    <x-tooltip title="Gross Revenue" text="Total revenue from all customer orders before discounts, delivery fees, or refunds." position="top" />
+                                </div>
                                 <span class="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 transition-colors">View breakdown &rarr;</span>
                             </div>
                             <h3 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-tight whitespace-nowrap">₱ {{ number_format($kpi['gross_sales'], 2) }}</h3>
@@ -162,17 +165,20 @@
                             </div>
                         </div>
                         {{-- Sparkline chart below --}}
-                        <div class="w-full h-[45px] mt-3" wire:ignore>
+                        <div class="w-full h-[45px] mt-3 overflow-hidden rounded-b-xl" wire:ignore>
                             <div x-ref="sparklineSales" data-height="45"></div>
                         </div>
                     </div>
 
                     {{-- Card 2: Net Earnings / Profit & Loss (Cashflow Card) --}}
-                    <div wire:click="openBreakdown('Profit')" class="p-5 sm:p-6 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between relative overflow-hidden group">
+                    <div wire:click="openBreakdown('Profit')" class="p-5 sm:p-6 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between relative overflow-visible group">
                         <div class="flex flex-col justify-between h-full">
                             <div>
                                 <div class="flex items-center justify-between mb-2">
-                                    <span class="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Gross Profit</span>
+                                    <div class="flex items-center gap-1.5" @click.stop>
+                                        <span class="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Gross Profit</span>
+                                        <x-tooltip title="Gross Profit" text="Net Sales minus Cost of Goods Sold (COGS) and inventory waste." position="top" />
+                                    </div>
                                     <span class="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 transition-colors">View &rarr;</span>
                                 </div>
                                 <h3 class="text-2xl font-black text-slate-900 tracking-tight">₱ {{ number_format($kpi['gross_profit'], 2) }}</h3>
@@ -217,49 +223,58 @@
                 {{-- Row 2: Sparkline cards grid (Net Sales, AOV, Resource Costs) --}}
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {{-- Card 3: Net Sales --}}
-                    <div wire:click="openBreakdown('Revenue')" class="p-5 sm:p-6 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between relative overflow-hidden group">
+                    <div wire:click="openBreakdown('Revenue')" class="p-5 sm:p-6 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between relative overflow-visible group">
                         <div>
                             <div class="flex items-center justify-between mb-2">
-                                <span class="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Net Sales</span>
+                                <div class="flex items-center gap-1.5" @click.stop>
+                                    <span class="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Net Sales</span>
+                                    <x-tooltip title="Net Sales" text="Actual sales revenue collected after deducting delivery fees and refunds." position="top" />
+                                </div>
                                 <span class="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 transition-colors">View</span>
                             </div>
                             <h3 class="text-2xl font-black text-slate-900 tracking-tight">₱ {{ number_format($kpi['net_sales'], 2) }}</h3>
                             <p class="text-[11px] text-slate-500 font-semibold mt-0.5">Excl. ₱{{ number_format($kpi['delivery_fees'], 2) }} delivery</p>
                         </div>
                         {{-- Small Sparkline bottom --}}
-                        <div class="w-full h-[35px] mt-4" wire:ignore>
+                        <div class="w-full h-[35px] mt-4 overflow-hidden rounded-b-xl" wire:ignore>
                             <div x-ref="sparklineNetSales" data-height="35"></div>
                         </div>
                     </div>
 
                     {{-- Card 4: Avg. Order Value (AOV) --}}
-                    <div wire:click="openBreakdown('AOV')" class="p-5 sm:p-6 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between relative overflow-hidden group">
+                    <div wire:click="openBreakdown('AOV')" class="p-5 sm:p-6 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-white border border-indigo-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between relative overflow-visible group">
                         <div>
                             <div class="flex items-center justify-between mb-2">
-                                <span class="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Avg. Order Value</span>
+                                <div class="flex items-center gap-1.5" @click.stop>
+                                    <span class="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Avg. Order Value</span>
+                                    <x-tooltip title="Avg. Order Value (AOV)" text="Average sales revenue generated per completed customer transaction." position="top" />
+                                </div>
                                 <span class="text-[11px] font-bold text-indigo-600 hover:text-indigo-700 transition-colors">View</span>
                             </div>
                             <h3 class="text-2xl font-black text-slate-900 tracking-tight">₱ {{ number_format($kpi['aov'], 2) }}</h3>
                             <p class="text-[11px] text-slate-500 font-semibold mt-0.5">Average spend per order</p>
                         </div>
                         {{-- Small Sparkline bottom --}}
-                        <div class="w-full h-[35px] mt-4" wire:ignore>
+                        <div class="w-full h-[35px] mt-4 overflow-hidden rounded-b-xl" wire:ignore>
                             <div x-ref="sparklineAov" data-height="35"></div>
                         </div>
                     </div>
 
                     {{-- Card 5: Resource Costs (COGS) --}}
-                    <div wire:click="openBreakdown('COGS')" class="p-5 sm:p-6 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between relative overflow-hidden group">
+                    <div wire:click="openBreakdown('COGS')" class="p-5 sm:p-6 bg-gradient-to-br from-rose-500/10 via-rose-500/5 to-white border border-rose-500/10 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer flex flex-col justify-between relative overflow-visible group">
                         <div>
                             <div class="flex items-center justify-between mb-2">
-                                <span class="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Ingredient Costs</span>
+                                <div class="flex items-center gap-1.5" @click.stop>
+                                    <span class="text-[12px] font-bold text-slate-400 uppercase tracking-wider">Ingredient Costs</span>
+                                    <x-tooltip title="Ingredient Costs (COGS)" text="Total raw material expenditure calculated from product recipe formulations." position="top" />
+                                </div>
                                 <span class="text-[11px] font-bold text-rose-600 hover:text-rose-700 transition-colors">View</span>
                             </div>
                             <h3 class="text-2xl font-black text-slate-900 tracking-tight">₱ {{ number_format($kpi['total_cogs'], 2) }}</h3>
                             <p class="text-[11px] text-slate-500 font-semibold mt-0.5">Cost of goods sold this period</p>
                         </div>
                         {{-- Small Sparkline bottom --}}
-                        <div class="w-full h-[35px] mt-4" wire:ignore>
+                        <div class="w-full h-[35px] mt-4 overflow-hidden rounded-b-xl" wire:ignore>
                             <div x-ref="sparklineCogs" data-height="35"></div>
                         </div>
                     </div>
@@ -313,161 +328,145 @@
             
         </div>
 
-        {{-- ─── Breakdown Side Panel ────────────────────────────────────────── --}}
-        <x-side-panel wire:model.live="showBreakdown" name="kpi-breakdown" width="max-w-md">
-            <div class="flex flex-col h-full bg-white">
+        {{-- ─── Breakdown Modal ────────────────────────────────────────── --}}
+        <x-modal name="kpi-breakdown" :show="$showBreakdown" maxWidth="2xl" focusable>
+            <div style="max-height: calc(85vh - 40px);" class="bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col">
                 {{-- Premium Header --}}
-                <div class="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/40">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white shadow-lg shadow-slate-200">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 via-white to-slate-50/50 shrink-0">
+                    <div class="flex items-center gap-3.5">
+                        <div class="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white shadow-md shadow-slate-300 shrink-0">
+                            <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         </div>
                         <div>
-                            <h3 class="text-[15px] font-black text-slate-900 tracking-tight leading-none">Intelligence Report</h3>
-                            <span class="text-[11px] text-indigo-600 font-bold uppercase tracking-wider mt-1 block">{{ $selectedMetric }} Analysis</span>
+                            <div class="flex items-center gap-2">
+                                <h3 class="text-[16px] font-black text-slate-900 tracking-tight leading-none">Intelligence Breakdown</h3>
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-100 uppercase tracking-wider">{{ $selectedMetric }} Analysis</span>
+                            </div>
+                            <p class="text-[11px] text-slate-500 font-medium mt-1">Granular financial insights and component breakdown</p>
                         </div>
                     </div>
-                    <button @click="isPanelOpen = false" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all">
+                    <button type="button" @click="$dispatch('close-modal', 'kpi-breakdown')" wire:click="closeBreakdown" class="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all shrink-0">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
 
-                {{-- Identity Section --}}
-                <div class="p-6 bg-gradient-to-b from-slate-50/80 to-white border-b border-slate-50">
-                    <div class="flex items-start gap-4">
-                        <div class="flex-shrink-0 w-12 h-12 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-900 text-lg font-black italic">
-                            {{ substr($selectedMetric, 0, 1) }}
-                        </div>
-                        <div class="flex-1">
-                            <h4 class="text-[16px] font-black text-slate-900 leading-tight">Analytical Insights</h4>
-                            <div class="flex flex-col gap-1 mt-2">
-                                <div class="flex items-center gap-2 text-[12px] text-slate-500 font-medium">
-                                    <svg class="w-3.5 h-3.5 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                    <div class="flex items-center gap-1.5">
-                                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Formula:</span>
-                                        <code class="text-[11px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
-                                            @if($selectedMetric === 'Revenue')
-                                                Σ (Sales Price × Qty)
-                                            @elseif($selectedMetric === 'COGS')
-                                                Σ (Inventory Used × Unit Cost)
-                                            @elseif($selectedMetric === 'AOV')
-                                                Total Revenue ÷ Order Count
-                                            @elseif($selectedMetric === 'Profit')
-    Net Sales - COGS - Waste
-                                            @elseif($selectedMetric === 'Margin')
-                                                (Net Profit ÷ Revenue) × 100
-                                            @endif
-                                        </code>
-                                    </div>
-                                </div>
-                                <div class="flex items-center gap-2 text-[12px] text-slate-500 font-medium">
-                                    <svg class="w-3.5 h-3.5 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                    <span class="font-bold text-slate-700 uppercase tracking-tight">{{ $activeFilter }}</span>
-                                </div>
-                            </div>
-                        </div>
+                {{-- Formula & Scope Banner --}}
+                <div class="px-6 py-2.5 bg-slate-50/70 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 text-[12px] shrink-0">
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Formula:</span>
+                        <code class="text-[11px] font-bold text-indigo-600 bg-white border border-indigo-100 px-2 py-0.5 rounded-md shadow-xs">
+                            @if($selectedMetric === 'Revenue')
+                                Σ (Sales Price × Qty)
+                            @elseif($selectedMetric === 'COGS')
+                                Σ (Inventory Used × Unit Cost)
+                            @elseif($selectedMetric === 'AOV')
+                                Total Revenue ÷ Order Count
+                            @elseif($selectedMetric === 'Profit')
+                                Net Sales - COGS - Waste
+                            @elseif($selectedMetric === 'Margin')
+                                (Net Profit ÷ Revenue) × 100
+                            @endif
+                        </code>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-white border border-slate-200 text-slate-700">{{ $activeFilter }}</span>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase bg-white px-2 py-1 rounded-md border border-slate-200">{{ count($breakdownData) }} Data Nodes</span>
                     </div>
                 </div>
 
-                <div class="p-6 flex-1 overflow-y-auto custom-scrollbar">
-                    <div class="flex items-center justify-between mb-8">
-                        <h5 class="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                            <span class="w-1.5 h-1.5 rounded-full bg-slate-900"></span>
-                            Performance Breakdown
-                        </h5>
-                        <span class="text-[10px] font-bold text-slate-400 uppercase bg-slate-50 px-2 py-1 rounded-md border border-slate-100">{{ count($breakdownData) }} Data Nodes</span>
-                    </div>
-
+                {{-- Content Body with adaptive height and clean scrollbar --}}
+                <div style="max-height: min(460px, calc(82vh - 150px)); overflow-y: auto;" class="p-6 custom-scrollbar">
                     @if($selectedMetric === 'Profit')
                         <div class="space-y-4">
-                            <div class="p-5 rounded-2xl bg-white border border-slate-100 shadow-sm">
-                                <span class="text-[10px] font-black text-emerald-600 uppercase tracking-widest block mb-1">Total Revenue inflow</span>
-                                <div class="flex items-baseline gap-2">
-                                    <p class="text-2xl font-black text-slate-900">₱ {{ number_format($kpi['revenue'], 2) }}</p>
-                                    <span class="text-[10px] font-bold text-slate-400">Gross</span>
-                                </div>
-                            </div>
-                            <div class="p-5 rounded-2xl bg-white border border-slate-100 shadow-sm">
-                                <span class="text-[10px] font-black text-rose-600 uppercase tracking-widest block mb-1">Resource Consumption</span>
-                                <div class="flex items-baseline gap-2">
-                                    <p class="text-2xl font-black text-slate-900">- ₱ {{ number_format($kpi['total_cogs'], 2) }}</p>
-                                    <span class="text-[10px] font-bold text-slate-400">Total Costs</span>
-                                </div>
-                            </div>
-                            <div class="p-5 rounded-2xl bg-white border border-slate-100 shadow-sm">
-                                <span class="text-[10px] font-black text-amber-600 uppercase tracking-widest block mb-1">Variance & Spoilage</span>
-                                <div class="flex items-baseline gap-2">
-                                    <p class="text-2xl font-black text-slate-900">- ₱ {{ number_format($kpi['waste_cost'] ?? 0, 2) }}</p>
-                                    <span class="text-[10px] font-bold text-slate-400">Loss</span>
-                                </div>
-                            </div>
-                            <div class="mt-6 pt-6 border-t border-dashed border-slate-200">
-                                <div class="flex justify-between items-end bg-slate-900 p-6 rounded-2xl shadow-xl shadow-slate-200 overflow-hidden relative">
-                                    <div class="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-bl-full -mr-16 -mt-16"></div>
-                                    <div class="relative z-10">
+                            {{-- Gross Profit Result (Hero Card at Top) --}}
+                            <div class="bg-slate-900 p-6 rounded-2xl shadow-xl shadow-slate-200 overflow-hidden relative">
+                                <div class="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-bl-full pointer-events-none"></div>
+                                <div class="flex justify-between items-end relative z-10">
+                                    <div>
                                         <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-1">Gross Profit Result</span>
                                         <p class="text-3xl font-black text-white">₱ {{ number_format($kpi['gross_profit'], 2) }}</p>
                                     </div>
-                                    <div class="relative z-10 text-right">
-                                        <span class="px-3 py-1.5 rounded-xl bg-white/10 text-white text-[14px] font-black backdrop-blur-md">{{ $kpi['profit_margin_pct'] }}%</span>
-                                        <p class="text-[9px] font-black text-slate-500 uppercase mt-2">Margin</p>
+                                    <div class="text-right">
+                                        <span class="px-3.5 py-1.5 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[15px] font-black backdrop-blur-md">{{ $kpi['profit_margin_pct'] }}%</span>
+                                        <p class="text-[9px] font-black text-slate-400 uppercase mt-2 tracking-wider">Gross Margin</p>
                                     </div>
+                                </div>
+                            </div>
+
+                            {{-- Component Breakdown Cards Below --}}
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                                <div class="p-4 rounded-xl bg-emerald-50/60 border border-emerald-100">
+                                    <span class="text-[10px] font-black text-emerald-700 uppercase tracking-widest block mb-1">Revenue Inflow</span>
+                                    <p class="text-xl font-black text-slate-900">₱ {{ number_format(abs($kpi['revenue'] ?? $kpi['gross_sales'] ?? 0), 2) }}</p>
+                                    <span class="text-[10px] font-semibold text-emerald-600">Gross Sales</span>
+                                </div>
+                                <div class="p-4 rounded-xl bg-rose-50/60 border border-rose-100">
+                                    <span class="text-[10px] font-black text-rose-700 uppercase tracking-widest block mb-1">Resource Consumption</span>
+                                    <p class="text-xl font-black text-slate-900">₱ {{ number_format(abs($kpi['total_cogs']), 2) }}</p>
+                                    <span class="text-[10px] font-semibold text-rose-600">Cost of Goods (COGS)</span>
+                                </div>
+                                <div class="p-4 rounded-xl bg-amber-50/60 border border-amber-100">
+                                    <span class="text-[10px] font-black text-amber-700 uppercase tracking-widest block mb-1">Variance & Loss</span>
+                                    <p class="text-xl font-black text-slate-900">₱ {{ number_format(abs($kpi['waste_cost'] ?? 0), 2) }}</p>
+                                    <span class="text-[10px] font-semibold text-amber-600">Inventory Waste</span>
                                 </div>
                             </div>
                         </div>
                     @else
-                        <div class="space-y-6 relative">
-                            {{-- Vertical line --}}
-                            <div class="absolute left-[7px] top-2 bottom-2 w-[1px] bg-slate-100"></div>
-
+                        <div class="space-y-2.5">
                             @forelse($breakdownData as $item)
-                                <div class="relative pl-8 group">
-                                    {{-- Dot --}}
-                                    <div class="absolute left-0 top-[6px] w-[16px] h-[16px] rounded-full border-[3px] border-white bg-slate-100 group-hover:bg-slate-900 group-hover:scale-110 transition-all duration-300 z-10 shadow-sm"></div>
-                                    
-                                    <div class="flex items-center justify-between p-4 rounded-2xl border border-transparent hover:border-slate-100 hover:bg-slate-50/50 transition-all duration-300">
+                                <div class="flex items-center justify-between p-3.5 rounded-xl border border-slate-100 hover:border-indigo-100 hover:bg-slate-50/70 transition-all duration-200">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-700 font-black text-xs">
+                                            {{ substr($item['category'] ?? $item['name'] ?? 'Item', 0, 2) }}
+                                        </div>
                                         <div>
-                                            <h4 class="text-[14px] font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                                            <h4 class="text-[13px] font-bold text-slate-900">
                                                 {{ $item['category'] ?? $item['name'] ?? $item['bucket'] }}
                                             </h4>
                                             @isset($item['count'])
-                                                <div class="flex items-center gap-2 mt-1">
-                                                    <span class="w-1 h-1 rounded-full bg-slate-300"></span>
-                                                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{{ $item['count'] }} Volume</p>
-                                                </div>
+                                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{{ $item['count'] }} orders/units</p>
                                             @endisset
                                         </div>
-                                        <div class="text-right">
-                                            <p class="text-[14px] font-black text-slate-900">
-                                                @if(isset($item['is_percentage']) && $item['is_percentage'])
-                                                    {{ number_format($item['total'], 2) }}%
-                                                @elseif($selectedMetric === 'Volume')
-                                                    {{ number_format($item['total'], 0) }}
-                                                @elseif(isset($item['total']))
-                                                    ₱ {{ number_format($item['total'], 2) }}
-                                                @else
-                                                    {{ $item['count'] ?? '' }}
-                                                @endif
-                                            </p>
-                                            <p class="text-[9px] font-black text-slate-400 uppercase mt-0.5 tracking-tighter">
-                                                @if($selectedMetric === 'Margin') Efficiency @elseif($selectedMetric === 'AOV') Volume Share @else Contribution @endif
-                                            </p>
-                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-[14px] font-black text-slate-900">
+                                            @if(isset($item['is_percentage']) && $item['is_percentage'])
+                                                {{ number_format($item['total'], 2) }}%
+                                            @elseif($selectedMetric === 'Volume')
+                                                {{ number_format($item['total'], 0) }}
+                                            @elseif(isset($item['total']))
+                                                ₱ {{ number_format($item['total'], 2) }}
+                                            @else
+                                                {{ $item['count'] ?? '' }}
+                                            @endif
+                                        </p>
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-tighter">
+                                            @if($selectedMetric === 'Margin') Efficiency @elseif($selectedMetric === 'AOV') Volume Share @else Contribution @endif
+                                        </p>
                                     </div>
                                 </div>
                             @empty
-                                <div class="py-20 text-center">
-                                    <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
-                                        <svg class="w-8 h-8 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                <div class="py-14 text-center">
+                                    <div class="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3 border border-slate-100">
+                                        <svg class="w-6 h-6 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                     </div>
-                                    <p class="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">No analytical data available</p>
+                                    <p class="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">No analytical breakdown data available</p>
                                 </div>
                             @endforelse
                         </div>
                     @endif
                 </div>
+
+                {{-- Modal Footer --}}
+                <div class="px-6 py-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between shrink-0">
+                    <span class="text-[11px] text-slate-400 font-medium">Click outside or press <kbd class="px-1.5 py-0.5 rounded bg-white border border-slate-200 text-[10px] font-mono text-slate-600 shadow-xs">ESC</kbd> to close</span>
+                    <button type="button" @click="$dispatch('close-modal', 'kpi-breakdown')" wire:click="closeBreakdown" class="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-[12px] font-bold rounded-xl transition-all shadow-sm">
+                        Dismiss
+                    </button>
+                </div>
             </div>
-        </x-side-panel>
+        </x-modal>
 
         {{-- ─── Main Analytical Layer ────────────────────────────────────────── --}}
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6" x-data="dashboardCharts()" @update-sales-chart.window="handleChartUpdate($event.detail)" wire:key="dashboard-charts-container">
@@ -475,20 +474,24 @@
             <div class="lg:col-span-8 rounded-2xl bg-white border border-gray-200/80 shadow-sm p-5 sm:p-6 overflow-hidden h-[400px] relative flex flex-col justify-between">
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
                     <div>
-                        <h2 class="text-[16px] font-bold text-gray-900 tracking-tight">
-                            Spend & Revenue Activity
-                        </h2>
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-[16px] font-bold text-gray-900 tracking-tight">
+                                Spend & Revenue Activity
+                            </h2>
+                            <x-tooltip title="Spend & Revenue Tracker" text="Plots actual collected revenue against raw material resource consumption (COGS) recorded over the selected timeframe." position="bottom" />
+                        </div>
                         <p class="text-[11px] text-gray-400 font-medium">Financial performance and raw material spend trends</p>
                     </div>
 
                     <div class="flex items-center gap-3 self-end sm:self-auto overflow-x-auto max-w-full pb-1 sm:pb-0">
                         {{-- Metric selector --}}
                         <div class="flex items-center p-0.5 bg-gray-50 rounded-lg border border-gray-100">
-                            @foreach(['Sales' => 'Sales', 'Volume' => 'Vol', 'Profit' => 'Profit'] as $m => $label)
+                            @foreach(['Sales' => ['label' => 'Sales', 'title' => 'Gross Revenue vs Resource Costs'], 'Volume' => ['label' => 'Vol', 'title' => 'Order Volume Activity'], 'Profit' => ['label' => 'Profit', 'title' => 'Gross Profit (Revenue - COGS - Waste)']] as $m => $cfg)
                                 <button @click="updateMetricLocal('{{ $m }}')"
+                                        title="{{ $cfg['title'] }}"
                                         :class="selectedMetric === '{{ $m }}' ? 'bg-white text-gray-900 shadow-sm border border-gray-100 scale-[1.02]' : 'text-gray-400 hover:text-gray-600'"
                                         class="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all duration-200">
-                                    {{ $label }}
+                                    {{ $cfg['label'] }}
                                 </button>
                             @endforeach
                         </div>
@@ -668,9 +671,10 @@
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
             {{-- 1: Revenue Channels (Dynamic from POS Config) --}}
-            <div class="lg:col-span-4 rounded-xl bg-white border border-gray-200 shadow-sm p-6 flex flex-col h-[400px]">
-                <h2 class="text-[14px] font-black text-gray-900 uppercase tracking-widest mb-6">Revenue Channels</h2>
-                <div class="flex-1 flex flex-col justify-center space-y-6">
+            <div class="lg:col-span-4 rounded-xl bg-white border border-gray-200 shadow-sm p-6 flex flex-col justify-between h-[400px]">
+                {{-- Top: Revenue Channels --}}
+                <div>
+                    <h2 class="text-[14px] font-black text-gray-900 uppercase tracking-widest mb-4">Revenue Channels</h2>
                     @php
                         $totalOrders = array_sum($chart['channels']['series']);
                         $channelLabels = $chart['channels']['labels'];
@@ -687,60 +691,69 @@
                             'Pick-up' => 'bg-indigo-500',
                         ];
                     @endphp
-                    @forelse($channelLabels as $idx => $label)
-                        <div class="space-y-2">
-                            <div class="flex justify-between items-center">
-                                <span class="text-[12px] font-black text-gray-600 uppercase tracking-wider">{{ $label }}</span>
-                                <div class="flex items-center gap-2">
-                                    <span class="text-[10px] font-bold text-gray-400">{{ $channelSeries[$idx] }} orders</span>
-                                    <span class="text-[12px] font-black text-gray-900">{{ $channelValues[$idx] }}%</span>
+                    <div class="space-y-3">
+                        @forelse($channelLabels as $idx => $label)
+                            <div class="space-y-1.5">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-[12px] font-black text-gray-600 uppercase tracking-wider">{{ $label }}</span>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-[11px] font-semibold text-gray-400">{{ $channelSeries[$idx] }} orders</span>
+                                        <span class="text-[12px] font-black text-gray-900">{{ $channelValues[$idx] }}%</span>
+                                    </div>
+                                </div>
+                                <div class="h-2.5 w-full bg-gray-50 border border-gray-100 rounded-full overflow-hidden">
+                                    <div class="h-full {{ $channelColors[$label] ?? 'bg-slate-400' }} transition-all duration-1000" style="width: {{ $channelValues[$idx] }}%"></div>
                                 </div>
                             </div>
-                            <div class="h-3 w-full bg-gray-50 border border-gray-100 rounded-full overflow-hidden">
-                                <div class="h-full {{ $channelColors[$label] ?? 'bg-slate-400' }} transition-all duration-1000" style="width: {{ $channelValues[$idx] }}%"></div>
+                        @empty
+                            <div class="py-3 text-center">
+                                <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">No Active Channels</p>
                             </div>
-                        </div>
-                    @empty
-                        <div class="flex-1 flex flex-col items-center justify-center -mt-6">
-                            <div class="w-12 h-12 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-300 mb-3">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
-                            </div>
-                            <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">No Active Channels</p>
-                        </div>
-                    @endforelse
-                    {{-- Payment Methods Breakdown --}}
-                    <div class="pt-4 border-t border-gray-100">
-                        @php
-                            $paymentLabels = $chart['payment']['labels'] ?? [];
-                            $paymentSeries = $chart['payment']['series'] ?? [];
-                        @endphp
-                        <h4 class="text-[12px] font-black text-gray-700 mb-3 uppercase tracking-wider">Payment Methods</h4>
-                        <div class="space-y-3">
-                            @foreach($paymentLabels as $i => $pm)
-                                    @php
-                                        $count = (int)($paymentSeries[$i] ?? 0);
-                                        $amount = (float)($chart['payment']['totals'][$i] ?? 0);
-                                        $currency = $financialConfig['currency_symbol'] ?? '₱';
-                                    @endphp
-                                    <div class="flex items-center justify-between">
-                                        <div class="flex items-center gap-3">
-                                            <div class="w-8 h-8 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-600 font-bold text-xs">{{ substr($pm, 0, 2) }}</div>
-                                            <div>
-                                                <p class="text-[13px] font-bold text-gray-900">{{ $pm }}</p>
-                                                <p class="text-[10px] text-gray-400">{{ $count }} orders</p>
-                                            </div>
-                                        </div>
-                                        <div class="text-[12px] font-black text-gray-900">{{ $currency }} {{ number_format($amount, 2) }}</div>
+                        @endforelse
+                    </div>
+                </div>
+
+                {{-- Bottom: Payment Methods Breakdown --}}
+                <div class="pt-4 border-t border-gray-100">
+                    @php
+                        $paymentLabels = $chart['payment']['labels'] ?? [];
+                        $paymentSeries = $chart['payment']['series'] ?? [];
+                    @endphp
+                    <h4 class="text-[12px] font-black text-gray-700 mb-3 uppercase tracking-wider">Payment Methods</h4>
+                    <div class="space-y-3">
+                        @foreach($paymentLabels as $i => $pm)
+                            @php
+                                $count = (int)($paymentSeries[$i] ?? 0);
+                                $amount = (float)($chart['payment']['totals'][$i] ?? 0);
+                                $currency = $financialConfig['currency_symbol'] ?? '₱';
+                                $shortCode = match(strtolower(trim($pm))) {
+                                    'cash on delivery', 'cod' => 'COD',
+                                    'gcash' => 'GC',
+                                    'cash' => 'CS',
+                                    'credit card', 'debit card' => 'CC',
+                                    'bank transfer' => 'BT',
+                                    'maya', 'paymaya' => 'MY',
+                                    default => strtoupper(substr($pm, 0, 2)),
+                                };
+                            @endphp
+                            <div class="flex items-center justify-between gap-3">
+                                <div class="flex items-center gap-3 min-w-0">
+                                    <div class="w-8 h-8 rounded-lg bg-gray-50 border border-gray-200/80 flex items-center justify-center text-gray-700 font-black text-[10px] shrink-0">{{ $shortCode }}</div>
+                                    <div class="min-w-0">
+                                        <p class="text-[13px] font-bold text-gray-900 truncate leading-tight">{{ $pm }}</p>
+                                        <p class="text-[11px] text-gray-400 font-medium leading-none mt-0.5">{{ $count }} {{ $count === 1 ? 'order' : 'orders' }}</p>
                                     </div>
-                                @endforeach
-                        </div>
+                                </div>
+                                <div class="text-[13px] font-black text-gray-900 whitespace-nowrap shrink-0">{{ $currency }} {{ number_format($amount, 2) }}</div>
+                            </div>
+                        @endforeach
                     </div>
                 </div>
             </div>
 
             {{-- 2: Usage Velocity (Linear Items) --}}
-            <div class="lg:col-span-4 p-6 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col h-[400px] min-h-0">
-                <div class="flex items-center justify-between mb-6">
+            <div class="lg:col-span-4 p-5 sm:p-6 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col h-[400px] min-h-0">
+                <div class="flex items-center justify-between mb-4">
                     <h2 class="text-[14px] font-black text-gray-900 uppercase tracking-widest">Ingredient Consumption</h2>
                 </div>
                 <div class="flex-1 min-h-0 overflow-hidden">
@@ -768,8 +781,8 @@
             </div>
 
             {{-- 3: Efficiency Audit (New Level Indicator Design) --}}
-            <div class="lg:col-span-4 p-6 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col h-[400px]">
-                <div class="flex items-center justify-between mb-6">
+            <div class="lg:col-span-4 p-5 sm:p-6 bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col h-[400px]">
+                <div class="flex items-center justify-between mb-4">
                     <h2 class="text-[14px] font-black text-gray-900 uppercase tracking-widest">Inventory Health</h2>
                 </div>
                 <div class="flex-1 flex gap-10 items-center px-4">
@@ -1053,7 +1066,7 @@
                 initSparklines() {
                     if (typeof window.ApexCharts === 'undefined') return;
 
-                    const createSparkline = (el, data, color) => {
+                    const createSparkline = (el, data, color, label = 'Amount') => {
                         if (!el) return null;
                         
                         let seriesData = data ?? [];
@@ -1062,7 +1075,7 @@
                         }
                         
                         var options = {
-                            series: [{ data: seriesData }],
+                            series: [{ name: label, data: seriesData }],
                             chart: {
                                 type: 'area',
                                 height: el.dataset.height ? parseInt(el.dataset.height) : 35,
@@ -1080,13 +1093,21 @@
                                 }
                             },
                             colors: [color],
+                            xaxis: {
+                                categories: this.metricsCategories ?? []
+                            },
                             tooltip: {
                                 theme: 'dark',
                                 fixed: { enabled: false },
-                                x: { show: false },
+                                x: { 
+                                    show: true,
+                                    formatter: (val, { dataPointIndex }) => {
+                                        return this.metricsCategories?.[dataPointIndex] || (val ? String(val) : '');
+                                    }
+                                },
                                 y: {
-                                    title: { formatter: (seriesName) => '' },
-                                    formatter: (val) => '₱ ' + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                    title: { formatter: () => label + ': ' },
+                                    formatter: (val) => '₱ ' + Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                                 },
                                 marker: { show: false }
                             }
@@ -1097,10 +1118,10 @@
                     };
  
                     setTimeout(() => {
-                        this.sparklineSalesChart = createSparkline(this.$refs.sparklineSales, this.metrics['Sales'], '#10B981');
-                        this.sparklineNetSalesChart = createSparkline(this.$refs.sparklineNetSales, this.metrics['Sales'], '#10B981');
-                        this.sparklineAovChart = createSparkline(this.$refs.sparklineAov, this.metrics['AOV'] ?? this.metrics['Aov'], '#6366F1');
-                        this.sparklineCogsChart = createSparkline(this.$refs.sparklineCogs, this.metrics['COGS'] ?? this.metrics['Cogs'], '#F43F5E');
+                        this.sparklineSalesChart = createSparkline(this.$refs.sparklineSales, this.metrics['Sales'], '#10B981', 'Gross Revenue');
+                        this.sparklineNetSalesChart = createSparkline(this.$refs.sparklineNetSales, this.metrics['Sales'], '#10B981', 'Net Sales');
+                        this.sparklineAovChart = createSparkline(this.$refs.sparklineAov, this.metrics['AOV'] ?? this.metrics['Aov'], '#6366F1', 'Avg. Order');
+                        this.sparklineCogsChart = createSparkline(this.$refs.sparklineCogs, this.metrics['COGS'] ?? this.metrics['Cogs'], '#F43F5E', 'COGS');
                     }, 300);
                 },
 
@@ -1327,18 +1348,91 @@
                         },
                         tooltip: {
                             theme: 'dark',
-                            x: { show: true },
-                            y: { 
-                                formatter: (val) => { 
-                                    if (this.selectedMetric === 'Volume') return val.toLocaleString() + " units";
-                                    return "₱ " + val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); 
+                            shared: true,
+                            intersect: false,
+                            custom: ({ series, seriesIndex, dataPointIndex, w }) => {
+                                const cat = w.globals.categoryLabels[dataPointIndex] ?? w.globals.labels[dataPointIndex] ?? '';
+                                const metric = this.selectedMetric;
+                                let rowsHtml = '';
+
+                                if (metric === 'Sales') {
+                                    const revenue = Number(series[0]?.[dataPointIndex] ?? 0);
+                                    const costs = Number(series[1]?.[dataPointIndex] ?? 0);
+                                    const grossProfit = revenue - costs;
+                                    const margin = revenue > 0 ? ((grossProfit / revenue) * 100).toFixed(1) : '0.0';
+
+                                    rowsHtml = `
+                                        <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:3px 0;">
+                                            <span style="display:flex;align-items:center;gap:6px;color:#cbd5e1;font-size:11px;">
+                                                <span style="width:8px;height:8px;border-radius:9999px;background:#10B981;display:inline-block;"></span>
+                                                Gross Revenue
+                                            </span>
+                                            <span style="font-weight:800;color:#ffffff;font-size:12px;">₱ ${revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        </div>
+                                        <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:3px 0;">
+                                            <span style="display:flex;align-items:center;gap:6px;color:#cbd5e1;font-size:11px;">
+                                                <span style="width:8px;height:8px;border-radius:9999px;background:#F43F5E;display:inline-block;"></span>
+                                                Resource Costs
+                                            </span>
+                                            <span style="font-weight:800;color:#fda4af;font-size:12px;">₱ ${costs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        </div>
+                                        <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(51,65,85,0.7);display:flex;justify-content:space-between;align-items:center;gap:16px;font-size:10px;">
+                                            <span style="color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;">Est. Margin</span>
+                                            <span style="font-weight:800;color:${grossProfit >= 0 ? '#34d399' : '#f87171'};">${margin}% (₱ ${grossProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</span>
+                                        </div>
+                                    `;
+                                } else if (metric === 'Volume') {
+                                    const vol = Number(series[0]?.[dataPointIndex] ?? 0);
+                                    const avg = Number(series[1]?.[dataPointIndex] ?? 0);
+                                    rowsHtml = `
+                                        <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:3px 0;">
+                                            <span style="display:flex;align-items:center;gap:6px;color:#cbd5e1;font-size:11px;">
+                                                <span style="width:8px;height:8px;border-radius:9999px;background:#6366F1;display:inline-block;"></span>
+                                                Order Volume
+                                            </span>
+                                            <span style="font-weight:800;color:#ffffff;font-size:12px;">${vol.toLocaleString()} orders</span>
+                                        </div>
+                                        <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:3px 0;">
+                                            <span style="display:flex;align-items:center;gap:6px;color:#94a3b8;font-size:11px;">
+                                                <span style="width:8px;height:8px;border-radius:9999px;background:#a5b4fc;display:inline-block;"></span>
+                                                Period Average
+                                            </span>
+                                            <span style="font-weight:800;color:#c7d2fe;font-size:12px;">${avg.toLocaleString()} orders</span>
+                                        </div>
+                                    `;
+                                } else {
+                                    const profit = Number(series[0]?.[dataPointIndex] ?? 0);
+                                    const avg = Number(series[1]?.[dataPointIndex] ?? 0);
+                                    rowsHtml = `
+                                        <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:3px 0;">
+                                            <span style="display:flex;align-items:center;gap:6px;color:#cbd5e1;font-size:11px;">
+                                                <span style="width:8px;height:8px;border-radius:9999px;background:#10B981;display:inline-block;"></span>
+                                                Gross Profit
+                                            </span>
+                                            <span style="font-weight:800;color:#ffffff;font-size:12px;">₱ ${profit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        </div>
+                                        <div style="display:flex;justify-content:space-between;align-items:center;gap:16px;padding:3px 0;">
+                                            <span style="display:flex;align-items:center;gap:6px;color:#94a3b8;font-size:11px;">
+                                                <span style="width:8px;height:8px;border-radius:9999px;background:#6ee7b7;display:inline-block;"></span>
+                                                Period Average
+                                            </span>
+                                            <span style="font-weight:800;color:#a7f3d0;font-size:12px;">₱ ${avg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        </div>
+                                    `;
                                 }
-                            },
-                            style: { fontSize: '12px', fontFamily: 'Outfit' },
-                            onDatasetHover: { highlightDataSeries: true },
-                            marker: { show: true },
-                            items: { display: 'flex' },
-                            fixed: { enabled: false }
+
+                                return `
+                                    <div style="background:rgba(15,23,42,0.96);backdrop-filter:blur(8px);border:1px solid rgba(51,65,85,0.7);border-radius:12px;padding:10px 14px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.5);font-family:Outfit,Inter,sans-serif;min-width:210px;text-align:left;">
+                                        <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:6px;margin-bottom:6px;border-bottom:1px solid rgba(51,65,85,0.7);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;">
+                                            <span>${cat}</span>
+                                            <span style="color:#818cf8;">${metric}</span>
+                                        </div>
+                                        <div>
+                                            ${rowsHtml}
+                                        </div>
+                                    </div>
+                                `;
+                            }
                         }
                     };
                     this.salesChart = new ApexCharts(this.$refs.salesChart, options);

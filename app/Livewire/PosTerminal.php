@@ -127,7 +127,7 @@ protected $validationAttributes = [
     public function handlePosSettingsUpdated($pos = null): void
     {
         $this->orderTypes      = (array) SystemSetting::get('pos_order_types', ['Dine-in', 'Take-out'], $this->branchId);
-        $this->paymentMethods   = (array) SystemSetting::get('pos_payment_methods', ['Cash', 'GCash'], $this->branchId);
+        $this->paymentMethods   = (array) SystemSetting::get('pos_payment_methods', ['Cash', 'GCash', 'Cash on Delivery'], $this->branchId);
         $this->serviceChargeRate = (float) SystemSetting::get('service_charge', 0, $this->branchId);
         $this->discountPercent   = (float) SystemSetting::get('discount_rate', 0, $this->branchId);
         $this->seniorDiscountRate = (float) SystemSetting::get('senior_discount_rate', 0.20, $this->branchId);
@@ -256,7 +256,7 @@ public function openPaymentModal(?array $cartData = null): void
         $this->currencySymbol    = (string) SystemSetting::get('currency_symbol', '₱');
         
         $this->orderTypes      = (array) SystemSetting::get('pos_order_types', ['Dine-in', 'Take-out'], $this->branchId);
-        $this->paymentMethods = (array) SystemSetting::get('pos_payment_methods', ['Cash', 'GCash'], $this->branchId);
+        $this->paymentMethods = (array) SystemSetting::get('pos_payment_methods', ['Cash', 'GCash', 'Cash on Delivery'], $this->branchId);
 
         $userTheme = $user->getRoleTheme();
         $this->primaryColor = $userTheme['primary'] ?? 'indigo';

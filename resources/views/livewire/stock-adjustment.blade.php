@@ -859,7 +859,8 @@
     </x-modal>
 
     {{-- ── Adjustment Details Side Panel ── --}}
-    <x-side-panel name="view-adjustment-details" width="max-w-md">
+    <x-modal name="view-adjustment-details" maxWidth="2xl" focusable>
+        <div style="max-height: calc(88vh - 40px);" class="flex flex-col bg-white rounded-2xl overflow-hidden">
           @if($viewingReferenceId)
             @php
                 // Group viewing movements by ingredient_id to combine identical items
@@ -1012,5 +1013,6 @@
                 </div>
             </div>
          @endif
-    </x-side-panel>
+        </div>
+    </x-modal>
 </div>
