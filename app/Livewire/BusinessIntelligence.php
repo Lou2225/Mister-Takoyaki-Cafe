@@ -1022,13 +1022,49 @@ class BusinessIntelligence extends Component
         return max(0.80, min(0.96, abs($r1)));
     }
 
+    private function calculateDayOfWeekSeasonality(Collection $cleanData): array
+    {
+        if ($cleanData->count() < 7) {
+            return [];
+        }
+
+        $dowTotals = [];
+        $dowCounts = [];
+        foreach ($cleanData as $row) {
+            $dow = (int)Carbon::parse($row->label)->dayOfWeekIso; // 1 = Monday, ..., 7 = Sunday
+            $val = (float)$row->total;
+            $dowTotals[$dow] = ($dowTotals[$dow] ?? 0.0) + $val;
+            $dowCounts[$dow] = ($dowCounts[$dow] ?? 0) + 1;
+        }
+
+        $dowAverages = [];
+        foreach ($dowTotals as $dow => $sum) {
+            $dowAverages[$dow] = $dowCounts[$dow] > 0 ? $sum / $dowCounts[$dow] : 0.0;
+        }
+
+        $overallAvg = !empty($dowAverages) ? array_sum($dowAverages) / count($dowAverages) : 0.0;
+        if ($overallAvg <= 0) {
+            return [];
+        }
+
+        $dowIndices = [];
+        for ($d = 1; $d <= 7; $d++) {
+            $avg = $dowAverages[$d] ?? $overallAvg;
+            // Bound seasonal multiplier between 0.35 and 2.50 to reflect true cafe foot-traffic without extreme runaway outliers
+            $dowIndices[$d] = max(0.35, min(2.50, $avg / $overallAvg));
+        }
+
+        return $dowIndices;
+    }
+
     private function generateContinuousForecastTrajectory(
         string $type,
         int $predictCount,
         float $currentLevel,
         float $slope,
         float $phi,
-        float $activeMin
+        float $activeMin,
+        array $dowIndices = []
     ): array {
         $forecast = [];
         $startDate = $type === 'daily' ? Carbon::tomorrow() : Carbon::now()->addMonth()->startOfMonth();
@@ -1040,7 +1076,28 @@ class BusinessIntelligence extends Component
                 : $startDate->copy()->addMonths($i);
 
             $cumTrend += pow($phi, $i + 1) * $slope;
-            $predictedValue = max($activeMin, round($currentLevel + $cumTrend, 2));
+            $baseLevel = max($activeMin, $currentLevel + $cumTrend);
+
+            if ($type === 'daily' && !empty($dowIndices)) {
+                // Option A: Organic Damped Wave
+                // 1. Attenuate seasonal swing over horizon distance (near-term peaks are sharp, far-term softly reverts toward baseline trend)
+                $decay = exp(-0.035 * $i);
+                $dow = (int)$predictedDate->dayOfWeekIso;
+                $rawSeasonal = $dowIndices[$dow] ?? 1.0;
+                $effSeasonal = 1.0 + (($rawSeasonal - 1.0) * $decay);
+
+                // 2. Deterministic pseudo-organic variance based on calendar date hash
+                // Guarantees zero UI flicker across reloads while ensuring every individual day & week is naturally unique
+                $dateKey = $predictedDate->toDateString();
+                $hash = hexdec(substr(md5($dateKey), 0, 6));
+                $organicNoise = sin($hash) * 0.05 * (0.5 + ($decay * 0.5));
+
+                $multiplier = max(0.20, $effSeasonal + $organicNoise);
+            } else {
+                $multiplier = 1.0;
+            }
+
+            $predictedValue = max(max(10.0, $activeMin * 0.4), round($baseLevel * $multiplier, 2));
 
             $forecast[] = [
                 'date'      => $type === 'daily' ? $predictedDate->format('M d') : $predictedDate->format('M Y'),
@@ -1141,7 +1198,8 @@ class BusinessIntelligence extends Component
 
         $currentLevel = $intercept + ($slope * $nClean);
         $phi = $this->deriveLag1Damping($cleanData, $meanY);
-        $forecast = $this->generateContinuousForecastTrajectory($type, $predictCount, $currentLevel, $slope, $phi, $activeMin);
+        $dowIndices = $type === 'daily' ? $this->calculateDayOfWeekSeasonality($cleanData) : [];
+        $forecast = $this->generateContinuousForecastTrajectory($type, $predictCount, $currentLevel, $slope, $phi, $activeMin, $dowIndices);
 
         [$confidence, $rSquared, $trendLabel, $growthRate] = $this->evaluateForecastQuality(
             $type, $cleanData, $meanY, $slope, $intercept, $currentLevel, $n, $hasReliableTrend

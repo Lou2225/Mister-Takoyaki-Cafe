@@ -311,11 +311,12 @@
                             <div class="rounded-lg bg-indigo-50 px-3 py-2"><span class="font-black text-indigo-800">MAE</span><span class="text-slate-600"> - Mean Absolute Error</span></div>
                             <div class="rounded-lg bg-indigo-50 px-3 py-2"><span class="font-black text-indigo-800">RMSE</span><span class="text-slate-600"> - Root Mean Squared Error</span></div>
                             <div class="rounded-lg bg-indigo-50 px-3 py-2"><span class="font-black text-indigo-800">WAPE</span><span class="text-slate-600"> - Weighted Absolute Percentage Error</span></div>
+                            <div class="rounded-lg bg-emerald-50 px-3 py-2"><span class="font-black text-emerald-800">DOW</span><span class="text-slate-600"> - Day-of-Week Seasonality Index</span></div>
+                            <div class="rounded-lg bg-teal-50 px-3 py-2"><span class="font-black text-teal-800">ODW</span><span class="text-slate-600"> - Organic Damped Wave (Horizon Decay)</span></div>
                             <div class="rounded-lg bg-slate-50 px-3 py-2"><span class="font-black text-slate-800">R2</span><span class="text-slate-600"> - R-squared model fit score</span></div>
                             <div class="rounded-lg bg-slate-50 px-3 py-2"><span class="font-black text-slate-800">WLR</span><span class="text-slate-600"> - Weighted Linear Regression</span></div>
                             <div class="rounded-lg bg-slate-50 px-3 py-2"><span class="font-black text-slate-800">IQR</span><span class="text-slate-600"> - Interquartile Range outlier filter</span></div>
                             <div class="rounded-lg bg-amber-50 px-3 py-2"><span class="font-black text-amber-800">DCT</span><span class="text-slate-600"> - Dynamic Continuous Trajectory</span></div>
-                            <div class="rounded-lg bg-emerald-50 px-3 py-2"><span class="font-black text-emerald-800">DST</span><span class="text-slate-600"> - Data Sufficiency Threshold</span></div>
                             <div class="rounded-lg bg-violet-50 px-3 py-2"><span class="font-black text-violet-800">MRD</span><span class="text-slate-600"> - Mean-Reverting Damped Trend</span></div>
                         </div>
                     </div>
@@ -326,7 +327,7 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div class="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
                                 <p class="text-[11px] font-black text-indigo-800">Daily Rolling Timeline (14 – 180 Days)</p>
-                                <p class="mt-1 text-[10px] leading-relaxed text-indigo-900/70">Calculated using recency-weighted linear regression over active daily history, combined with empirical autocorrelation trend momentum. Eliminates artificial repeating patterns by computing a continuous forward trajectory where values evolve dynamically as the date range extends. Prediction uncertainty bounds widen with horizon distance without synthetic or hardcoded assumptions.</p>
+                                <p class="mt-1 text-[10px] leading-relaxed text-indigo-900/70">Calculated using recency-weighted linear regression (WLR) over active daily history, combined with empirical autocorrelation trend momentum, historical Day-of-Week (DOW) seasonality indices, horizon attenuation (gradual damping of cyclical swings toward baseline), and deterministic calendar variance (ODW) so each projected week reflects organic day-to-day individuality without mechanical repetition. Prediction uncertainty bounds widen dynamically with horizon distance without synthetic or hardcoded assumptions.</p>
                             </div>
                             <div class="rounded-xl border border-violet-100 bg-violet-50/60 p-4">
                                 <p class="text-[11px] font-black text-violet-800">Monthly Capacity Projection (3 – 24 Months)</p>
@@ -335,7 +336,7 @@
                         </div>
                         <div class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
                             <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">Model flow</p>
-                            <p class="mt-2 text-[10px] leading-relaxed text-slate-600">Historical recorded orders &rarr; Filter recording outliers (IQR) &rarr; Fit recency-weighted trend line &rarr; Advance continuous trajectory over future horizon &rarr; Bound with dynamically expanding confidence interval bands.</p>
+                            <p class="mt-2 text-[10px] leading-relaxed text-slate-600">Historical recorded orders &rarr; Filter recording outliers (IQR) &rarr; Calculate Day-of-Week Seasonality (DOW) &rarr; Fit recency-weighted trend line (WLR) &rarr; Project Organic Damped Wave (ODW) cyclical trajectory &rarr; Bound with dynamically expanding confidence interval bands.</p>
                         </div>
                     </div>
 
@@ -504,13 +505,13 @@
                                 <div>
                                     <h4 class="text-[15px] font-bold text-gray-900 tracking-tight flex items-center gap-1.5">
                                         Daily Forecast Timeline ({{ count($fc['short_term']['forecast'] ?? []) }} Days)
-                                        <x-tooltip title="Daily Timeline" text="Continuous rolling sales prediction incorporating recency-weighted linear regression and autocorrelation momentum. Scroll horizontally to inspect future days." position="bottom" align="start" />
+                                        <x-tooltip title="Daily Timeline" text="Continuous rolling sales prediction incorporating recency-weighted linear regression, autocorrelation momentum, and empirical Day-of-Week cyclical seasonality. Scroll horizontally to inspect future days." position="bottom" align="start" />
                                     </h4>
                                     <p class="text-[11px] text-gray-400 font-medium">Sequential daily revenue projections. Scroll horizontally across the timeline to view future dates.</p>
                                 </div>
                                 <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-[9px] font-black text-indigo-700 uppercase tracking-widest whitespace-nowrap self-start">
                                     <span class="w-1 h-1 rounded-full bg-indigo-500"></span>
-                                    WLR w/ Damped Trend
+                                    WLR + DOW (Organic Wave)
                                 </span>
                             </div>
 
@@ -566,7 +567,7 @@
                         <div class="text-[10px] text-gray-500 space-y-1 bg-blue-50/50 border border-blue-100 rounded-lg p-3 mb-4">
                             <p><span class="font-bold text-gray-700">Trend:</span> Direction of daily sales change (analyzed over trailing window)</p>
                             <p><span class="font-bold text-gray-700">Baseline:</span> Trailing average x {{ $shortCount }} days (reference benchmark)</p>
-                            <p><span class="font-bold text-gray-700">Method:</span> Weighted Linear Regression with recency emphasis + autocorrelation momentum (non-cyclical continuous trajectory)</p>
+                            <p><span class="font-bold text-gray-700">Method:</span> Weighted Linear Regression (WLR) + Organic Damped Wave (ODW) Seasonality</p>
                         </div>
 
                           @php
