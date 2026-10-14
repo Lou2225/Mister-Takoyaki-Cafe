@@ -696,6 +696,14 @@ class BusinessIntelligence extends Component
             $cursor->addDay();
         }
 
+        // Trim trailing (near-)empty days so the backtest is graded on real trading days,
+        // not on closed days or stray test orders.
+        $activeMean = $series->where('total', '>', 0)->avg('total') ?: 0;
+        $minDayTotal = $activeMean * 0.10;
+        while ($series->count() > 0 && (float) $series->last()->total < $minDayTotal) {
+            $series->pop();
+        }
+
         $holdout = 7;
         if ($series->count() < $holdout + 14) {
             return [
@@ -797,24 +805,25 @@ class BusinessIntelligence extends Component
         $benchmarkPredicted = array_fill(0, $holdout, (float)$naiveValue);
 
         // 6. Compute evaluation metrics
-        $modelErrors = $benchmarkErrors = $modelAbsPct = $benchmarkAbsPct = [];
+        $modelErrors = $benchmarkErrors = [];
+        $totalActual = 0.0;
         foreach ($actual as $idx => $row) {
             $value = (float)$row->total;
             $modelErrors[] = abs($value - $modelPredicted[$idx]);
             $benchmarkErrors[] = abs($value - $benchmarkPredicted[$idx]);
-            if ($value > 0) {
-                $modelAbsPct[] = abs(($value - $modelPredicted[$idx]) / $value) * 100;
-                $benchmarkAbsPct[] = abs(($value - $benchmarkPredicted[$idx]) / $value) * 100;
-            }
+            $totalActual += $value;
         }
 
-        $mae = count($modelErrors) ? array_sum($modelErrors) / count($modelErrors) : 0.0;
-        $rmse = count($modelErrors) ? sqrt(array_sum(array_map(fn($e) => $e ** 2, $modelErrors)) / count($modelErrors)) : 0.0;
-        $mape = count($modelAbsPct) ? array_sum($modelAbsPct) / count($modelAbsPct) : 0.0;
+        $count = count($modelErrors);
+        $mae = $count ? array_sum($modelErrors) / $count : 0.0;
+        $rmse = $count ? sqrt(array_sum(array_map(fn($e) => $e ** 2, $modelErrors)) / $count) : 0.0;
+        $benchmarkMae = $count ? array_sum($benchmarkErrors) / $count : 0.0;
 
-        $benchmarkMae = count($benchmarkErrors) ? array_sum($benchmarkErrors) / count($benchmarkErrors) : 0.0;
-        $benchmarkMape = count($benchmarkAbsPct) ? array_sum($benchmarkAbsPct) / count($benchmarkAbsPct) : 0.0;
-        $improvement = $benchmarkMape > 0 ? (($benchmarkMape - $mape) / $benchmarkMape) * 100 : 0.0;
+        // WAPE: total absolute error / total actual sales (stable when some days are near zero).
+        // Stored under the 'mape' keys so the view keeps working.
+        $mape = $totalActual > 0 ? (array_sum($modelErrors) / $totalActual) * 100 : 0.0;
+        $benchmarkMape = $totalActual > 0 ? (array_sum($benchmarkErrors) / $totalActual) * 100 : 0.0;
+        $improvement = $benchmarkMae > 0 ? (($benchmarkMae - $mae) / $benchmarkMae) * 100 : 0.0;
 
         return [
             'mae' => round($mae, 2),
@@ -881,6 +890,16 @@ class BusinessIntelligence extends Component
                 ->groupBy('label')
                 ->orderBy('label', 'asc')
                 ->get();
+        }
+
+        // Trim trailing (near-)empty days so closed days or stray test orders
+        // don't drag the forecast level down (same rule as the backtest).
+        if ($type === 'daily' && $data->isNotEmpty()) {
+            $activeMean = $data->where('total', '>', 0)->avg('total') ?: 0;
+            $minDayTotal = $activeMean * 0.10;
+            while ($data->count() > 0 && (float) $data->last()->total < $minDayTotal) {
+                $data->pop();
+            }
         }
 
         $n = $data->count();
@@ -999,6 +1018,10 @@ class BusinessIntelligence extends Component
         $ssRes = 0.0;
         foreach ($cleanData as $index => $row) {
             $predicted = ($slope * ($index + 1)) + $intercept;
+            if ($type === 'daily') {
+                $rowDow = (int) Carbon::parse($row->label)->dayOfWeekIso;
+                $predicted *= ($dowIndices[$rowDow] ?? 1.0);
+            }
             $ssRes += pow((float)$row->total - $predicted, 2);
         }
         $rSquared = $ssTot > 0 ? max(0, 1 - ($ssRes / $ssTot)) : 0;

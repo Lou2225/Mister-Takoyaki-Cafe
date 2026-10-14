@@ -286,7 +286,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                             <div class="rounded-lg bg-indigo-50 px-3 py-2"><span class="font-black text-indigo-800">MAE</span><span class="text-slate-600"> - Mean Absolute Error</span></div>
                             <div class="rounded-lg bg-indigo-50 px-3 py-2"><span class="font-black text-indigo-800">RMSE</span><span class="text-slate-600"> - Root Mean Squared Error</span></div>
-                            <div class="rounded-lg bg-indigo-50 px-3 py-2"><span class="font-black text-indigo-800">MAPE</span><span class="text-slate-600"> - Mean Absolute Percentage Error</span></div>
+                            <div class="rounded-lg bg-indigo-50 px-3 py-2"><span class="font-black text-indigo-800">WAPE</span><span class="text-slate-600"> - Weighted Absolute Percentage Error</span></div>
                             <div class="rounded-lg bg-slate-50 px-3 py-2"><span class="font-black text-slate-800">R2</span><span class="text-slate-600"> - R-squared model fit score</span></div>
                             <div class="rounded-lg bg-slate-50 px-3 py-2"><span class="font-black text-slate-800">WLR</span><span class="text-slate-600"> - Weighted Linear Regression</span></div>
                             <div class="rounded-lg bg-slate-50 px-3 py-2"><span class="font-black text-slate-800">IQR</span><span class="text-slate-600"> - Interquartile Range for outlier filtering</span></div>
@@ -299,7 +299,7 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div class="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
                                 <p class="text-[11px] font-black text-indigo-800">7-Day Forecast</p>
-                                <p class="mt-1 text-[10px] leading-relaxed text-indigo-900/70">Uses up to 60 completed daily periods. Recent days have more weight, unusual values are filtered with the IQR method, and day-of-week patterns are applied when at least 14 days are available.</p>
+                                <p class="mt-1 text-[10px] leading-relaxed text-indigo-900/70">Uses up to 60 completed daily periods. Recent days have more weight, unusual values are filtered with the IQR method, and day-of-week patterns are applied when at least 7 days are available.</p>
                             </div>
                             <div class="rounded-xl border border-violet-100 bg-violet-50/60 p-4">
                                 <p class="text-[11px] font-black text-violet-800">6-Month Forecast</p>
@@ -334,14 +334,14 @@
                             </div>
                             <div class="rounded-xl border border-slate-200 p-3">
                                 <div class="flex items-center justify-between gap-3">
-                                    <p class="text-[11px] font-black text-slate-800">MAPE - Mean Absolute Percentage Error</p>
+<p class="text-[11px] font-black text-slate-800">WAPE - Weighted Absolute Percentage Error</p>
                                     <span class="text-[10px] font-black text-indigo-600">Percent</span>
                                 </div>
-                                <p class="mt-1 text-[10px] font-mono text-indigo-700">MAPE = average(|actual - predicted| / actual) x 100</p>
-                                <p class="mt-1 text-[10px] leading-relaxed text-slate-500">The average error relative to actual revenue. A MAPE of 12% means the forecast differs from actual sales by about 12% on average. Days with zero sales are excluded from this percentage.</p>
+                                <p class="mt-1 text-[10px] font-mono text-indigo-700">WAPE = sum(|actual - predicted|) / sum(actual) x 100</p>
+                                <p class="mt-1 text-[10px] leading-relaxed text-slate-500">Total forecast error relative to total actual revenue. A WAPE of 12% means the forecast missed about 12% of actual sales over the test week. Unlike MAPE, a single near-zero sales day cannot blow it up.</p>
                             </div>
                         </div>
-                        <p class="mt-3 text-[10px] leading-relaxed text-slate-500">These metrics are calculated by hiding the most recent 7 complete days, forecasting them from earlier data, and comparing the predictions with what actually happened. Lower MAE, RMSE, and MAPE are better.</p>
+                        <p class="mt-3 text-[10px] leading-relaxed text-slate-500">These metrics are calculated by hiding the most recent 7 trading days (empty trailing days are ignored), forecasting them from earlier data, and comparing the predictions with what actually happened. Lower MAE, RMSE, and WAPE are better.</p>
                     </div>
 
                     {{-- Where metrics apply --}}
@@ -349,7 +349,7 @@
                         <p class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Where each signal is used</p>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px] leading-relaxed text-slate-600">
                             <div class="rounded-lg bg-indigo-50 px-3 py-2"><span class="font-black text-indigo-800">Confidence:</span> shown on both forecast cards to indicate how much trust to place in the trend.</div>
-                            <div class="rounded-lg bg-slate-50 px-3 py-2"><span class="font-black text-slate-800">MAE / RMSE / MAPE:</span> shown in Benchmarking to evaluate forecast quality against the baseline.</div>
+                            <div class="rounded-lg bg-slate-50 px-3 py-2"><span class="font-black text-slate-800">MAE / RMSE / WAPE:</span> shown in Benchmarking to evaluate forecast quality against the baseline.</div>
                             <div class="rounded-lg bg-amber-50 px-3 py-2"><span class="font-black text-amber-800">RMSE range:</span> used around the 7-day chart as an approximate error range, not a guaranteed interval.</div>
                             <div class="rounded-lg bg-emerald-50 px-3 py-2"><span class="font-black text-emerald-800">Restock actions:</span> use the 7-day forecast to estimate 14-day ingredient demand, then adjust for buffer, waste, and current stock.</div>
                         </div>
@@ -363,7 +363,7 @@
                                 <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Model Quality (R2 Score)</p>
                                 <p class="text-[18px] font-black text-indigo-900">{{ number_format($forecasting['short_term']['r_squared'] * 100, 1) }}%</p>
                             </div>
-                            <p class="text-[10px] text-slate-600 leading-relaxed">R2 measures how well the regression model fits your historical sales data on a scale of 0-100%. Higher scores indicate more reliable forecasts. Typically, 70%+ = Strong, 40-70% = Moderate, Below 40% = Weak.</p>
+                            <p class="text-[10px] text-slate-600 leading-relaxed">R2 measures how well the trend and day-of-week pattern fit your historical daily sales on a scale of 0-100%. Daily sales are naturally noisy, so use WAPE as the main accuracy check. Higher scores indicate more reliable forecasts. Typically, 70%+ = Strong, 40-70% = Moderate, Below 40% = Weak.</p>
                         </div>
                     </div>
                     @endif
@@ -408,7 +408,7 @@
                     <p class="mt-2 text-[24px] font-black text-slate-900">&#8369;{{ number_format($accuracy['rmse'] ?? 0, 2) }}</p>
                 </div>
                 <div class="rounded-2xl border border-gray-100 bg-amber-50 p-4">
-                    <p class="text-[10px] font-black uppercase tracking-[0.18em] text-amber-600">Model MAPE</p>
+                    <p class="text-[10px] font-black uppercase tracking-[0.18em] text-amber-600">Model WAPE</p>
                     <p class="mt-2 text-[24px] font-black text-amber-900">{{ number_format($accuracy['mape'] ?? 0, 2) }}%</p>
                 </div>
                 <div class="rounded-2xl border border-gray-100 {{ $isBetter ? 'bg-emerald-50' : 'bg-amber-50' }} p-4">
@@ -467,7 +467,7 @@
             </div>
 
             <p class="mt-4 text-[11px] leading-relaxed text-gray-500">
-                Benchmark uses the previous-period average as the simple baseline. The model is evaluated using MAE, RMSE, and MAPE, then compared against that baseline to show whether the forecasting logic adds practical value.
+                Benchmark uses the previous-period average as the simple baseline. The model is evaluated using MAE, RMSE, and WAPE, then compared against that baseline to show whether the forecasting logic adds practical value.
             </p>
         </div>
 
@@ -503,7 +503,7 @@
                                 <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-[9px] font-black text-indigo-700 uppercase tracking-widest whitespace-nowrap">
                                     <span class="w-1 h-1 rounded-full bg-indigo-500"></span>
                                     WLR w/ Seasonality
-                                </span>
+                                    </span>
                             </div>
                         </div>
 
@@ -581,7 +581,7 @@
                                 </div>
                                 <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-violet-50 border border-violet-200 text-[9px] font-black text-violet-700 uppercase tracking-widest whitespace-nowrap">
                                     <span class="w-1 h-1 rounded-full bg-violet-500"></span>
-                                    WLR w/ Seasonality
+                                                                        WLR w/ Damped Trend
                                 </span>
                             </div>
                         </div>
@@ -617,8 +617,8 @@
 
                         <div class="text-[10px] text-gray-500 space-y-1 bg-violet-50/50 border border-violet-100 rounded-lg p-3 mb-4">
                             <p><span class="font-bold text-gray-700">Trend:</span> Direction of monthly sales change (12-month history analyzed)</p>
-                            <p><span class="font-bold text-gray-700">Total:</span> Sum of all 6 monthly forecasts with seasonal adjustments applied</p>
-                            <p><span class="font-bold text-gray-700">Method:</span> Weighted Linear Regression using monthly aggregates + day-of-week patterns maintained across months</p>
+                            <p><span class="font-bold text-gray-700">Total:</span> Sum of all 6 monthly forecasts (damped trend, no seasonality)</p>
+<p><span class="font-bold text-gray-700">Method:</span> Weighted Linear Regression using monthly totals with a damped trend</p>
                         </div>
 
                         @php
