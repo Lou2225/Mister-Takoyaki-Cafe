@@ -403,14 +403,12 @@ function generateQrRasterBytes(text, charsPerLine = 32) {
 
         const qr = QREngine.create(qrText);
         const moduleCount = qr.getModuleCount();
-        // 0-module quiet zone so there is no blank space above or below the QR code
-        const quietZone = 2;
+        // 4-module quiet zone (ISO/IEC 18004 standard) to ensure camera scanning reliability
+        const quietZone = 4;
         const totalModules = moduleCount + quietZone * 2;
 
-        // Keep the black area a little less packed so the pattern prints with cleaner contrast
-        // and less muddy density on narrow thermal receipt paper.
-        const maxDots = charsPerLine > 32 ? 190 : 155;
-        const dotScale = Math.max(7, Math.min(10, Math.floor(maxDots / totalModules)));
+        const maxDots = charsPerLine > 32 ? 260 : 180;
+        const dotScale = Math.max(3, Math.min(6, Math.floor(maxDots / totalModules)));
         const rawWidth = totalModules * dotScale;
         const heightDots = totalModules * dotScale;
 

@@ -534,6 +534,16 @@
             width: 100%;
         }
 
+        .receipt-qr-img {
+            display: block;
+            margin: 4px auto 2px;
+            width: 110px;
+            height: 110px;
+            background: #ffffff;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+        }
+
         .qr-code-canvas {
             display: inline-block;
             margin: 0 auto !important;
@@ -570,6 +580,9 @@
         $kitchenItems = $order->items->filter(fn ($item) => (optional($item->product->category)->production_station ?? 'kitchen') === 'kitchen');
         $baristaItems = $order->items->filter(fn ($item) => (optional($item->product->category)->production_station ?? '') === 'barista');
         $reviewUrl = $qrUrl ?? \App\Services\ReceiptService::buildReviewQrUrl($order);
+        $receiptQrDataUri = !empty($settings['qr_code'])
+            ? $settings['qr_code']
+            : (!empty($reviewUrl) ? \App\Helpers\QrCodeHelper::generateDataUri($reviewUrl, 160) : null);
 
         // Format Titles cleanly without non-ASCII junk that breaks printers
         $kitchenTitle = trim(preg_replace('/[^\x20-\x7E]/', '', $settings['kitchen_slip_title'] ?? 'KITCHEN SLIP')) ?: 'KITCHEN SLIP';
@@ -981,7 +994,11 @@
                             <div class="receipt-qr-title">SCAN TO REVIEW &amp; RATE ORDER</div>
                             <div class="divider-dashed"></div>
                             <div class="qr-canvas-container">
-                                <canvas id="receiptQrCanvas" class="qr-code-canvas" width="100" height="100"></canvas>
+                                @if(!empty($receiptQrDataUri))
+                                    <img src="{{ $receiptQrDataUri }}" alt="Review QR Code" class="receipt-qr-img">
+                                @else
+                                    <canvas class="qr-code-canvas" width="110" height="110"></canvas>
+                                @endif
                             </div>
                             <div class="receipt-qr-url">Review us: {{ $reviewUrl }}</div>
                         </div>
@@ -1455,14 +1472,15 @@
                         qr.make();
 
                         var moduleCount = qr.getModuleCount();
-                        var margin = 2;
-                        var targetSize = 96;
+                        var margin = 4;
                         var totalModules = moduleCount + margin * 2;
-                        var scale = Math.max(1, Math.floor(targetSize / totalModules));
+                        var scale = Math.max(3, Math.min(6, Math.floor(180 / totalModules)));
                         var finalSize = totalModules * scale;
 
                         canvas.width = finalSize;
                         canvas.height = finalSize;
+                        canvas.style.width = '110px';
+                        canvas.style.height = '110px';
                         var ctx = canvas.getContext('2d');
                         ctx.imageSmoothingEnabled = false;
                         ctx.fillStyle = '#FFFFFF';

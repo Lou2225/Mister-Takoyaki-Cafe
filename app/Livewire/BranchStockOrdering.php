@@ -18,10 +18,11 @@ use App\Services\BranchContext;
 use App\Services\NotificationService;
 use App\Traits\HandlesValidations;
 use App\Traits\RequiresOperatingBranch;
+use App\Traits\HandlesExports;
 
 class BranchStockOrdering extends Component
 {
-    use WithPagination, HandlesValidations, RequiresOperatingBranch;
+    use WithPagination, HandlesValidations, RequiresOperatingBranch, HandlesExports;
 
     // ── Panel / View State ────────────────────────────────────────
     public $panel = 'requests';
@@ -853,5 +854,145 @@ class BranchStockOrdering extends Component
             $this->deliverTargetRef = $order->reference_no;
             $this->dispatch('open-modal', name: 'confirm-delivery');
         }
+    }
+
+    // ── Reports ───────────────────────────────────────────────────
+
+    public function exportPdf()
+    {
+        $data = $this->getExportDataForReport();
+        $branchName = str_replace(' ', '_', Branch::find($this->selectedBranchId)?->branch_name ?? 'Branch');
+        return $this->generatePdfReport('reports.template', $data, "Branch_Stock_Report_{$branchName}_" . now()->format('Y-m-d') . '.pdf');
+    }
+
+    public function exportCsv()
+    {
+        $branch = Branch::find($this->selectedBranchId)?->branch_name ?? 'Branch';
+        $orders = StockOrder::with(['items.ingredient', 'sourceBranch', 'requester'])
+            ->where('requesting_branch_id', $this->selectedBranchId)
+            ->latest()
+            ->get();
+
+        if ($orders->isEmpty()) {
+            $this->dispatch('notify', type: 'info', message: 'No supply requests available to export.');
+            return;
+        }
+
+        $data = [];
+        foreach ($orders as $order) {
+            if ($order->items->isEmpty()) {
+                $data[] = [
+                    'Reference'     => $order->reference_no,
+                    'Date'          => $order->created_at ? $order->created_at->format('Y-m-d H:i:s') : 'N/A',
+                    'Branch'        => $branch,
+                    'Ingredient'    => 'N/A',
+                    'Requested Qty' => 0,
+                    'Approved Qty'  => 0,
+                    'Unit Price'    => '0.00',
+                    'Subtotal'      => '0.00',
+                    'Delivery Fee'  => number_format((float)$order->delivery_fee, 2),
+                    'Order Total'   => number_format((float)$order->total_amount, 2),
+                    'Status'        => strtoupper((string)$order->status),
+                    'Priority'      => strtoupper((string)$order->priority),
+                    'Requester'     => $order->requester ? trim($order->requester->first_name . ' ' . $order->requester->last_name) : 'Staff',
+                ];
+            } else {
+                foreach ($order->items as $item) {
+                    $data[] = [
+                        'Reference'     => $order->reference_no,
+                        'Date'          => $order->created_at ? $order->created_at->format('Y-m-d H:i:s') : 'N/A',
+                        'Branch'        => $branch,
+                        'Ingredient'    => $item->ingredient->name ?? 'N/A',
+                        'Requested Qty' => $item->requested_quantity . ' ' . $item->order_unit,
+                        'Approved Qty'  => ($item->approved_quantity !== null ? $item->approved_quantity : $item->requested_quantity) . ' ' . $item->order_unit,
+                        'Unit Price'    => number_format((float)$item->unit_price, 2),
+                        'Subtotal'      => number_format((float)$item->subtotal, 2),
+                        'Delivery Fee'  => number_format((float)$order->delivery_fee, 2),
+                        'Order Total'   => number_format((float)$order->total_amount, 2),
+                        'Status'        => strtoupper((string)$order->status),
+                        'Priority'      => strtoupper((string)$order->priority),
+                        'Requester'     => $order->requester ? trim($order->requester->first_name . ' ' . $order->requester->last_name) : 'Staff',
+                    ];
+                }
+            }
+        }
+
+        $branchName = str_replace(' ', '_', $branch);
+        return $this->generateCsvReport("Branch_Supplies_Report_{$branchName}_" . now()->format('Y-m-d') . '.csv', $data);
+    }
+
+    public function exportExcel()
+    {
+        return $this->exportCsv();
+    }
+
+    private function getExportDataForReport(): array
+    {
+        $branchObj = Branch::find($this->selectedBranchId);
+        $branch = $branchObj?->branch_name ?? 'Branch';
+
+        $kpis = $this->getKpis();
+
+        // 1. Low stock items for this branch
+        $lowStocks = BranchIngredientStock::with(['ingredient.category'])
+            ->where('branch_id', $this->selectedBranchId)
+            ->whereHas('ingredient')
+            ->get()
+            ->filter(fn($s) => $s->ingredient->minimum_stock > 0 && $s->stock_quantity < $s->ingredient->minimum_stock);
+
+        $lowRows = $lowStocks->map(fn($s) => [
+            $s->ingredient->name,
+            $s->ingredient->category?->name ?? 'General',
+            $s->stock_quantity . ' ' . $s->ingredient->unit,
+            $s->ingredient->minimum_stock . ' ' . $s->ingredient->unit,
+            number_format(max(0, $s->ingredient->minimum_stock - $s->stock_quantity), 2) . ' ' . $s->ingredient->unit,
+            'LOW STOCK',
+        ])->values()->toArray();
+
+        // 2. Active & recent requests
+        $recentOrders = StockOrder::with(['items', 'requester'])
+            ->where('requesting_branch_id', $this->selectedBranchId)
+            ->latest()
+            ->limit(15)
+            ->get();
+
+        $orderRows = $recentOrders->map(fn($o) => [
+            $o->reference_no,
+            $o->created_at ? $o->created_at->format('M d, Y h:i A') : 'N/A',
+            $o->items->count() . ' item(s)',
+            strtoupper((string)$o->priority),
+            'P ' . number_format((float)$o->total_amount, 2),
+            strtoupper(str_replace('_', ' ', (string)$o->status)),
+        ])->values()->toArray();
+
+        return [
+            'reportType'  => 'branch_stock',
+            'title'       => 'Branch Supplies & Stock Status Report',
+            'subtitle'    => 'Replenishment Orders, Delivery Status & Inventory Deficits',
+            'period'      => 'As of ' . now()->format('F d, Y'),
+            'branch'      => $branch,
+            'generatedAt' => now()->format('F d, Y h:i A'),
+            'kpis' => [
+                'Pending Requests'   => number_format($kpis['pending'] ?? 0),
+                'Approved / Active'  => number_format($kpis['approved'] ?? 0),
+                'In Transit'         => number_format($kpis['in_transit'] ?? 0),
+                'Delivered (Month)'  => number_format($kpis['delivered'] ?? 0),
+            ],
+            'sections' => [
+                [
+                    'title'     => 'Low Stock Replenishment Needed',
+                    'headers'   => ['Ingredient', 'Category', 'Current Stock', 'Min. Required', 'Deficit Needed', 'Status'],
+                    'rows'      => $lowRows,
+                    'empty'     => 'All ingredient stock levels are currently healthy.',
+                    'highlight' => true,
+                ],
+                [
+                    'title'   => 'Recent Supplies Requests (Last 15)',
+                    'headers' => ['Reference #', 'Date Requested', 'Items Count', 'Priority', 'Total Amount', 'Status'],
+                    'rows'    => $orderRows,
+                    'empty'   => 'No supply requests recorded yet.',
+                ],
+            ],
+        ];
     }
 }

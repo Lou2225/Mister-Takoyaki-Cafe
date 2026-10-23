@@ -3,7 +3,9 @@
 namespace App\Helpers;
 
 use Endroid\QrCode\QrCode;
-use Endroid\QrCode\Writer\PngWriter;
+use Endroid\QrCode\Writer\SvgWriter;
+use Endroid\QrCode\ErrorCorrectionLevel\ErrorCorrectionLevelMedium;
+use Endroid\QrCode\RoundBlockSizeMode\RoundBlockSizeModeMargin;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -11,7 +13,7 @@ use Illuminate\Support\Str;
 class QrCodeHelper
 {
     /**
-     * Generate a QR code as a data URI (base64 encoded PNG)
+     * Generate a QR code as a data URI (base64 encoded SVG)
      * 
      * @param string $data The data to encode in the QR code
      * @param int $size The size of the QR code in pixels (default: 200)
@@ -23,8 +25,10 @@ class QrCodeHelper
             $qrCode = new QrCode($data);
             $qrCode->setSize($size);
             $qrCode->setMargin(4);
+            $qrCode->setErrorCorrectionLevel(new ErrorCorrectionLevelMedium());
+            $qrCode->setRoundBlockSizeMode(new RoundBlockSizeModeMargin());
             
-            $writer = new \Endroid\QrCode\Writer\SvgWriter();
+            $writer = new SvgWriter();
             $result = $writer->write($qrCode);
             
             $svgData = $result->getString();

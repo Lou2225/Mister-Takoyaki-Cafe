@@ -17,6 +17,7 @@ use Carbon\Carbon;
 use Livewire\WithPagination;
 
 use App\Traits\HandlesValidations;
+use App\Traits\HandlesExports;
 use App\Helpers\ValidationHelper;
 
 /**
@@ -27,7 +28,7 @@ use App\Helpers\ValidationHelper;
  */
 class StockAdjustment extends Component
 {
-    use WithPagination, HandlesValidations;
+    use WithPagination, HandlesValidations, HandlesExports;
 
     // View State
     public $panel = 'list';
@@ -667,10 +668,15 @@ if ($type === 'in' || $type === 'customer_return') {
 
     public function exportToCsv()
     {
+        return $this->exportCsv();
+    }
+
+    public function exportCsv()
+    {
         if ($this->isStaff()) return;
 
         $movements = StockMovement::with(['ingredient', 'branch', 'user'])
-            ->where('branch_id', $this->selectedBranchId)
+            ->when($this->selectedBranchId, fn($q) => $q->where('branch_id', $this->selectedBranchId))
             ->when($this->startDate && $this->endDate, function($q) {
                 $q->whereBetween('created_at', [
                     $this->startDate . ' 00:00:00',
@@ -699,27 +705,40 @@ if ($type === 'in' || $type === 'customer_return') {
             ->latest()
             ->get();
 
-        $filename = "audit_ledger_" . now()->format('Ymd_His') . ".csv";
-        $headers = ["Content-type" => "text/csv", "Content-Disposition" => "attachment; filename=$filename"];
+        if ($movements->isEmpty()) {
+            $this->dispatch('notify', type: 'info', message: 'No stock movements available to export.');
+            return;
+        }
 
-        $callback = function() use ($movements) {
-            $file = fopen('php://output', 'w');
-            fputcsv($file, ['Date', 'Branch', 'Ingredient', 'Type', 'Quantity', 'Ref', 'Attendant']);
-            foreach ($movements as $mov) {
-                fputcsv($file, [
-                    $mov->created_at->format('Y-m-d H:i:s'),
-                    $mov->branch->branch_name ?? 'N/A',
-                    $mov->ingredient->name ?? 'N/A',
-                    strtoupper($mov->type),
-                    $mov->quantity,
-                    $mov->reference_id,
-                    $mov->user->first_name . ' ' . $mov->user->last_name,
-                ]);
+        $data = $movements->map(function ($mov) {
+            $attendant = 'System';
+            if ($mov->user) {
+                $attendant = trim(($mov->user->first_name ?? '') . ' ' . ($mov->user->last_name ?? ''));
+                if (empty($attendant)) {
+                    $attendant = $mov->user->email ?? ('User #' . $mov->user_id);
+                }
             }
-            fclose($file);
-        };
 
-        return response()->stream($callback, 200, $headers);
+            return [
+                'Date'       => $mov->created_at ? $mov->created_at->format('Y-m-d H:i:s') : 'N/A',
+                'Branch'     => $mov->branch->branch_name ?? 'N/A',
+                'Ingredient' => $mov->ingredient->name ?? 'N/A',
+                'Type'       => strtoupper((string) ($mov->type ?? 'N/A')),
+                'Quantity'   => $mov->quantity,
+                'Reference'  => $mov->reference_id ?? 'N/A',
+                'Attendant'  => $attendant,
+                'Remarks'    => $mov->remarks ?? '',
+            ];
+        })->toArray();
+
+        $filename = "audit_ledger_" . now()->format('Ymd_His') . ".csv";
+
+        return $this->generateCsvReport($filename, $data);
+    }
+
+    public function exportExcel()
+    {
+        return $this->exportCsv();
     }
 
     // ── System Utilities ──────────────────────────────────────────

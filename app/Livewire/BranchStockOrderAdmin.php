@@ -749,4 +749,150 @@ foreach ($sourceBatches as $sourceBatch) {
         });
     }
 
+    // ── Reports ───────────────────────────────────────────────────
+
+    public function exportPdf()
+    {
+        $data = $this->getExportDataForReport();
+        return $this->generatePdfReport('reports.template', $data, 'Stock_Order_Admin_Report_' . now()->format('Y-m-d') . '.pdf');
+    }
+
+    public function exportCsv()
+    {
+        $orders = StockOrder::with(['items.ingredient', 'requestingBranch', 'requester', 'approver'])
+            ->when($this->startDate && $this->endDate, function($q) {
+                $q->whereBetween('created_at', [
+                    $this->startDate . ' 00:00:00',
+                    $this->endDate . ' 23:59:59'
+                ]);
+            })
+            ->when($this->search, fn($q) => $q->where('reference_no', 'like', "%{$this->search}%"))
+            ->when($this->branchFilter, fn($q) => $q->where('requesting_branch_id', $this->branchFilter))
+            ->when($this->priorityFilter, fn($q) => $q->where('priority', $this->priorityFilter))
+            ->when($this->statusFilter && $this->statusFilter !== 'all', fn($q) => $q->where('status', $this->statusFilter))
+            ->latest()
+            ->get();
+
+        if ($orders->isEmpty()) {
+            $this->dispatch('notify', type: 'info', message: 'No stock orders available for export.');
+            return;
+        }
+
+        $data = [];
+        foreach ($orders as $order) {
+            $branchName = $order->requestingBranch->branch_name ?? 'Branch #' . $order->requesting_branch_id;
+            $requester = $order->requester ? trim($order->requester->first_name . ' ' . $order->requester->last_name) : 'Staff';
+            $approver = $order->approver ? trim($order->approver->first_name . ' ' . $order->approver->last_name) : 'N/A';
+
+            if ($order->items->isEmpty()) {
+                $data[] = [
+                    'Reference'     => $order->reference_no,
+                    'Date'          => $order->created_at ? $order->created_at->format('Y-m-d H:i:s') : 'N/A',
+                    'Branch'        => $branchName,
+                    'Ingredient'    => 'N/A',
+                    'Requested Qty' => 0,
+                    'Approved Qty'  => 0,
+                    'Unit Price'    => '0.00',
+                    'Subtotal'      => '0.00',
+                    'Delivery Fee'  => number_format((float)$order->delivery_fee, 2),
+                    'Total Amount'  => number_format((float)$order->total_amount, 2),
+                    'Status'        => strtoupper((string)$order->status),
+                    'Priority'      => strtoupper((string)$order->priority),
+                    'Requester'     => $requester,
+                    'Approver'      => $approver,
+                ];
+            } else {
+                foreach ($order->items as $item) {
+                    $data[] = [
+                        'Reference'     => $order->reference_no,
+                        'Date'          => $order->created_at ? $order->created_at->format('Y-m-d H:i:s') : 'N/A',
+                        'Branch'        => $branchName,
+                        'Ingredient'    => $item->ingredient->name ?? 'N/A',
+                        'Requested Qty' => $item->requested_quantity . ' ' . $item->order_unit,
+                        'Approved Qty'  => ($item->approved_quantity !== null ? $item->approved_quantity : $item->requested_quantity) . ' ' . $item->order_unit,
+                        'Unit Price'    => number_format((float)$item->unit_price, 2),
+                        'Subtotal'      => number_format((float)$item->subtotal, 2),
+                        'Delivery Fee'  => number_format((float)$order->delivery_fee, 2),
+                        'Total Amount'  => number_format((float)$order->total_amount, 2),
+                        'Status'        => strtoupper((string)$order->status),
+                        'Priority'      => strtoupper((string)$order->priority),
+                        'Requester'     => $requester,
+                        'Approver'      => $approver,
+                    ];
+                }
+            }
+        }
+
+        return $this->generateCsvReport('Stock_Orders_Admin_' . now()->format('Y-m-d') . '.csv', $data);
+    }
+
+    public function exportExcel()
+    {
+        return $this->exportCsv();
+    }
+
+    private function getExportDataForReport(): array
+    {
+        $kpis = $this->getKpis();
+
+        $pending = StockOrder::with(['requestingBranch', 'items.ingredient'])
+            ->where('status', 'pending')
+            ->latest()
+            ->limit(10)
+            ->get();
+
+        $pendingRows = $pending->map(fn($o) => [
+            $o->reference_no,
+            $o->requestingBranch->branch_name ?? 'Branch #' . $o->requesting_branch_id,
+            $o->items->count() . ' item(s)',
+            strtoupper((string)$o->priority),
+            'P ' . number_format((float)$o->total_amount, 2),
+            $o->created_at ? $o->created_at->format('M d, Y') : 'N/A',
+        ])->values()->toArray();
+
+        $active = StockOrder::with(['requestingBranch', 'items'])
+            ->whereIn('status', ['approved', 'preparing', 'in_transit'])
+            ->latest()
+            ->limit(10)
+            ->get();
+
+        $activeRows = $active->map(fn($o) => [
+            $o->reference_no,
+            $o->requestingBranch->branch_name ?? 'Branch #' . $o->requesting_branch_id,
+            strtoupper(str_replace('_', ' ', (string)$o->status)),
+            $o->items->count() . ' item(s)',
+            'P ' . number_format((float)$o->total_amount, 2),
+            $o->created_at ? $o->created_at->format('M d, Y') : 'N/A',
+        ])->values()->toArray();
+
+        return [
+            'reportType'  => 'hq_stock_orders',
+            'title'       => 'Headquarters Stock Fulfillment Report',
+            'subtitle'    => 'Branch Replenishment Orders, Approvals & Transfer Logistics',
+            'period'      => 'As of ' . now()->format('F d, Y'),
+            'branch'      => 'Headquarters (Main Distribution Hub)',
+            'generatedAt' => now()->format('F d, Y h:i A'),
+            'kpis' => [
+                'Pending Requests'   => number_format($kpis['pending'] ?? 0),
+                'Active Fulfillment' => number_format($kpis['active'] ?? 0),
+                'Delivered (Month)'  => number_format($kpis['delivered_month'] ?? 0),
+                'Rejected (Month)'   => number_format($kpis['rejected_month'] ?? 0),
+            ],
+            'sections' => [
+                [
+                    'title'     => 'Pending Requests Requiring Approval',
+                    'headers'   => ['Reference #', 'Branch', 'Items', 'Priority', 'Est. Total', 'Date'],
+                    'rows'      => $pendingRows,
+                    'empty'     => 'No pending requests requiring approval.',
+                    'highlight' => true,
+                ],
+                [
+                    'title'   => 'Active Dispatches & Transfers in Progress',
+                    'headers' => ['Reference #', 'Branch', 'Status', 'Items', 'Order Total', 'Date'],
+                    'rows'    => $activeRows,
+                    'empty'   => 'No active dispatches currently in progress.',
+                ],
+            ],
+        ];
+    }
 }
